@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<!--
+Copyright 2014 Netsend.
+
+This file is part of Mastersync.
+
+Mastersync is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+-->
+<meta charset="utf-8">
+<style>
+
+.link {
+  fill: none;
+  stroke: #666;
+  stroke-width: 2.5px;
+}
+
+.link.insert {
+  fill: #0f0;
+  opacity: 0.2;
+  box-shadow: 10px 10px 5px #888888;
+}
+
+.link.update {
+  fill: #09f;
+  opacity: 0.2;
+}
+
+.link.delete {
+  fill: #ff0;
+  opacity: 0.2;
+}
+
+.link.si {
+  stroke: #c00;
+}
+
+.link.si {
+  stroke: #c00;
+}
+
+circle {
+  fill: #ccc;
+  stroke: #333;
+  stroke-width: 1.5px;
+}
+
+text {
+  font: 20px sans-serif;
+  pointer-events: none;
+  text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+}
+
+</style>
+<body>
+<script src="d3.v3.min.js"></script>
+<script>
+
+// http://blog.thomsonreuters.com/index.php/mobile-patent-suits-graphic-of-the-day/
+var links;
+
+xmlhttp = new XMLHttpRequest();
+xmlhttp.onreadystatechange = function() {
+  if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+    links = JSON.parse(xmlhttp.responseText);
+    console.log(links);
+    start();
+  }
+};
+xmlhttp.open('GET', 'fsm.json', true);
+xmlhttp.send();
+
+function start() {
+  var nodes = {};
+
+  // Compute the distinct nodes from the links.
+  links.forEach(function(link) {
+    link.source = nodes[link.from] || (nodes[link.from] = {name: link.from});
+    link.target = nodes[link.to] || (nodes[link.to] = {name: link.to});
+  });
+
+  var width = 1024,
+      height = 700;
+
+  var force = d3.layout.force()
+      .nodes(d3.values(nodes))
+      .links(links)
+      .size([width, height])
+      .linkDistance(200)
+      .charge(-1000)
+      .on("tick", tick)
+      .start();
+
+  var svg = d3.select("body").append("svg")
+      .attr("width", width)
+      .attr("height", height);
+
+  // Per-type markers, as they don't inherit styles.
+  svg.append("defs").selectAll("marker")
+      .data(["insert", "update", "delete"])
+    .enter().append("marker")
+      .attr("id", function(d) { return d; })
+      .attr("viewBox", "0 -5 10 10")
+      .attr("refX", 15)
+      .attr("refY", -1.5)
+      .attr("markerWidth", 6)
+      .attr("markerHeight", 6)
+      .attr("orient", "auto")
+    .append("path")
+      .attr("d", "M0,-5L10,0L0,5");
+
+  var path = svg.append("g").selectAll("path")
+      .data(force.links())
+    .enter().append("path")
+      .attr("class", function(d) { return "link " + d.name; })
+      .attr("marker-end", function(d) { return "url(#" + d.name + ")"; });
+
+  var circle = svg.append("g").selectAll("circle")
+      .data(force.nodes())
+    .enter().append("circle")
+      .attr("r", 10)
+      .call(force.drag);
+
+  var text = svg.append("g").selectAll("text")
+      .data(force.nodes())
+    .enter().append("text")
+      .attr("x", 8)
+      .attr("y", ".31em")
+      .text(function(d) { return d.name; });
+
+  // Use elliptical arc path segments to doubly-encode directionality.
+  function tick() {
+    path.attr("d", linkArc);
+    circle.attr("transform", transform);
+    text.attr("transform", transform);
+  }
+
+  function linkArc(d) {
+    var dx = d.target.x - d.source.x,
+        dy = d.target.y - d.source.y,
+        dr = Math.sqrt(dx * dx + dy * dy);
+    return "M" + d.source.x + "," + d.source.y + "A" + dr + "," + dr + " 0 0,1 " + d.target.x + "," + d.target.y;
+  }
+
+  function transform(d) {
+    return "translate(" + d.x + "," + d.y + ")";
+  }
+};
+</script>
