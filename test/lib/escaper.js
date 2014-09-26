@@ -63,7 +63,6 @@ describe('escaper', function () {
     });
   });
 
-  // TODO: test special characters since strictEqual('\uFF04', '$') === true
   describe('escape', function () {
     it('should work with empty object', function() {
       var obj = {};
@@ -79,6 +78,13 @@ describe('escaper', function () {
 
     it('should not recurse', function() {
       var obj = { $: '$', 'foo.bar': { $: '$' } };
+      escaper.escape(obj);
+      should.deepEqual(obj, { '\uFF04': '$', 'foo\uFF0Ebar': { $: '$' } });
+    });
+
+    it('should be idempotent', function() {
+      var obj = { $: '$', 'foo.bar': { $: '$' } };
+      escaper.escape(obj);
       escaper.escape(obj);
       should.deepEqual(obj, { '\uFF04': '$', 'foo\uFF0Ebar': { $: '$' } });
     });
@@ -105,6 +111,13 @@ describe('escaper', function () {
 
     it('should not recurse', function() {
       var obj = { '\uFF04': '$', 'foo\uFF0Ebar': { $: '$' } };
+      escaper.unescape(obj);
+      should.deepEqual(obj, { $: '$', 'foo.bar': { $: '$' } });
+    });
+
+    it('should be idempotent', function() {
+      var obj = { '\uFF04': '$', 'foo\uFF0Ebar': { $: '$' } };
+      escaper.unescape(obj);
       escaper.unescape(obj);
       should.deepEqual(obj, { $: '$', 'foo.bar': { $: '$' } });
     });
