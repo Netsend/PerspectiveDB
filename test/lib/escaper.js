@@ -25,44 +25,6 @@ var should = require('should');
 var escaper = require('../../lib/escaper');
 
 describe('escaper', function () {
-  describe('_transform', function () {
-    it('should require obj to be an object', function() {
-      (function() { escaper._transform(); }).should.throw('obj must be an object');
-    });
-
-    it('should require transform to be a function', function() {
-      (function() { escaper._transform({}); }).should.throw('transform must be a function');
-    });
-
-    it('should require recurse to be a boolean', function() {
-      (function() { escaper._transform({}, function(a) { return a; }, []); }).should.throw('recurse must be a boolean');
-    });
-
-    it('should work with empty object', function() {
-      var obj = {};
-      escaper._transform(obj, function(a) { return a; });
-      should.deepEqual(obj, {});
-    });
-
-    it('should use transformation', function() {
-      var obj = { $: '$' };
-      escaper._transform(obj, function() { return 'b'; });
-      should.deepEqual(obj, { b: '$' });
-    });
-
-    it('should not recurse', function() {
-      var obj = { $: '$', foo: { $: '$' } };
-      escaper._transform(obj, function(a) { return a + 'b'; });
-      should.deepEqual(obj, { $b: '$', foob: { $: '$' } });
-    });
-
-    it('should recurse', function() {
-      var obj = { $: '$', foo: { $: '$', bar: { some: 'other' } }, a: 'b' };
-      escaper._transform(obj, function(a) { return a + 'b'; }, true);
-      should.deepEqual(obj, { $b: '$', foob: { $b: '$', barb: { someb: 'other' } } , ab: 'b'});
-    });
-  });
-
   describe('escape', function () {
     it('should work with empty object', function() {
       var obj = {};
