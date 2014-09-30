@@ -27,9 +27,9 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/timkuijsten/mastersync.git"
+    "url": "git://github.com/Netsend/mastersync.git"
   },
-  "bugs": "https://github.com/timkuijsten/mastersync/issues",
+  "bugs": "https://github.com/Netsend/mastersync/issues",
   "bin" : { "mastersync" : "./server.js" },
   "scripts": {
     "test": "mocha ./test"

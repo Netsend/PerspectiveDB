@@ -8,9 +8,9 @@ Fork, then clone the repo:
 
 Add our repo as a remote:
 
-    git remote add upstream git@github.com:timkuijsten/mastersync.git
+    git remote add upstream git@github.com:Netsend/mastersync.git
 
-Please first read the [Contributor Assignment Agreement](https://raw.githubusercontent.com/timkuijsten/mastersync/master/misc/caa/caa.txt).
+Please first read the [Contributor Assignment Agreement](https://raw.githubusercontent.com/Netsend/mastersync/master/misc/caa/caa.txt).
 
 If you agree, create a new topic branch and sign the CAA:
 
@@ -64,7 +64,7 @@ If your patch is rebased, please make sure the tests still pass:
 
 Push your topic branch to your fork and [submit a pull request][pr].
 
-[pr]: https://github.com/timkuijsten/mastersync/compare/
+[pr]: https://github.com/Netsend/mastersync/compare/
 
 At this point you're waiting on us.
 
