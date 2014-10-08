@@ -3,6 +3,8 @@
 Work in progress. First phase is to replicate MongoDB collections to other
 MongoDB instances.
 
+See [wiki](https://github.com/Netsend/mastersync/wiki) for progress.
+
 # License
 
 Copyright 2014 Netsend.
