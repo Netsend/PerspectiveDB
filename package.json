@@ -20,7 +20,10 @@
     "async": "~0.9.0",
     "crc-32": "~0.2.2",
     "commander": "~2.3.0",
-    "object-key-transform": "~0.0.1"
+    "object-key-transform": "~0.0.1",
+    "mongo-bcrypt-user": "~0.0.4",
+    "split": "~0.3.0",
+    "read": "~1.0.5"
   },
   "devDependencies": {
     "mocha": ">=1.21.4",
