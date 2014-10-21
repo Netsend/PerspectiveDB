@@ -6,6 +6,10 @@ Fork, then clone the repo:
 
     git clone git@github.com:your-username/mastersync.git
 
+Install dependencies:
+
+    cd mastersync && npm install
+
 Add our repo as a remote:
 
     git remote add upstream git@github.com:Netsend/mastersync.git
