@@ -24,8 +24,6 @@ var should = require('should');
 var BSON = require('mongodb').BSON;
 var Readable = require('stream').Readable;
 
-var fetchItems = require('./_fetch_items');
-
 var VersionedCollectionReader = require('../../lib/versioned_collection_reader');
 
 var db;
@@ -44,8 +42,6 @@ before(function(done) {
 after(database.disconnect.bind(database));
 
 describe('versioned_collection', function() {
-  var vColl;
-
   describe('constructor', function() {
     it('should require coll to be a mongodb.Collection', function() {
       (function () { new VersionedCollectionReader(); }).should.throw('db must be an instance of mongodb.Db');
@@ -301,6 +297,7 @@ describe('versioned_collection', function() {
     it('should work with empty DAG and collection', function(done) {
       var vc = new VersionedCollectionReader(db, collectionName);
       database.createCappedColl(vc.snapshotCollectionName, function(err) {
+        if (err) { throw err; }
         vc.on('data', function() { throw Error('no data should be emitted'); });
         vc.on('end', done);
       });
@@ -581,12 +578,6 @@ describe('versioned_collection', function() {
 
     it('should cancel hook execution and skip item if one hook filters', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, {
-        localPerspective: perspective,
-        follow: false,
-        offset: E._id._v,
-        hooks: [transform, hook1, hook2]
-      });
 
       function transform(db, object, opts, callback) {
         delete object.baz;
@@ -605,6 +596,13 @@ describe('versioned_collection', function() {
         callback(null, object);
       }
 
+      var vc = new VersionedCollectionReader(db, collectionName, {
+        localPerspective: perspective,
+        follow: false,
+        offset: E._id._v,
+        hooks: [transform, hook1, hook2]
+      });
+
       var docs = [];
 
       vc.on('data', function(doc) {
@@ -620,12 +618,6 @@ describe('versioned_collection', function() {
     });
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents, filtered by hook', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName, {
-        localPerspective: perspective,
-        follow: false,
-        offset: A._id._v,
-        hooks: [hook]
-      });
       function hook(db, object, opts, callback) {
         if (object.foo === 'bar') {
           return callback(null, object);
@@ -633,6 +625,12 @@ describe('versioned_collection', function() {
         callback(null, null);
       }
 
+      var vc = new VersionedCollectionReader(db, collectionName, {
+        localPerspective: perspective,
+        follow: false,
+        offset: A._id._v,
+        hooks: [hook]
+      });
       var docs = [];
 
       vc.on('data', function(doc) {
@@ -649,19 +647,19 @@ describe('versioned_collection', function() {
     });
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents, filtered by hook and offset = B', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName, {
-        localPerspective: perspective,
-        follow: false,
-        offset: B._id._v,
-        hooks: [hook]
-      });
-
       function hook(db, object, opts, callback) {
         if (object.foo === 'bar') {
           return callback(null, object);
         }
         callback(null, null);
       }
+
+      var vc = new VersionedCollectionReader(db, collectionName, {
+        localPerspective: perspective,
+        follow: false,
+        offset: B._id._v,
+        hooks: [hook]
+      });
 
       var docs = [];
 
