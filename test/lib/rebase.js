@@ -25,7 +25,7 @@
 
 var should = require('should');
 
-var fetchItems = require('./_fetch_items');
+var fetchItems = require('../_fetch_items');
 
 var rebase = require('../../lib/rebase');
 var VersionedSystem = require('../../lib/versioned_system');
@@ -50,7 +50,7 @@ var vsConfig = {
   }
 };
 
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(vsConfig.databases);

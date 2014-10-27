@@ -26,7 +26,7 @@ var VirtualStream = require('../../lib/virtual_stream');
 
 var db;
 var databaseName = 'test_virtual_stream';
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseName);

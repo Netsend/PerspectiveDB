@@ -26,7 +26,7 @@ var VersionedCollection = require('../../lib/versioned_collection');
 
 var db;
 var databaseName = 'test_versioned_collection_findlca';
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseName);

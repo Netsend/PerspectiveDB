@@ -46,7 +46,7 @@ var vc, oplogDb, oplogCollection;
 
 var db;
 var databaseName = 'test_oplog_resolver';
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseName);

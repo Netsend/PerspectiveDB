@@ -30,7 +30,7 @@ var tmpColl;
 
 var db;
 var databaseName = 'test_sync_attr';
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseName);

@@ -21,7 +21,7 @@
 var mongodb = require('mongodb');
 var async = require('async');
 
-var _db = require('../../bin/_db');
+var _db = require('../bin/_db');
 var createCappedCollection = require('./_create_capped_coll');
 
 /**
@@ -41,7 +41,7 @@ function Database(databaseNames) {
   if (databaseNames.length < 1) { throw new TypeError('databaseNames must contain at least one name'); }
 
   this._databaseNames = databaseNames;
-  this._config = require('../../config/test.json');
+  this._config = require('../config/test.json');
 }
 
 module.exports = Database;

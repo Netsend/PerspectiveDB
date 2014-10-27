@@ -31,7 +31,7 @@ var databaseName2 = 'test2';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, databaseName2, 'foo', 'bar'];
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseNames);

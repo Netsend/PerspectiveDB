@@ -28,7 +28,7 @@ var VersionedCollectionReader = require('../../lib/versioned_collection_reader')
 
 var db;
 var databaseName = 'test_versioned_collection';
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseName);

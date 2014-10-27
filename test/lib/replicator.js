@@ -32,7 +32,7 @@ var Replicator = require('../../lib/replicator');
 var dbImport, dbExport, dbFoo, dbBar, dbQux, dbRaboof;
 
 var databaseNames = ['dbImport', 'dbExport', 'dbFoo', 'dbBar', 'dbQux', 'dbRaboof'];
-var Database = require('./_database');
+var Database = require('../_database');
 
 // open database connection
 var database = new Database(databaseNames);
