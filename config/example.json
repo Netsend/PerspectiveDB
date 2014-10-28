@@ -1,5 +1,7 @@
 {
   "dbName": "test",
   "dbPort": 27019,
-  "oplogCollectionName": "fubar"
+  "oplogCollectionName": "fubar",
+  "privUser": "ms",
+  "unprivUser": "nobody"
 }
