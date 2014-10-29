@@ -23,6 +23,7 @@
 var should = require('should');
 var ObjectID = require('mongodb').ObjectID;
 var Timestamp = require('mongodb').Timestamp;
+var Writable = require('stream').Writable;
 
 var fetchItems = require('../_fetch_items');
 
@@ -137,6 +138,35 @@ describe('versioned_collection', function() {
         vc._locked = false;
         vc.stopAutoProcessing(done);
       }, 10);
+    });
+  });
+
+  describe('writable stream', function() {
+    var collectionName = 'writableStream';
+    var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
+    var opts = { localPerspective: 'I', remotes: ['II'], debug: false };
+
+    it('should be a writable stream', function(done) {
+      var vc = new VersionedCollection(db, collectionName);
+      should.strictEqual(vc instanceof Writable, true);
+      done();
+    });
+
+    it('should write the item', function(done){
+      var vc = new VersionedCollection(db, collectionName, opts);
+      var result = vc.write(item, done);
+      should.strictEqual(result, true);
+    });
+
+    it('should write the item through end', function(done){
+      var vc = new VersionedCollection(db, collectionName, opts);
+      vc.end(item, done);
+    });
+
+    it('should write the item through end and emit finish', function(done){
+      var vc = new VersionedCollection(db, collectionName, opts);
+      vc.on('finish', done);
+      vc.end(item);
     });
   });
 
@@ -467,7 +497,7 @@ describe('versioned_collection', function() {
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'foo', _pa: [] } };
 
       vc.saveRemoteItem(item, function(err) {
-        should.equal(err.message, 'remote queue not found for passed perspective');
+        should.equal(err.message, 'item perspective does not equal remote');
         done();
       });
       vc.processQueues();
