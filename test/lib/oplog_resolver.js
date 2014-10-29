@@ -371,7 +371,7 @@ describe('OplogResolver', function() {
 
         it('needs an item in the snapshot and collection initiated by the "system", via a remote', function(done) {
           var item =  { _id: { _co: 'foo', _id: 'baz', _v: 'X', _pe: 'foo', _pa: [], _lo: true, _i: 10 }, a: 'b' };
-          vc.saveRemoteItem(item, 'foo', function() {});
+          vc.saveRemoteItem(item, function() {});
           vc.processQueues(done);
         });
 
@@ -629,9 +629,9 @@ describe('OplogResolver', function() {
             });
           });
 
-          ve.saveRemoteItem(item1, 'foo', function() {});
-          ve.saveRemoteItem(item2, 'foo', function() {});
-          ve.saveRemoteItem(item3, 'foo', function() {});
+          ve.saveRemoteItem(item1, function() {});
+          ve.saveRemoteItem(item2, function() {});
+          ve.saveRemoteItem(item3, function() {});
 
           ve.processQueues(function(err) {
             if (err) { throw err; }
@@ -836,8 +836,8 @@ describe('OplogResolver', function() {
           // unfortunately, this means we have to insert previous items first.
           var item1 = { _id: { _co: 'foo', _id: 'fubar', _v: 'K', _pe: 'foo', _pa: [], _lo: true, _i: 3 }, a: 'j' };
           var item2 =  { _id: { _co: 'foo', _id: 'fubar', _v: 'L', _pe: 'foo', _pa: [lastVersion], _lo: true, _i: 5, _d: true }, a: 'k' };
-          vc.saveRemoteItem(item1, 'foo', function() {});
-          vc.saveRemoteItem(item2, 'foo', function() {});
+          vc.saveRemoteItem(item1, function() {});
+          vc.saveRemoteItem(item2, function() {});
           vc.processQueues(done);
         });
 

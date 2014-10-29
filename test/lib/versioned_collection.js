@@ -449,45 +449,25 @@ describe('versioned_collection', function() {
       should.equal(vc._mergingRemoteQueue, null);
     });
 
-    it('should error if given remote is not initialized', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, hide: true });
-      vc.saveRemoteItem({ foo: 'bar' }, 'fubar', function(err) {
-        should.equal(err.message, 'missing remote queue, pass remote to constructor');
-        done();
-      });
-      vc.processQueues();
-    });
-
-    it('should require item\'s perspective to be passed to constructor', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, hide: true });
-      var item = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
-
-      vc.saveRemoteItem(item, 'fubar', function(err) {
-        should.equal(err.message, 'missing remote queue, pass remote to constructor');
-        done();
-      });
-      vc.processQueues();
-    });
-
     it('should require item\'s perspective to be different from the local perspective', function(done) {
       var opts = { localPerspective: perspective, remotes: [perspective], hide: true };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: perspective, _pa: [] } };
 
-      vc.saveRemoteItem(item, perspective, function(err) {
+      vc.saveRemoteItem(item, function(err) {
         should.equal(err.message, 'remote must not equal local perspective');
         done();
       });
       vc.processQueues();
     });
 
-    it('should require item\'s perspective to equal remote', function(done) {
+    it('should require item\'s perspective to equal a listed remote', function(done) {
       var opts = { localPerspective: perspective, remotes: ['fubar'], hide: true };
       var vc = new VersionedCollection(db, collectionName, opts);
-      var item = { _id: { _id: 'foo', _v: 'A', _pe: perspective, _pa: [] } };
+      var item = { _id: { _id: 'foo', _v: 'A', _pe: 'foo', _pa: [] } };
 
-      vc.saveRemoteItem(item, 'fubar', function(err) {
-        should.equal(err.message, 'item perspective does not equal remote');
+      vc.saveRemoteItem(item, function(err) {
+        should.equal(err.message, 'remote queue not found for passed perspective');
         done();
       });
       vc.processQueues();
@@ -499,7 +479,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
 
-      vc.saveRemoteItem(item, 'II', function(err) {
+      vc.saveRemoteItem(item, function(err) {
         if (err) { throw err; }
         fetchItems(vc, function(err, result) {
           if (err) { throw err; }
@@ -533,7 +513,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName + 'ClearLo', opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [], _lo: true } };
 
-      vc.saveRemoteItem(item, 'II', function(err) {
+      vc.saveRemoteItem(item, function(err) {
         if (err) { throw err; }
         fetchItems(vc, function(err, result) {
           if (err) { throw err; }
@@ -567,7 +547,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName + 'M3False', opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: true } };
 
-      vc.saveRemoteItem(item, 'II', function(err) {
+      vc.saveRemoteItem(item, function(err) {
         if (err) { throw err; }
         fetchItems(vc, function(err, result) {
           if (err) { throw err; }
@@ -604,7 +584,7 @@ describe('versioned_collection', function() {
 
       vc._queueLimit = 0;
       vc._queueLimitRetryTimeout = 1000;
-      vc.saveRemoteItem(item, 'II', done, function() {});
+      vc.saveRemoteItem(item, done, function() {});
       vc.processQueues();
     });
     */
@@ -620,7 +600,7 @@ describe('versioned_collection', function() {
 
 
       [A, B, C, D, E].forEach(function(item) {
-        vc.saveRemoteItem(item, 'II', function(err) { if (err) { throw err; } }, function() {});
+        vc.saveRemoteItem(item, function(err) { if (err) { throw err; } }, function() {});
       });
       vc.processQueues(function(err) {
         if (err) { throw err; }
@@ -691,7 +671,7 @@ describe('versioned_collection', function() {
 
       vc._snapshotCollection.insert(item1, {w: 1}, function(err) {
         if (err) { throw err; }
-        vc.saveRemoteItem(item2, 'II', function(err) { if (err) { throw err; } }, function() {});
+        vc.saveRemoteItem(item2, function(err) { if (err) { throw err; } }, function() {});
         vc._processRemoteQueues(function(err) {
           if (err) { throw err; }
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -717,7 +697,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v : 'B', _pe: 'II', _pa: ['A'] }, baz : 'fubar' };
 
-      vc.saveRemoteItem(item, 'II', function(err) { if (err) { throw err; } }, function() {});
+      vc.saveRemoteItem(item, function(err) { if (err) { throw err; } }, function() {});
       vc._processRemoteQueues(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
