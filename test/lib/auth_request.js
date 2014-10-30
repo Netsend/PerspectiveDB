@@ -141,7 +141,49 @@ describe('authRequest', function () {
       });
     });
 
-    describe('field length checks', function() {
+    describe('field min length checks', function() {
+      it('should return false when username is too short', function() {
+        var result = authRequest.valid({
+          username: '',
+          password: 'bar',
+          database: 'qux',
+          collection: 'baz'
+        });
+        should.strictEqual(result, false);
+      });
+
+      it('should return false when password is too short', function() {
+        var result = authRequest.valid({
+          username: 'foo',
+          password: '',
+          database: 'qux',
+          collection: 'baz'
+        });
+        should.strictEqual(result, false);
+      });
+
+      it('should return false when database is too short', function() {
+        var result = authRequest.valid({
+          username: 'foo',
+          password: 'bar',
+          database: '',
+          collection: 'baz'
+        });
+        should.strictEqual(result, false);
+      });
+
+      it('should return false when collection is too short', function() {
+        var result = authRequest.valid({
+          username: 'foo',
+          password: 'bar',
+          database: 'qux',
+          collection: ''
+        });
+        should.strictEqual(result, false);
+      });
+    });
+
+    describe('field max length checks', function() {
       var tooLong = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
                     'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
                     'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
