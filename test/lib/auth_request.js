@@ -229,38 +229,4 @@ describe('authRequest', function () {
       });
     });
   });
-
-  describe('map', function () {
-    it('should require req to be an object', function() {
-      (function() { authRequest.map(null); }).should.throw('req must be an object');
-    });
-
-    it('should map username, password, database, collection only', function() {
-      var result = authRequest.map({
-        username: 'baz',
-        foo: 'bar',
-        database: 'raboof'
-      });
-      should.deepEqual(result, {
-        username: 'baz',
-        password: undefined,
-        database: 'raboof',
-        collection: undefined
-      });
-    });
-
-    it('should map offset if given', function() {
-      var result = authRequest.map({
-        offset: 'baz',
-        foo: 'bar'
-      });
-      should.deepEqual(result, {
-        username: undefined,
-        password: undefined,
-        database: undefined,
-        collection: undefined,
-        offset: 'baz'
-      });
-    });
-  });
 });
