@@ -54,7 +54,31 @@ describe('pullRequest', function () {
       should.strictEqual(result, true);
     });
 
-    it('should return true when all fields are set', function() {
+    it('should return false when path and port are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        path: 'foo',
+        port: 1
+      });
+      should.strictEqual(result, false);
+    });
+
+    it('should return false when path and host are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        path: 'foo',
+        host: 'bar'
+      });
+      should.strictEqual(result, false);
+    });
+
+    it('should return false when all fields are set', function() {
       var result = pullRequest.valid({
         username: 'foo',
         password: 'bar',
@@ -64,10 +88,55 @@ describe('pullRequest', function () {
         host: 'bar',
         port: 0
       });
+      should.strictEqual(result, false);
+    });
+
+    it('should return true when all fields but host and port are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        path: 'foo'
+      });
       should.strictEqual(result, true);
     });
 
-    it('should return false port is a string', function() {
+    it('should return true when all fields but path are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        host: 'bar',
+        port: 0
+      });
+      should.strictEqual(result, true);
+    });
+
+    it('should return true when all fields but path and host are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        port: 0
+      });
+      should.strictEqual(result, true);
+    });
+
+    it('should return true when all fields but path and port are set', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'zab',
+        host: 'foo'
+      });
+      should.strictEqual(result, true);
+    });
+
+    it('should return false when port is a string', function() {
       var result = pullRequest.valid({
         username: 'foo',
         password: 'bar',
