@@ -22,37 +22,37 @@
 
 var should = require('should');
 
-var dataRequest = require('../../lib/data_request');
+var pushRequest = require('../../lib/push_request');
 
-describe('dataRequest', function () {
+describe('pushRequest', function () {
   describe('valid', function () {
     it('should return true without parameters', function() {
-      var result = dataRequest.valid();
+      var result = pushRequest.valid();
       should.strictEqual(result, true);
     });
 
     it('should return true when parameter is null', function() {
-      var result = dataRequest.valid(null);
+      var result = pushRequest.valid(null);
       should.strictEqual(result, true);
     });
 
     it('should return false when parameter is not an object', function() {
-      var result = dataRequest.valid('');
+      var result = pushRequest.valid('');
       should.strictEqual(result, false);
     });
 
     it('should return true when all fields are missing', function() {
-      var result = dataRequest.valid({});
+      var result = pushRequest.valid({});
       should.strictEqual(result, true);
     });
 
     it('should return false when all fields are missing but others are present', function() {
-      var result = dataRequest.valid({ foo: 'bar' });
+      var result = pushRequest.valid({ foo: 'bar' });
       should.strictEqual(result, false);
     });
 
     it('should return false when some fields are missing and non-valid fields are present', function() {
-      var result = dataRequest.valid({
+      var result = pushRequest.valid({
         offset: 'baz',
         foo: 'bar'
       });
@@ -60,7 +60,7 @@ describe('dataRequest', function () {
     });
 
     it('should return true when all fields are present', function() {
-      var result = dataRequest.valid({
+      var result = pushRequest.valid({
         filter: {},
         hooks: [],
         hooksOpts: {},
@@ -70,7 +70,7 @@ describe('dataRequest', function () {
     });
 
     it('should return false when all fields are present and others are present', function() {
-      var result = dataRequest.valid({
+      var result = pushRequest.valid({
         filter: {},
         hooks: [],
         hooksOpts: {},
@@ -81,12 +81,12 @@ describe('dataRequest', function () {
     });
 
     it('should return false if offset is not a string', function() {
-      var result = dataRequest.valid({ offset: 1 });
+      var result = pushRequest.valid({ offset: 1 });
       should.strictEqual(result, false);
     });
 
     it('should pass if offset is a string', function() {
-      var result = dataRequest.valid({ offset: 'foo' });
+      var result = pushRequest.valid({ offset: 'foo' });
       should.strictEqual(result, true);
     });
 
@@ -96,7 +96,7 @@ describe('dataRequest', function () {
                     'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
 
       it('should return false when offset is too long', function() {
-        var result = dataRequest.valid({ offset: tooLong });
+        var result = pushRequest.valid({ offset: tooLong });
         should.strictEqual(result, false);
       });
     });
