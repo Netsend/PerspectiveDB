@@ -90,37 +90,6 @@ tasks.push(function(done) {
   });
 });
 
-// should require remotes to be an array
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.remotes must be an array/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'nobody',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    },
-    remotes: {}
-  });
-});
-
 // should not fail with valid configurations
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
@@ -148,41 +117,6 @@ tasks.push(function(done) {
     vcConfig: {
       collectionName: 'test'
     }
-  });
-
-  setTimeout(function() {
-    child.kill();
-  }, 0);
-});
-
-// should not fail with valid configurations and remotes array
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(buff.length, 0);
-    assert.strictEqual(code, null);
-    assert.strictEqual(sig, 'SIGTERM');
-    done();
-  });
-
-  child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'nobody',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    },
-    remotes: []
   });
 
   setTimeout(function() {
