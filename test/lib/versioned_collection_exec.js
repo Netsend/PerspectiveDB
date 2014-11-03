@@ -59,13 +59,15 @@ tasks.push(function(done) {
   });
   child.on('exit', function(code, sig) {
     assert.strictEqual(buff.length, 0);
-    assert.strictEqual(code, null);
-    assert.strictEqual(sig, 'SIGTERM');
+    assert.strictEqual(code, 143);
+    assert.strictEqual(sig, null);
     done();
   });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   setTimeout(function() {
     child.kill();
-  }, 0);
+  }, 30);
 });
 
 // should fail if first message is not an object

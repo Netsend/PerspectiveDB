@@ -29,6 +29,7 @@ var childProcess = require('child_process');
 var async = require('async');
 
 var tasks = [];
+var tasks2 = [];
 
 // should require chrootConfig to have a valid username
 tasks.push(function(done) {
@@ -100,8 +101,8 @@ tasks.push(function(done) {
   });
   child.on('exit', function(code, sig) {
     assert.strictEqual(buff.length, 0);
-    assert.strictEqual(code, null);
-    assert.strictEqual(sig, 'SIGTERM');
+    assert.strictEqual(code, 143);
+    assert.strictEqual(sig, null);
     done();
   });
 
@@ -119,9 +120,10 @@ tasks.push(function(done) {
     }
   });
 
-  setTimeout(function() {
+  child.on('message', function(msg) {
+    assert.strictEqual(msg, 'ready');
     child.kill();
-  }, 0);
+  });
 });
 
 async.series(tasks, function(err) {
