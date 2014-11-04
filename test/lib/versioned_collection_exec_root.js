@@ -121,8 +121,13 @@ tasks.push(function(done) {
   });
 
   child.on('message', function(msg) {
-    assert.strictEqual(msg, 'ready');
-    child.kill();
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      child.kill();
+      break;
+    }
   });
 });
 

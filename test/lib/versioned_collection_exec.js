@@ -65,9 +65,10 @@ tasks.push(function(done) {
   });
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  setTimeout(function() {
+  child.once('message', function(msg) {
+    assert.strictEqual(msg, 'init');
     child.kill();
-  }, 30);
+  });
 });
 
 // should fail if first message is not an object
