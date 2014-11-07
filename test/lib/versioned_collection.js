@@ -179,25 +179,26 @@ describe('versioned_collection', function() {
 
     it('should add a new root (in empty snapshot)', function(done) {
       var vc = new VersionedCollection(db, collectionName);
+      var ts = new Timestamp(0, 0);
       vc.saveCollectionItem(fooA, [], function(err, newObj) {
         if (err) { throw err; }
         should.deepEqual(newObj, {
           _id: { _co: 'saveCollectionItem', _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _lo: true, _i: 1 },
           a: 1,
-          _m3: { _ack: false }
+          _m3: { _ack: false, _op: ts  }
         });
         done();
       });
     });
 
     it('should add a child', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
       vc.saveCollectionItem(fooB, ['A'], function(err, newObj) {
         if (err) { throw err; }
         should.deepEqual(newObj, {
           _id: { _co: 'saveCollectionItem', _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'], _lo: true, _i: 2 },
           b: 2,
-          _m3: { _ack: false }
+          _m3: { _ack: false, _op: new Timestamp(0, 0) }
         });
         done();
       });
@@ -210,7 +211,7 @@ describe('versioned_collection', function() {
         should.deepEqual(newObj, {
           _id: { _co: 'saveCollectionItem', _id: 'bar', _v: 'A', _pe: '_local', _pa: [], _lo: true, _i: 3 },
           b: 3,
-          _m3: { _ack: false }
+          _m3: { _ack: false, _op: new Timestamp(0, 0) }
         });
         done();
       });
@@ -351,10 +352,10 @@ describe('versioned_collection', function() {
     var quxA = { _id: 'qux', _v: 'A', e: 5 };
     var items = [ fooA, barA, bazB, quxA ];
 
-    var sFooA = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _i: 1, _pa: [] }, a: 1, _m3: { _ack: true } };
-    var sBarA = { _id: { _id: 'bar', _v: 'A', _pe: '_local', _i: 2, _pa: [] }, b: 2, _m3: { _ack: true } };
-    var sBazA = { _id: { _id: 'baz', _v: 'A', _pe: '_local', _i: 3, _pa: [] }, c: 3, _m3: { _ack: true } };
-    var sBazB = { _id: { _id: 'baz', _v: 'B', _pe: '_local', _i: 4, _pa: ['A'] }, d: 4, _m3: { _ack: false } };
+    var sFooA = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _i: 1, _pa: [] }, a: 1, _m3: { _ack: true, _op: new Timestamp(1414516132, 1) } };
+    var sBarA = { _id: { _id: 'bar', _v: 'A', _pe: '_local', _i: 2, _pa: [] }, b: 2, _m3: { _ack: true, _op: new Timestamp(1414516133, 1) } };
+    var sBazA = { _id: { _id: 'baz', _v: 'A', _pe: '_local', _i: 3, _pa: [] }, c: 3, _m3: { _ack: true, _op: new Timestamp(1414516134, 1) } };
+    var sBazB = { _id: { _id: 'baz', _v: 'B', _pe: '_local', _i: 4, _pa: ['A'] }, d: 4, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
     var snapshotItems = [ sFooA, sBarA, sBazA, sBazB ];
 
     it('should save collection items', function(done) {
@@ -377,12 +378,12 @@ describe('versioned_collection', function() {
           should.deepEqual(items.length, 6);
 
           var v = items[4]._id._v;
-          should.deepEqual(items[0], { _id: { _id: 'foo', _v: 'A', _pe: '_local', _i: 1, _pa: [] }, a: 1, _m3: { _ack: true } });
-          should.deepEqual(items[1], { _id: { _id: 'bar', _v: 'A', _pe: '_local', _i: 2, _pa: [] }, b: 2, _m3: { _ack: true } });
-          should.deepEqual(items[2], { _id: { _id: 'baz', _v: 'A', _pe: '_local', _i: 3, _pa: [] }, c: 3, _m3: { _ack: true } });
-          should.deepEqual(items[3], { _id: { _id: 'baz', _v: 'B', _pe: '_local', _i: 4, _pa: ['A'] }, d: 4, _m3: { _ack: true } });
-          should.deepEqual(items[4], { _id: { _co: 'copyCollectionOverSnapshot', _id: 'bar', _v: v,   _pe: '_local', _i: 5, _pa: ['A'], _lo: true }, b: 3, _m3: { _ack: true } });
-          should.deepEqual(items[5], { _id: { _co: 'copyCollectionOverSnapshot', _id: 'qux', _v: 'A', _pe: '_local', _i: 6, _pa: [], _lo: true }, e: 5, _m3: { _ack: true } });
+          should.deepEqual(items[0], { _id: { _id: 'foo', _v: 'A', _pe: '_local', _i: 1, _pa: [] }, a: 1, _m3: { _ack: true, _op: new Timestamp(1414516132, 1) } });
+          should.deepEqual(items[1], { _id: { _id: 'bar', _v: 'A', _pe: '_local', _i: 2, _pa: [] }, b: 2, _m3: { _ack: true, _op: new Timestamp(1414516133, 1) } });
+          should.deepEqual(items[2], { _id: { _id: 'baz', _v: 'A', _pe: '_local', _i: 3, _pa: [] }, c: 3, _m3: { _ack: true, _op: new Timestamp(1414516134, 1) } });
+          should.deepEqual(items[3], { _id: { _id: 'baz', _v: 'B', _pe: '_local', _i: 4, _pa: ['A'] }, d: 4, _m3: { _ack: true, _op: new Timestamp(0, 0) } });
+          should.deepEqual(items[4], { _id: { _co: 'copyCollectionOverSnapshot', _id: 'bar', _v: v,   _pe: '_local', _i: 5, _pa: ['A'], _lo: true }, b: 3, _m3: { _ack: true, _op: new Timestamp(0, 0) } });
+          should.deepEqual(items[5], { _id: { _co: 'copyCollectionOverSnapshot', _id: 'qux', _v: 'A', _pe: '_local', _i: 6, _pa: [], _lo: true }, e: 5, _m3: { _ack: true, _op: new Timestamp(0, 0) } });
 
           vc._collection.find().toArray(function(err, items2) {
             if (err) { throw err; }
@@ -526,11 +527,11 @@ describe('versioned_collection', function() {
           });
           should.deepEqual(m3items[0], {
             _id: { _co: 'saveRemoteItem', _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[1], {
             _id: { _co: 'saveRemoteItem', _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           done();
         });
@@ -560,11 +561,11 @@ describe('versioned_collection', function() {
           });
           should.deepEqual(m3items[0], {
             _id: { _co: 'saveRemoteItemClearLo', _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[1], {
             _id: { _co: 'saveRemoteItemClearLo', _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           done();
         });
@@ -594,11 +595,11 @@ describe('versioned_collection', function() {
           });
           should.deepEqual(m3items[0], {
             _id: { _co: 'saveRemoteItemM3False', _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[1], {
             _id: { _co: 'saveRemoteItemM3False', _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           done();
         });
@@ -645,43 +646,43 @@ describe('versioned_collection', function() {
 
           should.deepEqual(m3items[0], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[1], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'bar', _v: 'B', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[2], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'baz', _v: 'C', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[3], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'qux', _v: 'D', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[4], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'quux', _v: 'E', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[5], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[6], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'bar', _v: 'B', _pe: 'I', _pa: [], _i: 2 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[7], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'baz', _v: 'C', _pe: 'I', _pa: [], _i: 3 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[8], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'qux', _v: 'D', _pe: 'I', _pa: [], _i: 4 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(m3items[9], {
             _id: { _co: 'saveRemoteItemInsertionOrder', _id: 'quux', _v: 'E', _pe: 'I', _pa: [], _i: 5 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           done();
         });
@@ -696,7 +697,7 @@ describe('versioned_collection', function() {
     it('should add the item to the versioned collection and merge', function(done) {
       var opts = { localPerspective: perspective, remotes: ['II'], debug: false, hide: true };
       var vc = new VersionedCollection(db, collectionName, opts);
-      var item1 = { _id: { _id: 'foo', _v : 'A', _pe: 'I', _pa: [] }, foo : 'bar', _m3: { _ack: true } };
+      var item1 = { _id: { _id: 'foo', _v : 'A', _pe: 'I', _pa: [] }, foo : 'bar', _m3: { _ack: true , _op: new Timestamp(123456789, 1) } };
       var item2 = { _id: { _id: 'foo', _v : 'A', _pe: 'II', _pa: [] }};
 
       vc._snapshotCollection.insert(item1, {w: 1}, function(err) {
@@ -709,12 +710,12 @@ describe('versioned_collection', function() {
             should.equal(items.length, 2);
             should.deepEqual(items[0], {
               _id: { _id: 'foo', _v : 'A', _pe: 'I', _pa: [] },
-              _m3: { _ack: true},
+              _m3: { _ack: true, _op: new Timestamp(123456789, 1)},
               foo : 'bar'
             });
             should.deepEqual(items[1], {
               _id: { _co: '_processRemoteQueues', _id: 'foo', _v : 'A', _pe: 'II', _pa: [] },
-              _m3: { _ack: false}
+              _m3: { _ack: false, _op: new Timestamp(0, 0)}
             });
             done();
           });
@@ -735,21 +736,21 @@ describe('versioned_collection', function() {
           should.equal(items.length, 4);
           should.deepEqual(items[0], {
             _id: { _id: 'foo', _v : 'A', _pe: 'I', _pa: [] },
-            _m3: { _ack: true },
+            _m3: { _ack: true, _op: new Timestamp(123456789, 1) },
             foo : 'bar'
           });
           should.deepEqual(items[1], {
             _id: { _co: '_processRemoteQueues', _id: 'foo', _v : 'A', _pe: 'II', _pa: [] },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           should.deepEqual(items[2], {
             _id: { _co: '_processRemoteQueues', _id: 'foo', _v : 'B', _pe: 'II', _pa: ['A'] },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: new Timestamp(0, 0) },
             baz : 'fubar'
           });
           should.deepEqual(items[3], {
             _id: { _co: '_processRemoteQueues', _id: 'foo', _v : 'B', _pe: 'I', _pa: ['A'], _i: 1 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: new Timestamp(0, 0) },
             foo : 'bar',
             baz : 'fubar'
           });
@@ -1605,14 +1606,14 @@ describe('versioned_collection', function() {
             delete snapshotItems[0]._id._v;
             should.deepEqual(snapshotItems[0], {
               _id: { _co: 'rebuild', _id: 'bar', _pe: '_local', _pa: [], _lo: true, _i: 1 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               bar: 'qux'
             });
 
             // the version should not be altered
             should.deepEqual(snapshotItems[1], {
               _id: { _co: 'rebuild', _id: 'baz', _v: 'A', _pe: '_local', _pa: [], _lo: true, _i: 2 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               raboof: 'foobar',
             });
 
@@ -1621,7 +1622,7 @@ describe('versioned_collection', function() {
             delete snapshotItems[2]._id._v;
             should.deepEqual(snapshotItems[2], {
               _id: { _co: 'rebuild', _id: 'foo', _pe: '_local', _pa: [], _lo: true, _i: 3 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               foo: 'bar'
             });
 
@@ -2345,7 +2346,7 @@ describe('versioned_collection', function() {
       bar: 'qux'
     };
     var mod = { $set: { bar: 'baz' } };
-    var oplogItem = { o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
+    var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
 
     it('should require dagItem to be an object', function() {
       var vc = new VersionedCollection(db, collectionName);
@@ -2417,7 +2418,7 @@ describe('versioned_collection', function() {
         delete item._id._v;
         should.deepEqual(item, {
           _id: { _co: 'createNewVersionByUpdateDoc', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true },
-          _m3: { _ack: false },
+          _m3: { _ack: false, _op: new Timestamp(1414516132, 1) },
           bar: 'baz'
         });
         done();
@@ -2426,6 +2427,7 @@ describe('versioned_collection', function() {
 
     it('should not have altered the original doc and have side-effects', function() {
       should.deepEqual(oplogItem, {
+        ts: new Timestamp(5709483428, 1),
         o: { $set: { bar: 'baz' } },
         op: 'u',
         o2: { _id: 'foo', _v: 'A' }
@@ -2502,14 +2504,14 @@ describe('versioned_collection', function() {
           v1.should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[10], {
             _id : { _co: 'mergeAndSave', _id: 'foo', _v: v1, _pa: ['D', 'G'], _pe: '_local', _lo: true, _i: 11 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
 
           var v2 = items[11]._id._v;
           v2.should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[11], {
             _id : { _co: 'mergeAndSave', _id: 'foo', _v: v2, _pa: [v1, 'K'], _pe: '_local', _lo: true, _i: 12 },
-            _m3: { _ack: false }
+            _m3: { _ack: false, _op: new Timestamp(0, 0) }
           });
           done();
         });
@@ -2595,9 +2597,9 @@ describe('versioned_collection', function() {
   describe('_setAckd', function() {
     var collectionName = '_setAckd';
 
-    var A = { _id : { _id: 'foo', _v: 'A', _pa: [], _pe: '_local' }, _m3: { _ack: false } };
-    var B = { _id : { _id: 'foo', _v: 'B', _pa: ['A'], _pe: '_local', _i: 2 }, _m3: { _ack: false } };
-    var C = { _id : { _id: 'foo', _v: 'C', _pa: ['B'], _pe: '_local', _i: 4 }, _m3: { _ack: false } };
+    var A = { _id : { _id: 'foo', _v: 'A', _pa: [], _pe: '_local' }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+    var B = { _id : { _id: 'foo', _v: 'B', _pa: ['A'], _pe: '_local', _i: 2 }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+    var C = { _id : { _id: 'foo', _v: 'C', _pa: ['B'], _pe: '_local', _i: 4 }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
 
     it('needs a capped collection and A', function(done) {
       var vc = new VersionedCollection(db, collectionName);
@@ -2606,7 +2608,7 @@ describe('versioned_collection', function() {
 
     it('should ack', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc._setAckd('foo', 'A', '_local', function(err) {
+      vc._setAckd('foo', 'A', '_local', new Timestamp(0, 0), function(err) {
         if (err) { throw err; }
         done();
       });
@@ -2614,20 +2616,20 @@ describe('versioned_collection', function() {
 
     it('should have set the item ackd', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc._snapshotCollection.find().toArray(function(err, items) {
+      vc._snapshotCollection.find({}, { sort: { '_id._v': 1 } }).toArray(function(err, items) {
         if (err) { throw err; }
         should.deepEqual(items.length, 3);
         should.deepEqual(items[0], {
           _id : { _id: 'foo', _v: 'A', _pa: [], _pe: '_local' },
-          _m3: { _ack: true }
+          _m3: { _ack: true, _op: new Timestamp(0, 0) }
         });
         should.deepEqual(items[1], {
           _id : { _id: 'foo', _v: 'B', _pa: ['A'], _pe: '_local', _i: 2 },
-          _m3: { _ack: false }
+          _m3: { _ack: false, _op: new Timestamp(0, 0) }
         });
         should.deepEqual(items[2], {
           _id : { _id: 'foo', _v: 'C', _pa: ['B'], _pe: '_local', _i: 4 },
-          _m3: { _ack: false }
+          _m3: { _ack: false, _op: new Timestamp(0, 0) }
         });
         done();
       });
@@ -3744,11 +3746,11 @@ describe('versioned_collection', function() {
             should.equal(items.length, 2);
             should.deepEqual(items[0], {
               _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _i: 1 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[1], {
               _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'], _i: 2 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -3774,7 +3776,7 @@ describe('versioned_collection', function() {
             should.equal(items.length, 3);
             should.deepEqual(items[2], {
               _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'], _i: 3 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -3804,13 +3806,13 @@ describe('versioned_collection', function() {
             should.equal(items.length, 5);
             should.deepEqual(items[3], {
               _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['B'], _lo: true, _i: 4 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             var v = items[4]._id._v;
             should.deepEqual(items[4], {
               _id: { _co: '_addAllToDAGOnePe', _id: 'foo', _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 5 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -3873,15 +3875,15 @@ describe('versioned_collection', function() {
               should.equal(items.length, 3);
               should.deepEqual(items[0], {
                 _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _i: 1 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
               should.deepEqual(items[1], {
                 _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'], _i: 2, _d: true },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
               should.deepEqual(items[2], {
                 _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'], _i: 3 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
 
               // inspect collection
@@ -3912,7 +3914,7 @@ describe('versioned_collection', function() {
               should.equal(items.length, 1);
               should.deepEqual(items[0], {
                 _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: [], _i: 1 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
 
               vc._collection.find().toArray(function(err, items) {
@@ -3947,7 +3949,7 @@ describe('versioned_collection', function() {
               should.equal(items.length, 2);
               should.deepEqual(items[1], {
                 _id: { _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _i: 2, _d: true },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
 
               vc._collection.find().toArray(function(err, items) {
@@ -3969,7 +3971,7 @@ describe('versioned_collection', function() {
               should.equal(items.length, 3);
               should.deepEqual(items[2], {
                 _id: { _id: 'foo', _v: 'F', _pe: '_local', _pa: ['E'], _i: 3 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
 
               // inspect collection
@@ -4003,11 +4005,11 @@ describe('versioned_collection', function() {
             should.equal(items.length, 2);
             should.deepEqual(items[0], {
               _id: { _id: 'foo', _v: 'X', _pe: '_local', _pa: [], _i: 1 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[1], {
               _id: { _id: 'bar', _v: 'Y', _pe: '_local', _pa: [], _i: 2 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4039,11 +4041,11 @@ describe('versioned_collection', function() {
             should.equal(items.length, 4);
             should.deepEqual(items[2], {
               _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['X'], _i: 3 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[3], {
               _id: { _id: 'bar', _v: 'C', _pe: '_local', _pa: ['Y'], _i: 4 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4075,27 +4077,27 @@ describe('versioned_collection', function() {
             should.equal(items.length, 8);
             should.deepEqual(items[4], {
               _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['X'], _lo: true, _i: 5 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
 
             should.deepEqual(items[5], {
               _id: { _id: 'bar', _v: 'D', _pe: '_local', _pa: ['Y'], _lo: true, _i: 6 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
 
             var v1 = items[6]._id._v;
             should.deepEqual(items[6], {
               _id: { _co: '_addAllToDAGOnePeMultiId', _id: 'foo', _v: v1, _pe: '_local', _pa: ['B', 'D'], _lo: true, _i: 7 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
 
             var v2 = items[7]._id._v;
             should.deepEqual(items[7], {
               _id: { _co: '_addAllToDAGOnePeMultiId', _id: 'bar', _v: v2, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 8 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
 
@@ -4136,19 +4138,19 @@ describe('versioned_collection', function() {
               should.equal(items.length, 4);
               should.deepEqual(items[0], {
                 _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'bar', _pa: [] },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
               should.deepEqual(items[1], {
                 _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'bar', _pa: ['A'] },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
               should.deepEqual(items[2], {
                 _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: '_local', _pa: [], _i: 1 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
               should.deepEqual(items[3], {
                 _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: '_local', _pa: ['A'], _i: 2 },
-                _m3: { _ack: false }
+                _m3: { _ack: false, _op: new Timestamp(0, 0) }
               });
 
               // inspect collection
@@ -4175,11 +4177,11 @@ describe('versioned_collection', function() {
             should.equal(items.length, 6);
             should.deepEqual(items[4], {
               _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'bar', _pa: ['B'] },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[5], {
               _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: '_local', _pa: ['B'], _i: 3 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4216,17 +4218,17 @@ describe('versioned_collection', function() {
             should.equal(items.length, 9);
             should.deepEqual(items[6], {
               _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: 'bar', _pa: ['B'] },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[7], {
               _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: '_local', _pa: ['B'], _i: 4 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             var v = items[8]._id._v;
             should.deepEqual(items[8], {
               _id: { _co: '_addAllToDAGMultiplePe', _id: new ObjectID('f00000000000000000000000'), _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 5 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4256,19 +4258,19 @@ describe('versioned_collection', function() {
             should.equal(items.length, 4);
             should.deepEqual(items[0], {
               _id: { _id: 'multi1', _v: 'A', _pe: 'remote', _pa: [] },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[1], {
               _id: { _id: 'multi2', _v: 'A', _pe: 'remote', _pa: [] },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[2], {
               _id: { _id: 'multi1', _v: 'A', _pe: '_local', _pa: [], _i: 1 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
             should.deepEqual(items[3], {
               _id: { _id: 'multi2', _v: 'A', _pe: '_local', _pa: [], _i: 2 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4302,7 +4304,7 @@ describe('versioned_collection', function() {
             should.equal(items.length, 5);
             should.deepEqual(items[4], {
               _id: { _id: 'multi1', _v: 'B', _pe: '_local', _pa: ['A'], _i: 3 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
             // inspect collection
@@ -4336,7 +4338,7 @@ describe('versioned_collection', function() {
             should.equal(items.length, 6);
             should.deepEqual(items[5], {
               _id: { _id: 'multi1', _v: 'A', _pe: 'remote2', _pa: [] },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               foo: 'bar'
             });
 
@@ -4393,13 +4395,13 @@ describe('versioned_collection', function() {
 
     it('should create a local clone if the snapshot collection is empty', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
-      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false } };
-      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false } };
+      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
         if (err) { throw err; }
         should.deepEqual(newLocalItems, [
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false } },
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false } }
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
         ]);
         done();
       });
@@ -4407,8 +4409,8 @@ describe('versioned_collection', function() {
 
     it('needs an item in the snapshot collection for further testing', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
-      var itemI = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [], _i: 1  }, _m3: { _ack: true } };
-      var itemII = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false } };
+      var itemI = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [], _i: 1  }, _m3: { _ack: true, _op: new Timestamp(1, 1) } };
+      var itemII = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._snapshotCollection.insert([itemI, itemII], function(err, inserted) {
         if (err) { throw err; }
         should.equal(inserted.length, 2);
@@ -4470,7 +4472,7 @@ describe('versioned_collection', function() {
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
-        should.deepEqual(newLocalItems, [ { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } , _m3: { _ack: false } } ]);
+        should.deepEqual(newLocalItems, [ { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } , _m3: { _ack: false, _op: new Timestamp(0, 0) } } ]);
         done();
       });
     });
@@ -4482,8 +4484,8 @@ describe('versioned_collection', function() {
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
         if (err) { throw err; }
         should.deepEqual(newLocalItems, [
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } , _m3: { _ack: false } },
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['B'] } , _m3: { _ack: false } }
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } , _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['B'] } , _m3: { _ack: false, _op: new Timestamp(0, 0) } }
         ]);
         done();
       });
@@ -4491,7 +4493,7 @@ describe('versioned_collection', function() {
 
     it('needs a deleted item for further testing', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
-      var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'], _d: true, _i: 2 }, _m3: { _ack: true } };
+      var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'], _d: true, _i: 2 }, _m3: { _ack: true, _op: new Timestamp(24, 1) } };
       vc._snapshotCollection.insert([item], done);
     });
 
@@ -4604,7 +4606,7 @@ describe('versioned_collection', function() {
 
             should.deepEqual(items[0], {
               _id: { _co: '_applyOplogItemInsertWithColl', _id: 'bar', _pe: '_local', _pa: [], _lo: true, _i: 1 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0)},
               baz: 'foobar'
             });
             done();
@@ -4624,8 +4626,9 @@ describe('versioned_collection', function() {
     });
 
     describe('updateFullDoc', function() {
-      var dagRoot = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] }, _m3: { _ack: true } };
+      var dagRoot = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(1414516131, 1) } };
       var oplogItem  = {
+        ts: new Timestamp(1414516132, 1),
         op: 'u',
         o: { _id: 'foo', _v: 'A', qux: 'quux' },
         o2: { _id: 'foo' }
@@ -4652,7 +4655,7 @@ describe('versioned_collection', function() {
 
               should.deepEqual(items[1], {
                 _id: { _co: '_applyOplogItemUpdateFullDocWithColl', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true, _i: 1 },
-                _m3: { _ack: false },
+                _m3: { _ack: false, _op: new Timestamp(1414516132, 1)  },
                 qux: 'quux'
               });
               done();
@@ -4663,6 +4666,7 @@ describe('versioned_collection', function() {
 
       it('should not have altered the original doc and have side-effects', function() {
         should.deepEqual(oplogItem, {
+          ts: new Timestamp(1414516132, 1),
           op: 'u',
           o: { _id: 'foo', _v: 'A', qux: 'quux' },
           o2: { _id: 'foo' }
@@ -4672,8 +4676,8 @@ describe('versioned_collection', function() {
 
     describe('updateModifier', function() {
       var mod = { $set: { bar: 'baz' } };
-      var oplogItem = { o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
-      var dagRoot = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] }, qux: 'quux', _m3: { _ack: true } };
+      var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
+      var dagRoot = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] }, qux: 'quux', _m3: { _ack: true, _op: new Timestamp(1414516132, 1) } };
 
       it('should insert a new item into the DAG', function(done) {
         var vc = new VersionedCollection(db, collectionName + 'UpdateModifierWithColl', { hide: true });
@@ -4696,7 +4700,7 @@ describe('versioned_collection', function() {
 
               should.deepEqual(items[1], {
                 _id: { _co: '_applyOplogItemUpdateModifierWithColl', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true, _i: 1 },
-                _m3: { _ack: false },
+                _m3: { _ack: false, _op: new Timestamp(1414516132, 1) },
                 bar: 'baz',
                 qux: 'quux'
               });
@@ -4707,7 +4711,7 @@ describe('versioned_collection', function() {
       });
 
       it('should not have altered the original doc and have side-effects', function() {
-        should.deepEqual(oplogItem, { o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } });
+        should.deepEqual(oplogItem, { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } });
       });
     });
   });
@@ -4716,6 +4720,7 @@ describe('versioned_collection', function() {
     var collectionName = '_applyOplogInsertItem';
 
     var oplogItem = {
+      ts: new Timestamp(1414516124, 1),
       op: 'i',
       o: {
         _id : 'foo',
@@ -4725,6 +4730,7 @@ describe('versioned_collection', function() {
 
     var doc = { _id: 'bar', bar: 'qux', _v: 'A' };
     var oplogItem2 = {
+      ts: new Timestamp(1414516125, 1),
       op: 'i',
       o: {
         _id : 'bar',
@@ -4771,7 +4777,7 @@ describe('versioned_collection', function() {
           v.should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[0], {
             _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: v, _pe: '_local', _pa: [], _lo: true, _i: 1 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem.ts },
             baz: 'raboof'
           });
 
@@ -4808,6 +4814,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, { hide: true });
 
       var oplogItem = {
+        ts: new Timestamp(1414516126, 1),
         op: 'i',
         o: {
           _id : 'foo',
@@ -4833,7 +4840,7 @@ describe('versioned_collection', function() {
 
             should.deepEqual(items[0], {
               _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: v, _pe: '_local', _pa: [], _lo: true, _i: 1 },
-              _m3: { _ack: true },
+              _m3: { _ack: true, _op: oplogItem.ts },
               baz: 'raboof'
             });
 
@@ -4879,7 +4886,7 @@ describe('versioned_collection', function() {
 
           should.deepEqual(items[1], {
             _id: { _co: '_applyOplogInsertItem', _id: 'bar', _v: v, _pe: '_local', _pa: [], _lo: true, _i: 2 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem2.ts },
             baz: 'foobar'
           });
 
@@ -4902,6 +4909,7 @@ describe('versioned_collection', function() {
 
     it('should not have altered the original doc and have side-effects', function() {
       should.deepEqual(oplogItem2, {
+        ts: new Timestamp(1414516125, 1),
         op: 'i',
         o: {
           _id : 'bar',
@@ -4914,7 +4922,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, { debug: false });
       var item = {
         _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _i: 3, _d: true },
-        _m3: { _ack: true }
+        _m3: { _ack: true, _op: new Timestamp(1414516144, 1) }
       };
       vc._snapshotCollection.insert(item, function(err) {
         if (err) { throw err; }
@@ -4932,14 +4940,14 @@ describe('versioned_collection', function() {
 
           should.deepEqual(items[2], {
             _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _d: true, _i: 3 },
-            _m3: { _ack: true }
+            _m3: { _ack: true, _op: new Timestamp(1414516144, 1) }
           });
 
           var v = items[3]._id._v;
           v.should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[3], {
             _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: v, _pe: '_local', _pa: ['E'], _lo: true, _i: 4 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem.ts  },
             baz: 'raboof'
           });
 
@@ -4965,6 +4973,7 @@ describe('versioned_collection', function() {
 
     var time = new Date();
     var oplogItem = {
+      ts: new Timestamp(1414516188, 1),
       op: 'u',
       o: { _id: 'foo', _v: 'A', qux: 'quux', foo: time }
     };
@@ -5009,7 +5018,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName);
       var item = {
         _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _lo: true },
-        _m3: { _ack: true },
+        _m3: { _ack: true, _op: new Timestamp(1414516187, 1) },
         bar: 'qux'
       };
       vc._snapshotCollection.insert(item, {w: 1}, function(err, inserts) {
@@ -5021,6 +5030,7 @@ describe('versioned_collection', function() {
 
     it('should find last ackd item as parent and add to DAG', function(done) {
       var item = {
+        ts: new Timestamp(1414516190, 1),
         op: 'u',
         o: { _id: 'foo', qux: 'quux', foo: time }
       };
@@ -5039,7 +5049,7 @@ describe('versioned_collection', function() {
           delete items[1]._id._v;
           should.deepEqual(items[1], {
             _id: { _co: '_applyOplogUpdateFullDoc', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true, _i: 1 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: item.ts },
             qux: 'quux',
             foo: time
           });
@@ -5074,7 +5084,7 @@ describe('versioned_collection', function() {
 
           should.deepEqual(items[2], {
             _id: { _co: '_applyOplogUpdateFullDoc', _id: 'foo', _pe: '_local', _lo: true, _i: 2 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem.ts },
             qux: 'quux',
             foo: time
           });
@@ -5086,7 +5096,7 @@ describe('versioned_collection', function() {
     it('needs an unackd item from a remote for the next test', function(done) {
       var item = {
         _id: { _co: '_applyOplogUpdateFullDoc', _id: 'foo', _v: 'X', _pe: '_local', _pa: ['A'], _i: 3 },
-        _m3: { _ack: false },
+        _m3: { _ack: false, _op: new Timestamp(1414511111, 1) },
         qux: 'quux'
       };
 
@@ -5100,6 +5110,7 @@ describe('versioned_collection', function() {
 
     it('should set remote item ackd', function(done) {
       var item = {
+        ts: new Timestamp(1414511112, 1),
         op: 'u',
         o: { _id: 'foo', qux: 'quux', _v: 'X' }
       };
@@ -5116,7 +5127,7 @@ describe('versioned_collection', function() {
           // check if version is generated
           should.deepEqual(items[3], {
             _id: { _co: '_applyOplogUpdateFullDoc', _id: 'foo', _v: 'X', _pe: '_local', _pa: ['A'], _i: 3 },
-            _m3: { _ack: true },
+            _m3: { _ack: true, _op: item.ts },
             qux: 'quux'
           });
 
@@ -5136,12 +5147,12 @@ describe('versioned_collection', function() {
 
       var AI = {
         _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-        _m3: { _ack: true }
+        _m3: { _ack: true, _op: new Timestamp(1414511122, 1) }
       };
 
       var BI = {
         _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'], _i: 2 },
-        _m3: { _ack: false }
+        _m3: { _ack: false, _op: new Timestamp(1414511133, 1) }
       };
 
       it('should insert root and an non-locally created item', function(done) {
@@ -5155,8 +5166,9 @@ describe('versioned_collection', function() {
       });
 
       it('should merge if multiple heads are created and copy merge to collection', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: true, hide: false });
         var oplogItem = {
+          ts: new Timestamp(1414511144, 1),
           op: 'u',
           o: { _id: 'foo', qux: 'quux' }
         };
@@ -5170,11 +5182,11 @@ describe('versioned_collection', function() {
             // check and delete parents
             should.deepEqual(items[0], {
               _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
-              _m3: { _ack: true }
+              _m3: { _ack: true, _op: new Timestamp(1414511122, 1) }
             });
             should.deepEqual(items[1], {
               _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'], _i: 2 },
-              _m3: { _ack: false }
+              _m3: { _ack: false, _op: new Timestamp(1414511133, 1) }
             });
 
             // check and delete version
@@ -5185,7 +5197,7 @@ describe('versioned_collection', function() {
 
             should.deepEqual(items[2], {
               _id : { _co: '_applyOplogUpdateFullDocMultipleHeads', _id: 'foo', _pe: 'I', _pa: ['A'], _lo: true, _i: 3 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: oplogItem.ts },
               qux: 'quux'
             });
 
@@ -5200,7 +5212,7 @@ describe('versioned_collection', function() {
 
             should.deepEqual(items[3], {
               _id: { _co: '_applyOplogUpdateFullDocMultipleHeads', _id: 'foo', _pe: 'I', _lo: true, _i: 4 },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: new Timestamp(0, 0) },
               qux: 'quux'
             });
 
@@ -5220,6 +5232,7 @@ describe('versioned_collection', function() {
 
       it('should not have altered the original doc and have side-effects', function() {
         should.deepEqual(oplogItem, {
+          ts: new Timestamp(1414516188, 1),
           op: 'u',
           o: { _id: 'foo', _v: 'A', qux: 'quux', foo: time }
         });
@@ -5231,7 +5244,7 @@ describe('versioned_collection', function() {
     var collectionName = '_applyOplogUpdateModifier';
 
     var mod = { $set: { bar: 'baz' } };
-    var oplogItem = { o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
+    var oplogItem = { ts: new Timestamp(999, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
 
     it('should require cb to be a function', function() {
       var vc = new VersionedCollection(db, collectionName);
@@ -5279,7 +5292,7 @@ describe('versioned_collection', function() {
           delete items[1]._id._v;
           should.deepEqual(items[1], {
             _id: { _co: '_applyOplogUpdateModifier', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true, _i: 1 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem.ts },
             bar: 'baz'
           });
           done();
@@ -5307,7 +5320,7 @@ describe('versioned_collection', function() {
 
           should.deepEqual(items[2], {
             _id: { _co: '_applyOplogUpdateModifier', _id: 'foo', _pe: '_local', _lo: true, _i: 2 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: oplogItem.ts },
             bar: 'baz'
           });
           done();
@@ -5317,6 +5330,7 @@ describe('versioned_collection', function() {
 
     it('should not have altered the original doc and have side-effects', function() {
       should.deepEqual(oplogItem, {
+        ts: new Timestamp(999, 1),
         o: { $set: { bar: 'baz' } },
         op: 'u',
         o2: { _id: 'foo', _v: 'A' }
@@ -5334,7 +5348,7 @@ describe('versioned_collection', function() {
           _pe: '_local',
           _pa: ['XZiJCEpw']
         },
-        _m3: { _ack: true },
+        _m3: { _ack: true, _op: new Timestamp(234, 1) },
         foo: 'bar',
         qux: 'qux'
       };
@@ -5364,13 +5378,14 @@ describe('versioned_collection', function() {
                 _pe: '_local',
                 _pa: ['XZiJCEpw']
               },
-              _m3: { _ack: true },
+              _m3: { _ack: true, _op: new Timestamp(234, 1)  },
               foo: 'bar',
               qux: 'qux'
             });
 
             items[1]._id._v.should.not.equal('bsb8uChl');
             delete items[1]._id._v;
+
             should.deepEqual(items[1], {
               _id: {
                 _co: '_applyOplogUpdateModifierregression1',
@@ -5380,7 +5395,7 @@ describe('versioned_collection', function() {
                 _lo: true,
                 _i: 1
               },
-              _m3: { _ack: false },
+              _m3: { _ack: false, _op: '5934975428123951105' },
               baz: 'quux',
               foo: 'bar',
               qux: 'qux'
@@ -5397,6 +5412,7 @@ describe('versioned_collection', function() {
     var collectionName = '_applyOplogDeleteItem';
 
     var oplogItem  = {
+      ts: new Timestamp(1234, 1),
       op: 'd',
       o: { _id: 'foo' }
     };
@@ -5463,7 +5479,7 @@ describe('versioned_collection', function() {
           v.should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[1], {
             _id: { _co: '_applyOplogDeleteItem', _id: 'foo', _v: v, _pe: '_local', _pa: ['A'], _lo: true, _i: 1, _d: true },
-            _m3: { _ack: true },
+            _m3: { _ack: true, _op: new Timestamp(1234, 1) },
             bar: 'qux'
           });
 
@@ -5479,7 +5495,7 @@ describe('versioned_collection', function() {
 
     it('should work with deleted items that have no version', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false });
-      var item = { op: 'd', o: { _id: 'foo' } };
+      var item = { ts: new Timestamp(123, 1), op: 'd', o: { _id: 'foo' } };
       vc._applyOplogDeleteItem(item, function(err) {
         if (err) { throw err; }
 
@@ -5494,7 +5510,7 @@ describe('versioned_collection', function() {
           items[2]._id._pa.shift().should.match(/^[a-z0-9/+A-Z]{8}$/);
           should.deepEqual(items[2], {
             _id: { _co: '_applyOplogDeleteItem', _id: 'foo', _pe: '_local', _pa: [], _lo: true, _i: 2, _d: true },
-            _m3: { _ack: true },
+            _m3: { _ack: true, _op: new Timestamp(123, 1) },
             bar: 'qux'
           });
 
