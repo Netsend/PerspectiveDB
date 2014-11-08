@@ -716,4 +716,69 @@ describe('Replicator', function() {
       });
     });
   });
+
+  describe('fetchFromDb', function() {
+    var coll;
+
+    it('should require coll to be an instance of mongodb.Collection', function() {
+      (function() { Replicator.fetchFromDb(1); }).should.throw('coll must be an instance of mongodb.Collection');
+    });
+
+    it('should require type to be either "import" or "export"', function() {
+      coll = dbImport.collection('replication');
+      (function() { Replicator.fetchFromDb(coll, 1); }).should.throw('type must be either "import" or "export"');
+    });
+
+    it('should require remote to be a string', function() {
+      (function() { Replicator.fetchFromDb(coll, 'import'); }).should.throw('remote must be a string');
+    });
+
+    it('should require cb to be a function', function() {
+      (function() { Replicator.fetchFromDb(coll, 'import', 'foo', {}); }).should.throw('cb must be a function');
+    });
+
+    it('needs an import config for further testing', function(done) {
+      var importConfig = {
+        _id: 'some',
+        type: 'import',
+        remote: 'bar',
+        collections: {
+          fooColl: {
+            hooks: ['import_bar']
+          },
+          barColl: {
+            hooks: ['import_bar']
+          }
+        }
+      };
+      coll.insert(importConfig, done);
+    });
+
+    it('should callback with an error if config is not found', function(done) {
+      Replicator.fetchFromDb(coll, 'import', 'foo', function(err) {
+        should.strictEqual(err.message, 'replication config not found');
+        done();
+      });
+    });
+
+    it('should return import config', function(done) {
+      Replicator.fetchFromDb(coll, 'import', 'bar', function(err, cfg) {
+        if (err) { throw err; }
+        should.deepEqual(cfg, {
+          _id: 'some',
+          type: 'import',
+          remote: 'bar',
+          collections: {
+            fooColl: {
+              hooks: ['import_bar']
+            },
+            barColl: {
+              hooks: ['import_bar']
+            }
+          }
+        });
+        done();
+      });
+    });
+  });
 });
