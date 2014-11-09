@@ -107,26 +107,6 @@ tasks.push(function(done) {
   child.send({});
 });
 
-// should fail if first message does not contain a chroot config
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.chrootConfig must be an object/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {}
-  });
-});
-
 // should fail if first message does not contain a vc config
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
@@ -157,7 +137,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/config.dbName must be a string/.test(buff.toString()));
+    assert(/msg.dbConfig.dbName must be a string/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
@@ -166,58 +146,6 @@ tasks.push(function(done) {
   child.send({
     dbConfig: {},
     chrootConfig: {},
-    vcConfig: {}
-  });
-});
-
-// should fail if chrootConfig in first message does not contain valid user name
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/chrootCfg.user must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {},
-    vcConfig: {}
-  });
-});
-
-// should fail if chrootConfig in first message does not contain valid root path
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/chrootCfg.newRoot must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'test'
-    },
     vcConfig: {}
   });
 });
@@ -231,7 +159,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/vcCfg.collectionName must be a string/.test(buff.toString()));
+    assert(/msg.vcConfig.collectionName must be a string/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
