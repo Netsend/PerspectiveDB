@@ -62,78 +62,42 @@ describe('VersionedSystem', function() {
     });
   });
 
-  xdescribe('rebuild', function() {
-    var collName = 'rebuild';
+   /**
+    * initVCs
+    * sendPR
+    * chroot
+    * createServer
+    * _trackOplogVc
+    * _verifyAuthRequest
+    */
+
+  describe('initVCs non-root', function() {
+    var collName = 'initVCs';
+
+    it('should require vcs to be an object', function() {
+      var vs = new VersionedSystem(oplogDb);
+      (function() { vs.initVCs(1); }).should.throw('vcs must be an object');
+    });
 
     it('should require cb to be a function', function() {
       var vs = new VersionedSystem(oplogDb);
-      (function() { vs.rebuild({}); }).should.throw('cb must be a function');
+      (function() { vs.initVCs({}); }).should.throw('cb must be a function');
     });
 
-    it('should require to not be auto processing', function() {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      vs._startAutoProcessing();
-      (function() { vs.rebuild(function() {}); }).should.throw('stop auto processing before rebuilding');
+    it('should callback', function(done) {
+      var vs = new VersionedSystem(oplogDb);
+      vs.initVCs({}, done);
     });
 
-    it('rebuild an empty collection', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], { debug: false });
-      vs.rebuild(done);
-    });
-
-    it('needs an item in the collection for further testing', function(done) {
-      var item = { _id:  'foo', _v: 'A' };
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], { debug: false });
-      var vc = vs._databaseCollections[databaseName + '.' + collName];
-      vc._collection.insert(item, {w: 1}, done);
-    });
-
-    it('should rebuild', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], { debug: false });
-      vs.rebuild(done);
-    });
-
-    it('should have versioned and ackd the item in the collection', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      var vc = vs._databaseCollections[databaseName + '.' + collName];
-      vc._snapshotCollection.find().toArray(function(err, items) {
-        if (err) { throw err; }
-        should.deepEqual(items, [{ _id:{ _co: 'rebuild', _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _lo: true, _i: 1 }, _m3: { _ack: true }}]);
-        done();
-      });
-    });
-
-    it('should not have altered the version of the item in the collection', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      var vc = vs._databaseCollections[databaseName + '.' + collName];
-      vc._collection.find().toArray(function(err, items) {
-        if (err) { throw err; }
-        should.deepEqual(items, [{ _id: 'foo', _v: 'A' }]);
-        done();
-      });
-    });
-
-    it('should have saved the last oplog item as the last used oplog item', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      vs._getLastUsedOplogItem(function(err, lastUsed) {
-        if (err) { throw err; }
-        delete lastUsed.ts;
-        should.deepEqual(lastUsed, {
-          op: 'u',
-          ns: databaseName + '.rebuild',
-          o2: { _id: 'foo' },
-          o: { _id: 'foo', _v: 'A' },
-          _id: 'lastUsedOplogItem'
-        });
-        done();
-      });
-    });
-
-    it('should not have saved any last used collection oplog item, since there is none (at least not user initiated)', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], { debug: false });
-      vs._getLastUsedCollectionOplogItem(function(err, lastUsed) {
-        if (err) { throw err; }
-        should.deepEqual(lastUsed, null);
+    it('should fail if not running as root', function(done) {
+      var vcCfg = {
+        someDb: {
+          someColl: { }
+        }
+      };
+      var vs = new VersionedSystem(oplogDb, { hide: true });
+      vs.initVCs(vcCfg, function(err) {
+        should.strictEqual(err.message, 'abnormal termination');
         done();
       });
     });
