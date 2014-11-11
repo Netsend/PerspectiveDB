@@ -5590,6 +5590,68 @@ describe('versioned_collection', function() {
     });
   });
 
+  describe('maxOplogPointer', function() {
+    var collectionName = 'maxOplogPointer';
+    var perspective = 'I';
+
+    var fooAI = {
+      _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
+      _m3: { _ack: true, _op: new Timestamp(1414516168, 15) }
+    };
+
+    var fooBI = {
+      _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'], _lo: true, _i: 2 },
+      _m3: { _ack: true, _op: new Timestamp(1414516170, 158) }
+    };
+
+    var barAI = {
+      _id : { _id: 'bar', _v: 'A', _pe: 'I', _pa: [], _lo: true, _i: 3 },
+      _m3: { _ack: true, _op: new Timestamp(0, 0) }
+    };
+
+    var barBI = {
+      _id : { _id: 'bar', _v: 'B', _pe: 'I', _pa: ['A'], _i: 4 },
+      _m3: { _ack: true, _op: new Timestamp(1414516170, 165) }
+    };
+
+    it('should callback with null when no timestamps', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      vc.maxOplogPointer(function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, null);
+        done();
+      });
+    });
+
+    it('should save DAG', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc._snapshotCollection.insert([barAI], {w: 1}, done);
+    });
+
+    it('should callback with null when no timestamps greater than 0, 0', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      vc.maxOplogPointer(function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, null);
+        done();
+      });
+    });
+
+    it('should save DAG', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc._snapshotCollection.insert([fooAI, barBI, fooBI], {w: 1}, done);
+    });
+    
+    it('should callback with the max oplog pointer of the versioned collection', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      vc.maxOplogPointer(function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, barBI._m3._op);
+        done();
+      });
+    });  
+  });
+
   describe('_generateRandomVersion', function() {
     it('should generate a new id of 5 bytes', function() {
       VersionedCollection._generateRandomVersion(5).length.should.equal(8);
