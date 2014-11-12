@@ -89,7 +89,7 @@ tasks.push(function(done) {
   child.send(0);
 });
 
-// should fail if first message does not contain a db config
+// should fail if first message does not contain a db name
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
@@ -98,7 +98,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.dbConfig must be an object/.test(buff.toString()));
+    assert(/msg.dbName must be a string/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
@@ -107,7 +107,7 @@ tasks.push(function(done) {
   child.send({});
 });
 
-// should fail if first message does not contain a vc config
+// should fail if first message does not contain a collectionName
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
@@ -116,65 +116,17 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.vcConfig must be an object/.test(buff.toString()));
+    assert(/msg.collectionName must be a string/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
   });
 
   child.send({
-    dbConfig: {},
-    chrootConfig: {}
-  });
-});
-
-// should fail if dbConfig in first message does not contain valid db name
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.dbConfig.dbName must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {},
-    chrootConfig: {},
-    vcConfig: {}
-  });
-});
-
-// should fail if vcCfg in first message does not contain valid collection name
-tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.vcConfig.collectionName must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'test',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {}
+    dbName: 'test',
+    dbPort: 27019,
+    chrootUser: 'test',
+    chrootNewRoot: '/var/empty'
   });
 });
 
@@ -194,17 +146,11 @@ tasks.push(function(done) {
   });
 
   child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'test',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    }
+    dbName: 'test',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'test',
+    chrootNewRoot: '/var/empty'
   });
 });
 

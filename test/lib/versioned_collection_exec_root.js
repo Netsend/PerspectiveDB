@@ -31,7 +31,7 @@ var async = require('async');
 var tasks = [];
 var tasks2 = [];
 
-// should require chrootConfig to have a valid username
+// should require chrootUser to have a valid username
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
@@ -47,21 +47,15 @@ tasks.push(function(done) {
   });
 
   child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'test',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    }
+    dbName: 'test',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'test',
+    chrootNewRoot: '/var/empty'
   });
 });
 
-// should require chrootConfig to have a valid newRoot path
+// should require chrootNewRoot to be a valid path
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
@@ -77,17 +71,11 @@ tasks.push(function(done) {
   });
 
   child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'nobody',
-      newRoot: '/some'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    }
+    dbName: 'test',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/some'
   });
 });
 
@@ -107,17 +95,11 @@ tasks.push(function(done) {
   });
 
   child.send({
-    dbConfig: {
-      dbName: 'test',
-      dbPort: 27019
-    },
-    chrootConfig: {
-      user: 'nobody',
-      newRoot: '/var/empty'
-    },
-    vcConfig: {
-      collectionName: 'test'
-    }
+    dbName: 'test',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/var/empty'
   });
 
   child.on('message', function(msg) {
