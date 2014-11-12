@@ -5642,6 +5642,68 @@ describe('versioned_collection', function() {
     });  
   });
 
+  describe('determineRemoteOffset', function() {
+    var collectionName = 'determineRemoteOffset';
+    var perspective = '_local';
+
+    var snapshots = [
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'sZCqUpY6', '_pa' : [  'X2Sx6rXK' ], '_pe' : '_local', '_i' : 42 },
+        '_m3' : { '_ack' : true, '_op' : new Timestamp(1415807848, 7) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'X2Sx6rXK', '_pa' : [  '/TPEqPum' ], '_pe' : '_local', '_i' : 41 },
+        '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : '/TPEqPum', '_pa' : [  'daiye3wo' ], '_pe' : '_local', '_i' : 40 },
+        '_m3' : { '_ack' : true, '_op' : new Timestamp(1415807844, 6) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'daiye3wo', '_pe' : '_local', '_pa' : [ ], '_lo' : true, '_i' : 1 },
+        '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'daiye3wo', '_pa' : [ ], '_pe' : 'euromastercontracts' },
+        '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : '/TPEqPum', '_pa' : [  'daiye3wo' ], '_pe' : 'euromastercontracts' },
+        '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } },
+      { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'X2Sx6rXK', '_pa' : [  '/TPEqPum' ], '_pe' : 'euromastercontracts' },
+        '_m3' : {  } }
+    ];
+
+    var extraSnapshot = { '_id' : { '_co' : 'tyres', '_id' : '001309478', '_v' : 'sZCqUpY6', '_pa' : [  'X2Sx6rXK' ], '_pe' : 'euromastercontracts' },
+        '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } };
+
+    it('should callback with null when no snapshots', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc.determineRemoteOffset('euromastercontracts', function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, null);
+        done();
+      });
+    });
+
+    it('should save DAG', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc._snapshotCollection.insert(snapshots, {w: 1}, done);
+    });
+    
+    it('should callback with the last received snapshot version for the perspective', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc.determineRemoteOffset('euromastercontracts', function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, 'X2Sx6rXK');
+        done();
+      });
+    });
+
+    it('should save extra DAG', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc._snapshotCollection.insert(extraSnapshot, {w: 1}, done);
+    });
+
+    it('should callback with the new last received snapshot version for the perspective', function(done) {
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      vc.determineRemoteOffset('euromastercontracts', function(err, result) {
+        if (err) { throw err; }
+        should.deepEqual(result, 'sZCqUpY6');
+        done();
+      });
+    }); 
+  });
+
   describe('_generateRandomVersion', function() {
     it('should generate a new id of 5 bytes', function() {
       VersionedCollection._generateRandomVersion(5).length.should.equal(8);
