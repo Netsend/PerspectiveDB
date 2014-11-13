@@ -21,10 +21,11 @@
 /*jshint -W068, -W030, nonew: false */
 
 var should = require('should');
+var Timestamp = require('mongodb').Timestamp;
 
 var VersionedSystem = require('../../lib/versioned_system');
 
-var db, db2, oplogDb;
+var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
 var databaseName2 = 'test2';
 var oplogDatabase = 'local';
@@ -40,7 +41,7 @@ before(function(done) {
     db = dbs[0];
     db2 = dbs[1];
     oplogDb = db.db(oplogDatabase);
-
+    oplogColl = oplogDb.collection('oplog.$main');
     done();
   });
 });
@@ -49,130 +50,195 @@ after(database.disconnect.bind(database));
 
 describe('VersionedSystem', function() {
   describe('constructor', function() {
-    it('should require oplogDb to be a mongodb.Db', function() {
-      (function() { new VersionedSystem({}); }).should.throw('oplogDb must be a mongdb.Db');
+    it('should require oplogColl to be a mongodb.Collection', function() {
+      (function() { new VersionedSystem({}); }).should.throw('oplogColl must be a mongdb.Collection');
     });
 
-    it('should require opts', function() {
-      (function() { new VersionedSystem(oplogDb, 1); }).should.throw('opts must be an object');
+    it('should require opts to be an object', function() {
+      (function() { new VersionedSystem(oplogColl, 1); }).should.throw('opts must be an object');
     });
 
-    it('should construct', function() {
-      (function() { new VersionedSystem(oplogDb); }).should.not.throw();
+    it('should construct without options', function() {
+      (function() { new VersionedSystem(oplogColl); }).should.not.throw();
+    });
+
+    it('should construct with options', function() {
+      (function() { new VersionedSystem(oplogColl, { hide: true }); }).should.not.throw();
     });
   });
 
-   /**
-    * initVCs
-    * sendPR
-    * chroot
-    * createServer
-    * _trackOplogVc
-    * _verifyAuthRequest
-    */
+  /**
+   * initVCs
+   * sendPR
+   * chroot
+   * createServer
+   * _ensureSnapshotAndOplogOffset
+   * _verifyAuthRequest
+   */
 
   describe('initVCs non-root', function() {
-    var collName = 'initVCs';
-
     it('should require vcs to be an object', function() {
-      var vs = new VersionedSystem(oplogDb);
+      var vs = new VersionedSystem(oplogColl);
       (function() { vs.initVCs(1); }).should.throw('vcs must be an object');
     });
 
     it('should require cb to be a function', function() {
-      var vs = new VersionedSystem(oplogDb);
+      var vs = new VersionedSystem(oplogColl);
       (function() { vs.initVCs({}); }).should.throw('cb must be a function');
     });
 
     it('should callback', function(done) {
-      var vs = new VersionedSystem(oplogDb);
+      var vs = new VersionedSystem(oplogColl);
       vs.initVCs({}, done);
     });
 
-    it('should fail if not running as root', function(done) {
+    it('should fail if no size is specified', function(done) {
       var vcCfg = {
         someDb: {
           someColl: { }
         }
       };
-      var vs = new VersionedSystem(oplogDb, { hide: true });
+      var vs = new VersionedSystem(oplogColl, { hide: true });
+      vs.initVCs(vcCfg, function(err) {
+        should.strictEqual(err.message, 'missing size');
+        done();
+      });
+    });
+
+    it('should fail if not running as root', function(done) {
+      var vcCfg = {
+        someDb: {
+          someColl: {
+            size: 10
+          }
+        }
+      };
+      var vs = new VersionedSystem(oplogColl, { hide: true });
       vs.initVCs(vcCfg, function(err) {
         should.strictEqual(err.message, 'abnormal termination');
         done();
       });
     });
+
+
+    /////
+    // See versioned_system_root for further testing
+    ///
   });
 
-  xdescribe('info', function() {
-    var collName  = 'info';
-
-    it('should create a collection with one object and a collection without objects', function(done) {
-      db.collection('m3.' + collName).insert({ foo: 'bar' }, function(err, result) {
-        if (err) { throw err; }
-        should.equal(result.length, 1);
-        done();
-      });
-    });
-
-    it('should show info of the collection and the snapshot collection', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      vs.info(function(err, result) {
-        if (err) { throw err; }
-        should.strictEqual(result[databaseName+'.'+collName].collection.count, 1);
-        should.strictEqual(result[databaseName+'.'+collName].collection.capped, undefined);
-        should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.count, undefined);
-        should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.capped, undefined);
-        done();
-      });
-    });
-
-    it('should show extended info of the collection and the snapshot collection', function(done) {
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], {});
-      vs.info(true, function(err, result) {
-        should.equal(err, null);
-        should.strictEqual(result[databaseName+'.'+collName].collection.count, 1);
-        should.strictEqual(result[databaseName+'.'+collName].collection.capped, undefined);
-        should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.count, undefined);
-        should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.capped, undefined);
-        should.strictEqual(result[databaseName+'.'+collName].extended.ack, 0);
-        done();
-      });
-    });
+  /*
+  describe('info', function() {
+    /////
+    // See versioned_system_root for further testing
+    ///
   });
+  */
 
-  xdescribe('_ensureSnapshotCollections', function() {
-    var collName = '_ensureSnapshotCollections';
+  describe('_ensureSnapshotAndOplogOffset', function() {
+    var oplogCollName = '_ensureSnapshotAndOplogOffsetOplog';
+    var localOplogColl;
 
-    it('should default to using the snapshotSize option', function(done) {
-      var opts = { snapshotSize: 0.01171875, localDbName: databaseName, localStorageName: collName, oplogCollectionName: collName };
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collName], opts);
-      vs.ensureSnapshotCollections(function(err) {
+    it('should require cfg to be an object', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var cfg = 1;
+      (function() { vs._ensureSnapshotAndOplogOffset(cfg); }).should.throw('cfg must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var cfg = {};
+      (function() { vs._ensureSnapshotAndOplogOffset(cfg, {}); }).should.throw('cb must be a function');
+    });
+
+    it('should require cfg.dbName to be a string', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var cfg = {};
+      (function() { vs._ensureSnapshotAndOplogOffset(cfg, function() {}); }).should.throw('cfg.dbName must be a string');
+    });
+
+    it('should require cfg.collectionName to be a string', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var cfg = { dbName: 'foo' };
+      (function() { vs._ensureSnapshotAndOplogOffset(cfg, function() {}); }).should.throw('cfg.collectionName must be a string');
+    });
+
+    it('should require cfg.size to be a number', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var cfg = { dbName: 'foo', collectionName: 'bar' };
+      (function() { vs._ensureSnapshotAndOplogOffset(cfg, function() {}); }).should.throw('cfg.size must be a number');
+    });
+
+    it('needs a capped collection', function(done) {
+      database.createCappedColl(oplogCollName, done);
+    });
+
+    it('needs an artificial oplog for testing', function(done) {
+      var op1 = { ts: new Timestamp(2, 3) };
+      var op2 = { ts: new Timestamp(40, 50) };
+      var op3 = { ts: new Timestamp(600, 700) };
+
+      localOplogColl = db.collection(oplogCollName);
+      localOplogColl.insert([op1, op2, op3], done);
+    });
+
+    it('should create snapshot and callback with max oplog item (since snapshot was empty)', function(done) {
+      var vs = new VersionedSystem(localOplogColl);
+      var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
+      vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
-        vs.info(function(err, result) {
-          should.equal(err, null);
-          should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.count, 0);
-          should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.capped, true);
-          should.strictEqual(result[databaseName+'.'+collName].snapshotCollection.storageSize, 12288);
+        should.strictEqual(true, oplogOffset.equals(new Timestamp(600, 700)));
+
+        db.db('foo').collectionsInfo().toArray(function(err, info) {
+          if (err) { throw err; }
+          should.strictEqual(info[3].name, 'foo.m3.bar');
+          should.strictEqual(info[3].options.size, 2);
           done();
         });
       });
     });
 
-    it('should overrule the default snapshotSize with the provided snapshotSizes', function(done) {
-      var collectionName = '_ensureSnapshotCollectionsSnapshotSizes';
-      var snapshotSizes = {};
-      snapshotSizes[databaseName+'.'+collectionName] = 0.00390625;
-      var opts = { snapshotSize: 0.00193023681641, snapshotSizes: snapshotSizes };
-      var vs = new VersionedSystem(oplogDb, [databaseName], [collectionName], opts);
-      vs.ensureSnapshotCollections(function(err) {
+    it('needs an item in the versioned collection without oplog pointer', function(done) {
+      var item = { _id: { _id: 'foo' }, _m3: { _ack: true } };
+      db.db('foo').collection('m3.bar').insert(item, done);
+    });
+
+    it('should require an oplog pointer in the versioned collection if it has items', function(done) {
+      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
+      vs._ensureSnapshotAndOplogOffset(cfg, function(err) {
+        should.strictEqual(err.message, 'vc contains snapshots but no oplog pointer');
+        done();
+      });
+    });
+
+    it('needs an oplog pointer in the versioned collection thats precedes the oplog', function(done) {
+      var op = { _m3: { _op: new Timestamp(1, 2) } };
+      db.db('foo').collection('m3.bar').insert(op, done);
+    });
+
+    it('should callback with oplog pointer based on previous insert', function(done) {
+      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
+      vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
-        vs.info(function(err, result) {
-          should.equal(err, null);
-          should.strictEqual(result[databaseName+'.'+collectionName].snapshotCollection.count, 0);
-          should.strictEqual(result[databaseName+'.'+collectionName].snapshotCollection.capped, true);
-          should.strictEqual(result[databaseName+'.'+collectionName].snapshotCollection.storageSize, 4096);
-          done();
-        });
+        should.strictEqual(true, oplogOffset.equals(new Timestamp(1, 2)));
+        done();
+      });
+    });
+
+    it('needs an oplog pointer in the versioned collection thats in the oplog range', function(done) {
+      var op = { _m3: { _op: new Timestamp(12, 34) } };
+
+      db.db('foo').collection('m3.bar').insert(op, done);
+    });
+
+    it('should callback with oplog pointer based on previous insert', function(done) {
+      var vs = new VersionedSystem(localOplogColl);
+      var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
+      vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
+        if (err) { throw err; }
+        should.strictEqual(true, oplogOffset.equals(new Timestamp(12, 34)));
+        done();
       });
     });
   });
