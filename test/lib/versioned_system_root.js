@@ -18,10 +18,14 @@
 
 'use strict';
 
+/*jshint -W068 */
+
 if (process.getuid() !== 0) { 
   console.error('run tests as root');
   process.exit(1);
 }
+
+var fs = require('fs');
 
 var should = require('should');
 var mongodb = require('mongodb');
@@ -145,6 +149,32 @@ describe('VersionedSystem', function() {
           done();
         });
       });
+    });
+  });
+
+  // do these tests at last
+  describe('chroot', function() {
+    it('should require user to be a string', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs.chroot(); }).should.throw('user must be a string');
+    });
+
+    it('should require opts to be an object', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs.chroot('foo', 1); }).should.throw('opts must be an object');
+    });
+
+    it('should chroot', function() {
+      var vs = new VersionedSystem(oplogColl);
+
+      var ls = fs.readdirSync('/');
+      should.strictEqual(true, ls.length > 4);
+
+      vs.chroot('nobody');
+
+      ls = fs.readdirSync('/');
+      should.strictEqual(0, ls.length);
+      should.strictEqual(true, process.getuid() > 0);
     });
   });
 });
