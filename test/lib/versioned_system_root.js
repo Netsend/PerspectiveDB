@@ -153,6 +153,41 @@ describe('VersionedSystem', function() {
   });
 
   // do these tests at last
+  describe('createServer', function() {
+    it('should require user to be a string', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs.createServer(); }).should.throw('user must be a string');
+    });
+
+    it('should require newRoot to be a string', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs.createServer('foo', 1); }).should.throw('newRoot must be a string');
+    });
+
+    it('should chroot', function(done) {
+      var vs = new VersionedSystem(oplogColl);
+
+      var ls = fs.readdirSync('/');
+      should.strictEqual(true, ls.length > 4);
+
+      // remove any previously created socket
+      if (fs.existsSync('/var/run/ms-1234.sock')) {
+        fs.unlink('/var/run/ms-1234.sock');
+      }
+
+      vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
+        if (err) { throw err; }
+
+        should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
+        should.strictEqual(true, process.getuid() > 0);
+        done();
+      });
+    });
+  });
+
+  // do these tests at last
+  /*
+  tested via createServer
   describe('chroot', function() {
     it('should require user to be a string', function() {
       var vs = new VersionedSystem(oplogColl);
@@ -177,4 +212,5 @@ describe('VersionedSystem', function() {
       should.strictEqual(true, process.getuid() > 0);
     });
   });
+  */
 });
