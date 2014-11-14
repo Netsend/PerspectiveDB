@@ -22,7 +22,7 @@
     "commander": "~2.3.0",
     "object-key-transform": "~0.0.1",
     "mongo-bcrypt-user": "~0.0.4",
-    "split": "~0.3.0",
+    "ld-jsonstream": "~0.0.1",
     "read": "~1.0.5",
     "nest-namespace": "~0.0.2",
     "match-object": "~0.0.1"
