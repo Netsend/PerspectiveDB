@@ -234,6 +234,63 @@ tasks.push(function(done) {
   });
 });
 
+// should pass auth request to parent
+tasks.push(function(done) {
+  var authReq = {
+    username: 'foo',
+    password: 'bar',
+    database: 'qux',
+    collection: 'baz'
+  };
+
+  // remove any previously created socket
+  if (fs.existsSync('/var/run/ms-1234.sock')) {
+    fs.unlink('/var/run/ms-1234.sock');
+  }
+
+  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+
+  var stderr = new Buffer(0);
+  var stdout = new Buffer(0);
+  child.stdout.on('data', function(data) {
+    stdout = Buffer.concat([stdout, data]);
+  });
+  child.stderr.on('data', function(data) {
+    stderr = Buffer.concat([stderr, data]);
+  });
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 143);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        serverConfig: {
+          port: 1234
+        }
+      });
+      break;
+    case 'listen':
+      // write auth request
+      var ms = net.createConnection('/var/run/ms-1234.sock');
+      ms.end(JSON.stringify(authReq) + '\n');
+      break;
+    default:
+      assert.deepEqual(msg, {
+        username: 'foo',
+        password: 'bar',
+        database: 'qux',
+        collection: 'baz'
+      });
+      child.kill();
+    }
+  });
+});
+
 async.series(tasks, function(err) {
   if (err) {
     console.error(err);
