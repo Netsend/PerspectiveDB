@@ -37,12 +37,11 @@ var tasks2 = [];
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
 
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
-    assert(/msg.serverConfig.port must be a number/.test(buff.toString()));
+    assert(/msg.serverConfig.port must be a number/.test(stderr));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
@@ -72,14 +71,12 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
 
-  var stderr = new Buffer(0);
-  var stdout = new Buffer(0);
-  child.stdout.on('data', function(data) {
-    stdout = Buffer.concat([stdout, data]);
-  });
-  child.stderr.on('data', function(data) {
-    stderr = Buffer.concat([stderr, data]);
-  });
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 143);
@@ -98,7 +95,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout.toString()));
+      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
       child.kill();
       break;
     }
@@ -114,16 +111,14 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
 
-  var stderr = new Buffer(0);
-  var stdout = new Buffer(0);
-  child.stdout.on('data', function(data) {
-    stdout = Buffer.concat([stdout, data]);
-  });
-  child.stderr.on('data', function(data) {
-    stderr = Buffer.concat([stderr, data]);
-  });
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
-    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr.toString()));
+    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
     assert.strictEqual(code, 143);
     assert.strictEqual(sig, null);
     done();
@@ -140,7 +135,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout.toString()));
+      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
 
       var ms = net.createConnection('/var/run/ms-1234.sock');
 
@@ -183,16 +178,14 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
 
-  var stderr = new Buffer(0);
-  var stdout = new Buffer(0);
-  child.stdout.on('data', function(data) {
-    stdout = Buffer.concat([stdout, data]);
-  });
-  child.stderr.on('data', function(data) {
-    stderr = Buffer.concat([stderr, data]);
-  });
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
-    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr.toString()));
+    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
     assert.strictEqual(code, 143);
     assert.strictEqual(sig, null);
     done();
@@ -209,7 +202,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout.toString()));
+      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
 
       var ms = net.createConnection('/var/run/ms-1234.sock');
 
@@ -250,14 +243,12 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
 
-  var stderr = new Buffer(0);
-  var stdout = new Buffer(0);
-  child.stdout.on('data', function(data) {
-    stdout = Buffer.concat([stdout, data]);
-  });
-  child.stderr.on('data', function(data) {
-    stderr = Buffer.concat([stderr, data]);
-  });
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 143);
