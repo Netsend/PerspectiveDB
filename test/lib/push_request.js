@@ -90,6 +90,16 @@ describe('pushRequest', function () {
       should.strictEqual(result, true);
     });
 
+    it('should work with undefined values', function() {
+      var result = pushRequest.valid({
+        filter: { baz: 'A' },
+        hooks: [ 'some' ],
+        hooksOpts: {},
+        offset: undefined
+      });
+      should.strictEqual(result, true);
+    });
+
     describe('field length checks', function() {
       var tooLong = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
                     'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
