@@ -227,6 +227,47 @@ tasks.push(function(done) {
   });
 });
 
+// should make socket world writable
+tasks.push(function(done) {
+  // remove any previously created socket
+  if (fs.existsSync('/var/run/ms-1234.sock')) {
+    fs.unlink('/var/run/ms-1234.sock');
+  }
+
+  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 143);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        serverConfig: {
+          port: 1234
+        }
+      });
+      break;
+    case 'listen':
+      fs.stat('/var/run/ms-1234.sock', function(err, stat) {
+        assert(stat.mode & 2);
+        child.kill();
+      });
+      break;
+    }
+  });
+});
+
 // should pass auth request to parent
 tasks.push(function(done) {
   var authReq = {
