@@ -54,6 +54,15 @@ describe('pullRequest', function () {
       should.strictEqual(result, true);
     });
 
+    it('should return true when collection is "undefined"', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        collection: undefined
+      });
+      should.strictEqual(result, true);
+    });
+
     it('should return false when path and port are set', function() {
       var result = pullRequest.valid({
         username: 'foo',
