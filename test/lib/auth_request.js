@@ -76,6 +76,17 @@ describe('authRequest', function () {
       should.strictEqual(result, true);
     });
 
+    it('should pass with "undefined" offset', function() {
+      var result = authRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        database: 'qux',
+        collection: 'baz',
+        offset: undefined
+      });
+      should.strictEqual(result, true);
+    });
+
     it('should return false when extra fields are present', function() {
       var result = authRequest.valid({
         username: 'foo',
