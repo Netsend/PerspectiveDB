@@ -100,8 +100,9 @@ describe('OplogReader', function() {
       (function() { new OplogReader(oplogColl, 'foo.bar', { hide: '' }); }).should.throw('opts.hide must be a boolean');
     });
 
+    var ns = databaseName + '.' + collectionName;
     it('should construct', function(done) {
-      var or = new OplogReader(oplogColl, databaseName + '.' + collectionName);
+      var or = new OplogReader(oplogColl, ns);
       // needs a data handler resume() to start flowing and needs to flow before an end will be emitted
       or.resume();
       or.on('end', done);
@@ -115,7 +116,7 @@ describe('OplogReader', function() {
     });
 
     it('should emit previously inserted items from reading the oplog after offset', function(done) {
-      var or = new OplogReader(oplogColl, databaseName + '.' + collectionName, { offset: offset });
+      var or = new OplogReader(oplogColl, ns, { offset: offset });
       var i = 0;
       or.pipe(new BSONStream()).on('data', function(obj) {
         should.strictEqual(obj.op, 'i');
@@ -126,6 +127,18 @@ describe('OplogReader', function() {
         should.strictEqual(i, 2);
         done();
       });
+    });
+
+    it('should tail and not close', function(done) {
+      var or = new OplogReader(oplogColl, ns, { offset: offset, tailable: true });
+      var i = 0;
+      or.on('data', function() {
+        i++;
+        if (i > 1) {
+          done();
+        }
+      });
+      or.on('end', function() { throw new Error('should not close'); });
     });
   });
 });
