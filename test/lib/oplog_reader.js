@@ -26,6 +26,7 @@
 var should = require('should');
 var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
+var BSONStream = require('bson-stream');
 
 var OplogReader = require('../../lib/oplog_reader');
 var oplogDb, oplogColl;
@@ -116,7 +117,9 @@ describe('OplogReader', function() {
     it('should emit previously inserted items from reading the oplog after offset', function(done) {
       var or = new OplogReader(oplogColl, databaseName + '.' + collectionName, { offset: offset });
       var i = 0;
-      or.on('data', function() {
+      or.pipe(new BSONStream()).on('data', function(obj) {
+        should.strictEqual(obj.op, 'i');
+        should.strictEqual(obj.ns, 'test_oplog_reader.foo');
         i++;
       });
       or.on('end', function() {
