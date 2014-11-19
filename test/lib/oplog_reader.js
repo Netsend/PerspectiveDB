@@ -84,6 +84,10 @@ describe('OplogReader', function() {
       (function() { new OplogReader(oplogColl, 'foo.bar', { offset: '' }); }).should.throw('opts.offset must be an instance of mongodb.Timestamp');
     });
 
+    it('should require opts.includeOffset to be a boolean', function() {
+      (function() { new OplogReader(oplogColl, 'foo.bar', { includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
+    });
+
     it('should require opts.tailable to be a boolean', function() {
       (function() { new OplogReader(oplogColl, 'foo.bar', { tailable: '' }); }).should.throw('opts.tailable must be a boolean');
     });
@@ -139,6 +143,34 @@ describe('OplogReader', function() {
         }
       });
       or.on('end', function() { throw new Error('should not close'); });
+    });
+
+    it('should exclude offset by default', function(done) {
+      oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
+        if (err) { throw err; }
+
+        var or = new OplogReader(oplogColl, ns, { offset: items[1].ts });
+        var i = 0;
+        or.on('data', function() { i++; });
+        or.on('end', function() {
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+    });
+
+    it('should include offset', function(done) {
+      oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
+        if (err) { throw err; }
+
+        var or = new OplogReader(oplogColl, ns, { offset: items[1].ts, includeOffset: true });
+        var i = 0;
+        or.on('data', function() { i++; });
+        or.on('end', function() {
+          should.strictEqual(i, 2);
+          done();
+        });
+      });
     });
   });
 });
