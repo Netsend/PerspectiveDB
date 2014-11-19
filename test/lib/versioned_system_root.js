@@ -26,11 +26,14 @@ if (process.getuid() !== 0) {
 }
 
 var fs = require('fs');
+var net = require('net');
 
 var should = require('should');
 var mongodb = require('mongodb');
-var Timestamp = mongodb.Timestamp;
+var User = require('mongo-bcrypt-user');
+var BSONStream = require('bson-stream');
 
+var Timestamp = mongodb.Timestamp;
 var VersionedSystem = require('../../lib/versioned_system');
 
 var db, db2, oplogDb, oplogColl;
@@ -58,19 +61,80 @@ after(database.disconnect.bind(database));
 
 describe('VersionedSystem', function() {
   describe('initVCs root', function() {
-    it('should call back with all oplog readers', function(done) {
+    it('version newly inserted documents', function(done) {
+      this.timeout(4000);
       var vcCfg = {
-        someDb: {
+        test2: {
           someColl: {
+            dbPort: 27019,
+            debug: false,
+            autoProcessInterval: 100,
             size: 10
           }
         }
       };
-      var vs = new VersionedSystem(oplogColl, { debug: false });
-      vs.initVCs(vcCfg, function(err, oplogReaders) {
+
+      // insert two new documents and see if they're versioned (one of which is already versioned)
+      // if a new snapshot collection is created, rebuild should maintain original versions
+      var docs = [{ foo: 'a' }, { bar: 'b', _v: 'qux' }];
+      db2.collection('someColl').insert(docs, function(err) {
         if (err) { throw err; }
-        should.strictEqual(Object.keys(oplogReaders).length, 1);
-        oplogReaders['someDb.someColl'].on('end', done);
+
+        var vs = new VersionedSystem(oplogColl, { debug: false });
+        vs.initVCs(vcCfg, function(err, oplogReaders) {
+          if (err) { throw err; }
+
+          should.strictEqual(Object.keys(oplogReaders).length, 1);
+
+          // oplog reader should never end
+          var or = oplogReaders['test2.someColl'];
+          or.on('end', function() { throw new Error('oplog reader closed'); });
+
+
+          // should see three modifications in test2.someColl
+          var i = 0;
+          or.pipe(new BSONStream()).on('data', function() {
+            i++;
+            if (i >= 3) {
+              // inspect snapshot collection
+              setTimeout(function() {
+                db2.collection('m3.someColl').find().toArray(function(err, items) {
+                  if (err) { throw err; }
+                  should.strictEqual(items.length, 2);
+                  delete items[0]._id._id;
+                  delete items[0]._id._v;
+                  delete items[0]._m3._op;
+                  delete items[1]._id._id;
+                  delete items[1]._m3._op;
+                  should.deepEqual(items[0], {
+                    foo: 'a',
+                      _id: {
+                        _co: 'someColl',
+                        _pe: '_local',
+                        _pa: [],
+                        _lo: true,
+                        _i: 1
+                      },
+                   _m3: { _ack: true }
+                  });
+                  should.deepEqual(items[1], {
+                    bar: 'b',
+                    _id: {
+                      _co: 'someColl',
+                      _v: 'qux',
+                      _pe: '_local',
+                      _pa: [],
+                      _lo: true,
+                      _i: 2
+                    },
+                  _m3: { _ack: true }
+                  });
+                  done();
+                });
+              }, 100);
+            }
+          });
+        });
       });
     });
   });
@@ -152,7 +216,7 @@ describe('VersionedSystem', function() {
     });
   });
 
-  // do these tests at last
+  // do these tests at last because chroot can be called only once
   describe('createServer', function() {
     it('should require user to be a string', function() {
       var vs = new VersionedSystem(oplogColl);
