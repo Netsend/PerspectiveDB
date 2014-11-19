@@ -4352,6 +4352,44 @@ describe('versioned_collection', function() {
     });
   });
 
+  describe('fixConsistency', function() {
+    var collectionName = 'fixConsistency';
+
+    var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
+    var B = { _id: { _id: 'bar', _v: 'B', _pe: 'I', _pa: []} };
+    var C = { _id: { _id: 'qux', _v: 'C', _pe: 'I', _pa: [] } };
+
+    var snap1;
+
+    it('should process the items the same way as addAllToDAG', function(done){
+      var itemsA;
+      var vcA = new VersionedCollection(db, 'fixConsistencyA', { hide: true });
+      var vcB = new VersionedCollection(db, 'fixConsistencyB', { hide: true });
+      vcA._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+        vcA._snapshotCollection.find().toArray(function(err, itemsA) {
+          vcB._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+            vcB._snapshotCollection.find().toArray(function(err, itemsB) {
+              should.deepEqual(itemsA, itemsB);
+              done();
+            });
+          });
+        });
+      });
+    });
+
+    it('should not add the same version twice and raise an error', function(done) {
+      var collectionName = 'fixConsistency1';
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+        if (err) { throw err; return; }
+        vc._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+          should.equal(err.message, 'version already exists');
+          done();
+        });
+      });
+    });
+  });
+
   describe('_ensureLocalPerspective', function() {
     var collectionName = '_ensureLocalPerspective';
 
