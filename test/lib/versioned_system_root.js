@@ -161,7 +161,12 @@ describe('VersionedSystem', function() {
       var snapshotItem = { foo: 'bar', _m3: { _op: new Timestamp(8000, 9000) } };
       var cfg = {};
       cfg[databaseName] = {};
-      cfg[databaseName][collName] = { size: 1 };
+      cfg[databaseName][collName] = {
+        dbPort: 27019,
+        debug: false,
+        autoProcessInterval: 50,
+        size: 1
+      };
 
       var vs = new VersionedSystem(localOplogColl);
       vs.initVCs(cfg, function(err) {
@@ -177,7 +182,12 @@ describe('VersionedSystem', function() {
       var ns = databaseName + '.' + collName;
       var cfg = {};
       cfg[databaseName] = {};
-      cfg[databaseName][collName] = { size: 1 };
+      cfg[databaseName][collName] = {
+        dbPort: 27019,
+        debug: false,
+        autoProcessInterval: 50,
+        size: 1
+      };
 
       var vs = new VersionedSystem(localOplogColl, { hide: true });
       vs.initVCs(cfg, function(err) {
@@ -197,7 +207,12 @@ describe('VersionedSystem', function() {
       var ns = databaseName + '.' + collName;
       var cfg = {};
       cfg[databaseName] = {};
-      cfg[databaseName][collName] = { size: 1 };
+      cfg[databaseName][collName] = {
+        dbPort: 27019,
+        debug: false,
+        autoProcessInterval: 100,
+        size: 1
+      };
 
       var vs = new VersionedSystem(localOplogColl, { hide: true });
       vs.initVCs(cfg, function(err) {
