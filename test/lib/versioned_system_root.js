@@ -30,7 +30,6 @@ var net = require('net');
 
 var should = require('should');
 var mongodb = require('mongodb');
-var User = require('mongo-bcrypt-user');
 var BSONStream = require('bson-stream');
 
 var Timestamp = mongodb.Timestamp;
@@ -106,6 +105,7 @@ describe('VersionedSystem', function() {
                 delete items[0]._m3._op;
                 delete items[1]._id._id;
                 delete items[1]._m3._op;
+
                 should.deepEqual(items[0], {
                   foo: 'a',
                     _id: {
@@ -227,9 +227,41 @@ describe('VersionedSystem', function() {
       (function() { vs.createServer('foo', 1); }).should.throw('newRoot must be a string');
     });
 
-    it('should chroot', function(done) {
-      var vs = new VersionedSystem(oplogColl);
+    it('needs a valid user account for further testing', function(done) {
+      // i.e. "username" : "foo", "password" : "$2a$10$g.TOamyToPM37K43CDL.tuaYsUc5AnYBOVBKbhV6eeO3/E0u6XN0W", "realm" : "test2"
+      // password = 'secr3t';
+      db.collection('users').insert({
+        username: 'foo',
+        password: '$2a$10$g.TOamyToPM37K43CDL.tuaYsUc5AnYBOVBKbhV6eeO3/E0u6XN0W',
+        realm: 'test2'
+      }, done);
+    });
 
+    it('needs a valid replication config for further testing', function(done) {
+      var cfg = {
+        type: 'export',
+        remote: 'foo',
+        collections: {
+          baz: {
+            filter: { baz: 'A' }
+          }
+        }
+      };
+      db.collection('replication').insert(cfg, done);
+    });
+
+    it('needs an object in the vc test2.baz for further testing', function(done) {
+      var obj1 = { _id: 'X' };
+      var obj2 = { _id: 'A', baz: 'A' };
+      db.db('test2').collection('baz').insert([obj1, obj2], done);
+    });
+
+    it('should require initVCs() first', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
+    });
+
+    it('should chroot, disconnect invalid auth request and auth valid auth requests', function(done) {
       var ls = fs.readdirSync('/');
       should.strictEqual(true, ls.length > 4);
 
@@ -238,12 +270,71 @@ describe('VersionedSystem', function() {
         fs.unlink('/var/run/ms-1234.sock');
       }
 
-      vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
+      var cfg = {
+        test2: {
+          baz: {
+            dbPort: 27019,
+            debug: false,
+            autoProcessInterval: 100,
+            size: 1
+          }
+        }
+      };
+
+      var vs = new VersionedSystem(oplogColl, { usersDb: db.databaseName, replicationDb: db.databaseName, debug: false });
+      vs.initVCs(cfg, true, function(err) {
         if (err) { throw err; }
 
-        should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
-        should.strictEqual(true, process.getuid() > 0);
-        done();
+        // should chroot
+        vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
+          if (err) { throw err; }
+
+          should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
+          should.strictEqual(true, process.getuid() > 0);
+
+          // should disconnect auth request because of invalid password
+          var authReq = {
+            username: 'foo',
+            password: 'bar',
+            database: 'test2',
+            collection: 'baz'
+          };
+
+          // write auth request
+          var ms = net.createConnection('/ms-1234.sock');
+          ms.write(JSON.stringify(authReq) + '\n');
+
+          ms.on('data', function(data) {
+            should.strictEqual(data.toString(), 'invalid auth request\n');
+
+            // should not disconnect a valid auth request
+            var authReq2 = {
+              username: 'foo',
+              password: 'secr3t',
+              database: 'test2',
+              collection: 'baz'
+            };
+
+            // write a new auth request
+            var ms2 = net.createConnection('/ms-1234.sock');
+            ms2.write(JSON.stringify(authReq2) + '\n');
+
+            ms2.pipe(new BSONStream()).on('data', function(obj) {
+	      delete obj._id._v;
+	      delete obj._m3._op;
+              should.deepEqual(obj, {
+		_id: {
+		  _co: 'baz',
+		  _id: 'A',
+		  _pa: []
+		},
+		baz: 'A',
+		_m3: { }
+	      });
+              done();
+            });
+          });
+        });
       });
     });
   });
