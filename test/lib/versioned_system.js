@@ -71,7 +71,7 @@ describe('VersionedSystem', function() {
    * initVCs
    * sendPR
    * chroot
-   * createServer
+   * listen
    * _ensureSnapshotAndOplogOffset
    * _verifyAuthRequest
    */

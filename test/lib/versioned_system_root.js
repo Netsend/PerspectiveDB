@@ -216,15 +216,15 @@ describe('VersionedSystem', function() {
   });
 
   // do these tests at last because chroot can be called only once
-  describe('createServer', function() {
+  describe('listen', function() {
     it('should require user to be a string', function() {
       var vs = new VersionedSystem(oplogColl);
-      (function() { vs.createServer(); }).should.throw('user must be a string');
+      (function() { vs.listen(); }).should.throw('user must be a string');
     });
 
     it('should require newRoot to be a string', function() {
       var vs = new VersionedSystem(oplogColl);
-      (function() { vs.createServer('foo', 1); }).should.throw('newRoot must be a string');
+      (function() { vs.listen('foo', 1); }).should.throw('newRoot must be a string');
     });
 
     it('needs a valid user account for further testing', function(done) {
@@ -258,7 +258,7 @@ describe('VersionedSystem', function() {
 
     it('should require initVCs() first', function() {
       var vs = new VersionedSystem(oplogColl);
-      (function() { vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
+      (function() { vs.listen('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
     });
 
     it('should chroot, disconnect invalid auth request and auth valid auth requests', function(done) {
@@ -286,7 +286,7 @@ describe('VersionedSystem', function() {
         if (err) { throw err; }
 
         // should chroot
-        vs.createServer('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
+        vs.listen('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
           if (err) { throw err; }
 
           should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
@@ -341,7 +341,7 @@ describe('VersionedSystem', function() {
 
   // do these tests at last
   /*
-  tested via createServer
+  tested via listen
   describe('chroot', function() {
     it('should require user to be a string', function() {
       var vs = new VersionedSystem(oplogColl);
