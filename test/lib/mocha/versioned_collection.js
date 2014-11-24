@@ -4390,6 +4390,24 @@ describe('versioned_collection', function() {
     });
   });
 
+  describe('_ensureOneHead', function(){
+    it('should throw not exactly one head', function(done) {
+      var collectionName = 'ensureOneHead';
+  
+      var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
+      var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: [] } };
+      var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: [] } };
+
+      var items = [A, B, C];
+  
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureOneHead(items, function(err) {
+        should.equal(err.message, 'not exactly one head');
+        done();
+      });
+    });
+  });
+
   describe('_ensureLocalPerspective', function() {
     var collectionName = '_ensureLocalPerspective';
 
