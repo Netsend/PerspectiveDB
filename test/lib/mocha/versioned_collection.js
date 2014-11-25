@@ -4390,24 +4390,6 @@ describe('versioned_collection', function() {
     });
   });
 
-  describe('_ensureOneHead', function(){
-    it('should throw not exactly one head', function(done) {
-      var collectionName = 'ensureOneHead';
-  
-      var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
-      var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: [] } };
-      var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: [] } };
-
-      var items = [A, B, C];
-  
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
-      vc._ensureOneHead(items, function(err) {
-        should.equal(err.message, 'not exactly one head');
-        done();
-      });
-    });
-  });
-
   describe('_ensureLocalPerspective', function() {
     var collectionName = '_ensureLocalPerspective';
 
@@ -4554,6 +4536,54 @@ describe('versioned_collection', function() {
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
         ]);
         done();
+      });
+    });
+
+    it('should not create multiple new items if the result in DAG having multiple heads', function(done) {
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      vc._ensureLocalPerspective([ item1, item2, item3 ], function(err, newLocalItems) {
+        if (err) { throw err; }
+        should.deepEqual(newLocalItemsProcess, [
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
+        ]);
+        done();
+      });
+    });
+  });
+
+  describe('_ensureOneHead', function(){
+    it('should throw not exactly one head', function(done) {
+      var collectionName = 'ensureOneHead';
+
+      var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
+      var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: [] } };
+      var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: [] } };
+
+      var items = [A, B, C];
+
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureOneHead(items, function(err) {
+        should.equal(err.message, 'not exactly one head');
+        done();
+      });
+    });
+
+    it('should not be able to _ensureOneHead with the newly created items of ensureLocalPerspective', function(done){
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      vc._ensureLocalPerspective([ item1, item2, item3 ], function(err, newLocalItems) {
+        if (err) { throw err; }
+        vc._ensureOneHead(newLocalItems, function(err, newHeads){
+          should.deepEqual(err.message, 'not exactly one head');
+          done();
+        });
       });
     });
   });
