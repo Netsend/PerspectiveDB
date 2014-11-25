@@ -4578,7 +4578,7 @@ describe('versioned_collection', function() {
   });
 
   describe('_ensureOneHead', function(){
-    it('should throw not exactly one head', function(done) {
+    it('should return A', function(done) {
       var collectionName = 'ensureOneHead';
 
       var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
@@ -4587,22 +4587,23 @@ describe('versioned_collection', function() {
 
       var items = [A, B, C];
 
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
-      vc._ensureOneHead(items, function(err) {
-        should.equal(err.message, 'not exactly one head');
+      var vc = new VersionedCollection(db, collectionName, { hide: true, debug: false });
+      vc._ensureOneHead(items, function(err, nonConflictedHeads) {
+        if (err) { throw err; }
+        should.deepEqual(nonConflictedHeads, [A]);
         done();
       });
     });
 
-    it('should not be able to _ensureOneHead with the newly created items of ensureLocalPerspective', function(done){
+    it('should return B as head', function(done){
       var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2, item3 ], function(err, newLocalItems) {
         if (err) { throw err; }
-        vc._ensureOneHead(newLocalItems, function(err, newHeads){
-          should.deepEqual(err.message, 'not exactly one head');
+        vc._ensureOneHead(newLocalItems, function(err, nonConflictedHeads){
+          should.deepEqual(nonConflictedHeads, [newLocalItems[1]]);
           done();
         });
       });
