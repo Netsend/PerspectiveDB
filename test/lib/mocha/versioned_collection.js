@@ -4390,7 +4390,9 @@ describe('versioned_collection', function() {
         vcA._snapshotCollection.find().toArray(function(err, itemsA) {
           vcB._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
             vcB._snapshotCollection.find().toArray(function(err, itemsB) {
-              should.deepEqual(itemsA, itemsB);
+              should.deepEqual(itemsA[0]._id._v, itemsB[0]._id._v);
+              should.deepEqual(itemsA[1]._id._v, itemsB[1]._id._v);
+              should.deepEqual(itemsA[2]._id._v, itemsB[2]._id._v);
               done();
             });
           });
@@ -4405,6 +4407,20 @@ describe('versioned_collection', function() {
         if (err) { throw err; return; }
         vc._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
           should.equal(err.message, 'version already exists');
+          done();
+        });
+      });
+    });
+
+    it('should not add the same version twice and NOT raise an error', function(done) {
+      var collectionName = 'fixConsistency2';
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+        if (err) { throw err; return; }
+        vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+          vc._snapshotCollection.find().toArray(function(err, items) {
+            should.equal(items.length, 6);
+          });
           done();
         });
       });
