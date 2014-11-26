@@ -4414,11 +4414,12 @@ describe('versioned_collection', function() {
 
     it('should not add the same version twice and NOT raise an error', function(done) {
       var collectionName = 'fixConsistency2';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { hide: false, debug: true });
+      var vc2 = new VersionedCollection(db, collectionName, { hide: false, debug: true });
       vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
         if (err) { throw err; return; }
-        vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-          vc._snapshotCollection.find().toArray(function(err, items) {
+        vc2._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
+          vc2._snapshotCollection.find().toArray(function(err, items) {
             should.equal(items.length, 6);
           });
           done();
