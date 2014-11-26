@@ -23,7 +23,7 @@
 var should = require('should');
 
 var mongodb = require('mongodb');
-var nestNamespace = require('../../lib/nest_namespace');
+var nestNamespace = require('nest-namespace');
 var match = require('../../lib/match');
 
 describe('match', function () {
