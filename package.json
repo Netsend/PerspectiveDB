@@ -24,7 +24,8 @@
     "mongo-bcrypt-user": "~0.0.4",
     "split": "~0.3.0",
     "read": "~1.0.5",
-    "nest-namespace": "~0.0.2"
+    "nest-namespace": "~0.0.2",
+    "match-object": "~0.0.1"
   },
   "devDependencies": {
     "mocha": ">=1.21.4",
