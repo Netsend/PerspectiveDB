@@ -3221,7 +3221,7 @@ describe('versioned_collection', function() {
     var C  = { _id : { _id: 'foo', _v: 'C', _pa: ['B'] } };
     var D  = { _id : { _id: 'foo', _v: 'D', _pa: ['C'] } };
     var E  = { _id : { _id: 'foo', _v: 'E', _pa: ['B'] } };
-    var Ec = { _id : { _id: 'foo', _v: 'E', _pa: ['B'], _c: true } };
+    var Ec = { _id : { _id: 'foo', _v: 'E', _pa: ['B'] }, _m3: {_c: true } };
     var F  = { _id : { _id: 'foo', _v: 'F', _pa: ['E', 'C'] } };
     var G  = { _id : { _id: 'foo', _v: 'G', _pa: ['F'] } };
     var H  = { _id : { _id: 'foo', _v: 'H', _pa: ['F'] } };
