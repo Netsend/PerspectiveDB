@@ -267,6 +267,7 @@ describe('VersionedCollection._merge', function() {
 
     var A = {
       _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux'
@@ -274,6 +275,7 @@ describe('VersionedCollection._merge', function() {
 
     var B = {
       _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux'
@@ -281,6 +283,7 @@ describe('VersionedCollection._merge', function() {
 
     var C = {
       _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['A'] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux'
@@ -288,6 +291,7 @@ describe('VersionedCollection._merge', function() {
 
     var D = {
       _id : { _id: idFoo, _v: 'D', _pe: 'I', _pa: ['B', 'C'] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quz'
@@ -295,6 +299,7 @@ describe('VersionedCollection._merge', function() {
 
     var E = {
       _id : { _id: idFoo, _v: 'E', _pe: 'I', _pa: ['C', 'B'] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'foobar',
       qux: 'qux'
@@ -302,6 +307,7 @@ describe('VersionedCollection._merge', function() {
 
     var F = {
       _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
+      _m3: { _ack: true },
       foo: 'bar',
       bar: 'foobar',
       qux: 'quz'
@@ -326,16 +332,20 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux'
         }]);
+        should.strictEqual(merged[0]._id === A._id, true);
+        should.strictEqual(merged[0]._m3 === A._m3, true);
         done();
       });
     });
 
     it('B and C = merge', function(done) {
       var vc = new VersionedCollection(db, collectionName);
+      console.log(B);
       vc._merge(B, C, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -344,6 +354,10 @@ describe('VersionedCollection._merge', function() {
           bar: 'raboof',
           qux: 'qux'
         }]);
+        should.strictEqual(merged[0]._id === B._id, false);
+        should.strictEqual(merged[0]._m3 === B._m3, false);
+        should.strictEqual(merged[0]._id === C._id, false);
+        should.strictEqual(merged[0]._m3 === C._m3, false);
         done();
       });
     });
@@ -354,10 +368,15 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'E', _pe: 'I', _pa: ['C', 'B'] },
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'qux'
         }]);
+        should.strictEqual(merged[0]._id === B._id, false);
+        should.strictEqual(merged[0]._m3 === B._m3, false);
+        should.strictEqual(merged[0]._id === E._id, true);
+        should.strictEqual(merged[0]._m3 === E._m3, true);
         done();
       });
     });
@@ -386,6 +405,10 @@ describe('VersionedCollection._merge', function() {
           bar: 'foobar',
           qux: 'quz'
         }]);
+        should.strictEqual(merged[0]._id === D._id, false);
+        should.strictEqual(merged[0]._m3 === D._m3, false);
+        should.strictEqual(merged[0]._id === E._id, false);
+        should.strictEqual(merged[0]._m3 === E._m3, false);
         done();
       });
     });
@@ -396,10 +419,15 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
         }]);
+        should.strictEqual(merged[0]._id === F._id, true);
+        should.strictEqual(merged[0]._m3 === F._m3, true);
+        should.strictEqual(merged[0]._id === E._id, false);
+        should.strictEqual(merged[0]._m3 === E._m3, false);
         done();
       });
     });
@@ -410,6 +438,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
@@ -904,6 +933,14 @@ describe('VersionedCollection._merge', function() {
           baz : 'qux',
           bar: 'raboof'
         }]);
+        should.strictEqual(merged[0]._id === AI._id, true);
+        should.strictEqual(merged[0]._id === AII._id, false);
+        should.strictEqual(merged[0]._m3 === AI._m3, true);
+        should.strictEqual(merged[0]._m3 === AII._m3, false);
+        should.strictEqual(merged[1]._id === AI._id, false);
+        should.strictEqual(merged[1]._id === AII._id, true);
+        should.strictEqual(merged[1]._m3 === AI._m3, false);
+        should.strictEqual(merged[1]._m3 === AII._m3, true);
         done();
       });
     });
@@ -924,6 +961,14 @@ describe('VersionedCollection._merge', function() {
           bar: 'raboof',
           some: 'secret'
         }]);
+        should.strictEqual(merged[0]._id === AI._id, false);
+        should.strictEqual(merged[0]._id === AII._id, true);
+        should.strictEqual(merged[0]._m3 === AI._m3, false);
+        should.strictEqual(merged[0]._m3 === AII._m3, true);
+        should.strictEqual(merged[1]._id === AI._id, true);
+        should.strictEqual(merged[1]._id === AII._id, false);
+        should.strictEqual(merged[1]._m3 === AI._m3, true);
+        should.strictEqual(merged[1]._m3 === AII._m3, false);
         done();
       });
     });
@@ -943,6 +988,14 @@ describe('VersionedCollection._merge', function() {
           bar: 'raboof',
           foo: 'bar'
         }]);
+        should.strictEqual(merged[0]._id === BI._id, false);
+        should.strictEqual(merged[0]._id === DII._id, false);
+        should.strictEqual(merged[0]._m3 === BI._m3, false);
+        should.strictEqual(merged[0]._m3 === DII._m3, false);
+        should.strictEqual(merged[1]._id === BI._id, false);
+        should.strictEqual(merged[1]._id === DII._id, true);
+        should.strictEqual(merged[1]._m3 === BI._m3, false);
+        should.strictEqual(merged[1]._m3 === DII._m3, true);
         done();
       });
     });
@@ -961,6 +1014,14 @@ describe('VersionedCollection._merge', function() {
           bar: 'foo',
           foo: 'bar'
         }]);
+        should.strictEqual(merged[0]._id === EI._id, false);
+        should.strictEqual(merged[0]._id === DII._id, false);
+        should.strictEqual(merged[0]._m3 === EI._m3, false);
+        should.strictEqual(merged[0]._m3 === DII._m3, false);
+        should.strictEqual(merged[1]._id === EI._id, false);
+        should.strictEqual(merged[1]._id === DII._id, false);
+        should.strictEqual(merged[1]._m3 === EI._m3, false);
+        should.strictEqual(merged[1]._m3 === DII._m3, false);
         done();
       });
     });
@@ -975,6 +1036,10 @@ describe('VersionedCollection._merge', function() {
           bar: 'foo',
           some: 'secret'
         }]);
+        should.strictEqual(merged[0]._id === EI._id, true);
+        should.strictEqual(merged[0]._id === BI._id, false);
+        should.strictEqual(merged[0]._m3 === EI._m3, true);
+        should.strictEqual(merged[0]._m3 === BI._m3, false);
         done();
       });
     });
@@ -994,6 +1059,14 @@ describe('VersionedCollection._merge', function() {
           bar: 'raboof',
           foo: 'bar'
         });
+        should.strictEqual(merged[0]._id === BI._id, false);
+        should.strictEqual(merged[0]._id === CII._id, false);
+        should.strictEqual(merged[0]._m3 === BI._m3, false);
+        should.strictEqual(merged[0]._m3 === CII._m3, false);
+        should.strictEqual(merged[1]._id === BI._id, false);
+        should.strictEqual(merged[1]._id === CII._id, false);
+        should.strictEqual(merged[1]._m3 === BI._m3, false);
+        should.strictEqual(merged[1]._m3 === CII._m3, false);
         done();
       });
     });
@@ -1027,6 +1100,58 @@ describe('VersionedCollection._merge', function() {
           should.equal(err.message, 'no lca found');
           done();
         });
+      });
+    });
+
+    it('should not have had any side effects on merged objects', function() {
+      should.deepEqual(AI, {
+        _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
+        _m3: { _ack: true },
+        baz : 'qux',
+        bar: 'raboof',
+        some: 'secret'
+      });
+
+      should.deepEqual(BI, {
+        _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
+        _m3: { _ack: true },
+        bar: 'raboof',
+        some: 'secret'
+      });
+
+      should.deepEqual(EI, {
+        _id : { _id: idFoo, _v: 'E', _pe: 'I', _pa: ['B'] },
+        _m3: { _ack: true },
+        bar: 'foo',
+        some: 'secret'
+      });
+
+      should.deepEqual(AII, {
+        _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
+        _m3: { _ack: false },
+        baz : 'qux',
+        bar: 'raboof'
+      });
+
+      should.deepEqual(BII, {
+        _id : { _id: idFoo, _v: 'B', _pe: 'II', _pa: ['A'] },
+        _m3: { _ack: false },
+        bar: 'raboof'
+      });
+
+      should.deepEqual(CII, {
+        _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['A'] },
+        _m3: { _ack: false },
+        baz : 'qux',
+        bar: 'raboof',
+        foo: 'bar'
+      });
+
+      should.deepEqual(DII, {
+        _id : { _id: idFoo, _v: 'D', _pe: 'II', _pa: ['C', 'B'] },
+        _m3: { _ack: false },
+        bar: 'raboof',
+        foo: 'bar'
       });
     });
   });
