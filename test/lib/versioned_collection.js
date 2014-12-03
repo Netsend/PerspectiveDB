@@ -4394,15 +4394,18 @@ describe('versioned_collection', function() {
     });
 
     it('should create a local clone if the snapshot collection is empty', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
-      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
-      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
+      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
         if (err) { throw err; }
-        should.deepEqual(newLocalItems, [
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
-        ]);
+        should.strictEqual(newLocalItems.length, 2);
+        should.deepEqual(newLocalItems[0], {
+          _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) }
+        });
+        should.deepEqual(newLocalItems[1], {
+          _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) }
+        });
         done();
       });
     });
@@ -4411,11 +4414,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
       var itemI = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [], _i: 1  }, _m3: { _ack: true, _op: new Timestamp(1, 1) } };
       var itemII = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
-      vc._snapshotCollection.insert([itemI, itemII], function(err, inserted) {
-        if (err) { throw err; }
-        should.equal(inserted.length, 2);
-        done();
-      });
+      vc._snapshotCollection.insert([itemI, itemII], done);
     });
 
     it('should not create new items if item already exists (input _pe local)', function(done) {
@@ -4472,7 +4471,7 @@ describe('versioned_collection', function() {
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
-        should.deepEqual(newLocalItems, [ { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } , _m3: { _ack: false, _op: new Timestamp(0, 0) } } ]);
+        should.deepEqual(newLocalItems, [ { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } } ]);
         done();
       });
     });
@@ -4505,7 +4504,7 @@ describe('versioned_collection', function() {
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
         should.deepEqual(newLocalItems, [
-          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: [] } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
         ]);
         done();
       });
