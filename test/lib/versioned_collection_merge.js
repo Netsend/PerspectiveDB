@@ -120,13 +120,16 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(A, A, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
-          _m3: {}
-        }]);
+          _m3: { _ack: true }
+        });
+        should.strictEqual(merged[0]._id === A._id, true);
+        should.strictEqual(merged[0]._m3 === A._m3, true);
         done();
       });
     });
@@ -135,13 +138,18 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(A, B, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
-          _m3: {}
-        }]);
+          _m3: { _ack: true }
+        });
+        should.strictEqual(merged[0]._id === A._id, false);
+        should.strictEqual(merged[0]._id === B._id, true);
+        should.strictEqual(merged[0]._m3 === A._m3, false);
+        should.strictEqual(merged[0]._m3 === B._m3, true);
         done();
       });
     });
@@ -150,13 +158,18 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(A, C, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'], _d: true },
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
+          _id: { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'], _d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
-          _m3: {}
-        }]);
+          _m3: { _ack: true }
+        });
+        should.strictEqual(merged[0]._id === A._id, false);
+        should.strictEqual(merged[0]._id === C._id, true);
+        should.strictEqual(merged[0]._m3 === A._m3, false);
+        should.strictEqual(merged[0]._m3 === C._m3, true);
         done();
       });
     });
@@ -165,13 +178,18 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(C, B, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'], _d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
-          _m3: {}
-        }]);
+          _m3: { _ack: true }
+        });
+        should.strictEqual(merged[0]._id === B._id, false);
+        should.strictEqual(merged[0]._id === C._id, true);
+        should.strictEqual(merged[0]._m3 === B._m3, false);
+        should.strictEqual(merged[0]._m3 === C._m3, true);
         done();
       });
     });
@@ -180,13 +198,18 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(A, D, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _id: idFoo, _v: 'D', _pe: 'I', _pa: ['A'], _d: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
-          _m3: {}
-        }]);
+          _m3: { _ack: true }
+        });
+        should.strictEqual(merged[0]._id === A._id, false);
+        should.strictEqual(merged[0]._id === D._id, true);
+        should.strictEqual(merged[0]._m3 === A._m3, false);
+        should.strictEqual(merged[0]._m3 === D._m3, true);
         done();
       });
     });
@@ -195,13 +218,17 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName, { hide: true });
       vc._merge(B, D, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _co: 'maintainM3', _id: idFoo, _v: null, _pe: 'I', _pa: ['B', 'D'], _lo: true },
           foo: 'bar',
           bar: 'baz',
-          qux: 'qux',
-          _m3: {}
-        }]);
+          qux: 'qux'
+        });
+        should.strictEqual(merged[0]._id === B._id, false);
+        should.strictEqual(merged[0]._id === D._id, false);
+        should.strictEqual(merged[0]._m3 === B._m3, false);
+        should.strictEqual(merged[0]._m3 === D._m3, false);
         done();
       });
     });
@@ -219,17 +246,20 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName);
       vc._merge(C, D, function(err, merged) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
+        should.strictEqual(merged.length, 1);
+        should.deepEqual(merged[0], {
           _id : { _co: 'maintainM3', _id: idFoo, _v: null, _pe: 'I', _pa: ['C', 'D'], _lo: true, _d: true },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
-        }]);
+        });
+        should.strictEqual(merged[0]._id === C._id, false);
+        should.strictEqual(merged[0]._id === D._id, false);
+        should.strictEqual(merged[0]._m3 === C._m3, false);
+        should.strictEqual(merged[0]._m3 === D._m3, false);
         done();
       });
     });
-
   });
 
   describe('one perspective', function() {
@@ -864,13 +894,13 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           baz : 'qux',
           bar: 'raboof',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           baz : 'qux',
           bar: 'raboof'
         }]);
@@ -884,12 +914,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           baz : 'qux',
           bar: 'raboof'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           baz : 'qux',
           bar: 'raboof',
           some: 'secret'
@@ -904,13 +934,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'D', _pe: 'I', _pa: ['C', 'B'] },
-          _m3: {},
           bar: 'raboof',
           some: 'secret',
           foo: 'bar'
         }, {
           _id : { _id: idFoo, _v: 'D', _pe: 'II', _pa: ['C', 'B'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar'
         }]);
@@ -924,13 +953,11 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, _v: null, _pe: 'I', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           some: 'secret',
           foo: 'bar'
         }, {
           _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, _v: null, _pe: 'II', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           foo: 'bar'
         }]);
@@ -944,7 +971,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'E', _pe: 'I', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: true },
           bar: 'foo',
           some: 'secret'
         }]);
@@ -958,14 +985,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged[0], {
           _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, _v: null, _pe: 'I', _pa: ['B', 'C'], _lo: true },
-          _m3: {},
           bar: 'raboof',
           some: 'secret',
           foo: 'bar'
         });
         should.deepEqual(merged[1], {
           _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, _v: null, _pe: 'II', _pa: ['B', 'C'], _lo: true },
-          _m3: {},
           bar: 'raboof',
           foo: 'bar'
         });
@@ -977,12 +1002,10 @@ describe('VersionedCollection._merge', function() {
       var vc = new VersionedCollection(db, collectionName, { hide: true });
       var vm1 = { // add c: 'foo'
         _id : { _id: idFoo, _pe: 'I', _pa: ['A'] },
-        _m3: {},
         foo: 'bar'
       };
       var vm2 = { // add c: 'bar'
         _id : { _id: idFoo, _pe: 'II', _pa: ['A'] },
-        _m3: {},
         foo: 'baz'
       };
 
@@ -1077,7 +1100,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
@@ -1093,7 +1116,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
@@ -1109,7 +1132,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
@@ -1125,7 +1148,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
         }]);
@@ -1139,7 +1162,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'II', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'baz',
           qux: 'qux'
         }]);
@@ -1153,7 +1176,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'II', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'baz',
           qux: 'qux'
         }]);
@@ -1167,14 +1190,14 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
         }]);
@@ -1188,12 +1211,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
@@ -1209,12 +1232,11 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'II', _pa: ['A'] },
-          _m3: {},
           bar: 'baz',
           qux: 'qux'
         }, {
           _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
@@ -1230,14 +1252,13 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'B', _pe: 'I', _pa: ['A'] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'B', _pe: 'II', _pa: ['A'] },
-          _m3: {},
           bar: 'baz',
           qux: 'qux'
         }]);
@@ -1251,14 +1272,13 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'] },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
         }]);
@@ -1272,12 +1292,11 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
         }, {
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'] },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -1293,7 +1312,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
         }]);
@@ -1307,7 +1326,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
         }]);
@@ -1321,7 +1340,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -1337,7 +1356,7 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -1475,14 +1494,14 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux'
@@ -1497,14 +1516,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'I', _pa: ['B', 'C'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
           some: 'secret'
         }, {
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'II', _pa: ['B', 'C'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -1519,14 +1536,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'I', _pa: ['D', 'E'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
           some: 'secret'
         }, {
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'II', _pa: ['D', 'E'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
@@ -1541,13 +1556,11 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'II', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
         }, {
           _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, _v: null, _pe: 'I', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
@@ -1563,14 +1576,13 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'F', _pe: 'II', _pa: ['D', 'E'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
@@ -1585,13 +1597,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'F', _pe: 'II', _pa: ['D', 'E'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
         }, {
           _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
-          _m3: {},
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
@@ -1716,7 +1727,6 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'F', _pe: 'II', _pa: ['C', 'D', 'E'] },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           c: true,
@@ -1724,7 +1734,7 @@ describe('VersionedCollection._merge', function() {
           e: true
         }, {
           _id : { _id: idFoo, _v: 'F', _pe: 'I', _pa: ['C', 'D', 'E'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
           c: true,
@@ -1742,13 +1752,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'C', _pe: 'II', _pa: ['B'] },
-          _m3: {},
           foo: 'bar',
           bar: 'raboof',
           c: true
         }, {
           _id : { _id: idFoo, _v: 'C', _pe: 'I', _pa: ['B'] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
           c: true,
@@ -1764,14 +1773,14 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'A', _pe: 'I', _pa: [] },
-          _m3: {},
+          _m3: { _ack: false },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
           _id : { _id: idFoo, _v: 'A', _pe: 'II', _pa: [] },
-          _m3: {},
+          _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux'
@@ -1982,7 +1991,6 @@ describe('VersionedCollection._merge', function() {
         should.equal(merged.length, 1);
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, _v: null, _pe: 'I', _pa: ['G', 'F'], _lo: true },
-          _m3: {},
           a: true,
           b: true,
           c: true,
@@ -2002,7 +2010,6 @@ describe('VersionedCollection._merge', function() {
         should.equal(merged.length, 2);
         should.deepEqual(merged, [{
           _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, _v: null, _pe: 'II', _pa: ['G', 'F'], _lo: true },
-          _m3: {},
           a: true,
           b: true,
           c: true,
@@ -2011,7 +2018,6 @@ describe('VersionedCollection._merge', function() {
           g: true,
         }, {
           _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, _v: null, _pe: 'I', _pa: ['G', 'F'], _lo: true },
-          _m3: {},
           a: true,
           b: true,
           c: true,
@@ -2030,7 +2036,6 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'H', _pe: 'II', _pa: ['F', 'G'] },
-          _m3: {},
           a: true,
           b: true,
           c: true,
@@ -2041,7 +2046,7 @@ describe('VersionedCollection._merge', function() {
           h: true
         }, {
           _id : { _id: idFoo, _v: 'H', _pe: 'I', _pa: ['F', 'G'] },
-          _m3: {},
+          _m3: { _ack: false },
           a: true,
           b: true,
           c: true,
@@ -2091,7 +2096,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, _v: null, _pe: 'II', _pa: ['G', 'F'], _lo: true },
-            _m3: {},
             a: true,
             b: true,
             c: true,
@@ -2100,7 +2104,6 @@ describe('VersionedCollection._merge', function() {
             g: true,
           }, {
             _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, _v: null, _pe: 'I', _pa: ['G', 'F'], _lo: true },
-            _m3: {},
             a: true,
             b: true,
             c: true,
@@ -2120,7 +2123,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, _v: null, _pe: 'I', _pa: ['F', 'G'], _lo: true },
-            _m3: {},
             a: true,
             b: true,
             c: true,
@@ -2130,7 +2132,6 @@ describe('VersionedCollection._merge', function() {
             some: 'secret'
           }, {
             _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, _v: null, _pe: 'II', _pa: ['F', 'G'], _lo: true },
-            _m3: {},
             a: true,
             b: true,
             c: true,
@@ -2428,7 +2429,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 1);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: idFoo, _v: null, _pe: 'I', _pa: ['F', 'G'], _lo: true },
-            _m3: {},
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2448,7 +2448,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 1);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: idFoo, _v: null, _pe: 'I', _pa: ['I', 'J'], _lo: true },
-            _m3: {},
             c: 'foo',
             d: 'baz',
             e: 'II',
@@ -2489,7 +2488,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, _v: null, _pe: 'II', _pa: ['F', 'G'], _lo: true },
-            _m3: {},
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2498,7 +2496,6 @@ describe('VersionedCollection._merge', function() {
             g: true,
           }, {
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, _v: null, _pe: 'I', _pa: ['F', 'G'], _lo: true },
-            _m3: {},
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2518,7 +2515,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _id: idFoo, _v: 'I', _pe: 'I', _pa: ['F', 'G', 'H'] },
-            _m3: {},
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2529,7 +2525,7 @@ describe('VersionedCollection._merge', function() {
             some: 'secret'
           }, {
             _id : { _id: idFoo, _v: 'I', _pe: 'II', _pa: ['F', 'G', 'H'] },
-            _m3: {},
+            _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2549,7 +2545,7 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _id: idFoo, _v: 'I', _pe: 'I', _pa: ['F', 'G', 'H'] },
-            _m3: {},
+            _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
             e: 'II',
@@ -2560,7 +2556,7 @@ describe('VersionedCollection._merge', function() {
             some: 'secret'
           }, {
             _id : { _id: idFoo, _v: 'I', _pe: 'II', _pa: ['F', 'G', 'H'] },
-            _m3: {},
+            _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2590,7 +2586,6 @@ describe('VersionedCollection._merge', function() {
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, _v: null, _pe: 'I', _pa: ['J', 'I'], _lo: true },
-            _m3: {},
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2602,7 +2597,6 @@ describe('VersionedCollection._merge', function() {
             some: 'secret'
           }, {
             _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, _v: null, _pe: 'II', _pa: ['J', 'I'], _lo: true },
-            _m3: {},
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2691,14 +2685,13 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _id: idFoo, _v: 'D', _pe: 'I', _pa: ['C', 'B'] },
-          _m3: { },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar',
           d: true
         }, {
           _id : { _id: idFoo, _v: 'D', _pe: 'II', _pa: ['C', 'B'] },
-          _m3: { },
+          _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar',
           d: true
@@ -2713,14 +2706,12 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeMergeWithPatches', _id: idFoo, _v: null, _pe: 'I', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
           d: true
         }, {
           _id : { _co: '_mergeMergeWithPatches', _id: idFoo, _v: null, _pe: 'II', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           foo: 'bar',
           d: true
@@ -2841,7 +2832,6 @@ describe('VersionedCollection._merge', function() {
         should.equal(merged.length, 2);
         should.deepEqual(merged[0], {
           _id : { _id: idFoo, _v: 'D', _pe: 'I', _pa: ['C', 'B'] },
-          _m3: { },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar',
@@ -2850,7 +2840,7 @@ describe('VersionedCollection._merge', function() {
         });
         should.deepEqual(merged[1], {
           _id : { _id: idFoo, _v: 'D', _pe: 'II', _pa: ['C', 'B'] },
-          _m3: { },
+          _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar',
           c: 'baz',
@@ -2866,7 +2856,6 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, _v: null, _pe: 'I', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
@@ -2875,7 +2864,6 @@ describe('VersionedCollection._merge', function() {
           d: true
         }, {
           _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, _v: null, _pe: 'II', _pa: ['E', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           foo: 'bar',
           c: 'baz',
@@ -2892,7 +2880,6 @@ describe('VersionedCollection._merge', function() {
         if (err) { throw err; }
         should.deepEqual(merged, [{
           _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, _v: null, _pe: 'I', _pa: ['F', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
@@ -2902,7 +2889,6 @@ describe('VersionedCollection._merge', function() {
           f: true
         }, {
           _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, _v: null, _pe: 'II', _pa: ['F', 'D'], _lo: true },
-          _m3: {},
           bar: 'foo',
           foo: 'bar',
           c: 'baz',
