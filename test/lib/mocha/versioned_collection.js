@@ -4414,8 +4414,8 @@ describe('versioned_collection', function() {
 
     it('should not add the same version twice and NOT raise an error', function(done) {
       var collectionName = 'fixConsistency2';
-      var vc = new VersionedCollection(db, collectionName, { hide: false, debug: true });
-      var vc2 = new VersionedCollection(db, collectionName, { hide: false, debug: true });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, debug: false });
+      var vc2 = new VersionedCollection(db, collectionName, { hide: true, debug: false });
       vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
         if (err) { throw err; return; }
         vc2._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
@@ -4598,9 +4598,9 @@ describe('versioned_collection', function() {
     it('should return A', function(done) {
       var collectionName = 'ensureOneHead';
 
-      var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
-      var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: [] } };
-      var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: [] } };
+      var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] }, _m3: {} };
+      var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: [] }, _m3: {} };
+      var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: [] }, _m3: {} };
 
       var items = [A, B, C];
 
@@ -4621,6 +4621,43 @@ describe('versioned_collection', function() {
         if (err) { throw err; }
         vc._ensureOneHead(newLocalItems, function(err, nonConflictedHeads){
           should.deepEqual(nonConflictedHeads, [newLocalItems[1]]);
+          done();
+        });
+      });
+    });
+  });
+
+  describe('_markConflicts', function() {
+    var collectionName = 'markConflicts';
+
+    var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] }, _m3: { s:2, _ack: false, _op: new Timestamp(0, 0)}, foo1: '-1' };
+    var B = { _id: { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { s:2, _ack: false, _op: new Timestamp(0, 0) }, foo2: '0' };
+    var C = { _id: { _id: 'foo', _v: 'C', _pe: 'I', _pa: ['A'] }, _m3: { s:2, _ack: false, _op: new Timestamp(0, 0) }, foo3: '1' };
+    var D = { _id: { _id: 'foo', _v: 'D', _pe: 'I', _pa: ['A'] }, _m3: { s:2, _ack: false, _op: new Timestamp(0, 0) }, foo4: '2' };
+
+    it('should mark C and D as conflict', function(done){
+      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      vc._ensureLocalPerspective2([ A, B, C, D ], function(err, newLocalItems) {
+        if (err) { throw err; }
+        vc._ensureOneHead(newLocalItems, function(err){
+          should.deepEqual(newLocalItems[0]._m3._c, undefined);
+          should.deepEqual(newLocalItems[1]._m3._c, undefined);
+          should.deepEqual(newLocalItems[2]._m3._c, true);
+          should.deepEqual(newLocalItems[3]._m3._c, true);
+          done();
+        });
+      });
+    });
+
+    it('should mark C and D as conflict and write it to snapshotcollection', function(done){
+      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      vc._ensureAllInDAG([ {item: A}, {item: B}, {item: C}, {item: D} ], function(err) {
+        if (err) { throw err; }
+        vc._snapshotCollection.find().toArray(function(err, items) {
+          should.deepEqual(items[4]._m3._c, undefined);
+          should.deepEqual(items[5]._m3._c, undefined);
+          should.deepEqual(items[6]._m3._c, true);
+          should.deepEqual(items[7]._m3._c, true);
           done();
         });
       });
@@ -5804,7 +5841,7 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
       vc._snapshotCollection.insert(snapshots, {w: 1}, done);
     });
-    
+
     it('should callback with the last received snapshot version for the perspective', function(done) {
       var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
       vc.determineRemoteOffset('euromastercontracts', function(err, result) {
