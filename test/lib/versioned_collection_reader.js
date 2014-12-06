@@ -683,6 +683,18 @@ describe('versioned_collection', function() {
     });
   });
 
+  describe('close', function() {
+    var collectionName = 'tail';
+    it('should close', function(done) {
+      // should not find A twice for merge F
+      var vc = new VersionedCollectionReader(db, collectionName, { follow: true });
+
+      vc.on('end', done);
+      vc.resume();
+      vc.close();
+    });
+  });
+
   describe('runHooks', function() {
     it('should accept empty array', function(done) {
       var item = { foo: 'bar' };
