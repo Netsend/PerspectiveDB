@@ -75,11 +75,12 @@ tasks.push(function(done) {
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
@@ -119,7 +120,7 @@ tasks.push(function(done) {
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
@@ -186,7 +187,7 @@ tasks.push(function(done) {
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
@@ -240,11 +241,12 @@ tasks.push(function(done) {
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
@@ -288,11 +290,12 @@ tasks.push(function(done) {
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
