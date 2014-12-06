@@ -84,12 +84,17 @@ tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
+  //child.stdout.pipe(process.stdout);
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stdout);
   child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
+    buff += data;
   });
+
   child.on('exit', function(code, sig) {
     assert.strictEqual(buff.length, 0);
-    assert.strictEqual(code, 143);
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
