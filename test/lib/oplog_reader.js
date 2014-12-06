@@ -51,6 +51,8 @@ before(function(done) {
 after(database.disconnect.bind(database));
 
 describe('OplogReader', function() {
+  var ns = databaseName + '.' + collectionName;
+
   describe('constructor', function() {
     it('should require oplogColl to be an instance of mongdb.Collection', function() {
       (function() { new OplogReader(); }).should.throw('oplogColl must be an instance of mongodb.Collection');
@@ -104,7 +106,6 @@ describe('OplogReader', function() {
       (function() { new OplogReader(oplogColl, 'foo.bar', { hide: '' }); }).should.throw('opts.hide must be a boolean');
     });
 
-    var ns = databaseName + '.' + collectionName;
     it('should construct', function(done) {
       var or = new OplogReader(oplogColl, ns);
       // needs a data handler resume() to start flowing and needs to flow before an end will be emitted
@@ -173,4 +174,15 @@ describe('OplogReader', function() {
       });
     });
   });
+
+  describe('close', function() {
+    it('should close', function(done) {
+      var or = new OplogReader(oplogColl, ns, { tailable: true });
+
+      or.on('end', done);
+      or.resume();
+      or.close();
+    });
+  });
+
 });
