@@ -87,7 +87,7 @@ tasks.push(function(done) {
   //child.stdout.pipe(process.stdout);
 
   child.stderr.setEncoding('utf8');
-  child.stderr.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
   child.stderr.on('data', function(data) {
     buff += data;
   });
