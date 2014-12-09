@@ -30,7 +30,7 @@ var get = require('./lib/get_selector');
 var _db = require('./bin/_db');
 var VersionedSystem = require('./lib/versioned_system');
 
-var programName = path.basename(__filename, '.js');
+var programName = path.basename(__filename);
 
 function sendPRs(vs, remotes) {
   Object.keys(remotes).forEach(function(remoteKey) {
@@ -60,6 +60,11 @@ var configFile = program.args[0];
 
 if (!configFile) {
   program.help();
+}
+
+if (process.getuid() !== 0) {
+  console.error('%s: need root privileges', programName);
+  process.exit(1);
 }
 
 // if relative, prepend current working dir
