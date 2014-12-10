@@ -94,6 +94,8 @@ if (remoteConfig) {
 
 if (program.debug) { console.log('remote config', remoteConfig); }
 
+console.time('runtime');
+
 function start(db) {
   (function(cb) {
     var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
@@ -142,7 +144,10 @@ function start(db) {
       console.error(d.getTime(), d);
       process.exit(6);
     }
-    if (program.debug) { console.log(new Date(), 'server: start came to an end'); }
+    if (program.debug) {
+      console.log(new Date(), 'server down');
+      console.timeEnd('runtime');
+    }
     db.close();
   });
 }
