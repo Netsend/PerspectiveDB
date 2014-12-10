@@ -35,16 +35,14 @@ var programName = path.basename(__filename);
 function sendPRs(vs, remotes) {
   Object.keys(remotes).forEach(function(remoteKey) {
     var remote = remotes[remoteKey];
-    var remoteDb = remote.remote.split('.')[0];
-    var remoteColl = remote.remote.split('.').slice(1).join();
     var pr = {
       username:   remote.username,
       password:   remote.password,
       path:       remote.path,
       host:       remote.host,
       port:       remote.port,
-      database:   remoteDb,
-      collection: remoteColl
+      database:   remote.database,
+      collection: remote.collection
     };
     vs.sendPR(remote.vc, pr);
   });
@@ -74,25 +72,19 @@ if (configFile[0] !== '/') {
 
 var config = properties.parse(fs.readFileSync(configFile, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
-var remoteConfig = get(config, 'main.remotes');
+var remoteLogin = get(config, 'remotes');
 
 // find out if any remotes need to be initiated
-if (remoteConfig) {
-  if (typeof remoteConfig !== 'string') {
-    throw new TypeError('main.remotes must be a string');
-  }
-
+if (typeof remoteLogin === 'string') {
   // if relative, prepend path to config file
-  if (remoteConfig[0] !== '/') {
-    remoteConfig = path.dirname(configFile) + '/' + remoteConfig;
+  if (remoteLogin[0] !== '/') {
+    remoteLogin = path.dirname(configFile) + '/' + remoteLogin;
   }
 
-  remoteConfig = properties.parse(fs.readFileSync(remoteConfig, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
-} else {
-  remoteConfig = get(config, 'remotes');
+  remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
 }
 
-if (program.debug) { console.log('remote config', remoteConfig); }
+if (program.debug) { console.log('remote config', remoteLogin); }
 
 console.time('runtime');
 
@@ -117,14 +109,20 @@ function start(db) {
           if (err) { cb(err); return; }
 
           // find out if any remotes need to be initiated
-          if (remoteConfig) { sendPRs(vs, remoteConfig); }
+          if (remoteLogin) {
+            console.log('pull requests', remoteLogin);
+            sendPRs(vs, remoteLogin);
+          }
         });
       } else {
         // chroot
         vs.chroot(get(config, 'main.user'), { path: get(config, 'main.chroot') });
 
         // find out if any remotes need to be initiated
-        if (remoteConfig) { sendPRs(vs, remoteConfig); }
+        if (remoteLogin) {
+          console.log('pull requests', remoteLogin);
+          sendPRs(vs, remoteLogin);
+        }
       }
     });
 
