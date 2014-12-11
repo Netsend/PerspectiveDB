@@ -31,7 +31,7 @@ var childProcess = require('child_process');
 var async = require('async');
 
 var tasks = [];
-var tasks2 = [];
+//var tasks2 = [];
 
 // should require serverConfig.port to be a number
 tasks.push(function(done) {
@@ -59,6 +59,45 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  });
+});
+
+// should not start if socket path is taken by a regular file
+tasks.push(function(done) {
+  // ensure normal file
+  if (fs.existsSync('/var/run/ms-1234.sock')) {
+    fs.unlinkSync('/var/run/ms-1234.sock');
+  }
+  fs.open('/var/run/ms-1234.sock', 'wx', function(err) {
+    if (err) { throw err; }
+
+    var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+
+    var stdout = '';
+    var stderr = '';
+    child.stdout.setEncoding('utf8');
+    child.stderr.setEncoding('utf8');
+    child.stdout.on('data', function(data) { stdout += data; });
+    child.stderr.on('data', function(data) { stderr += data; });
+    child.on('exit', function(code, sig) {
+      assert(/path already exists and is not a socket/.test(stderr));
+      assert.strictEqual(code, 8);
+      assert.strictEqual(sig, null);
+      fs.unlink('/var/run/ms-1234.sock');
+      done();
+    });
+
+    child.on('message', function(msg) {
+      switch (msg) {
+      case 'init':
+        child.send({
+          serverConfig: {
+            port: 1234
+          }
+        });
+        break;
+      }
+    });
   });
 });
 
@@ -97,6 +136,40 @@ tasks.push(function(done) {
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
       assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      child.kill();
+      break;
+    }
+  });
+});
+
+// should remove any previously created sockets
+tasks.push(function(done) {
+  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        serverConfig: {
+          port: 1234
+        }
+      });
+      break;
+    case 'listen':
       child.kill();
       break;
     }
