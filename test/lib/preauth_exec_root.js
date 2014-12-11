@@ -399,6 +399,62 @@ tasks.push(function(done) {
   });
 });
 
+// should open a port on the local network interface by default
+tasks.push(function(done) {
+  var authReq = {
+    username: 'foo',
+    password: 'bar',
+    database: 'qux',
+    collection: 'baz'
+  };
+
+  // remove any previously created socket
+  if (fs.existsSync('/var/run/ms-1234.sock')) {
+    fs.unlink('/var/run/ms-1234.sock');
+  }
+
+  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        serverConfig: {
+          port: 1234
+        }
+      });
+      break;
+    case 'listen':
+      // write auth request
+      var ms = net.createConnection(1234, '127.0.0.1');
+      ms.end(JSON.stringify(authReq) + '\n');
+      break;
+    default:
+      assert.deepEqual(msg, {
+        username: 'foo',
+        password: 'bar',
+        database: 'qux',
+        collection: 'baz'
+      });
+      child.kill();
+    }
+  });
+});
+
 async.series(tasks, function(err) {
   if (err) {
     console.error(err);
