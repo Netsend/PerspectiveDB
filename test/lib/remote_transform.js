@@ -77,4 +77,26 @@ describe('RemoteTransform', function() {
     rt.on('data', function() { throw new Error('should not emit'); });
     rt.end({});
   });
+
+  it('should emit an error if error is set as the only key', function(done) {
+    var rt = new RemoteTransform('foo', { hide: true });
+    rt.on('error', function(err) {
+      should.strictEqual(err.message, 'some error');
+      done();
+    });
+
+    rt.on('data', function() { throw new Error('should not emit'); });
+    rt.end({ error: 'some error' });
+  });
+
+  it('should emit data when error is not the only key', function(done) {
+    var rt = new RemoteTransform('foo', { hide: true });
+    rt.on('data', function(data) {
+      should.deepEqual(data, { error: 'some error', _id: { some: 'not only error', _pe: 'foo' } });
+      done();
+    });
+
+    rt.on('err', function(err) { throw err; });
+    rt.end({ error: 'some error', _id: { some: 'not only error' } });
+  });
 });
