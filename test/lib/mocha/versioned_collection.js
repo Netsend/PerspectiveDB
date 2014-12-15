@@ -3711,15 +3711,16 @@ describe('versioned_collection', function() {
     });
   });
 
-  describe('_addAllToDAG', function() {
+  describe('_ensureAllInDAG', function() {
     describe('one perspective', function() {
-      var collectionName = '_addAllToDAGOnePe';
+      var collectionName = '_ensureAllInDAGOnePe';
 
       it('should require all items to have the same perspective', function(done) {
         var vc = new VersionedCollection(db, collectionName, { hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
+          console.log(err.message);
           should.equal(err.message, 'perspective mismatch');
           done();
         });
@@ -3729,28 +3730,35 @@ describe('versioned_collection', function() {
         var vc = new VersionedCollection(db, collectionName, { hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: [] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           should.equal(err.message, 'root preceded');
           done();
         });
       });
 
-      it('should require to have one head', function(done) {
+      it('should mark the extra head as conflict', function(done) {
         var vc = new VersionedCollection(db, collectionName, { hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
         var item3 = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['A'] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }, { item: item3 }], function(err) {
-          should.equal(err.message, 'not exactly one head');
-          done();
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }, { item: item3 }], function(err) {
+          if (err) { throw err; }
+          vc._snapshotCollection.findOne({'_id._id' : 'foo', '_id._v' : 'C', '_id._pe' : '_local'}, function(err, item) {
+            should.deepEqual(item, {
+              '_id':{'_id':'foo','_v':'C','_pe':'_local','_pa':['A'],'_i':3},
+              '_m3':{'_ack':false,'_op':new Timestamp(0, 0),'_c':true}}
+            );
+            done();
+          });
         });
       });
 
       it('should insert both items with root', function(done) {
+        var collectionName = '_ensureAllInDAGOnePe2';
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -3780,14 +3788,14 @@ describe('versioned_collection', function() {
       it('should append item to previous items, fast-forward', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'] } };
-        vc._addAllToDAG([{ item: item1 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
             if (err) { throw err; }
-            should.equal(items.length, 3);
-            should.deepEqual(items[2], {
-              _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'], _i: 3 },
+            should.equal(items.length, 4);
+            should.deepEqual(items[3], {
+              _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'], _i: 4 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
@@ -3810,20 +3818,20 @@ describe('versioned_collection', function() {
         //                             D----
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['B'], _lo: true } };
-        vc._addAllToDAG([{ item: item1 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
             if (err) { throw err; }
-            should.equal(items.length, 5);
-            should.deepEqual(items[3], {
-              _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['B'], _lo: true, _i: 4 },
+            should.equal(items.length, 6);
+            should.deepEqual(items[4], {
+              _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['B'], _lo: true, _i: 5 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
-            var v = items[4]._id._v;
-            should.deepEqual(items[4], {
-              _id: { _co: '_addAllToDAGOnePe', _id: 'foo', _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 5 },
+            var v = items[5]._id._v;
+            should.deepEqual(items[5], {
+              _id: { _co: '_ensureAllInDAGOnePe', _id: 'foo', _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 6 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
@@ -3843,14 +3851,14 @@ describe('versioned_collection', function() {
 
     describe('one perspective delete', function() {
       describe('empty DAG all in memory', function() {
-        var collectionName = '_addAllToDAGOnePeDeleteMemory';
+        var collectionName = '_ensureAllInDAGOnePeDeleteMemory';
 
-        it('should not accept multiple heads', function(done) {
+        it('should not accept absence of referenced parent', function(done) {
           var vc = new VersionedCollection(db, collectionName, { hide: true });
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var B = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['C']} };
-          vc._addAllToDAG([{ item: A }, { item: B }], function(err) {
-            should.equal(err.message, 'not exactly one head');
+          vc._ensureAllInDAG([{ item: A }, { item: B }], function(err) {
+            should.equal(err.message, 'parent not found');
             done();
           });
         });
@@ -3858,7 +3866,7 @@ describe('versioned_collection', function() {
         it('should not accept any non-connected items', function(done) {
           var vc = new VersionedCollection(db, collectionName, { hide: true });
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: ['C'] } };
-          vc._addAllToDAG([{ item: A }], function(err) {
+          vc._ensureAllInDAG([{ item: A }], function(err) {
             should.equal(err.message, 'parent not found');
             done();
           });
@@ -3869,7 +3877,7 @@ describe('versioned_collection', function() {
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var B = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A']} };
           var C = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: [] } };
-          vc._addAllToDAG([{ item: A }, { item: B }, { item: C }], function(err) {
+          vc._ensureAllInDAG([{ item: A }, { item: B }, { item: C }], function(err) {
             should.equal(err.message, 'root preceded');
             done();
           });
@@ -3880,7 +3888,7 @@ describe('versioned_collection', function() {
           var A  = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var Bd = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'], _d: true } };
           var C  = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: [] } };
-          vc._addAllToDAG([{ item: A }, { item: Bd }, { item: C }], function(err) {
+          vc._ensureAllInDAG([{ item: A }, { item: Bd }, { item: C }], function(err) {
             if (err) { throw err; }
             vc._snapshotCollection.find().toArray(function(err, items) {
               if (err) { throw err; }
@@ -3914,12 +3922,12 @@ describe('versioned_collection', function() {
       });
 
       describe('non-empty DAG', function() {
-        var collectionName = '_addAllToDAGOnePeDeleteSaved';
+        var collectionName = '_ensureAllInDAGOnePeDeleteSaved';
 
         it('needs a new root', function(done) {
           var vc = new VersionedCollection(db, collectionName, { debug: false });
           var D = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: [] } };
-          vc._addAllToDAG([{ item: D }], function(err) {
+          vc._ensureAllInDAG([{ item: D }], function(err) {
             if (err) { throw err; }
             vc._snapshotCollection.find().toArray(function(err, items) {
               if (err) { throw err; }
@@ -3945,7 +3953,7 @@ describe('versioned_collection', function() {
         it('should not accept any (non-deleted) items preceding a root', function(done) {
           var vc = new VersionedCollection(db, collectionName, { hide: true });
           var E  = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: [] } };
-          vc._addAllToDAG([{ item: E }], function(err) {
+          vc._ensureAllInDAG([{ item: E }], function(err) {
             should.equal(err.message, 'different root already in snapshot');
             done();
           });
@@ -3954,7 +3962,7 @@ describe('versioned_collection', function() {
         it('should delete item from collection', function(done) {
           var vc = new VersionedCollection(db, collectionName, { debug: false });
           var item = { _id: { _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _d: true } };
-          vc._addAllToDAG([{ item: item }], function(err) {
+          vc._ensureAllInDAG([{ item: item }], function(err) {
             if (err) { throw err; }
             vc._snapshotCollection.find().toArray(function(err, items) {
               if (err) { throw err; }
@@ -3976,7 +3984,7 @@ describe('versioned_collection', function() {
         it('should accept a new root if preceding item is a deletion', function(done) {
           var vc = new VersionedCollection(db, collectionName, { debug: false });
           var F  = { _id: { _id: 'foo', _v: 'F', _pe: '_local', _pa: [] } };
-          vc._addAllToDAG([{ item: F }], function(err) {
+          vc._ensureAllInDAG([{ item: F }], function(err) {
             if (err) { throw err; }
             vc._snapshotCollection.find().toArray(function(err, items) {
               if (err) { throw err; }
@@ -4003,13 +4011,13 @@ describe('versioned_collection', function() {
     });
 
     describe('one perspective multiple ids', function() {
-      var collectionName = '_addAllToDAGOnePeMultiId';
+      var collectionName = '_ensureAllInDAGOnePeMultiId';
 
       it('should insert both items with root', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'X', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'bar', _v: 'Y', _pe: '_local', _pa: [] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4045,7 +4053,7 @@ describe('versioned_collection', function() {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['X'] } };
         var item2 = { _id: { _id: 'bar', _v: 'C', _pe: '_local', _pa: ['Y'] } };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4081,7 +4089,7 @@ describe('versioned_collection', function() {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['X'], _lo: true }, d: true };
         var item2 = { _id: { _id: 'bar', _v: 'D', _pe: '_local', _pa: ['Y'], _lo: true }, d: true };
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4101,14 +4109,14 @@ describe('versioned_collection', function() {
 
             var v1 = items[6]._id._v;
             should.deepEqual(items[6], {
-              _id: { _co: '_addAllToDAGOnePeMultiId', _id: 'foo', _v: v1, _pe: '_local', _pa: ['B', 'D'], _lo: true, _i: 7 },
+              _id: { _co: '_ensureAllInDAGOnePeMultiId', _id: 'foo', _v: v1, _pe: '_local', _pa: ['B', 'D'], _lo: true, _i: 7 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
 
             var v2 = items[7]._id._v;
             should.deepEqual(items[7], {
-              _id: { _co: '_addAllToDAGOnePeMultiId', _id: 'bar', _v: v2, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 8 },
+              _id: { _co: '_ensureAllInDAGOnePeMultiId', _id: 'bar', _v: v2, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 8 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) },
               d: true
             });
@@ -4134,7 +4142,7 @@ describe('versioned_collection', function() {
     });
 
     describe('multiple perspective', function() {
-      var collectionName = '_addAllToDAGMultiplePe';
+      var collectionName = '_ensureAllInDAGMultiplePe';
 
       it('should insert both items with root', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
@@ -4142,7 +4150,7 @@ describe('versioned_collection', function() {
         var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'bar', _pa: ['A'] } };
         database.createCappedColl(vc.snapshotCollectionName, function(err) {
           if (err) { throw err; }
-          vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+          vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
             if (err) { throw err; }
             // inspect DAG
             vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4181,7 +4189,7 @@ describe('versioned_collection', function() {
       it('should append item to previous items, fast-forward', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'bar', _pa: ['B'] } };
-        vc._addAllToDAG([{ item: item1 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4222,7 +4230,7 @@ describe('versioned_collection', function() {
         //                             D'---
         var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
         var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: 'bar', _pa: ['B'] } };
-        vc._addAllToDAG([{ item: item1 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4239,7 +4247,7 @@ describe('versioned_collection', function() {
 
             var v = items[8]._id._v;
             should.deepEqual(items[8], {
-              _id: { _co: '_addAllToDAGMultiplePe', _id: new ObjectID('f00000000000000000000000'), _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 5 },
+              _id: { _co: '_ensureAllInDAGMultiplePe', _id: new ObjectID('f00000000000000000000000'), _v: v, _pe: '_local', _pa: ['C', 'D'], _lo: true, _i: 5 },
               _m3: { _ack: false, _op: new Timestamp(0, 0) }
             });
 
@@ -4262,7 +4270,7 @@ describe('versioned_collection', function() {
         var item1 = { _id: { _id: 'multi1', _v: 'A', _pe: 'remote', _pa: [] } };
         var item2 = { _id: { _id: 'multi2', _v: 'A', _pe: 'remote', _pa: [] } };
 
-        vc._addAllToDAG([{ item: item1 }, { item: item2 }], function(err) {
+        vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4308,7 +4316,7 @@ describe('versioned_collection', function() {
 
         var item = { _id: { _id: 'multi1', _v: 'B', _pe: '_local', _pa: ['A'] } };
 
-        vc._addAllToDAG([{ item: item }], function(err) {
+        vc._ensureAllInDAG([{ item: item }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4342,7 +4350,7 @@ describe('versioned_collection', function() {
 
         var item = { _id: { _id: 'multi1', _v: 'A', _pe: 'remote2', _pa: [] }, foo: 'bar' };
 
-        vc._addAllToDAG([{ item: item }], function(err) {
+        vc._ensureAllInDAG([{ item: item }], function(err) {
           if (err) { throw err; }
           // inspect DAG
           vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4368,61 +4376,6 @@ describe('versioned_collection', function() {
               done();
             });
           });
-        });
-      });
-    });
-  });
-
-  describe('fixConsistency', function() {
-    var collectionName = 'fixConsistency';
-
-    var A = { _id: { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] } };
-    var B = { _id: { _id: 'bar', _v: 'B', _pe: 'I', _pa: []} };
-    var C = { _id: { _id: 'qux', _v: 'C', _pe: 'I', _pa: [] } };
-
-    var snap1;
-
-    it('should process the items the same way as addAllToDAG', function(done){
-      var itemsA;
-      var vcA = new VersionedCollection(db, 'fixConsistencyA', { hide: true });
-      var vcB = new VersionedCollection(db, 'fixConsistencyB', { hide: true });
-      vcA._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-        vcA._snapshotCollection.find().toArray(function(err, itemsA) {
-          vcB._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-            vcB._snapshotCollection.find().toArray(function(err, itemsB) {
-              should.deepEqual(itemsA[0]._id._v, itemsB[0]._id._v);
-              should.deepEqual(itemsA[1]._id._v, itemsB[1]._id._v);
-              should.deepEqual(itemsA[2]._id._v, itemsB[2]._id._v);
-              done();
-            });
-          });
-        });
-      });
-    });
-
-    it('should not add the same version twice and raise an error', function(done) {
-      var collectionName = 'fixConsistency1';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
-      vc._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-        if (err) { throw err; return; }
-        vc._addAllToDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-          should.equal(err.message, 'version already exists');
-          done();
-        });
-      });
-    });
-
-    it('should not add the same version twice and NOT raise an error', function(done) {
-      var collectionName = 'fixConsistency2';
-      var vc = new VersionedCollection(db, collectionName, { hide: true, debug: false });
-      var vc2 = new VersionedCollection(db, collectionName, { hide: true, debug: false });
-      vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-        if (err) { throw err; return; }
-        vc2._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
-          vc2._snapshotCollection.find().toArray(function(err, items) {
-            should.equal(items.length, 6);
-          });
-          done();
         });
       });
     });
@@ -4494,22 +4447,27 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('should not create new items if item already exists (input _pe non-local)', function(done) {
+    it('should not create new items if item already exists (input _pe non-local), but should return that existing item', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
+        console.log(JSON.stringify(newLocalItems));
         if (err) { throw err; }
-        should.deepEqual(newLocalItems, []);
+        should.equal(newLocalItems.length, 1);
+        should.equal(newLocalItems[0]._m3._ack,true);
+        should.deepEqual(newLocalItems[0]._id, {'_id':new ObjectID('f00000000000000000000000'),'_v':'A','_pe':'I','_pa':[],'_i':1});
         done();
       });
     });
 
-    it('should not create new items if item already exists (input _pe new perspective', function(done) {
+    it('should not create new items if item already exists (input _pe new perspective), but should return existing item', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: false, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'III', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
-        should.deepEqual(newLocalItems, []);
+        should.equal(newLocalItems.length, 1);
+        should.equal(newLocalItems[0]._m3._ack,true);
+        should.deepEqual(newLocalItems[0]._id, {'_id':new ObjectID('f00000000000000000000000'),'_v':'A','_pe':'I','_pa':[],'_i':1});
         done();
       });
     });
@@ -4584,7 +4542,7 @@ describe('versioned_collection', function() {
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2, item3 ], function(err, newLocalItems) {
         if (err) { throw err; }
-        should.deepEqual(newLocalItemsProcess, [
+        should.deepEqual(newLocalItems, [
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
@@ -4637,9 +4595,10 @@ describe('versioned_collection', function() {
 
     it('should mark C and D as conflict', function(done){
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
-      vc._ensureLocalPerspective2([ A, B, C, D ], function(err, newLocalItems) {
+      vc._ensureLocalPerspective([ A, B, C, D ], function(err, newLocalItems) {
         if (err) { throw err; }
         vc._ensureOneHead(newLocalItems, function(err){
+          if (err) { throw err; }
           should.deepEqual(newLocalItems[0]._m3._c, undefined);
           should.deepEqual(newLocalItems[1]._m3._c, undefined);
           should.deepEqual(newLocalItems[2]._m3._c, true);
@@ -5318,7 +5277,7 @@ describe('versioned_collection', function() {
       });
 
       it('should merge if multiple heads are created and copy merge to collection', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: true, hide: false });
+        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
         var oplogItem = {
           ts: new Timestamp(1414511144, 1),
           op: 'u',
