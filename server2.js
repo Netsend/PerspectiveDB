@@ -93,6 +93,34 @@ function start(db) {
     var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
 
     var opts = { debug: program.debug };
+
+    var parts;
+
+    if (config.replication) {
+      if (config.replication.location === 'database') {
+        parts = config.replication.name.split('.');
+        if (parts.length > 1) {
+          opts.replicationDb = parts[0];
+          opts.replicationColl = parts.slice(1).join('.');
+        } else if (parts.length === 1) {
+          opts.replicationColl = parts[0];
+        }
+      }
+    }
+    if (config.users) {
+      if (config.users.location === 'database') {
+        parts = config.users.name.split('.');
+        if (parts.length > 1) {
+          opts.usersDb = parts[0];
+          opts.usersColl = parts.slice(1).join('.');
+        } else if (parts.length === 1) {
+          opts.usersColl = parts[0];
+        }
+      }
+    }
+
+    if (program.debug) { console.log('vs opts', opts); }
+
     var vs = new VersionedSystem(oplogColl, opts);
 
     // get all vc configs
