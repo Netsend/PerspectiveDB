@@ -160,7 +160,7 @@ function start(db) {
     });
     process.once('SIGTERM', function() {
       console.log('received SIGTERM shutting down... send another SIGTERM to force quit');
-      vs.stop(cb);
+      vs.stopTerm(cb);
     });
   })(function(err) {
     if (err) {
