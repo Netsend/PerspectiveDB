@@ -3711,6 +3711,354 @@ describe('versioned_collection', function() {
     });
   });
 
+  describe('_ensureSamePerspective', function(){
+    var collectionName = '_ensureSamePerspective';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureSamePerspective(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should callback with perspective of items when they are the same', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
+      vc._ensureSamePerspective([{ item: item1},{ item: item2}], function(err, per) {
+        should.equal(per, 'bar');
+        done();
+      });
+    });
+
+    it('should callback with error if perspectives are not the same', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] } };
+      vc._ensureSamePerspective([{ item: item1},{ item: item2}], function(err) {
+        should.equal(err.message, 'perspective mismatch');
+        done();
+      });
+    });
+  });
+
+  describe('_ensureM3', function(){
+    var collectionName = '_ensureM3';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureM3(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should add m3 to items that have no m3', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
+      vc._ensureM3([{ item: item1},{ item: item2}], function(err) {
+        if (err) { throw err; }
+        should.deepEqual(item1, { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } });
+        should.deepEqual(item2, { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } });
+        done();
+      });
+    });
+
+    it('should not change m3 of items that have m3', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(1, 2) } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(3, 4) } };
+      vc._ensureM3([{ item: item1},{ item: item2}], function(err) {
+        if (err) { throw err; }
+        should.deepEqual(item1, { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(1, 2) } });
+        should.deepEqual(item2, { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(3, 4) } });
+        done();
+      });
+    });
+  });
+
+  describe('_checkAncestry', function() {
+    var collectionName = '_checkAncestry';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._checkAncestry(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should extract all items and return these', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
+      vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems) {
+        if (err) { throw err; }
+        should.deepEqual(allItems,[item1, item2]);
+        done();
+      });
+    });
+
+    it('should throw an error when root is preceded', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] } };
+      vc._checkAncestry([{ item: item1},{ item: item2}], function(err) {
+        if (err && err.message!=='root preceded') { throw err; }
+        should.equal(err.message, 'root preceded');
+        done();
+      });
+    });
+
+    it('should collect items in DAGs and return these', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
+      vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs) {
+        if (err) { throw err; }
+        should.deepEqual(DAGs,{
+          'foo':[{ _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } }],
+          'bar':[{ _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } }]
+        });
+        done();
+      });
+    });
+
+    it('should record new roots and return these', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
+      vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs, newRoots) {
+        if (err) { throw err; }
+        should.deepEqual(newRoots,{ 'foo' : true, 'bar' : true });
+        done();
+      });
+    });
+
+    it('should connect new roots if previous item is a deletion', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [], _d: true } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
+      vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs) {
+        if (err) { throw err; }
+        should.deepEqual(DAGs, {
+          'foo':[
+            { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [], _d: true } },
+            { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: ['A'] } }
+          ]});
+        done();
+      });
+    });
+  });
+
+  describe('_ensureVirtualCollection', function(){
+    var collectionName = '_ensureVirtualCollection';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureVirtualCollection(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should create a virtual collection if none exists', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      should.equal(vc._virtualCollection, null);
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
+      var item3 = { _id: { _id: 'bar', _v: 'C', _pe: 'foo', _pa: [] } };
+      vc._ensureVirtualCollection([item1, item2, item3], function(err) {
+        if (err) { throw err; }
+        vc._virtualCollection.find().toArray(function(err, items) {
+          console.log(JSON.stringify(items));
+          should.deepEqual(items, [
+            {'_id':{'_id':'foo','_v':'A','_pe':'bar','_pa':[]}},
+            {'_id':{'_id':'foo','_v':'B','_pe':'bar','_pa':[]}},
+            {'_id':{'_id':'bar','_v':'C','_pe':'foo','_pa':[]}}]);
+        });
+        done();
+      });
+    });
+
+    it('should not create a virtual collection if one already exists', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      should.equal(vc._virtualCollection, null);
+      vc._ensureAllInDAG([{item: item1}], function(err){
+        if (err) { throw err; }
+        var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
+        var item3 = { _id: { _id: 'bar', _v: 'C', _pe: 'foo', _pa: [] } };
+        vc._ensureVirtualCollection([item2, item3], function(err) {
+          if (err) { throw err; }
+          vc._virtualCollection.find().toArray(function(err, items) {
+            should.deepEqual(items, [
+              {'_id':{'_id':'foo','_v':'A','_pe':'bar','_pa':[]},'_m3':{'_ack':false,'_op':new Timestamp(0, 0)}},
+              {'_id':{'_id':'foo','_v':'A','_pe':'_local','_pa':[],'_i':1},'_m3':{'_ack':false,'_op':new Timestamp(0, 0)}},
+              {'_id':{'_id':'foo','_v':'B','_pe':'bar','_pa':[]}},
+              {'_id':{'_id':'bar','_v':'C','_pe':'foo','_pa':[]}}]);
+          });
+          done();
+        });
+      });
+    });
+  });
+
+  describe('_checkParentsInVirtualCollection', function() {
+    var collectionName = '_checkParentsInVirtualCollection';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._checkParentsInVirtualCollection(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should return without error if parent is found', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: ['A'] } };
+
+      vc._ensureAllInDAG([{item: item1}], function(err){
+        if (err) { throw err; }
+
+        vc._checkParentsInVirtualCollection([item2], function(err) {
+          if (err) { throw err; }
+
+          done();
+        });
+      });
+    });
+
+    it('should return error if parent is not found', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: ['A'] } };
+      var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
+
+      vc._ensureAllInDAG([{item: item1}], function(err){
+        if (err) { throw err; }
+        vc._checkParentsInVirtualCollection([item2, item3], function(err) {
+          if (err && err.message!=='parent not found') { throw err; }
+          should.equal(err.message, 'parent not found');
+          done();
+        });
+      });
+    });
+  });
+
+  describe('_mergeNewHeads', function() {
+    var collectionName = '_mergeNewHeads';
+    it('should callback immediately when no items are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._mergeNewHeads(null, null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should require newRoots', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
+      vc._mergeNewHeads([item1, item2], null, function(err) {
+        if (err && err.message!=='provide newRoots') { throw err; }
+        should.equal(err.message, 'provide newRoots');
+        done();
+      });
+    });
+  });
+
+  describe('_syncLocalHeadsWithCollection', function(){
+    var collectionName = '_syncLocalHeadsWithCollection';
+    it('should callback immediately when no newLocalHeads are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._syncLocalHeadsWithCollection(null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+  });
+
+  describe('_ensureIntoSnapshot', function(){
+    var collectionName = '_ensureIntoSnapshot';
+    it('should require perspective', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureIntoSnapshot(null, null, null, function(err) {
+        if (err && err.message!=='provide perspective') { throw err; }
+        should.equal(err.message, 'provide perspective');
+        done();
+      });
+    });
+
+    it('should callback immediately when no localItems are passed', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      vc._ensureIntoSnapshot('foo', null, null, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should insert items into snapshot', function(done){
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
+      var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
+
+      vc._ensureIntoSnapshot('foo', [item1, item2], [item3], function(err, newLocalHeads) {
+        if (err) { throw err; }
+
+        should.deepEqual(newLocalHeads, [{'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':2}}]);
+        vc._snapshotCollection.find().toArray(function(err, items) {
+          should.deepEqual(items, [
+            {'_id':{'_id':'foo','_v':'C','_pe':'bar','_pa':['B']}},
+            {'_id':{'_id':'foo','_v':'A','_pe':'_local','_pa':[],'_i':1}},
+            {'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':2}}
+          ]);
+          done();
+        });
+
+      });
+    });
+
+    it('should not insert items into snapshot twice', function(done){
+      var collectionName = '_ensureIntoSnapshot2';
+      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
+      var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
+      var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
+
+      vc._ensureIntoSnapshot('foo', [item1, item2], [item3], function(err, newLocalHeads) {
+        if (err) { throw err; }
+
+        should.deepEqual(newLocalHeads, [{'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':2}}]);
+        vc._snapshotCollection.find().toArray(function(err, items) {
+          if (err) { throw err; }
+          should.deepEqual(items, [
+            {'_id':{'_id':'foo','_v':'C','_pe':'bar','_pa':['B']}},
+            {'_id':{'_id':'foo','_v':'A','_pe':'_local','_pa':[],'_i':1}},
+            {'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':2}}
+          ]);
+          vc._ensureIntoSnapshot('foo', [item1, item2], [item3], function(err, newLocalHeads2) {
+            if (err) { throw err; }
+            should.deepEqual(newLocalHeads2, [{'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':4}}]);
+
+            vc._snapshotCollection.find().toArray(function(err, items2) {
+              if (err) { throw err; }
+              should.deepEqual(items2, [
+                {'_id':{'_id':'foo','_v':'C','_pe':'bar','_pa':['B']}},
+                {'_id':{'_id':'foo','_v':'A','_pe':'_local','_pa':[],'_i':1}},
+                {'_id':{'_id':'foo','_v':'B','_pe':'_local','_pa':['A'],'_i':2}}
+              ]);
+              done();
+            });
+          });
+        });
+
+      });
+    });
+  });
+
+
+
   describe('_ensureAllInDAG', function() {
     describe('one perspective', function() {
       var collectionName = '_ensureAllInDAGOnePe';
