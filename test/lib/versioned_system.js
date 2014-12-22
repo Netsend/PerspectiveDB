@@ -92,17 +92,14 @@ describe('VersionedSystem', function() {
       vs.initVCs({}, done);
     });
 
-    it('should fail if no size is specified', function(done) {
+    it('should fail if no size is specified', function() {
       var vcCfg = {
         someDb: {
           someColl: { }
         }
       };
       var vs = new VersionedSystem(oplogColl, { hide: true });
-      vs.initVCs(vcCfg, function(err) {
-        should.strictEqual(err.message, 'missing size');
-        done();
-      });
+      (function() { vs.initVCs(vcCfg, function() {}); }).should.throw('config.size must be a number');
     });
 
     it('should fail if not running as root', function(done) {

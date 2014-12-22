@@ -29,6 +29,7 @@ var properties = require('properties');
 var get = require('./lib/get_selector');
 var _db = require('./bin/_db');
 var VersionedSystem = require('./lib/versioned_system');
+var VirtualCollection = require('./lib/virtual_collection');
 
 var programName = path.basename(__filename);
 
@@ -88,6 +89,18 @@ if (program.debug) { console.log('remote config', remoteLogin); }
 
 console.time('runtime');
 
+// load collection from configuration file
+function loadSelf(key, cfg) {
+  var docs = [];
+  Object.keys(cfg[key]).forEach(function(name) {
+    if (name === 'location' || name === 'name') {
+      return;
+    }
+    docs.push(cfg[key][name]);
+  });
+  return new VirtualCollection(null, docs);
+}
+
 function start(db) {
   (function(cb) {
     var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
@@ -107,15 +120,18 @@ function start(db) {
         }
       }
     }
+
     if (config.users) {
       if (config.users.location === 'database') {
         parts = config.users.name.split('.');
         if (parts.length > 1) {
           opts.usersDb = parts[0];
-          opts.usersColl = parts.slice(1).join('.');
+          opts.usersCollName = parts.slice(1).join('.');
         } else if (parts.length === 1) {
-          opts.usersColl = parts[0];
+          opts.usersCollName = parts[0];
         }
+      } else if (config.users.location === 'self') {
+        opts.usersColl = loadSelf(config.users.name, config);
       }
     }
 
