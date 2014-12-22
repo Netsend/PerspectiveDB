@@ -149,7 +149,8 @@ function start(db) {
       if (get(config, 'server')) {
         if (program.debug) { console.log('%s: preauth forking...', programName); }
 
-        vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', { chrootConfig: get(config, 'server') }, function(err) {
+        var opts2 = { serverConfig: get(config, 'server'), chrootConfig: get(config, 'server') };
+        vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', opts2, function(err) {
           if (err) { cb(err); return; }
 
           // find out if any remotes need to be initiated
