@@ -98,7 +98,7 @@ function loadSelf(key, cfg) {
     }
     docs.push(cfg[key][name]);
   });
-  return new VirtualCollection(null, docs);
+  return new VirtualCollection(null, docs, { debug: program.debug });
 }
 
 function start(db) {
@@ -149,7 +149,10 @@ function start(db) {
       if (get(config, 'server')) {
         if (program.debug) { console.log('%s: preauth forking...', programName); }
 
-        var opts2 = { serverConfig: get(config, 'server'), chrootConfig: get(config, 'server') };
+        var opts2 = {
+          serverConfig: get(config, 'server'),
+          chrootConfig: get(config, 'server')
+        };
         vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', opts2, function(err) {
           if (err) { cb(err); return; }
 
