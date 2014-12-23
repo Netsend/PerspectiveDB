@@ -25,6 +25,7 @@ var fs = require('fs');
 
 var program = require('commander');
 var properties = require('properties');
+var keyFilter = require('object-key-filter');
 
 var get = require('./lib/get_selector');
 var _db = require('./bin/_db');
@@ -71,6 +72,11 @@ if (configFile[0] !== '/') {
   configFile = process.cwd() + '/' + configFile;
 }
 
+// filter password out request
+function debugReq(req) {
+  return JSON.stringify(keyFilter(req, ['password'], true), null, 2);
+}
+
 var config = properties.parse(fs.readFileSync(configFile, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 var remoteLogin = get(config, 'remotes');
@@ -85,7 +91,7 @@ if (typeof remoteLogin === 'string') {
   remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
 }
 
-if (program.debug) { console.log('remote config', remoteLogin); }
+if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); }
 
 console.time('runtime');
 
@@ -158,7 +164,7 @@ function start(db) {
 
           // find out if any remotes need to be initiated
           if (remoteLogin) {
-            console.log('pull requests', remoteLogin);
+            console.log('pull requests', debugReq(remoteLogin));
             sendPRs(vs, remoteLogin);
           }
         });
@@ -168,7 +174,7 @@ function start(db) {
 
         // find out if any remotes need to be initiated
         if (remoteLogin) {
-          console.log('pull requests', remoteLogin);
+          console.log('pull requests', debugReq(remoteLogin));
           sendPRs(vs, remoteLogin);
         }
       }

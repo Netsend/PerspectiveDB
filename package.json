@@ -26,7 +26,8 @@
     "ld-jsonstream": "~0.0.1",
     "read": "~1.0.5",
     "nest-namespace": "~0.0.2",
-    "match-object": "~0.0.1"
+    "match-object": "~0.0.1",
+    "object-key-filter": "~0.0.1"
   },
   "devDependencies": {
     "mocha": ">=1.21.4",
