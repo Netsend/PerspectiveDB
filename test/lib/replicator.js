@@ -720,8 +720,8 @@ describe('Replicator', function() {
   describe('fetchFromDb', function() {
     var coll;
 
-    it('should require coll to be an instance of mongodb.Collection', function() {
-      (function() { Replicator.fetchFromDb(1); }).should.throw('coll must be an instance of mongodb.Collection');
+    it('should require coll to be an object', function() {
+      (function() { Replicator.fetchFromDb(1); }).should.throw('coll must be an object');
     });
 
     it('should require type to be either "import" or "export"', function() {
