@@ -30,7 +30,7 @@ var keyFilter = require('object-key-filter');
 var get = require('./lib/get_selector');
 var _db = require('./bin/_db');
 var VersionedSystem = require('./lib/versioned_system');
-var VirtualCollection = require('./lib/virtual_collection');
+var ArrayCollection = require('./lib/array_collection');
 
 var programName = path.basename(__filename);
 
@@ -104,7 +104,7 @@ function loadSelf(key, cfg) {
     }
     docs.push(cfg[key][name]);
   });
-  return new VirtualCollection(null, docs, { debug: program.debug });
+  return new ArrayCollection(docs, { debug: program.debug });
 }
 
 function start(db) {
@@ -120,10 +120,12 @@ function start(db) {
         parts = config.replication.name.split('.');
         if (parts.length > 1) {
           opts.replicationDb = parts[0];
-          opts.replicationColl = parts.slice(1).join('.');
+          opts.replicationCollName = parts.slice(1).join('.');
         } else if (parts.length === 1) {
-          opts.replicationColl = parts[0];
+          opts.replicationCollName = parts[0];
         }
+      } else if (config.replication.location === 'self') {
+        opts.replicationColl = loadSelf(config.replication.name, config);
       }
     }
 
