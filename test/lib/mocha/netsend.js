@@ -4,7 +4,7 @@
 
 var should = require('should');
 
-var Netsend = require('../../lib/netsend');
+var Netsend = require('../../../lib/netsend');
 
 describe('Netsend', function () {
   describe('pad', function () {

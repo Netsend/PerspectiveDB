@@ -27,8 +27,8 @@ if (process.getuid() !== 0) {
 
 var should = require('should');
 
-var VersionedSystem = require('../../lib/versioned_system');
-var OplogReader = require('../../lib/oplog_reader');
+var VersionedSystem = require('../../../lib/versioned_system');
+var OplogReader = require('../../../lib/oplog_reader');
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system_startVC';
@@ -36,7 +36,7 @@ var databaseName2 = 'test2_startVC';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, databaseName2, 'foo', 'bar'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);

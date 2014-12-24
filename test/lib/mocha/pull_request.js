@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var pullRequest = require('../../lib/pull_request');
+var pullRequest = require('../../../lib/pull_request');
 
 describe('pullRequest', function () {
   describe('valid', function () {

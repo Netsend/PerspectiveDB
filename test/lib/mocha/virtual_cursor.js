@@ -22,12 +22,12 @@
 
 var should = require('should');
 
-var VirtualCursor = require('../../lib/virtual_cursor');
-var VirtualStream = require('../../lib/virtual_stream');
+var VirtualCursor = require('../../../lib/virtual_cursor');
+var VirtualStream = require('../../../lib/virtual_stream');
 
 var db;
 var databaseName = 'test_virtual_cursor';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

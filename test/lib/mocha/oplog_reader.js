@@ -28,13 +28,13 @@ var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
 var BSONStream = require('bson-stream');
 
-var OplogReader = require('../../lib/oplog_reader');
+var OplogReader = require('../../../lib/oplog_reader');
 var oplogDb, oplogColl;
 
 var db;
 var databaseName = 'test_oplog_reader';
 var collectionName = 'foo';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

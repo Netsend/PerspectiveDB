@@ -27,9 +27,9 @@ var should = require('should');
 var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
 
-var OplogResolver = require('../../lib/oplog_resolver');
-var VersionedSystem = require('../../lib/versioned_system');
-var VersionedCollection = require('../../lib/versioned_collection');
+var OplogResolver = require('../../../lib/oplog_resolver');
+var VersionedSystem = require('../../../lib/versioned_system');
+var VersionedCollection = require('../../../lib/versioned_collection');
 
 var vsConfig = {
   oplogDatabase: 'local',
@@ -46,7 +46,7 @@ var vc, oplogDb, oplogCollection;
 
 var db;
 var databaseName = 'test_oplog_resolver';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

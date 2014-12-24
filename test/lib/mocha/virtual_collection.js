@@ -22,12 +22,12 @@
 
 var should = require('should');
 
-var VirtualCollection = require('../../lib/virtual_collection');
-var VirtualCursor = require('../../lib/virtual_cursor');
+var VirtualCollection = require('../../../lib/virtual_collection');
+var VirtualCursor = require('../../../lib/virtual_cursor');
 
 var db;
 var databaseName = 'test_virtual_collection';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

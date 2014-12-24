@@ -22,8 +22,8 @@
 
 var should = require('should');
 
-var ArrayCursor = require('../../lib/array_cursor');
-var ArrayStream = require('../../lib/array_stream');
+var ArrayCursor = require('../../../lib/array_cursor');
+var ArrayStream = require('../../../lib/array_stream');
 
 describe('ArrayCursor', function() {
   describe('constructor', function() {

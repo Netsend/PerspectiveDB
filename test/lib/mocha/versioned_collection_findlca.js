@@ -22,11 +22,11 @@
 
 var should = require('should');
 
-var VersionedCollection = require('../../lib/versioned_collection');
+var VersionedCollection = require('../../../lib/versioned_collection');
 
 var db;
 var databaseName = 'test_versioned_collection_findlca';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);
@@ -1832,7 +1832,7 @@ describe('VersionedCollection._findLCAs', function() {
       it('should find the version itself to be the lca of two roots from different perspectives with the same version', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false });
 
-        var VirtualCollection = require('../../lib/virtual_collection');
+        var VirtualCollection = require('../../../lib/virtual_collection');
         var v = new VirtualCollection(vc._snapshotCollection, [itemIIA, itemIIB]);
 
         var newThis = {

@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var authRequest = require('../../lib/auth_request');
+var authRequest = require('../../../lib/auth_request');
 
 describe('authRequest', function () {
   describe('valid', function () {

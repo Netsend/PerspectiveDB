@@ -31,7 +31,7 @@ var net = require('net');
 var should = require('should');
 var BSONStream = require('bson-stream');
 
-var VersionedSystem = require('../../lib/versioned_system');
+var VersionedSystem = require('../../../lib/versioned_system');
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system_root_listen';
@@ -39,7 +39,7 @@ var databaseName2 = 'test2_versioned_system_root_listen';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, databaseName2, 'foo', 'bar'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);

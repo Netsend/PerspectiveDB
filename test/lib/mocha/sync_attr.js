@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var syncAttr = require('../../lib/sync_attr');
+var syncAttr = require('../../../lib/sync_attr');
 
 var collName1 = 'syncAttr1';
 var collName2 = 'syncAttr2';
@@ -30,7 +30,7 @@ var tmpColl;
 
 var db;
 var databaseName = 'test_sync_attr';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

@@ -23,11 +23,11 @@
 //var should = require('should');
 require('should');
 
-var Transform = require('../../lib/transform');
+var Transform = require('../../../lib/transform');
 
 var db;
 var databaseName = 'test_transform';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

@@ -25,13 +25,13 @@ var ObjectID = require('mongodb').ObjectID;
 var Timestamp = require('mongodb').Timestamp;
 var Writable = require('stream').Writable;
 
-var fetchItems = require('../_fetch_items');
+var fetchItems = require('../../_fetch_items');
 
-var VersionedCollection = require('../../lib/versioned_collection');
+var VersionedCollection = require('../../../lib/versioned_collection');
 
 var db;
 var databaseName = 'test_versioned_collection';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

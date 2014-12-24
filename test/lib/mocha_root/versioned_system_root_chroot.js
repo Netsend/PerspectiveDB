@@ -29,14 +29,14 @@ var fs = require('fs');
 
 var should = require('should');
 
-var VersionedSystem = require('../../lib/versioned_system');
+var VersionedSystem = require('../../../lib/versioned_system');
 
 var db, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, 'foo', 'bar'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);

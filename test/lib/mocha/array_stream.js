@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var ArrayStream = require('../../lib/array_stream');
+var ArrayStream = require('../../../lib/array_stream');
 
 describe('ArrayStream', function() {
   var vColl;

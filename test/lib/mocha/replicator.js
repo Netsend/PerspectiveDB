@@ -26,13 +26,13 @@ var fs = require('fs');
 var async = require('async');
 var should = require('should');
 
-var VersionedCollection = require('../../lib/versioned_collection');
-var Replicator = require('../../lib/replicator');
+var VersionedCollection = require('../../../lib/versioned_collection');
+var Replicator = require('../../../lib/replicator');
 
 var dbImport, dbExport, dbFoo, dbBar, dbQux, dbRaboof;
 
 var databaseNames = ['dbImport', 'dbExport', 'dbFoo', 'dbBar', 'dbQux', 'dbRaboof'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);

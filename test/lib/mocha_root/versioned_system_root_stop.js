@@ -25,7 +25,7 @@ if (process.getuid() !== 0) {
   process.exit(1);
 }
 
-var VersionedSystem = require('../../lib/versioned_system');
+var VersionedSystem = require('../../../lib/versioned_system');
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
@@ -33,7 +33,7 @@ var databaseName2 = 'test2';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, databaseName2, 'foo', 'bar'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);

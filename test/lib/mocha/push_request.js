@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var pushRequest = require('../../lib/push_request');
+var pushRequest = require('../../../lib/push_request');
 
 describe('pushRequest', function () {
   describe('valid', function () {

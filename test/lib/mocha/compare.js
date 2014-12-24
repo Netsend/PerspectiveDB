@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var compare = require('../../lib/compare');
+var compare = require('../../../lib/compare');
 
 var collName1 = 'compare1';
 var collName2 = 'compare2';
@@ -30,7 +30,7 @@ var coll1, coll2;
 
 var db;
 var databaseName = 'test_compare';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

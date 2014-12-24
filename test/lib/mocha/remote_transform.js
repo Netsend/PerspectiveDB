@@ -22,7 +22,7 @@
 
 var should = require('should');
 
-var RemoteTransform = require('../../lib/remote_transform');
+var RemoteTransform = require('../../../lib/remote_transform');
 
 describe('RemoteTransform', function() {
   it('should require remote to be a string', function() {
