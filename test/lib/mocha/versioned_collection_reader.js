@@ -693,6 +693,20 @@ describe('versioned_collection', function() {
       vc.resume();
       vc.close();
     });
+
+    it('should set closed', function(done) {
+      // should not find A twice for merge F
+      var vc = new VersionedCollectionReader(db, collectionName, { follow: true });
+
+      should.strictEqual(vc.closed, false);
+
+      vc.on('end', function() {
+        should.strictEqual(vc.closed, true);
+        done();
+      });
+      vc.resume();
+      vc.close();
+    });
   });
 
   describe('runHooks', function() {
