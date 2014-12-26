@@ -31,6 +31,19 @@ var async = require('async');
 
 var tasks = [];
 
+var db;
+var databaseName = 'test_versioned_collection_exec_root';
+var Database = require('../_database');
+
+// open database connection
+var database = new Database(databaseName);
+tasks.push(function(done) {
+  database.connect(function(err, dbc) {
+    db = dbc;
+    done(err);
+  });
+});
+
 var child1, child2;
 
 // should start a server and a client, the client should login and get some data from the server
@@ -47,10 +60,10 @@ tasks.push(function(done) {
     console.log('close');
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
-    child2.kill();
+    console.log('child1 dead');
   });
 
-  setTimeout(done, 2000);
+  setTimeout(done, 1000);
 });
 
 tasks.push(function(done) {
@@ -66,15 +79,17 @@ tasks.push(function(done) {
     console.log('close');
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
+    console.log('child2 dead');
+    child1.kill();
   });
 
-  setTimeout(done, 2000);
+  setTimeout(function() {
+    child1.on('close', done);
+    child2.kill();
+  }, 1200);
 });
 
-tasks.push(function(done) {
-  child1.kill();
-  setTimeout(done, 100);
-});
+tasks.push(database.disconnect.bind(database));
 
 async.series(tasks, function(err) {
   if (err) {
