@@ -492,26 +492,17 @@ describe('versioned_collection', function() {
       vc.processQueues();
     });
 
-    it('should require item\'s perspective to equal a listed remote', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['fubar'], hide: true };
-      var vc = new VersionedCollection(db, collectionName, opts);
-      var item = { _id: { _id: 'foo', _v: 'A', _pe: 'foo', _pa: [] } };
-
-      vc.saveRemoteItem(item, function(err) {
-        should.equal(err.message, 'item perspective does not equal remote');
-        done();
-      });
-      vc.processQueues();
-    });
-
-    it('should save to the right collection', function(done) {
+    it('should save to the right collection and add new remotes', function(done) {
       this.timeout(10000);
-      var opts = { localPerspective: perspective, remotes: ['II'], debug: false };
+      var opts = { localPerspective: perspective, debug: false };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
 
+      should.deepEqual(vc._remotes, []);
+
       vc.saveRemoteItem(item, function(err) {
         if (err) { throw err; }
+        should.deepEqual(vc._remotes, ['II']);
         fetchItems(vc, function(err, result) {
           if (err) { throw err; }
 
