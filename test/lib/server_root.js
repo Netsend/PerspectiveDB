@@ -31,20 +31,27 @@ var async = require('async');
 
 var tasks = [];
 
-var db;
-var databaseName = 'test_versioned_collection_exec_root';
+var dbServer, dbClient;
+var databaseNames = ['testserver', 'test_client'];
 var Database = require('../_database');
 
 // open database connection
-var database = new Database(databaseName);
+var database = new Database(databaseNames);
 tasks.push(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
+  database.connect(function(err, dbs) {
+    dbServer = dbs[0];
+    dbClient = dbs[1];
     done(err);
   });
 });
 
 var child1, child2;
+
+// should insert some dummies in the collection to version on the server side
+tasks.push(function(done) {
+  var coll = dbServer.collection('someColl');
+  coll.insert([{ foo: 'bar' },{ quz: 'zab' }], done);
+});
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
