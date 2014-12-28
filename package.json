@@ -15,7 +15,6 @@
     "oplog"
   ],
   "dependencies": {
-    "bson-stream": "~0.0.4",
     "properties": "~1.2.1",
     "mongodb": "~1.4.9",
     "javascript-state-machine": "~2.3.2",
@@ -31,6 +30,8 @@
     "object-key-filter": "~0.0.1"
   },
   "devDependencies": {
+    "chroot": ">=0.1.9",
+    "bson-stream": "~0.0.4",
     "mocha": ">=1.21.4",
     "should": ">=1.2.2"
   },
