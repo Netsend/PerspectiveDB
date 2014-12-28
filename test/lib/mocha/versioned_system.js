@@ -79,7 +79,7 @@ describe('VersionedSystem', function() {
   describe('initVCs non-root', function() {
     it('should require vcs to be an object', function() {
       var vs = new VersionedSystem(oplogColl);
-      (function() { vs.initVCs(1); }).should.throw('vcs must be an object');
+      (function() { vs.initVCs(1); }).should.throw('vces must be an object');
     });
 
     it('should require cb to be a function', function() {
@@ -185,10 +185,10 @@ describe('VersionedSystem', function() {
         if (err) { throw err; }
         should.strictEqual(true, oplogOffset.equals(new Timestamp(600, 700)));
 
-        db.db('foo').collectionsInfo().toArray(function(err, info) {
+        db.db('foo').collectionNames(function(err, info) {
           if (err) { throw err; }
-          should.strictEqual(info[3].name, 'foo.m3.bar');
-          should.strictEqual(info[3].options.size, 2);
+          should.strictEqual(info[2].name, 'foo.m3.bar');
+          should.strictEqual(info[2].options.size, 2);
           done();
         });
       });
