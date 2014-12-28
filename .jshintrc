@@ -22,7 +22,7 @@
   "maxparams"     : 8,
   "maxdepth"      : 5,
   //"maxstatements" : 60,
-  "maxcomplexity" : 14,
+  //"maxcomplexity" : 14,
 
   // Relaxing Options
   //boss              : true,
