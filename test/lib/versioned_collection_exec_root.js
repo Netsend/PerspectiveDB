@@ -26,11 +26,13 @@ if (process.getuid() !== 0) {
 var assert = require('assert');
 var net = require('net');
 var childProcess = require('child_process');
-var mongodb = require('mongodb');
-var BSON = mongodb.BSON;
-var Timestamp = mongodb.Timestamp;
 
 var async = require('async');
+var mongodb = require('mongodb');
+var BSONStream = require('bson-stream');
+
+var BSON = mongodb.BSON;
+var Timestamp = mongodb.Timestamp;
 
 var tasks = [];
 var tasks2 = [];
@@ -157,8 +159,7 @@ tasks.push(function(done) {
         username: 'foo',
         password: 'bar',
         database: 'baz',
-        collection: 'qux',
-        offset: null
+        collection: 'qux'
       });
       server.close();
       child.kill();
@@ -216,8 +217,7 @@ tasks.push(function(done) {
         username: 'foo',
         password: 'bar',
         database: 'baz',
-        collection: 'qux',
-        offset: null
+        collection: 'qux'
       });
 
       // now send a root node
@@ -278,6 +278,7 @@ tasks.push(function(done) {
     remotes: ['baz'], // list PR sources
   };
 
+  // pull request
   var pr = {
     username: 'foo',
     password: 'bar',
@@ -312,6 +313,86 @@ tasks.push(function(done) {
       break;
     case 'listen':
       child.send(pr);
+      break;
+    }
+  });
+});
+
+// should send BSON data following a push request
+tasks.push(function(done) {
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to check if pull request is sent by vcexec
+  var server = net.createServer(function(conn) {
+    var bs = conn.pipe(new BSONStream());
+    bs.on('data', function(item) {
+      assert.deepEqual(item, {
+        _id: {
+          _id: 'abc',
+          _v: 'def',
+          _pa: [],
+          _co: 'test'
+        },
+        _m3: {
+          _op: new Timestamp(0, 0)
+        }
+      });
+
+      server.close();
+      child.kill();
+    });
+  });
+  server.listen(port, host);
+
+  var vcCfg = {
+    dbName: 'test_versioned_collection_exec_root',
+    dbPort: 27019,
+    debug: false,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/var/empty',
+    autoProcessInterval: 50,
+    size: 1,
+    remotes: ['baz'], // list PR sources
+  };
+
+  // push request
+  var pr = {
+  };
+
+  var stderr = '';
+
+  child.stdout.setEncoding('utf8');
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
+  child.stderr.on('data', function(data) {
+    stderr += data;
+  });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send(vcCfg);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      //var s = net.createConnection(port, host
+      var s = net.createConnection(port, host, function() {
+        child.send(pr, s);
+      });
       break;
     }
   });
