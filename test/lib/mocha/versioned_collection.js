@@ -1744,20 +1744,15 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('1.1: needs a document in de collection for further testing', function(done) {
+    it('1.1: needs a document in the collection for further testing', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc._collection.insert({ _id: 'foo', foo: 'bar', _v: 'X' }, function(err, inserted) {
-        if (err) { throw err; }
-        should.equal(inserted.length, 1);
-        done();
-      });
+      vc._collection.insert({ _id: 'foo', foo: 'bar', _v: 'X' }, done);
     });
 
     it('1.2: should rebuild and create a capped collection with one document', function(done) {
       var vc = new VersionedCollection(db, collectionName);
       vc._snapshotCollection.isCapped(function(err, result) {
-        if (err) { throw err; }
-        should.equal(result, null);
+        should.strictEqual(err.message, 'collection test_versioned_collection.m3.ensureSnapshotCollection not found');
 
         vc.ensureSnapshotCollection(8192, function(err) {
           if (err) { throw err; }
@@ -1773,7 +1768,7 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('1.3: should have versioned the document in the normal collection', function(done) {
+    it('1.3: should have versioned he document in the normal collection', function(done) {
       var vc = new VersionedCollection(db, collectionName);
       vc._collection.find().toArray(function(err, citems) {
         if (err) { throw err; }
@@ -1786,7 +1781,7 @@ describe('versioned_collection', function() {
           should.deepEqual(citems[0], { _id: 'foo', _v: 'X', foo: 'bar' });
           should.deepEqual(vcitems[0], {
             _id: { _co: 'ensureSnapshotCollection', _id: 'foo', _v: 'X', _pa: [],  _pe: '_local', _lo: true, _i: 1 },
-            _m3: { _ack: false },
+            _m3: { _ack: false, _op: new Timestamp(0,0) },
             foo: 'bar'
           });
           done();
