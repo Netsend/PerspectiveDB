@@ -95,7 +95,12 @@ if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); 
 
 console.time('runtime');
 
-// load collection from configuration file
+// create a new mongodb like collection from an array
+function arrToColl(arr) {
+  return new ArrayCollection(arr, { debug: program.debug });
+}
+
+// load from config file itself
 function loadSelf(key, cfg) {
   var docs = [];
   Object.keys(cfg[key]).forEach(function(name) {
@@ -104,7 +109,26 @@ function loadSelf(key, cfg) {
     }
     docs.push(cfg[key][name]);
   });
-  return new ArrayCollection(docs, { debug: program.debug });
+  return docs;
+}
+
+// load from a separate config file
+function loadFile(file) {
+  var cfg;
+  if (~file.indexOf('.json')) {
+    cfg = require(file);
+  } else {
+    cfg = properties.parse(fs.readFileSync(file, { encoding: 'utf8' }), { sections: true, namespaces: true });
+  }
+
+  var docs = [];
+  Object.keys(cfg).forEach(function(name) {
+    if (name === 'location' || name === 'name') {
+      return;
+    }
+    docs.push(cfg[name]);
+  });
+  return docs;
 }
 
 function start(db) {
@@ -125,7 +149,9 @@ function start(db) {
           opts.replicationCollName = parts[0];
         }
       } else if (config.replication.location === 'self') {
-        opts.replicationColl = loadSelf(config.replication.name, config);
+        opts.replicationColl = arrToColl(loadSelf(config.replication.name, config));
+      } else if (config.replication.location === 'file') {
+        opts.replicationColl = arrToColl(loadFile(config.replication.name, config));
       }
     }
 
@@ -139,7 +165,9 @@ function start(db) {
           opts.usersCollName = parts[0];
         }
       } else if (config.users.location === 'self') {
-        opts.usersColl = loadSelf(config.users.name, config);
+        opts.usersColl = arrToColl(loadSelf(config.users.name, config));
+      } else if (config.users.location === 'file') {
+        opts.usersColl = arrToColl(loadFile(config.users.name, config));
       }
     }
 
@@ -210,7 +238,7 @@ function start(db) {
 
 var database = config.database;
 var dbCfg = {
-  dbName: database.name,
+  dbName: database.name || 'local',
   dbHost: database.path || database.host,
   dbPort: database.port,
   dbUser: database.username,
