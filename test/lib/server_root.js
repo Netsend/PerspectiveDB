@@ -74,7 +74,7 @@ tasks.push(function(done) {
   });
 
   child1.stdout.on('data', function(data) {
-    if (data === "server2.js: ready\n") {
+    if (data === 'server2.js: ready\n') {
       done();
     }
   });
@@ -102,7 +102,7 @@ tasks.push(function(done) {
   child2.stdout.on('data', function(data) {
     if (/_applyOplogUpdateFullDoc, set ackd/.test(data)) {
       i++;
-      if (i == 2) {
+      if (i === 2) {
         child2.kill();
       }
     }
