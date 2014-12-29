@@ -24,11 +24,11 @@ var should = require('should');
 var Timestamp = require('mongodb').Timestamp;
 var async = require('async');
 
-var VersionedCollection = require('../../lib/versioned_collection');
+var VersionedCollection = require('../../../lib/versioned_collection');
 
 var db;
 var databaseName = 'test_versioned_collection_fixconsistency';
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseName);

@@ -144,8 +144,8 @@ describe('VersionedSystem listen', function() {
         var ms = net.createConnection('/ms-1234.sock');
         ms.write(JSON.stringify(authReq) + '\n');
 
-        ms.on('data', function(data) {
-          should.strictEqual(data.toString(), 'invalid auth request\n');
+        ms.pipe(new BSONStream()).on('data', function(data) {
+          should.strictEqual(data.error, 'invalid auth request');
 
           // should not disconnect a valid auth request
           var authReq2 = {
