@@ -220,7 +220,7 @@ tasks.push(function(done) {
         setTimeout(function() {
           ms.write(pattern, function(err) {
             if (err) {
-              assert(/EPIPE/.test(err.code));
+              assert(/EPIPE|This socket is closed/.test(err.message));
               assert(i >= 127 && i <= 132);
               child.kill();
             } else {
@@ -235,7 +235,7 @@ tasks.push(function(done) {
       flood(ms);
 
       ms.on('error', function(err) {
-        assert(/EPIPE/.test(err.code));
+        assert(/EPIPE|ECONNRESET|This socket is closed/.test(err.message));
       });
       break;
     }
