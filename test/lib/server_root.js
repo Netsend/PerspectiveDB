@@ -73,11 +73,20 @@ tasks.push(function(done) {
     assert.strictEqual(sig, null);
   });
 
-  setTimeout(done, 1000);
+  child1.stdout.on('data', function(data) {
+    if (data === "server2.js: ready\n") {
+      done();
+    }
+  });
 });
 
 tasks.push(function(done) {
   child2 = spawn(__dirname + '/../../server2.js', ['-d', 'test/lib/test_client.ini']);
+
+  child2.on('close', function() {
+    child1.kill();
+    done();
+  });
 
   child2.stdout.setEncoding('utf8');
 
@@ -87,13 +96,17 @@ tasks.push(function(done) {
   child2.on('close', function(code, sig) {
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
-    child1.kill();
   });
 
-  setTimeout(function() {
-    child1.on('close', done);
-    child2.kill();
-  }, 1200);
+  var i = 0;
+  child2.stdout.on('data', function(data) {
+    if (/_applyOplogUpdateFullDoc, set ackd/.test(data)) {
+      i++;
+      if (i == 2) {
+        child2.kill();
+      }
+    }
+  });
 });
 
 // should have sent, saved and ackd dummies

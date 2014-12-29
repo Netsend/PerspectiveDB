@@ -169,6 +169,7 @@ function start(db) {
             console.log('pull requests', debugReq(remoteLogin));
             sendPRs(vs, remoteLogin);
           }
+          console.log('%s: ready', programName);
         });
       } else {
         // chroot
@@ -179,6 +180,7 @@ function start(db) {
           console.log('pull requests', debugReq(remoteLogin));
           sendPRs(vs, remoteLogin);
         }
+        console.log('%s: ready', programName);
       }
     });
 
