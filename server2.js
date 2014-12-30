@@ -91,7 +91,7 @@ if (typeof remoteLogin === 'string') {
   remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
 }
 
-if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); }
+if (program.debug && remoteLogin) { console.log('remote config', debugReq(remoteLogin || {})); }
 
 console.time('runtime');
 
