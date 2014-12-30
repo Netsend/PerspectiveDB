@@ -71,7 +71,7 @@ describe('authRequest', function () {
         password: 'bar',
         database: 'qux',
         collection: 'baz',
-        offset: 10
+        offset: '10'
       });
       should.strictEqual(result, true);
     });
@@ -146,7 +146,7 @@ describe('authRequest', function () {
           password: 'bar',
           database: 'qux',
           collection: 'baz',
-          offset: 'foo'
+          offset: 10
         });
         should.strictEqual(result, false);
       });
