@@ -172,7 +172,7 @@ function start(db) {
       if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); }
     }
 
-    if (program.debug) { console.log('vs opts', opts); }
+    if (program.debug) { console.log('vs opts', JSON.stringify(opts)); }
 
     var vs = new VersionedSystem(oplogColl, opts);
 
