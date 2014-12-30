@@ -128,7 +128,7 @@ tasks.push(function(done) {
       dbClient.collection('someColl').find().toArray(function(err, collClientItems) {
         if (err) { done(err); }
         assert.strictEqual(collClientItems.length, 2);
-        assert.deepEqual(collClientItems[0], { _id: item1id, foo: 'bar', someKey: 'someVal', someOtherKey: 'B', _v: item1v });
+        assert.deepEqual(collClientItems[0], { _id: item1id, foo: 'bar', someKey: 'someVal', _v: item1v });
         assert.deepEqual(collClientItems[1], { _id: item2id, foo: 'baz', someKey: 'someVal', _v: item2v });
 
         dbClient.collection('m3.someColl').find().toArray(function(err, snapshotClientItems) {
@@ -138,8 +138,7 @@ tasks.push(function(done) {
             _id: { _co: 'someColl', _id: item1id, _v: item1v, _pe: 'testserver', _pa: [] },
             _m3: { _op: new Timestamp(0, 0), _ack: false },
             foo: 'bar',
-            someKey: 'someVal',
-            someOtherKey: 'B'
+            someKey: 'someVal'
           });
           assert.deepEqual(snapshotClientItems[1], {
             _id: { _co: 'someColl', _id: item2id, _v: item2v, _pe: 'testserver', _pa: [] },
@@ -154,8 +153,7 @@ tasks.push(function(done) {
             _id: { _co: 'someColl', _id: item1id, _v: item1v, _pe: '_local', _pa: [], _i: 1 },
             _m3: { _ack: true },
             foo: 'bar',
-            someKey: 'someVal',
-            someOtherKey: 'B'
+            someKey: 'someVal'
           });
 
           assert.strictEqual(snapshotClientItems[3]._m3._op.greaterThan(new Timestamp(0, 0)), true);
