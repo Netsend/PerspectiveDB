@@ -84,6 +84,30 @@ describe('VersionedSystem', function() {
       (function() { vs._startVC(config, function() {}); }).should.throw('config.size must be a number');
     });
 
+    it('should require config.size to be larger than 0', function() {
+      var vs = new VersionedSystem(oplogColl);
+      var config = {
+        dbName: 'foo',
+        collectionName: 'bar',
+        size: 0
+      };
+      (function() { vs._startVC(config, function() {}); }).should.throw('config.size must be larger than 0');
+    });
+
+    it('should convert the config.size from MB to B', function(done) {
+      var vs = new VersionedSystem(oplogColl);
+      var config = {
+        dbName: 'foo',
+        collectionName: 'bar',
+        size: 1
+      };
+      vs._startVC(config, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(config.size, 1048576);
+        done();
+      });
+    });
+
     it('should rebuild and callback with a vce and oplog reader', function(done) {
       var vs = new VersionedSystem(oplogColl, { debug: false });
       var config= {
