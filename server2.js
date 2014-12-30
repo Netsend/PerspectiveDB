@@ -79,20 +79,6 @@ function debugReq(req) {
 
 var config = properties.parse(fs.readFileSync(configFile, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
-var remoteLogin = get(config, 'remotes');
-
-// find out if any remotes need to be initiated
-if (typeof remoteLogin === 'string') {
-  // if relative, prepend path to config file
-  if (remoteLogin[0] !== '/') {
-    remoteLogin = path.dirname(configFile) + '/' + remoteLogin;
-  }
-
-  remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
-}
-
-if (program.debug && remoteLogin) { console.log('remote config', debugReq(remoteLogin || {})); }
-
 console.time('runtime');
 
 // create a new mongodb like collection from an array
@@ -169,6 +155,21 @@ function start(db) {
       } else if (config.users.location === 'file') {
         opts.usersColl = arrToColl(loadFile(config.users.name, config));
       }
+    }
+
+    var remoteLogin = config.remotes;
+    if (config.remotes) {
+      // find out if any remotes need to be initiated
+      if (typeof remoteLogin === 'string') {
+        // if relative, prepend path to config file
+        if (remoteLogin[0] !== '/') {
+          remoteLogin = path.dirname(configFile) + '/' + remoteLogin;
+        }
+
+        remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
+      }
+
+      if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); }
     }
 
     if (program.debug) { console.log('vs opts', opts); }
