@@ -21,6 +21,8 @@
 'use strict';
 
 var crc32 = require('crc-32');
+var properties = require('properties');
+var fs = require('fs');
 
 var _db = require('./_db');
 
@@ -31,7 +33,7 @@ var Netsend = require('../lib/netsend');
 program
   .version(require('../package.json').version)
   .description('show snapshot collection status')
-  .usage('[-ec] config.json\n         info.js [-e] -c config.json [dbname][.collname]')
+  .usage('[-ec] config.ini\n         info.js [-e] -c config.ini [dbname][.collname]')
   .option('-c, --config <file>', 'configuration file to use')
   .option('-e, --extended', 'show extended information')
   .parse(process.argv);
@@ -47,25 +49,38 @@ if (config[0] !== '/') {
   config = process.cwd() + '/' + config;
 }
 
-config = require(config);
+var ns = [];
 
 // check if certain database and collection name is given
+// add them to ns array
 if (program.config && program.args[0]) {
   var splitted = program.args[0].split('.');
-  if (!splitted[1]) {
-    config.databases = [program.args[0]];
-  } else if (!splitted[0]) {
-    config.collections = [splitted[1]];
+  if (!splitted[0]) {
+    ns.push('.' + splitted[1]);
   } else {
-    config.databases = [splitted[0]];
-    config.collections = [splitted[1]];
+    ns.push(program.args[0]);
   }
 }
 
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+// create namespaces from all vcs
+Object.keys(config.vc).forEach(function(db) {
+  if (!config.vc[db]) {
+    ns.push(db);
+  } else {
+    Object.keys(config.vc[db]).forEach(function(collection) {
+      ns.push(db + '.' + collection);
+    });
+  }
+});
+
 function start(db) {
-  var opts = { debug: program.debug, autoProcessInterval: 0 };
-  var vs = new VersionedSystem(db, config.databases, config.collections, opts);
-  vs.info(!!program.extended, function(err, stats) {
+  var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
+
+  var opts = { debug: program.debug };
+  var vs = new VersionedSystem(oplogColl, opts);
+  vs.info({ extended: !!program.extended, nsList: ns }, function(err, stats) {
     if (err) {
       console.error(err);
       process.exit(1);
@@ -178,8 +193,18 @@ function start(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   start(db);
 });
