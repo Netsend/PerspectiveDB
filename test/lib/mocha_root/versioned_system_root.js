@@ -213,13 +213,66 @@ describe('VersionedSystem', function() {
       var vs = new VersionedSystem(localOplogColl, { hide: true });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
-        vs.info(true, function(err, result) {
+        var opts = { extended: true };
+        vs.info(opts, function(err, result) {
           should.equal(err, null);
           should.strictEqual(result[ns].collection.count, 1);
           should.strictEqual(result[ns].collection.capped, undefined);
           should.strictEqual(result[ns].snapshotCollection.count, 1);
           should.strictEqual(result[ns].snapshotCollection.capped, true);
           should.strictEqual(result[ns].extended.ack, 0);
+          done();
+        });
+      });
+    });
+
+    it('should work with a custom list of nameSpaces', function(done) {
+      var ns = databaseName + '.' + collName;
+      var cfg = {};
+      cfg[databaseName] = {};
+      cfg[databaseName][collName] = {
+        dbPort: 27019,
+        debug: false,
+        autoProcessInterval: 50,
+        size: 1
+      };
+
+      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      vs.initVCs(cfg, function(err) {
+        if (err) { throw err; }
+        var opts = { nsList: Object.keys(vs._vces) };
+        vs.info(opts, function(err, result) {
+          if (err) { throw err; }
+          should.strictEqual(result[ns].collection.count, 1);
+          should.strictEqual(result[ns].collection.capped, undefined);
+          should.strictEqual(result[ns].snapshotCollection.count, 1);
+          should.strictEqual(result[ns].snapshotCollection.capped, true);
+          done();
+        });
+      });
+    });
+
+    it('should work with a custom list of nameSpaces and extended option', function(done) {
+      var ns = databaseName + '.' + collName;
+      var cfg = {};
+      cfg[databaseName] = {};
+      cfg[databaseName][collName] = {
+        dbPort: 27019,
+        debug: false,
+        autoProcessInterval: 50,
+        size: 1
+      };
+
+      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      vs.initVCs(cfg, function(err) {
+        if (err) { throw err; }
+        var opts = { extended: false, nsList: Object.keys(vs._vces) };
+        vs.info(opts, function(err, result) {
+          if (err) { throw err; }
+          should.strictEqual(result[ns].collection.count, 1);
+          should.strictEqual(result[ns].collection.capped, undefined);
+          should.strictEqual(result[ns].snapshotCollection.count, 1);
+          should.strictEqual(result[ns].snapshotCollection.capped, true);
           done();
         });
       });
