@@ -179,20 +179,20 @@ describe('versioned_collection', function() {
       should.deepEqual(vc.hooks, ['foo', 'bar']);
     });
 
-    it('should require opts.hookOpts to be an object', function() {
+    it('should require opts.hooksOpts to be an object', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { hookOpts: 'foo' });
-      }).should.throw('opts.hookOpts must be an object');
+        new VersionedCollectionReader(db, 'foo', { hooksOpts: 'foo' });
+      }).should.throw('opts.hooksOpts must be an object');
     });
 
-    it('should default hookOpts to {}', function() {
+    it('should default hooksOpts to {}', function() {
       var vc = new VersionedCollectionReader(db, 'foo');
-      should.deepEqual(vc.hookOpts, {});
+      should.deepEqual(vc.hooksOpts, {});
     });
 
-    it('should set hookOpts to {foo: \'bar\'}', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', { hookOpts: { foo: 'bar'} } );
-      should.deepEqual(vc.hookOpts, { foo: 'bar'});
+    it('should set hooksOpts to {foo: \'bar\'}', function() {
+      var vc = new VersionedCollectionReader(db, 'foo', { hooksOpts: { foo: 'bar'} } );
+      should.deepEqual(vc.hooksOpts, { foo: 'bar'});
     });
 
     it('should set collectionName', function() {
