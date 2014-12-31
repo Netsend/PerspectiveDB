@@ -135,7 +135,23 @@ function start(db) {
           opts.replicationCollName = parts[0];
         }
       } else if (config.replication.location === 'self') {
-        opts.replicationColl = arrToColl(loadSelf(config.replication.name, config));
+
+        var replCfgs = loadSelf(config.replication.name, config);
+        // convert the hide string to an array
+        if (replCfgs) {
+          replCfgs.forEach(function(replCfg, key) {
+            if (replCfg.collections) {
+              Object.keys(replCfg.collections).forEach(function(collectionName) {
+                var hide = replCfg.collections[collectionName].hide;
+                if (hide && typeof hide === 'string') {
+                  replCfgs[key].collections[collectionName].hide = [hide];
+                }
+              });
+            }
+          });
+        }
+
+        opts.replicationColl = arrToColl(replCfgs);
       } else if (config.replication.location === 'file') {
         opts.replicationColl = arrToColl(loadFile(config.replication.name, config));
       }
