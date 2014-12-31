@@ -1812,7 +1812,7 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('1.1: should drop the collection and the versioned collection', function(done) {
+    it('4.1: should drop the collection and the versioned collection', function(done) {
       var vc = new VersionedCollection(db, collectionName);
       vc._collection.drop(function(err) {
         if (err) { throw err; }
@@ -1823,7 +1823,7 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('1.2: should create an empty capped collection', function(done) {
+    it('4.2: should create an empty capped collection', function(done) {
       var vc = new VersionedCollection(db, collectionName);
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
@@ -1838,7 +1838,7 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('2: should recreate if versioned collection exists but is too small and empty', function(done) {
+    it('5: should recreate if versioned collection exists but is too small and empty', function(done) {
       var vc = new VersionedCollection(db, collectionName, { hide: true });
       vc.ensureSnapshotCollection(8192, function(err) {
         if (err) { throw err; }
@@ -1853,7 +1853,7 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('3: should not error or recreate if capped collection already exists and is big enough', function(done) {
+    it('6: should not error or recreate if capped collection already exists and is big enough', function(done) {
       var vc = new VersionedCollection(db, collectionName);
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
@@ -1880,26 +1880,22 @@ describe('versioned_collection', function() {
       });
     });
 
-    it('4.1: needs a large document in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, 'enureSnapshotCollectionLargeDoc');
-      var item = { _id: 'foo', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux'] };
+    it('7.1: needs a large document in the collection for further testing', function(done) {
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc');
+      var item = { _id: 'foo', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux'] };
       vc._collection.insert(item, done);
     });
 
-    it('4.2: should error when document is too large', function(done) {
-      var vc = new VersionedCollection(db, 'enureSnapshotCollectionLargeDoc');
-      vc._snapshotCollection.isCapped(function(err, result) {
-        if (err) { throw err; }
-        vc.ensureSnapshotCollection(4096, function(err) {
-          if (err) { throw err; }
-          should.strictEqual(/document is larger than capped size/.test(err.message), true);
-          done();
-        });
+    it('7.2: should error when document is too large', function(done) {
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc');
+      vc.ensureSnapshotCollection(4096, function(err) {
+        should.strictEqual(/document is larger than capped size/.test(err.message), true);
+        done();
       });
     });
 
-    it('5.1: needs multiple documents in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, 'enureSnapshotCollectionLargeDocs');
+    it('8.1: needs multiple documents in the collection for further testing', function(done) {
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs');
       var item1 = { _id: 'foo', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
       var item2 = { _id: 'bar', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
       var item3 = { _id: 'baz', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
@@ -1907,19 +1903,16 @@ describe('versioned_collection', function() {
       vc._collection.insert(items, done);
     });
 
-    it('5.2: should only have the last document (since capped size allows only room for 1)', function(done) {
-      var vc = new VersionedCollection(db, 'enureSnapshotCollectionLargeDocs');
-      vc._snapshotCollection.isCapped(function(err, result) {
+    it('8.2: should only have the last document (since capped size allows only room for 1)', function(done) {
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs');
+      vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
-        vc.ensureSnapshotCollection(4096, function(err) {
+        vc._snapshotCollection.find().toArray(function(err, vcitems) {
           if (err) { throw err; }
-          vc._snapshotCollection.find().toArray(function(err, vcitems) {
-            if (err) { throw err; }
 
-            should.equal(vcitems.length, 1);
-            should.deepEqual(vcitems[0]._id._id, 'baz');
-            done();
-          });
+          should.equal(vcitems.length, 1);
+          should.deepEqual(vcitems[0]._id._id, 'baz');
+          done();
         });
       });
     });
