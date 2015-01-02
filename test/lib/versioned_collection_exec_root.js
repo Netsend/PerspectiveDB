@@ -37,15 +37,16 @@ var Timestamp = mongodb.Timestamp;
 var tasks = [];
 var tasks2 = [];
 
-var db;
-var databaseName = 'test_versioned_collection_exec_root';
+var db, dbHookTest;
+var databaseNames = ['test_versioned_collection_exec_root', 'test_versioned_collection_exec_root_hook'];
 var Database = require('../_database');
 
 // open database connection
-var database = new Database(databaseName);
+var database = new Database(databaseNames);
 tasks.push(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
+  database.connect(function(err, dbs) {
+    db = dbs[0];
+    dbHookTest = dbs[1];
     done(err);
   });
 });
@@ -98,7 +99,83 @@ tasks.push(function(done) {
   });
 });
 
+// should fail if hooks not found
+tasks.push(function(done) {
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  var stderr = '';
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) {
+    stderr += data;
+  });
+
+  child.on('exit', function(code, sig) {
+    assert(/ENOENT, no such file or directory .*\/foo\//.test(stderr));
+    assert.strictEqual(code, 2);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send({
+    hookPaths: ['foo', 'bar'],
+    dbName: 'test_versioned_collection_exec_root',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/var/empty'
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      child.kill();
+      break;
+    }
+  });
+});
+
 // should not fail with valid configurations
+tasks.push(function(done) {
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  var buff = new Buffer(0);
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
+  child.stderr.on('data', function(data) {
+    buff += data;
+  });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(buff.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send({
+    dbName: 'test_versioned_collection_exec_root',
+    dbPort: 27019,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/var/empty'
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      child.kill();
+      break;
+    }
+  });
+});
+
+// should not fail with valid configurations (include hooks)
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
 
@@ -119,6 +196,7 @@ tasks.push(function(done) {
   });
 
   child.send({
+    hookPaths: ['hooks'],
     dbName: 'test_versioned_collection_exec_root',
     dbPort: 27019,
     collectionName: 'test',
@@ -338,9 +416,7 @@ tasks.push(function(done) {
           _pa: [],
           _co: 'test'
         },
-        _m3: {
-          _op: new Timestamp(0, 0)
-        }
+        _m3: { }
       });
 
       server.close();
@@ -357,8 +433,7 @@ tasks.push(function(done) {
     chrootUser: 'nobody',
     chrootNewRoot: '/var/empty',
     autoProcessInterval: 50,
-    size: 1,
-    remotes: ['baz'], // list PR sources
+    size: 1
   };
 
   // push request
@@ -391,6 +466,183 @@ tasks.push(function(done) {
     case 'listen':
       //var s = net.createConnection(port, host
       var s = net.createConnection(port, host, function() {
+        child.send(pr, s);
+      });
+      break;
+    }
+  });
+});
+
+// should disconnect if requested hooks can not be loaded
+tasks.push(function(done) {
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to check if pull request with unloaded hook is disconnected by vcexec
+  var server = net.createServer(function(conn) {
+    conn.on('error', done);
+    conn.on('close', function() {
+      server.close();
+      child.kill();
+    });
+  });
+  server.listen(port, host);
+
+  var vcCfg = {
+    dbName: 'test_versioned_collection_exec_root',
+    dbPort: 27019,
+    debug: false,
+    collectionName: 'test',
+    size: 1
+  };
+
+  // push request
+  var stderr = '';
+
+  child.stdout.setEncoding('utf8');
+
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) {
+    stderr += data;
+  });
+
+  child.on('exit', function(code, sig) {
+    assert(/Error: hook requested that is not loaded/.test(stderr.toString()));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send(vcCfg);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      var s = net.createConnection(port, host, function() {
+        child.send({ hooks: ['a'] }, s);
+      });
+      break;
+    }
+  });
+});
+
+// should insert some dummies in the collection to version on the server side
+tasks.push(function(done) {
+  var coll = dbHookTest.collection('m3.test');
+  var item1 = {
+    _id: { _co: 'someColl', _id: 'key1', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+    _m3: { _op: new Timestamp(1, 2), _ack: true },
+    foo: 'bar',
+    someKey: 'someVal',
+    someOtherKey: 'B'
+  };
+  var item2 = {
+    _id: { _co: 'someColl', _id: 'key2', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+    _m3: { _op: new Timestamp(2, 3), _ack: true },
+    foo: 'baz',
+    someKey: 'someVal'
+  };
+  var item3 = {
+    _id: { _co: 'someColl', _id: 'key3', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+    _m3: { _op: new Timestamp(3, 4), _ack: true },
+    quz: 'zab',
+    someKey: 'someVal'
+  };
+
+  var items = [item1, item2, item3];
+  coll.insert(items, done);
+});
+
+// should run hooks
+tasks.push(function(done) {
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to check if pull request with unloaded hook is disconnected by vcexec
+  var expectedItems = [{
+    _id: { _co: 'someColl', _id: 'key1', _v: 'A', _pa: [] },
+    _m3: {},
+    foo: 'bar',
+    // someKey: 'someVal', this key should be stripped because of hook
+    someOtherKey: 'B'
+  }, {
+    _id: { _co: 'someColl', _id: 'key2', _v: 'A', _pa: [] },
+    _m3: {},
+    foo: 'baz',
+    someKey: 'someVal'
+  }, {
+    _id: { _co: 'someColl', _id: 'key3', _v: 'A', _pa: [] },
+    _m3: {},
+    quz: 'zab',
+    someKey: 'someVal'
+  }];
+  var i = 0;
+  var bs = new BSONStream();
+  var server = net.createServer(function(conn) {
+    conn.pipe(bs).on('data', function(obj) {
+      assert.deepEqual(obj, expectedItems[i]);
+      i++;
+    });
+    conn.on('error', done);
+    conn.on('close', function() {
+      server.close();
+      child.kill();
+    });
+  });
+  server.listen(port, host);
+
+  var vcCfg = {
+    hookPaths: ['hooks'],
+    dbName: 'test_versioned_collection_exec_root_hook',
+    dbPort: 27019,
+    debug: true,
+    collectionName: 'test',
+    autoProcessInterval: 50,
+    size: 1
+  };
+
+  // push request
+  var stderr = '';
+
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stderr.pipe(process.stderr);
+  child.stderr.on('data', function(data) {
+    stderr += data;
+  });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send(vcCfg);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      var s = net.createConnection(port, host, function() {
+        var pr = {
+          hooks: ['strip_field_if_holds'],
+          hooksOpts: {
+            field: 'someKey',
+            fieldFilter: { foo: 'bar' }
+          }
+        };
         child.send(pr, s);
       });
       break;
