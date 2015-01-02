@@ -21,7 +21,9 @@
 /*jshint -W068,-W116, nonew: false */
 
 var should = require('should');
-var BSON = require('mongodb').BSON;
+var mongodb = require('mongodb');
+var BSON = mongodb.BSON;
+var Timestamp = mongodb.Timestamp;
 var Readable = require('stream').Readable;
 
 var VersionedCollectionReader = require('../../../lib/versioned_collection_reader');
@@ -264,11 +266,11 @@ describe('versioned_collection', function() {
 
     var G = {
       _id : { _id: 'foo', _v: 'G', _pe: 'I', _pa: ['F'], _i: 7 },
-      _m3: { _ack: true },
+      _m3: { _ack: true, _op: new Timestamp(1, 2) },
       baz : 'qux'
     };
 
-    // same but without _id._pe and stripped m3 _ack
+    // same but without _id._pe and stripped m3 _ack and m3 _ack
     var rA = { _id : { _id: 'foo', _v: 'A', _pa: [] }, _m3: {},
       baz : 'qux' };
     var rB = { _id : { _id: 'foo', _v: 'B', _pa: ['A'] }, _m3: {},
