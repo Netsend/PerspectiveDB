@@ -211,8 +211,10 @@ function start(db) {
 
           // find out if any remotes need to be initiated
           if (remoteLogin) {
-            console.log('pull requests', debugReq(remoteLogin));
-            sendPRs(vs, remoteLogin);
+            console.log('pull requests, after 5 secs.', debugReq(remoteLogin));
+            setTimeout(function() {
+              sendPRs(vs, remoteLogin);
+            }, 5000);
           }
           console.log('%s: ready', programName);
         });
@@ -222,8 +224,10 @@ function start(db) {
 
         // find out if any remotes need to be initiated
         if (remoteLogin) {
-          console.log('pull requests', debugReq(remoteLogin));
-          sendPRs(vs, remoteLogin);
+          console.log('pull requests, after 5 secs.', debugReq(remoteLogin));
+          setTimeout(function() {
+            sendPRs(vs, remoteLogin);
+          }, 5000);
         }
         console.log('%s: ready', programName);
       }
