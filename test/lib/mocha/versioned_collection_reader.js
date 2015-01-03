@@ -45,6 +45,12 @@ after(database.disconnect.bind(database));
 
 describe('versioned_collection', function() {
   describe('constructor', function() {
+    var collectionName = 'tail';
+
+    it('needs a capped collection', function(done) {
+      database.createCappedColl('m3.' + collectionName, done);
+    });
+
     it('should require coll to be a mongodb.Collection', function() {
       (function () { new VersionedCollectionReader(); }).should.throw('db must be an instance of mongodb.Db');
     });
@@ -55,177 +61,176 @@ describe('versioned_collection', function() {
 
     it('should require opts.localPerspective to be a string', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { localPerspective: {} });
+        new VersionedCollectionReader(db, collectionName, { localPerspective: {} });
       }).should.throw('opts.localPerspective must be a string');
     });
 
     it('should default localPerspective to _local', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.equal(vc.localPerspective, '_local');
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.equal(vc._localPerspective, '_local');
     });
 
     it('should set localPerspective to foo', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', {localPerspective: 'foo'});
-      should.equal(vc.localPerspective, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName, {localPerspective: 'foo'});
+      should.equal(vc._localPerspective, 'foo');
     });
 
     it('should require opts.debug to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { debug: {} });
+        new VersionedCollectionReader(db, collectionName, { debug: {} });
       }).should.throw('opts.debug must be a boolean');
     });
 
     it('should default _debug to false', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
       should.equal(vc._debug, false);
     });
 
     it('should set _debug to true', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', {debug: true});
+      var vc = new VersionedCollectionReader(db, collectionName, {debug: true});
       should.equal(vc._debug, true);
     });
 
     it('should require opts.hide to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { hide: {} });
+        new VersionedCollectionReader(db, collectionName, { hide: {} });
       }).should.throw('opts.hide must be a boolean');
     });
 
     it('should default _hide to false', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
       should.equal(vc._hide, false);
     });
 
     it('should set _hide to true', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', {hide: true});
+      var vc = new VersionedCollectionReader(db, collectionName, {hide: true});
       should.equal(vc._hide, true);
     });
 
     it('should require opts.raw to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { raw: {} });
+        new VersionedCollectionReader(db, collectionName, { raw: {} });
       }).should.throw('opts.raw must be a boolean');
     });
 
     it('should default _raw to false', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
       should.equal(vc._raw, false);
     });
 
     it('should set _raw to true', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', {raw: true});
+      var vc = new VersionedCollectionReader(db, collectionName, {raw: true});
       should.equal(vc._raw, true);
     });
 
     it('should require opts.filter to be an object', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { filter: 'foo' });
+        new VersionedCollectionReader(db, collectionName, { filter: 'foo' });
       }).should.throw('opts.filter must be an object');
     });
 
     it('should default filter to {}', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.deepEqual(vc.filter, {});
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.deepEqual(vc._filter, {});
     });
 
     it('should set filter to { foo: \'bar\'}', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', { filter: {foo: 'bar'}});
-      should.deepEqual(vc.filter, {foo: 'bar'});
+      var vc = new VersionedCollectionReader(db, collectionName, { filter: {foo: 'bar'}});
+      should.deepEqual(vc._filter, {foo: 'bar'});
     });
 
     it('should require opts.offset to be a string', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { offset: {} });
+        new VersionedCollectionReader(db, collectionName, { offset: {} });
       }).should.throw('opts.offset must be a string');
     });
 
     it('should default offset to \'\'', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.equal(vc.offset, '');
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.equal(vc._offset, '');
     });
 
     it('should set offset to \'foo\'', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', {offset: 'foo'});
-      should.equal(vc.offset, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName, {offset: 'foo'});
+      should.equal(vc._offset, 'foo');
     });
 
     it('should require opts.follow to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { follow: {} });
+        new VersionedCollectionReader(db, collectionName, { follow: {} });
       }).should.throw('opts.follow must be a boolean');
     });
 
     it('should default follow to true', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.equal(vc.follow, true);
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.equal(vc._follow, true);
     });
 
     it('should set follow to false', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', { follow: false });
-      should.equal(vc.follow, false);
+      var vc = new VersionedCollectionReader(db, collectionName, { follow: false });
+      should.equal(vc._follow, false);
     });
 
     it('should require opts.hooks to be an array', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { hooks: {} });
+        new VersionedCollectionReader(db, collectionName, { hooks: {} });
       }).should.throw('opts.hooks must be an array');
     });
 
     it('should default hooks to []', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.deepEqual(vc.hooks, []);
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.deepEqual(vc._hooks, []);
     });
 
     it('should set hooks to [\'foo\',\'bar\']', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', { hooks: ['foo', 'bar'] });
-      should.deepEqual(vc.hooks, ['foo', 'bar']);
+      var vc = new VersionedCollectionReader(db, collectionName, { hooks: ['foo', 'bar'] });
+      should.deepEqual(vc._hooks, ['foo', 'bar']);
     });
 
     it('should require opts.hooksOpts to be an object', function() {
       (function() {
-        new VersionedCollectionReader(db, 'foo', { hooksOpts: 'foo' });
+        new VersionedCollectionReader(db, collectionName, { hooksOpts: 'foo' });
       }).should.throw('opts.hooksOpts must be an object');
     });
 
     it('should default hooksOpts to {}', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.deepEqual(vc.hooksOpts, {});
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.deepEqual(vc._hooksOpts, {});
     });
 
     it('should set hooksOpts to {foo: \'bar\'}', function() {
-      var vc = new VersionedCollectionReader(db, 'foo', { hooksOpts: { foo: 'bar'} } );
-      should.deepEqual(vc.hooksOpts, { foo: 'bar'});
+      var vc = new VersionedCollectionReader(db, collectionName, { hooksOpts: { foo: 'bar'} } );
+      should.deepEqual(vc._hooksOpts, { foo: 'bar'});
     });
 
     it('should set collectionName', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.equal(vc.collectionName, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.equal(vc._collectionName, collectionName);
     });
 
     it('should set snapshotCollectionName', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
-      should.equal(vc.snapshotCollectionName, 'm3.foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
+      should.equal(vc._snapshotCollectionName, 'm3.' + collectionName);
     });
 
     it('should open collection', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
       //vc._collection.should.have.property('collectionName');
       should.notEqual(vc._collection.collectionName, undefined);
     });
 
     it('should open snapshotCollection', function() {
-      var vc = new VersionedCollectionReader(db, 'foo');
+      var vc = new VersionedCollectionReader(db, collectionName);
       should.notEqual(vc._snapshotCollection.collectionName, undefined);
     });
 
     it('should construct', function(done) {
-      var vcr = new VersionedCollectionReader(db, 'foo');
+      var vcr = new VersionedCollectionReader(db, collectionName, { debug: false });
       // needs a data handler resume() to start flowing and needs to flow before an end will be emitted
-      vcr.resume();
       vcr.on('end', done);
+      vcr.resume();
     });
 
-    var collectionName = 'tail';
     var perspective = 'I';
 
     var A = {
@@ -291,18 +296,10 @@ describe('versioned_collection', function() {
     //        \     \
     //         E <-- F <-- G
 
-    it('needs a capped collection', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName);
-      database.createCappedColl(vc.snapshotCollectionName, done);
-    });
-
     it('should work with empty DAG and collection', function(done) {
       var vc = new VersionedCollectionReader(db, collectionName);
-      database.createCappedColl(vc.snapshotCollectionName, function(err) {
-        if (err) { throw err; }
-        vc.on('data', function() { throw Error('no data should be emitted'); });
-        vc.on('end', done);
-      });
+      vc.on('data', function() { throw Error('no data should be emitted'); });
+      vc.on('end', done);
     });
 
     it('should work without offset', function(done) {
@@ -312,13 +309,13 @@ describe('versioned_collection', function() {
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective, follow: false });
       vc._snapshotCollection.insert([A, B, C, D, E, F, G], {w: 1}, done);
     });
 
     it('should return all elements when offset is empty', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective, follow: false });
       var docs = [];
 
       vc.on('data', function(doc) {
@@ -336,6 +333,7 @@ describe('versioned_collection', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var vc = new VersionedCollectionReader(db, collectionName, {
         localPerspective: perspective,
+        follow: false,
         raw: true
       });
       var docs = [];
@@ -700,10 +698,10 @@ describe('versioned_collection', function() {
       // should not find A twice for merge F
       var vc = new VersionedCollectionReader(db, collectionName, { follow: true });
 
-      should.strictEqual(vc.closed, false);
+      should.strictEqual(vc._closed, false);
 
       vc.on('end', function() {
-        should.strictEqual(vc.closed, true);
+        should.strictEqual(vc._closed, true);
         done();
       });
       vc.resume();
