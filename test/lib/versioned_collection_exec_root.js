@@ -51,6 +51,14 @@ tasks.push(function(done) {
   });
 });
 
+// should create capped collections
+tasks.push(function(done) {
+  database.createCappedColl(db, 'm3.test', function(err) {
+    if (err) { throw err; }
+    database.createCappedColl(dbHookTest, 'm3.test', done);
+  });
+});
+
 // should require chrootUser to have a valid username
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
@@ -559,7 +567,7 @@ tasks.push(function(done) {
   coll.insert(items, done);
 });
 
-// should run hooks
+// should run export hooks
 tasks.push(function(done) {
   // then fork a vce
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
