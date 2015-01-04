@@ -22,39 +22,36 @@
 
 var program = require('commander');
 var async = require('async');
+var properties = require('properties');
+var fs = require('fs');
 
 var _db = require('./_db');
 var VersionedCollection = require('../lib/versioned_collection');
 
 program
   .version('0.0.1')
-  .usage('[-vm] -d database -c collection config.json')
+  .usage('[-vm] -c collection -f config')
   .description('find all ids that are not merged because of multiple heads')
-  .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection to repair')
+  .option('-f, --config <config>', 'an ini config file')
   .option('-m, --merge', 'try to merge multiple heads')
   .option('-a, --ack', 'ack ancestors of ackd items, implies -m')
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
 
-if (!program.args[0]) {
-  program.help();
-}
 
-var config = program.args[0];
+if (!program.config) { program.help(); }
+if (!program.collection) { program.help(); }
+
+var config = program.config;
+var collection = program.collection;
 
 // if relative, prepend current working dir
 if (config[0] !== '/') {
   config = process.cwd() + '/' + config;
 }
 
-config = require(config);
-
-config.dbName = program.database || config.dbName;
-config.collection = program.collection || config.collection;
-
-if (!config.dbName) { program.help(); }
-if (!config.collection) { program.help(); }
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 var debug2;
 var debug = !!program.verbose;
@@ -65,7 +62,7 @@ if (program.ack && !program.merge) {
 }
 
 function run(db) {
-  var vc = new VersionedCollection(db, config.collection, { debug: debug });
+  var vc = new VersionedCollection(db, collection, { debug: debug });
 
   var multiHeads = [];
   var error;
@@ -139,8 +136,18 @@ function run(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   run(db);
 });
