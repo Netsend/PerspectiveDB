@@ -37,8 +37,8 @@ var Timestamp = mongodb.Timestamp;
 var tasks = [];
 var tasks2 = [];
 
-var db, dbHookTest;
-var databaseNames = ['test_versioned_collection_exec_root', 'test_versioned_collection_exec_root_hook'];
+var db, dbHookPush, dbHookPull;
+var databaseNames = ['test_versioned_collection_exec_root', 'test_versioned_collection_exec_root_hook_push', 'test_versioned_collection_exec_root_hook_pull'];
 var Database = require('../_database');
 
 // open database connection
@@ -46,7 +46,8 @@ var database = new Database(databaseNames);
 tasks.push(function(done) {
   database.connect(function(err, dbs) {
     db = dbs[0];
-    dbHookTest = dbs[1];
+    dbHookPush = dbs[1];
+    dbHookPull = dbs[2];
     done(err);
   });
 });
@@ -55,7 +56,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   database.createCappedColl(db, 'm3.test', function(err) {
     if (err) { throw err; }
-    database.createCappedColl(dbHookTest, 'm3.test', done);
+    database.createCappedColl(dbHookPush, 'm3.test', done);
   });
 });
 
@@ -481,7 +482,7 @@ tasks.push(function(done) {
   });
 });
 
-// should disconnect if requested hooks can not be loaded
+// should disconnect if requested hooks in push request can not be loaded
 tasks.push(function(done) {
   // then fork a vce
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
@@ -542,7 +543,7 @@ tasks.push(function(done) {
 
 // should insert some dummies in the collection to version on the server side
 tasks.push(function(done) {
-  var coll = dbHookTest.collection('m3.test');
+  var coll = dbHookPush.collection('m3.test');
   var item1 = {
     _id: { _co: 'someColl', _id: 'key1', _v: 'A', _pe: '_local', _pa: [], _lo: true },
     _m3: { _op: new Timestamp(1, 2), _ack: true },
@@ -567,7 +568,7 @@ tasks.push(function(done) {
   coll.insert(items, done);
 });
 
-// should run export hooks
+// should run export hooks of push request
 tasks.push(function(done) {
   // then fork a vce
   var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
@@ -614,7 +615,7 @@ tasks.push(function(done) {
 
   var vcCfg = {
     hookPaths: ['hooks'],
-    dbName: 'test_versioned_collection_exec_root_hook',
+    dbName: 'test_versioned_collection_exec_root_hook_push',
     dbPort: 27019,
     debug: true,
     collectionName: 'test',
@@ -655,6 +656,154 @@ tasks.push(function(done) {
           }
         };
         child.send(pr, s);
+      });
+      break;
+    }
+  });
+});
+
+// should run import hooks of pull request
+tasks.push(function(done) {
+  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+
+  var stderr = '';
+
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+
+  child.stdout.on('data', function(data) {
+    // wait till the last item is synced
+    if (/_syncLocalHeadsWithCollection synced .*key3.*_local.*_i":3/.test(data)) {
+      dbHookPull.collection('m3.test').find().toArray(function(err, items) {
+        if (err) { throw err; }
+
+        assert.strictEqual(items.length, 6);
+        assert.deepEqual(items[0], {
+          _id: { _co: 'test', _id: 'key1', _v: 'A', _pe: 'baz', _pa: [] },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never updated
+          foo: 'bar',
+          // someKey: 'someVal', this key should be stripped because of hook
+          someOtherKey: 'B'
+        });
+        assert.deepEqual(items[1], {
+          _id: { _co: 'test', _id: 'key2', _v: 'A', _pe: 'baz', _pa: [] },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never update
+          foo: 'baz',
+          someKey: 'someVal'
+        });
+        assert.deepEqual(items[2], {
+          _id: { _co: 'test', _id: 'key3', _v: 'A', _pe: 'baz', _pa: [] },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never update
+          quz: 'zab',
+          someKey: 'someVal'
+        });
+        assert.deepEqual(items[3], {
+          _id: { _co: 'test', _id: 'key1', _v: 'A', _pe: '_local', _pa: [], _i: 1 },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never update
+          foo: 'bar',
+          // someKey: 'someVal', this key should be stripped because of hook
+          someOtherKey: 'B'
+        });
+        assert.deepEqual(items[4], {
+          _id: { _co: 'test', _id: 'key2', _v: 'A', _pe: '_local', _pa: [], _i: 2 },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never update
+          foo: 'baz',
+          someKey: 'someVal'
+        });
+        assert.deepEqual(items[5], {
+          _id: { _co: 'test', _id: 'key3', _v: 'A', _pe: '_local', _pa: [], _i: 3 },
+          _m3: { _op: new Timestamp(0, 0), _ack: false }, // oplog reader is not connected so _m3._ack is never update
+          quz: 'zab',
+          someKey: 'someVal'
+        });
+        server.close();
+        child.kill();
+      });
+    }
+  });
+  child.stderr.pipe(process.stderr);
+  child.stderr.on('data', function(data) {
+    stderr += data;
+  });
+
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to check if pull request is sent by vcexec, and to send some data that should be run through the hooks
+  var server = net.createServer(function(conn) {
+    conn.on('data', function(data) {
+      assert.deepEqual(JSON.parse(data), {
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'qux'
+      });
+
+      // send some data
+      var item1 = {
+        _id: { _co: 'someColl', _id: 'key1', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+        _m3: { _op: new Timestamp(1, 2), _ack: true },
+        foo: 'bar',
+        someKey: 'someVal',
+        someOtherKey: 'B'
+      };
+      var item2 = {
+        _id: { _co: 'someColl', _id: 'key2', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+        _m3: { _op: new Timestamp(2, 3), _ack: true },
+        foo: 'baz',
+        someKey: 'someVal'
+      };
+      var item3 = {
+        _id: { _co: 'someColl', _id: 'key3', _v: 'A', _pe: '_local', _pa: [], _lo: true },
+        _m3: { _op: new Timestamp(3, 4), _ack: true },
+        quz: 'zab',
+        someKey: 'someVal'
+      };
+
+      conn.write(BSON.serialize(item1));
+      conn.write(BSON.serialize(item2));
+      conn.write(BSON.serialize(item3));
+      conn.end();
+    });
+  });
+  server.listen(port, host);
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.send({
+    hookPaths: ['hooks'],
+    dbName: 'test_versioned_collection_exec_root_hook_pull',
+    dbPort: 27019,
+    debug: true,
+    autoProcessInterval: 50,
+    collectionName: 'test',
+    chrootUser: 'nobody',
+    chrootNewRoot: '/var/empty'
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      break;
+    case 'listen':
+      // send pr
+      child.send({
+        hooks: ['strip_field_if_holds'],
+        hooksOpts: {
+          field: 'someKey',
+          fieldFilter: { foo: 'bar' }
+        },
+        username: 'foo',
+        password: 'bar',
+        database: 'baz',
+        collection: 'qux',
+        host: host,
+        port: port
       });
       break;
     }
