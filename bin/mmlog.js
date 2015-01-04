@@ -24,17 +24,20 @@ var _db = require('./_db');
 var mongodb = require('mongodb');
 var async = require('async');
 var VersionedCollection = require('../lib/versioned_collection');
+var properties = require('properties');
+var fs = require('fs');
 
 var program = require('commander');
 
 program
   .version('0.1.0')
-  .usage('[-n] -d database -c collection')
+  .usage('[-n] -d database -c collection -f config')
   .description('tail the given collection')
   .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection')
   .option('    --id <id>', 'show the log of one string based id')
   .option('    --oid <id>', 'show the log of one object id')
+  .option('-f, --config <config>', 'an ini config file')
   .option('-s, --show', 'show complete objects')
   .option('    --sync', 'only show versions that are in sync')
   .option('    --nsync', 'only show versions that are not in sync')
@@ -44,7 +47,18 @@ program
   .parse(process.argv);
 
 // get config path from environment
-var config = require(process.env.CONFIG || '../config/development.json');
+if (!program.config) {
+  program.help();
+}
+
+var config = program.config;
+
+// if relative, prepend current working dir
+if (config[0] !== '/') {
+  config = process.cwd() + '/' + config;
+}
+
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 if (!program.database) { program.help(); }
 if (!program.collection) { program.help(); }
@@ -217,8 +231,19 @@ function run(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   run(db);
 });
+
