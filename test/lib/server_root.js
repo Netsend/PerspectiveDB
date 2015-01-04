@@ -128,8 +128,8 @@ tasks.push(function(done) {
       dbClient.collection('someColl').find().toArray(function(err, collClientItems) {
         if (err) { done(err); }
         assert.strictEqual(collClientItems.length, 2);
-        assert.deepEqual(collClientItems[0], { _id: item1id, foo: 'bar', someKey: 'someVal', _v: item1v });
-        assert.deepEqual(collClientItems[1], { _id: item2id, foo: 'baz', someKey: 'someVal', _v: item2v });
+        assert.deepEqual(collClientItems[0], { _id: item1id, foo: 'bar', _v: item1v });
+        assert.deepEqual(collClientItems[1], { _id: item2id, foo: 'baz', _v: item2v });
 
         dbClient.collection('m3.someColl').find().toArray(function(err, snapshotClientItems) {
           if (err) { done(err); }
@@ -138,13 +138,13 @@ tasks.push(function(done) {
             _id: { _co: 'someColl', _id: item1id, _v: item1v, _pe: 'testserver', _pa: [] },
             _m3: { _op: new Timestamp(0, 0), _ack: false },
             foo: 'bar',
-            someKey: 'someVal'
+            // someKey: 'someVal' should be hidden by import hooks
           });
           assert.deepEqual(snapshotClientItems[1], {
             _id: { _co: 'someColl', _id: item2id, _v: item2v, _pe: 'testserver', _pa: [] },
             _m3: { _op: new Timestamp(0, 0), _ack: false },
             foo: 'baz',
-            someKey: 'someVal'
+            // someKey: 'someVal' should be hidden by import hooks
           });
 
           assert.strictEqual(snapshotClientItems[2]._m3._op.greaterThan(new Timestamp(0, 0)), true);
@@ -153,7 +153,7 @@ tasks.push(function(done) {
             _id: { _co: 'someColl', _id: item1id, _v: item1v, _pe: '_local', _pa: [], _i: 1 },
             _m3: { _ack: true },
             foo: 'bar',
-            someKey: 'someVal'
+            // someKey: 'someVal' should be hidden by import hooks
           });
 
           assert.strictEqual(snapshotClientItems[3]._m3._op.greaterThan(new Timestamp(0, 0)), true);
@@ -162,7 +162,7 @@ tasks.push(function(done) {
             _id: { _co: 'someColl', _id: item2id, _v: item2v, _pe: '_local', _pa: [], _i: 2 },
             _m3: { _ack: true },
             foo: 'baz',
-            someKey: 'someVal'
+            // someKey: 'someVal' should be hidden by import hooks
           });
           done();
         });
