@@ -46,7 +46,13 @@ function sendPRs(vs, remotes) {
       database:   remote.database,
       collection: remote.collection
     };
-    vs.sendPR(remote.vc, pr);
+    vs.sendPR(remote.vc, pr, function(err) {
+      if (err) {
+        console.error('%s: send pr error', programName, remote.vc, err);
+        return;
+      }
+      if (program.debug) { console.log('%s: sent pr', programName, remote.vc, JSON.stringify(pr)); }
+    });
   });
 }
 
