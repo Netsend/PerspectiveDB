@@ -22,25 +22,36 @@
 
 var program = require('commander');
 var Timestamp = require('mongodb').Timestamp;
+var properties = require('properties');
+var fs = require('fs');
 
 var _db = require('./_db');
 
 program
   .version('0.0.1')
-  .usage('[-r] [database.collection]')
+  .usage('[-r] -f config [database.collection]')
   .description('set last used oplog item global or for a collection')
   .option('-r, --remove', 'remove the timestamp')
+  .option('-f, --config  <config>', 'an ini config file')
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
 
-// get config path from environment
-var config = require(process.env.CONFIG || '../config/development.json');
+if (!program.config) { program.help(); }
+
+var config = program.config
+
+// if relative, prepend current working dir
+if (config[0] !== '/') {
+  config = process.cwd() + '/' + config;
+}
+
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 var id = program.args[0] || 'lastUsedOplogItem';
 
 // update last used oplog item
 function run(db) {
-  var localDb = db.db(config.localDbName || 'local');
+  var localDb = db.db(config.database.name || 'local');
   if (program.remove) {
     localDb.collection('m3').remove({ _id: id }, function(err, removed) {
       if (err) {
@@ -73,8 +84,18 @@ function run(db) {
   }
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   run(db);
 });
