@@ -600,6 +600,9 @@ tasks.push(function(done) {
     conn.pipe(bs).on('data', function(obj) {
       assert.deepEqual(obj, expectedItems[i]);
       i++;
+      if (i === 3) {
+        conn.end();
+      }
     });
     conn.on('error', done);
     conn.on('close', function() {
