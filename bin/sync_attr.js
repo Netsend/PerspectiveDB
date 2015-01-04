@@ -23,25 +23,41 @@
 var program = require('commander');
 
 var _db = require('./_db');
+var properties = require('properties');
+var fs = require('fs');
 
 var syncAttr = require('../lib/sync_attr');
 
 program
   .version('0.0.1')
-  .usage('[-v] -a database [-b database] -c collection [-d collection] attr')
+  .usage('[-v] -a database [-b database] -c collection [-d collection] -f config attr')
   .description('synchronize attr on items in a.c from corresponding items in b.d')
   .option('-a, --database1 <database>', 'name of the database for collection1')
   .option('-b, --database2 <database>', 'name of the database for collection2 if different from database1')
   .option('-c, --collection1 <collection>', 'name of the collection to report about')
   .option('-d, --collection2 <collection>', 'name of the collection to compare against if different from collection1')
+  .option('-f, --config <config>', 'an ini config file')
   .option('-m, --match <attrs>', 'comma separated list of attributes to should match', function(val) { return val.split(','); })
   .option('-i, --include <attrs>', 'comma separated list of attributes to include in comparison', function(val) { return val.split(','); })
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
 
+
+console.log(program.config);
 // get config path from environment
-var config = require(process.env.CONFIG || '../config/development.json');
+if (!program.config) {
+  program.help();
+}
+
+var config = program.config;
+
+// if relative, prepend current working dir
+if (config[0] !== '/') {
+  config = process.cwd() + '/' + config;
+}
+
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 if (!program.database1) { program.help(); }
 if (!program.database2) { program.database2 = program.database1; }
@@ -94,8 +110,18 @@ function run(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   run(db);
 });
