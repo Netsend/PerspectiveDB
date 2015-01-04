@@ -153,5 +153,75 @@ describe('pullRequest', function () {
       });
       should.strictEqual(result, false);
     });
+
+    it('should return true when all fields are present', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        filter: {},
+        hooks: [],
+        hooksOpts: {},
+        offset: ''
+      });
+      should.strictEqual(result, true);
+    });
+
+    it('should return false when all fields are present and others are present', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        filter: {},
+        hooks: [],
+        hooksOpts: {},
+        offset: '',
+        foo: 'bar'
+      });
+      should.strictEqual(result, false);
+    });
+
+    it('should return false if offset is not a string', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        offset: 1
+      });
+      should.strictEqual(result, false);
+    });
+
+    it('should pass if offset is a string', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        offset: 'foo'
+      });
+      should.strictEqual(result, true);
+    });
+
+    it('should work with undefined values', function() {
+      var result = pullRequest.valid({
+        username: 'foo',
+        password: 'bar',
+        filter: { baz: 'A' },
+        hooks: [ 'some' ],
+        hooksOpts: {},
+        offset: undefined
+      });
+      should.strictEqual(result, true);
+    });
+
+    describe('field length checks', function() {
+      var tooLong = 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
+                    'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' +
+                    'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx';
+
+      it('should return false when offset is too long', function() {
+        var result = pullRequest.valid({
+          username: 'foo',
+          password: 'bar',
+          offset: tooLong
+        });
+        should.strictEqual(result, false);
+      });
+    });
   });
 });
