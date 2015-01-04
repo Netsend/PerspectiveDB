@@ -96,8 +96,37 @@ describe('RemoteTransform', function() {
       done();
     });
 
-    rt.on('err', function(err) { throw err; });
     rt.end({ error: 'some error', _id: { some: 'not only error' } });
+  });
+
+  it('should strip _id._lo', function(done) {
+    var rt = new RemoteTransform('foo', { hide: true });
+    rt.on('data', function(data) {
+      should.deepEqual(data, { _id: { _pe: 'foo' } });
+      done();
+    });
+
+    rt.end({ _id: { _lo: true } });
+  });
+
+  it('should strip _id._i', function(done) {
+    var rt = new RemoteTransform('foo', { hide: true });
+    rt.on('data', function(data) {
+      should.deepEqual(data, { _id: { _pe: 'foo' } });
+      done();
+    });
+
+    rt.end({ _id: { _i: 1 } });
+  });
+
+  it('should strip _m3', function(done) {
+    var rt = new RemoteTransform('foo', { hide: true });
+    rt.on('data', function(data) {
+      should.deepEqual(data, { _id: { bar: 'baz', _pe: 'foo' } });
+      done();
+    });
+
+    rt.end({ _m3: { foo: 'bar' }, _id: { bar: 'baz' } });
   });
 
   it('should support simple hooks and hook options', function(done) {
