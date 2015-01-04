@@ -33,8 +33,8 @@ var Netsend = require('../lib/netsend');
 program
   .version(require('../package.json').version)
   .description('show snapshot collection status')
-  .usage('[-ec] config.ini\n         info.js [-e] -c config.ini [dbname][.collname]')
-  .option('-c, --config <file>', 'configuration file to use')
+  .usage('[-ef] config\n         info.js [-e] -f config [dbname][.collname]')
+  .option('-f, --config <config>', 'an ini config file')
   .option('-e, --extended', 'show extended information')
   .parse(process.argv);
 
