@@ -28,6 +28,7 @@ var Writable = require('stream').Writable;
 var fetchItems = require('../../_fetch_items');
 
 var VersionedCollection = require('../../../lib/versioned_collection');
+var VersionedCollectionReader = require('../../../lib/versioned_collection_reader');
 
 var db;
 var databaseName = 'test_versioned_collection';
@@ -116,6 +117,14 @@ describe('versioned_collection', function() {
 
     it('should construct', function() {
       (function() { vColl = new VersionedCollection(db, 'foo'); }).should.not.throwError();
+    });
+  });
+
+  describe('createReader', function() {
+    it('should return a VersionedCollectionReader', function() {
+      var vc = new VersionedCollection(db, 'foo');
+      var vcr = vc.createReader({ follow: false });
+      should.strictEqual(vcr instanceof VersionedCollectionReader, true);
     });
   });
 
@@ -1751,7 +1760,7 @@ describe('versioned_collection', function() {
 
     it('1.2: should rebuild and create a capped collection with one document', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc._snapshotCollection.isCapped(function(err, result) {
+      vc._snapshotCollection.isCapped(function(err) {
         should.strictEqual(err.message, 'collection test_versioned_collection.m3.ensureSnapshotCollection not found');
 
         vc.ensureSnapshotCollection(8192, function(err) {
