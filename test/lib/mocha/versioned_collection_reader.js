@@ -45,191 +45,183 @@ after(database.disconnect.bind(database));
 
 describe('versioned_collection', function() {
   describe('constructor', function() {
-    var collectionName = 'tail';
+    var snapshotCollectionName = 'm3.constructor';
+    var snapshotCollection;
 
     it('needs a capped collection', function(done) {
-      database.createCappedColl('m3.' + collectionName, done);
+      snapshotCollection = db.collection(snapshotCollectionName);
+      database.createCappedColl(snapshotCollectionName, done);
     });
 
-    it('should require coll to be a mongodb.Collection', function() {
-      (function () { new VersionedCollectionReader(); }).should.throw('db must be an instance of mongodb.Db');
-    });
-
-    it('should require collectionName to be a string', function() {
-      (function() { new VersionedCollectionReader(db, {}); }).should.throw('collectionName must be a string');
+    it('should require snapshotCollection to be an object', function() {
+      (function () { new VersionedCollectionReader(); }).should.throw('snapshotCollection must be an object');
     });
 
     it('should require opts.localPerspective to be a string', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { localPerspective: {} });
+        new VersionedCollectionReader(snapshotCollection, { localPerspective: {} });
       }).should.throw('opts.localPerspective must be a string');
     });
 
     it('should default localPerspective to _local', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._localPerspective, '_local');
     });
 
     it('should set localPerspective to foo', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, {localPerspective: 'foo'});
+      var vc = new VersionedCollectionReader(snapshotCollection, {localPerspective: 'foo'});
       should.equal(vc._localPerspective, 'foo');
     });
 
     it('should require opts.debug to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { debug: {} });
+        new VersionedCollectionReader(snapshotCollection, { debug: {} });
       }).should.throw('opts.debug must be a boolean');
     });
 
     it('should default _debug to false', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._debug, false);
     });
 
     it('should set _debug to true', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, {debug: true});
+      var vc = new VersionedCollectionReader(snapshotCollection, { debug: true });
       should.equal(vc._debug, true);
     });
 
     it('should require opts.hide to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { hide: {} });
+        new VersionedCollectionReader(snapshotCollection, { hide: {} });
       }).should.throw('opts.hide must be a boolean');
     });
 
     it('should default _hide to false', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._hide, false);
     });
 
     it('should set _hide to true', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, {hide: true});
+      var vc = new VersionedCollectionReader(snapshotCollection, {hide: true});
       should.equal(vc._hide, true);
     });
 
     it('should require opts.raw to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { raw: {} });
+        new VersionedCollectionReader(snapshotCollection, { raw: {} });
       }).should.throw('opts.raw must be a boolean');
     });
 
     it('should default _raw to false', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._raw, false);
     });
 
     it('should set _raw to true', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, {raw: true});
+      var vc = new VersionedCollectionReader(snapshotCollection, {raw: true});
       should.equal(vc._raw, true);
     });
 
     it('should require opts.filter to be an object', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { filter: 'foo' });
+        new VersionedCollectionReader(snapshotCollection, { filter: 'foo' });
       }).should.throw('opts.filter must be an object');
     });
 
     it('should default filter to {}', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.deepEqual(vc._filter, {});
     });
 
     it('should set filter to { foo: \'bar\'}', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, { filter: {foo: 'bar'}});
+      var vc = new VersionedCollectionReader(snapshotCollection, { filter: {foo: 'bar'}});
       should.deepEqual(vc._filter, {foo: 'bar'});
     });
 
     it('should require opts.offset to be a string', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { offset: {} });
+        new VersionedCollectionReader(snapshotCollection, { offset: {} });
       }).should.throw('opts.offset must be a string');
     });
 
     it('should default offset to \'\'', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._offset, '');
     });
 
     it('should set offset to \'foo\'', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, {offset: 'foo'});
+      var vc = new VersionedCollectionReader(snapshotCollection, {offset: 'foo'});
       should.equal(vc._offset, 'foo');
     });
 
     it('should require opts.follow to be a boolean', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { follow: {} });
+        new VersionedCollectionReader(snapshotCollection, { follow: {} });
       }).should.throw('opts.follow must be a boolean');
     });
 
     it('should default follow to true', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.equal(vc._follow, true);
     });
 
     it('should set follow to false', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, { follow: false });
+      var vc = new VersionedCollectionReader(snapshotCollection, { follow: false });
       should.equal(vc._follow, false);
     });
 
     it('should require opts.hooks to be an array', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { hooks: {} });
+        new VersionedCollectionReader(snapshotCollection, { hooks: {} });
       }).should.throw('opts.hooks must be an array');
     });
 
     it('should default hooks to []', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.deepEqual(vc._hooks, []);
     });
 
     it('should set hooks to [\'foo\',\'bar\']', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, { hooks: ['foo', 'bar'] });
+      var vc = new VersionedCollectionReader(snapshotCollection, { hooks: ['foo', 'bar'] });
       should.deepEqual(vc._hooks, ['foo', 'bar']);
     });
 
     it('should require opts.hooksOpts to be an object', function() {
       (function() {
-        new VersionedCollectionReader(db, collectionName, { hooksOpts: 'foo' });
+        new VersionedCollectionReader(snapshotCollection, { hooksOpts: 'foo' });
       }).should.throw('opts.hooksOpts must be an object');
     });
 
     it('should default hooksOpts to {}', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.deepEqual(vc._hooksOpts, {});
     });
 
     it('should set hooksOpts to {foo: \'bar\'}', function() {
-      var vc = new VersionedCollectionReader(db, collectionName, { hooksOpts: { foo: 'bar'} } );
+      var vc = new VersionedCollectionReader(snapshotCollection, { hooksOpts: { foo: 'bar'} } );
       should.deepEqual(vc._hooksOpts, { foo: 'bar'});
     });
 
-    it('should set collectionName', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
-      should.equal(vc._collectionName, collectionName);
-    });
-
     it('should set snapshotCollectionName', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
-      should.equal(vc._snapshotCollectionName, 'm3.' + collectionName);
-    });
-
-    it('should open collection', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
-      //vc._collection.should.have.property('collectionName');
-      should.notEqual(vc._collection.collectionName, undefined);
+      var vc = new VersionedCollectionReader(snapshotCollection);
+      should.equal(vc._snapshotCollectionName, snapshotCollectionName);
     });
 
     it('should open snapshotCollection', function() {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.notEqual(vc._snapshotCollection.collectionName, undefined);
     });
 
     it('should construct', function(done) {
-      var vcr = new VersionedCollectionReader(db, collectionName, { debug: false });
+      var vcr = new VersionedCollectionReader(snapshotCollection);
       // needs a data handler resume() to start flowing and needs to flow before an end will be emitted
       vcr.on('end', done);
       vcr.resume();
     });
+  });
+
+  describe('stream', function() {
+    var snapshotCollectionName = 'm3.stream';
+    var snapshotCollection;
 
     var perspective = 'I';
 
@@ -296,26 +288,31 @@ describe('versioned_collection', function() {
     //        \     \
     //         E <-- F <-- G
 
+    it('needs a capped collection', function(done) {
+      snapshotCollection = db.collection(snapshotCollectionName);
+      database.createCappedColl(snapshotCollectionName, done);
+    });
+
     it('should work with empty DAG and collection', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       vc.on('data', function() { throw Error('no data should be emitted'); });
       vc.on('end', done);
     });
 
     it('should work without offset', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       vc.resume();
       vc.on('end', done);
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective, follow: false });
+      var vc = new VersionedCollectionReader(snapshotCollection, { localPerspective: perspective, follow: false });
       vc._snapshotCollection.insert([A, B, C, D, E, F, G], {w: 1}, done);
     });
 
     it('should return all elements when offset is empty', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, { localPerspective: perspective, follow: false });
+      var vc = new VersionedCollectionReader(snapshotCollection, { localPerspective: perspective, follow: false });
       var docs = [];
 
       vc.on('data', function(doc) {
@@ -331,7 +328,7 @@ describe('versioned_collection', function() {
 
     it('should return raw buffer instances', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         raw: true
@@ -351,7 +348,7 @@ describe('versioned_collection', function() {
 
     it('should return only the last element if that is the offset', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: G._id._v
@@ -371,7 +368,7 @@ describe('versioned_collection', function() {
 
     it('should return from offset E', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: E._id._v
@@ -393,7 +390,7 @@ describe('versioned_collection', function() {
 
     it('should return everything since offset C (including E)', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: C._id._v
@@ -417,7 +414,7 @@ describe('versioned_collection', function() {
 
     it('should return the complete DAG if filter is empty', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v
@@ -443,7 +440,7 @@ describe('versioned_collection', function() {
 
     it('should not endup with two same parents A for G since F is a merge but not selected', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -466,7 +463,7 @@ describe('versioned_collection', function() {
 
     it('should return only attrs with baz = mug and change root to C', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -487,7 +484,7 @@ describe('versioned_collection', function() {
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -510,7 +507,7 @@ describe('versioned_collection', function() {
 
     it('should return nothing if filters don\'t match any item', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -551,7 +548,7 @@ describe('versioned_collection', function() {
         callback(null, object);
       }
 
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -596,7 +593,7 @@ describe('versioned_collection', function() {
         callback(null, object);
       }
 
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: E._id._v,
@@ -625,7 +622,7 @@ describe('versioned_collection', function() {
         callback(null, null);
       }
 
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: A._id._v,
@@ -654,7 +651,7 @@ describe('versioned_collection', function() {
         callback(null, null);
       }
 
-      var vc = new VersionedCollectionReader(db, collectionName, {
+      var vc = new VersionedCollectionReader(snapshotCollection, {
         localPerspective: perspective,
         follow: false,
         offset: B._id._v,
@@ -677,17 +674,24 @@ describe('versioned_collection', function() {
     });
 
     it('should be a readable stream', function(done) {
-      var vc = new VersionedCollectionReader(db, collectionName);
+      var vc = new VersionedCollectionReader(snapshotCollection);
       should.strictEqual(vc instanceof Readable, true);
       done();
     });
   });
 
   describe('close', function() {
-    var collectionName = 'tail';
+    var snapshotCollectionName = 'm3.close';
+    var snapshotCollection;
+
+    it('needs a capped collection', function(done) {
+      snapshotCollection = db.collection(snapshotCollectionName);
+      database.createCappedColl(snapshotCollectionName, done);
+    });
+
     it('should close', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, { follow: true });
+      var vc = new VersionedCollectionReader(snapshotCollection, { follow: true });
 
       vc.on('end', done);
       vc.resume();
@@ -696,7 +700,7 @@ describe('versioned_collection', function() {
 
     it('should set closed', function(done) {
       // should not find A twice for merge F
-      var vc = new VersionedCollectionReader(db, collectionName, { follow: true });
+      var vc = new VersionedCollectionReader(snapshotCollection, { follow: true });
 
       should.strictEqual(vc._closed, false);
 
