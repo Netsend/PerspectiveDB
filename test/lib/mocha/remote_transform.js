@@ -99,4 +99,47 @@ describe('RemoteTransform', function() {
     rt.on('err', function(err) { throw err; });
     rt.end({ error: 'some error', _id: { some: 'not only error' } });
   });
+
+  it('should support simple hooks and hook options', function(done) {
+    var hooksOpts = { some: 'options' };
+
+    function hook1(db, item, opts, cb) {
+      if (opts.some !== 'options') { throw new Error('missing opts'); }
+
+      if (item.foo === 'bar') {
+        item.hook1 = true;
+      }
+      cb(null, item);
+    }
+
+    function hook2(db, item, opts, cb) {
+      if (opts.some !== 'options') { throw new Error('missing opts'); }
+
+      if (item.foo === 'baz') {
+        cb(null, null);
+      }
+      cb(null, item);
+    }
+
+    var hooks = [hook1, hook2];
+
+    var opts = {
+      hooks: hooks,
+      hooksOpts: hooksOpts
+    };
+    var rt = new RemoteTransform('fu', opts);
+
+    rt.once('data', function(data) {
+      should.deepEqual(data, { foo: 'bar', hook1: true, _id: { _id: 'foo', _pe: 'fu' } });
+
+      rt.on('data', function(data) {
+        should.deepEqual(data, { foo: 'quz', _id: { _id: 'foo', _pe: 'fu' } });
+        done();
+      });
+      rt.write({ _id: { _id: 'foo' }, foo: 'baz' }); // this one should be filtered by hook2
+      rt.write({ _id: { _id: 'foo' }, foo: 'quz' }); // nothing should happen to this one and it should be emitted
+    });
+
+    rt.write({ _id: { _id: 'foo' }, foo: 'bar' });
+  });
 });
