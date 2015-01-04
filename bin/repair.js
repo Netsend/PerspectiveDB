@@ -21,42 +21,38 @@
 'use strict';
 
 var program = require('commander');
+var properties = require('properties');
+var fs = require('fs');
 
 var _db = require('./_db');
 var VersionedCollection = require('../lib/versioned_collection');
 
 program
   .version('0.0.1')
-  .usage('[-vn] -d database -c collection config.json')
+  .usage('[-vn] -c collection -f config')
   .description('Make sure all items in the collection are in the snapshot as the latest version. Run multi_head first!')
-  .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection to repair')
+  .option('-f, --config <config>', 'an ini config file')
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
 
-if (!program.args[0]) {
-  program.help();
-}
+if (!program.collection) { program.help(); }
+if (!program.config) { program.help(); }
 
-var config = program.args[0];
+var config = program.config;
+var collection = program.collection;
 
 // if relative, prepend current working dir
 if (config[0] !== '/') {
   config = process.cwd() + '/' + config;
 }
 
-config = require(config);
-
-config.dbName = program.database || config.dbName;
-config.collection = program.collection || config.collection;
-
-if (!config.dbName) { program.help(); }
-if (!config.collection) { program.help(); }
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 var debug = !!program.verbose;
 
 function run(db) {
-  var vc = new VersionedCollection(db, config.collection, { debug: debug });
+  var vc = new VersionedCollection(db, collection, { debug: debug });
 
   vc.copyCollectionOverSnapshot(function(err) {
     if (err) {
@@ -68,8 +64,18 @@ function run(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   run(db);
 });
