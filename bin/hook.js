@@ -23,24 +23,33 @@
 var _db = require('./_db');
 
 var program = require('commander');
+var properties = require('properties');
+var fs = require('fs');
 
 program
   .version('0.0.1')
-  .usage('-d database -c collection <hook.js>')
+  .usage('-c collection -f config <hook.js>')
   .description('run a hook on a collection')
   .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection')
+  .option('-f, --config <config>', 'an ini config file')
   .option('    <hook.js>', 'path to the hook to use')
   .parse(process.argv);
 
-// get config path from environment
-var config = require(process.env.CONFIG || '../config/development.json');
-
 var hook = program.args[0];
 
-if (!program.database) { program.help(); }
+if (!program.config) { program.help(); }
 if (!program.collection) { program.help(); }
 if (!hook) { program.help(); }
+
+var config = program.config
+
+// if relative, prepend current working dir
+if (config[0] !== '/') {
+    config = process.cwd() + '/' + config;
+}
+
+config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 // if relative, prepend current working dir
 if (hook[0] !== '/') {
@@ -50,7 +59,7 @@ if (hook[0] !== '/') {
 hook = require(hook);
 
 function start(db) {
-  var coll = db.db(program.database).collection(program.collection);
+  var coll = db.db(config.database.name || 'local').collection(program.collection);
 
   // start at the end
   var stream = coll.find().stream();
@@ -77,8 +86,18 @@ function start(db) {
   });
 }
 
+var database = config.database;
+var dbCfg = {
+  dbName: database.name || 'local',
+  dbHost: database.path || database.host,
+  dbPort: database.port,
+  dbUser: database.username,
+  dbPass: database.password,
+  adminDb: database.adminDb
+};
+
 // open database
-_db(config, function(err, db) {
+_db(dbCfg, function(err, db) {
   if (err) { throw err; }
   start(db);
 });
