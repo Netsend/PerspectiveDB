@@ -41,9 +41,9 @@ program
   .option('-i, --include <attrs>', 'comma separated list of attributes to include in comparison', function(val) { return val.split(','); })
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-s  --showid', 'print id of missing and unequal items')
-  .option('-p, --patch', 'show a patch with differences between unequal items')
-  .option('    --columns', 'print comma separated list of column names that have differences')
-  .option('-v, --verbose', 'verbose')
+  .option('-p, --patch', 'show a patch with differences between unequal items (contains output of -s)')
+  .option('-v, --verbose', 'verbose (contains output of -p)')
+  .option('    --attrstats', 'show per attribute statistics (implies -p or -v)')
   .parse(process.argv);
 
 if (!program.database1) { program.help(); }
@@ -52,7 +52,7 @@ if (!program.collection1) { program.help(); }
 if (!program.collection2) { program.collection2 = program.collection1; }
 if (!program.config) { program.help(); }
 
-var config = program.config
+var config = program.config;
 
 // if relative, prepend current working dir
 if (config[0] !== '/') {
@@ -91,7 +91,7 @@ function groupPatch(patch) {
   return result;
 }
 
-// count columns
+// count attrs
 function diffColumnCount(item1, item2, diffColumns) {
   var diff = VersionedCollection.diff(item1, item2);
   Object.keys(diff).forEach(function(key) {
@@ -117,33 +117,7 @@ function run(db) {
 
     var diffColumns = {};
 
-    if (debug) {
-      console.log('missing');
-      stats.missing.forEach(function(item) {
-        console.log(item);
-      });
-      console.log('end of missing');
-
-      console.log('unequal');
-      stats.inequal.forEach(function(item) {
-        console.log(1, item.item1);
-        console.log(2, item.item2);
-      });
-      console.log('end of unequal');
-
-      console.log('multiple');
-      stats.multiple.forEach(function(item) {
-        console.log(1, item.item1);
-        console.log(2, JSON.stringify(item.items2));
-      });
-      console.log('end of multiple');
-
-      console.log('unknown');
-      stats.unknown.forEach(function(item) {
-        console.log(item);
-      });
-      console.log('end of unknown');
-    } else if (program.showid) {
+    if (program.showid) {
       console.log('missing');
       stats.missing.forEach(function(item) {
         console.log(item._id);
@@ -195,10 +169,10 @@ function run(db) {
         console.log(item);
       });
       console.log('end of unknown');
-    } else if (program.columns) {
+    } else if (program.verbose) {
       console.log('missing');
       stats.missing.forEach(function(item) {
-        console.log(item._id);
+        console.log(item);
       });
       console.log('end of missing');
 
@@ -206,6 +180,8 @@ function run(db) {
       stats.inequal.forEach(function(item) {
         var diff = diffColumnCount(item.item1, item.item2, diffColumns);
         console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
+        console.log(1, item.item1);
+        console.log(2, item.item2);
       });
       console.log('end of unequal');
 
@@ -215,6 +191,8 @@ function run(db) {
           var diff = diffColumnCount(item.item1, subItem, diffColumns);
           console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
         });
+        console.log(1, item.item1);
+        console.log(2, JSON.stringify(item.items2));
       });
       console.log('end of multiple');
 
@@ -225,7 +203,20 @@ function run(db) {
       console.log('end of unknown');
     }
 
-    if (program.columns) {
+    if (program.attrstats) {
+      // ensure counts
+      if (!program.patch && !program.verbose) {
+        stats.inequal.forEach(function(item) {
+          diffColumnCount(item.item1, item.item2, diffColumns);
+        });
+
+        stats.multiple.forEach(function(item) {
+          item.items2.forEach(function(subItem) {
+            diffColumnCount(item.item1, subItem, diffColumns);
+          });
+        });
+      }
+
       // show diffColumns sorted
       var sorted = Object.keys(diffColumns).map(function(key) {
         return {
@@ -245,7 +236,7 @@ function run(db) {
         obj[key.name] = key.val;
         return obj;
       });
-      console.log('columns', sorted);
+      console.log('attrstats', sorted);
     }
 
     console.log('missing',  stats.missing.length);
