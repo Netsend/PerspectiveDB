@@ -171,7 +171,10 @@ describe('VersionedSystem listen', function() {
               baz: 'A',
               _m3: { }
             });
-            done();
+            ms2.on('end', function() {
+              vs.stopTerm(done);
+            });
+            ms2.end();
           });
         });
       });
