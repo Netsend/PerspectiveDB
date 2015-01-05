@@ -239,7 +239,7 @@ function run(db) {
         }
       }).map(function(key) {
         var obj = {};
-        if (program.verbose) {
+        if (program.verbose && !excludeAttrs[key.name]) {
           obj[key.name + ' ' + key.len] = diffColumns[key.name];
         } else {
           obj[key.name] = key.len;
