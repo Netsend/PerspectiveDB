@@ -69,9 +69,9 @@ var dbCfg = {
   dbName: database.name || 'local',
   dbHost: database.path || database.host,
   dbPort: database.port,
-  dbUser: database.username,
-  dbPass: database.password,
-  adminDb: database.adminDb
+  dbUser: database.user,
+  dbPass: database.pass,
+  authDb: database.authDb
 };
 
 // open database
