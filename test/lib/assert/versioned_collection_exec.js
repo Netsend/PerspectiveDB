@@ -28,14 +28,14 @@ var tasks = [];
 // should fail if required directly
 tasks.push(function(done) {
   assert.throws(function () {
-    require('./../../lib/versioned_collection_exec');
+    require('./../../../lib/versioned_collection_exec');
   }, /this module should be invoked via child_process.fork/);
   done();
 });
 
 // should fail if spawned
 tasks.push(function(done) {
-  var child = childProcess.spawn('node', [__dirname + '/../../lib/versioned_collection_exec']);
+  var child = childProcess.spawn('node', [__dirname + '/../../../lib/versioned_collection_exec']);
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -51,7 +51,7 @@ tasks.push(function(done) {
 
 // should not fail if forked
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -73,7 +73,7 @@ tasks.push(function(done) {
 
 // should fail if first message is not an object
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -91,7 +91,7 @@ tasks.push(function(done) {
 
 // should fail if first message does not contain a db name
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -109,7 +109,7 @@ tasks.push(function(done) {
 
 // should fail if first message does not contain a collectionName
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -132,7 +132,7 @@ tasks.push(function(done) {
 
 // should fail if not executed as root
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {

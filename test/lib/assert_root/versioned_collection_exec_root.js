@@ -39,7 +39,7 @@ var tasks2 = [];
 
 var db, dbHookPush, dbHookPull;
 var databaseNames = ['test_versioned_collection_exec_root', 'test_versioned_collection_exec_root_hook_push', 'test_versioned_collection_exec_root_hook_pull'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);
@@ -62,7 +62,7 @@ tasks.push(function(done) {
 
 // should require chrootUser to have a valid username
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -86,7 +86,7 @@ tasks.push(function(done) {
 
 // should require chrootNewRoot to be a valid path
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   child.stderr.on('data', function(data) {
@@ -110,7 +110,7 @@ tasks.push(function(done) {
 
 // should fail if hooks not found
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var stderr = '';
 
@@ -148,7 +148,7 @@ tasks.push(function(done) {
 
 // should not fail with valid configurations
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
 
@@ -186,7 +186,7 @@ tasks.push(function(done) {
 
 // should not fail with valid configurations (include hooks)
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
   //child.stdout.pipe(process.stdout);
@@ -226,7 +226,7 @@ tasks.push(function(done) {
 
 // should pass through a pull request
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var stderr = '';
 
@@ -291,7 +291,7 @@ tasks.push(function(done) {
 // should save valid incoming BSON data following a pull request
 tasks.push(function(done) {
   // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
@@ -408,7 +408,7 @@ tasks.push(function(done) {
 // should send BSON data following a push request
 tasks.push(function(done) {
   // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
@@ -485,7 +485,7 @@ tasks.push(function(done) {
 // should disconnect if requested hooks in push request can not be loaded
 tasks.push(function(done) {
   // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
@@ -571,7 +571,7 @@ tasks.push(function(done) {
 // should run export hooks of push request
 tasks.push(function(done) {
   // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
@@ -664,7 +664,7 @@ tasks.push(function(done) {
 
 // should run import hooks of pull request
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/versioned_collection_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var stderr = '';
 

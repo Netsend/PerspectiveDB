@@ -34,7 +34,7 @@ var tasks = [];
 
 var db;
 var databaseNames = ['test_local_only'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);
@@ -60,7 +60,7 @@ tasks.push(function(done) {
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
-  child = spawn(__dirname + '/../../server.js', ['-d', 'test/lib/test_local_only.ini']);
+  child = spawn(__dirname + '/../../../server.js', ['-d', 'test/lib/assert_root/test_local_only.ini']);
 
   child.on('close', function() {
     child.kill();
@@ -71,7 +71,6 @@ tasks.push(function(done) {
 
   child.stderr.setEncoding('utf8');
   child.stderr.pipe(process.stderr);
-  child.stdout.pipe(process.stdout);
 
   child.on('close', function(code, sig) {
     assert.strictEqual(code, 0);

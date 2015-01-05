@@ -35,7 +35,7 @@ var tasks = [];
 
 // should require serverConfig.port to be a number
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stderr = '';
   child.stderr.setEncoding('utf8');
@@ -71,7 +71,7 @@ tasks.push(function(done) {
   fs.open('/var/run/ms-1234.sock', 'wx', function(err) {
     if (err) { throw err; }
 
-    var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+    var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
     var stdout = '';
     var stderr = '';
@@ -108,7 +108,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -144,7 +144,7 @@ tasks.push(function(done) {
 
 // should remove any previously created sockets
 tasks.push(function(done) {
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -183,7 +183,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -250,7 +250,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -308,7 +308,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -357,7 +357,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';
@@ -413,7 +413,7 @@ tasks.push(function(done) {
     fs.unlink('/var/run/ms-1234.sock');
   }
 
-  var child = childProcess.fork(__dirname + '/../../lib/preauth_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
   var stderr = '';

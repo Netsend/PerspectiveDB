@@ -34,7 +34,7 @@ var tasks = [];
 
 var dbServer, dbClient;
 var databaseNames = ['testserver', 'test_client'];
-var Database = require('../_database');
+var Database = require('../../_database');
 
 // open database connection
 var database = new Database(databaseNames);
@@ -61,7 +61,7 @@ tasks.push(function(done) {
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
-  child1 = spawn(__dirname + '/../../server.js', ['-d', 'test/lib/test_server.ini']);
+  child1 = spawn(__dirname + '/../../../server.js', ['-d', 'test/lib/assert_root/test_server.ini']);
 
   child1.stdout.setEncoding('utf8');
 
@@ -81,7 +81,7 @@ tasks.push(function(done) {
 });
 
 tasks.push(function(done) {
-  child2 = spawn(__dirname + '/../../server.js', ['-d', 'test/lib/test_client.ini']);
+  child2 = spawn(__dirname + '/../../../server.js', ['-d', 'test/lib/assert_root/test_client.ini']);
 
   child2.on('close', function() {
     child1.kill();
