@@ -44,6 +44,7 @@ program
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-s  --showid', 'print id of missing and unequal items')
   .option('-p, --patch', 'show a patch with differences between unequal items (contains output of -s)')
+  .option('               diff: "-" is not in a, "+" is not in b, "~" both differ')
   .option('-v, --verbose', 'verbose (contains output of -p)')
   .option('    --attrstats', 'add per attribute statistics')
   .parse(process.argv);
@@ -98,10 +99,15 @@ function diffColumnCount(item1, item2, diffColumns) {
   var diff = VersionedCollection.diff(item1, item2);
   Object.keys(diff).forEach(function(key) {
     diffColumns[key] = diffColumns[key] || [];
-    if (diff[key] === '-') {
-      diffColumns[key].push([item1._id, diff[key], item2[key]]);
-    } else {
+    if (diff[key] === '~') {
       diffColumns[key].push([item1._id, diff[key], item1[key], item2[key]]);
+    } else if (diff[key] === '-') {
+      diffColumns[key].push([item1._id, diff[key], item2[key]]);
+    } else if (diff[key] === '+') {
+      diffColumns[key].push([item1._id, diff[key], item1[key]]);
+    } else {
+      console.error(diff, key);
+      throw new Error('unknown diff format');
     }
   });
   return diff;
