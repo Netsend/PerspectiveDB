@@ -21,6 +21,9 @@
 'use strict';
 
 var program = require('commander');
+var async = require('async');
+var mongodb = require('mongodb');
+var ObjectId = mongodb.ObjectId;
 
 var _db = require('./_db');
 var properties = require('properties');
@@ -37,14 +40,14 @@ program
   .option('-c, --collection1 <collection>', 'name of the collection to report about')
   .option('-d, --collection2 <collection>', 'name of the collection to compare against if different from collection1')
   .option('-f, --config <config>', 'an ini config file')
-  .option('-m, --match <attrs>', 'comma separated list of attributes to should match', function(val) { return val.split(','); })
+  .option('-m, --match <attrs>', 'comma separated list of attributes that should match', function(val) { return val.split(','); })
+  .option('    --ids <ids>', 'comma separated list of (string) ids to copy attr from a to b', function(val) { return val.split(','); })
+  .option('    --oids <oids>', 'comma separated list of object ids to copy attr from a to b', function(val) { return val.split(','); })
   .option('-i, --include <attrs>', 'comma separated list of attributes to include in comparison', function(val) { return val.split(','); })
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
 
-
-console.log(program.config);
 // get config path from environment
 if (!program.config) {
   program.help();
@@ -94,20 +97,50 @@ if (debug && Object.keys(matchAttrs).length) { console.log('match:', program.mat
 function run(db) {
   var coll1 = db.db(program.database1).collection(program.collection1);
   var coll2 = db.db(program.database2).collection(program.collection2);
-  var tmpColl = db.db(program.database1).collection(program.collection1 + '.tmp');
 
-  var opts = {
-    includeAttrs: includeAttrs,
-    excludeAttrs: excludeAttrs,
-    matchAttrs: matchAttrs,
-    debug: debug
-  };
+  if (program.ids || program.oids) {
+    var ids = program.ids.slice();
+    if (program.oids) {
+      program.oids.forEach(function(oid) {
+        ids.push(new ObjectId(oid));
+      });
+    }
 
-  syncAttr(coll1, coll2, tmpColl, attr, opts, function(err, updated) {
-    if (err) { throw err; }
-    console.log('updated', updated);
-    db.close();
-  });
+    var field = {};
+    field[attr] = true;
+    coll1.find({ _id: { $in: ids } }, field).toArray(function(err, items) {
+      if (err) { throw err; }
+      async.eachSeries(items, function(item, cb) {
+        if (typeof item[attr] === 'undefined') {
+          console.log(coll2.db.databaseName, coll2.collectionName, item._id, 'unset', field);
+          coll2.update({ _id: item._id }, { $unset: field }, cb);
+        } else {
+          var setter = {};
+          setter[attr] = item[attr];
+          console.log(coll2.db.databaseName, coll2.collectionName, item._id, 'set', setter);
+          coll2.update({ _id: item._id }, { $set: setter }, cb);
+        }
+      }, function(err) {
+        if (err) { throw err; }
+        db.close();
+      });
+    });
+  } else {
+    var tmpColl = db.db(program.database1).collection(program.collection1 + '.tmp');
+
+    var opts = {
+      includeAttrs: includeAttrs,
+      excludeAttrs: excludeAttrs,
+      matchAttrs: matchAttrs,
+      debug: debug
+    };
+
+    syncAttr(coll1, coll2, tmpColl, attr, opts, function(err, updated) {
+      if (err) { throw err; }
+      console.log('updated', updated);
+      db.close();
+    });
+  }
 }
 
 var database = config.database;
