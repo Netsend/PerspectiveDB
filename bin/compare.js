@@ -20,6 +20,8 @@
 
 'use strict';
 
+var util = require('util');
+
 var program = require('commander');
 var properties = require('properties');
 var fs = require('fs');
@@ -43,7 +45,7 @@ program
   .option('-s  --showid', 'print id of missing and unequal items')
   .option('-p, --patch', 'show a patch with differences between unequal items (contains output of -s)')
   .option('-v, --verbose', 'verbose (contains output of -p)')
-  .option('    --attrstats', 'show per attribute statistics (implies -p or -v)')
+  .option('    --attrstats', 'add per attribute statistics')
   .parse(process.argv);
 
 if (!program.database1) { program.help(); }
@@ -95,8 +97,12 @@ function groupPatch(patch) {
 function diffColumnCount(item1, item2, diffColumns) {
   var diff = VersionedCollection.diff(item1, item2);
   Object.keys(diff).forEach(function(key) {
-    diffColumns[key] = diffColumns[key] || 0;
-    diffColumns[key]++;
+    diffColumns[key] = diffColumns[key] || [];
+    if (diff[key] === '-') {
+      diffColumns[key].push([item1._id, diff[key], item2[key]]);
+    } else {
+      diffColumns[key].push([item1._id, diff[key], item1[key], item2[key]]);
+    }
   });
   return diff;
 }
@@ -221,22 +227,26 @@ function run(db) {
       var sorted = Object.keys(diffColumns).map(function(key) {
         return {
           name: key,
-          val: diffColumns[key]
+          len: diffColumns[key].length
         };
       }).sort(function(a, b) {
-        if (a.val < b.val) {
+        if (a.len < b.len) {
           return -1;
-        } else if (a.val === b.val) {
+        } else if (a.len === b.len) {
           return 0;
         } else {
           return 1;
         }
       }).map(function(key) {
         var obj = {};
-        obj[key.name] = key.val;
+        if (program.verbose) {
+          obj[key.name + ' ' + key.len] = diffColumns[key.name];
+        } else {
+          obj[key.name] = key.len;
+        }
         return obj;
       });
-      console.log('attrstats', sorted);
+      console.log('attrstats', util.inspect(sorted, { depth: null }));
     }
 
     console.log('missing',  stats.missing.length);
