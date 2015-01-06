@@ -8,10 +8,14 @@ module.exports = function(db, item, opts, cb) {
     var maxAge = now - (opts.maxAge * 1000);
     maxAge = new Date(maxAge);
     if (item[opts.field] >= maxAge) {
-      cb(null, item);
+      process.nextTick(function() {
+        cb(null, item);
+      });
       return;
     }
   }
 
-  cb(null, null);
+  process.nextTick(function() {
+    cb(null, null);
+  });
 };

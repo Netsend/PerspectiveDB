@@ -9,5 +9,7 @@ module.exports = function(db, item, opts, cb) {
     }
   }
 
-  cb(null, item);
+  process.nextTick(function() {
+    cb(null, item);
+  });
 };
