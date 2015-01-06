@@ -41,8 +41,8 @@ program
   .option('-d, --collection2 <collection>', 'name of the collection to compare against if different from collection1')
   .option('-f, --config <config>', 'an ini config file')
   .option('-m, --match <attrs>', 'comma separated list of attributes that should match', function(val) { return val.split(','); })
-  .option('    --ids <ids>', 'comma separated list of (string) ids to copy attr from a to b', function(val) { return val.split(','); })
-  .option('    --oids <oids>', 'comma separated list of object ids to copy attr from a to b', function(val) { return val.split(','); })
+  .option('    --ids <ids>', 'comma separated list of (string) ids to copy attr from b.d to a.c', function(val) { return val.split(','); })
+  .option('    --oids <oids>', 'comma separated list of object ids to copy attr from b.d to a.c', function(val) { return val.split(','); })
   .option('-i, --include <attrs>', 'comma separated list of attributes to include in comparison', function(val) { return val.split(','); })
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-v, --verbose', 'verbose')
@@ -108,17 +108,17 @@ function run(db) {
 
     var field = {};
     field[attr] = true;
-    coll1.find({ _id: { $in: ids } }, field).toArray(function(err, items) {
+    coll2.find({ _id: { $in: ids } }, field).toArray(function(err, items) {
       if (err) { throw err; }
       async.eachSeries(items, function(item, cb) {
         if (typeof item[attr] === 'undefined') {
-          console.log(coll2.db.databaseName, coll2.collectionName, item._id, 'unset', field);
-          coll2.update({ _id: item._id }, { $unset: field }, cb);
+          console.log(coll1.db.databaseName, coll1.collectionName, item._id, 'unset', field);
+          coll1.update({ _id: item._id }, { $unset: field }, cb);
         } else {
           var setter = {};
           setter[attr] = item[attr];
-          console.log(coll2.db.databaseName, coll2.collectionName, item._id, 'set', setter);
-          coll2.update({ _id: item._id }, { $set: setter }, cb);
+          console.log(coll1.db.databaseName, coll1.collectionName, item._id, 'set', setter);
+          coll1.update({ _id: item._id }, { $set: setter }, cb);
         }
       }, function(err) {
         if (err) { throw err; }
