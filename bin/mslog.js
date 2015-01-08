@@ -31,13 +31,13 @@ var program = require('commander');
 
 program
   .version('0.1.0')
-  .usage('[-n] -d database -c collection -f config')
+  .usage('[-f config] [-n] -d database -c collection')
   .description('tail the given collection')
   .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection')
   .option('    --id <id>', 'show the log of one string based id')
   .option('    --oid <id>', 'show the log of one object id')
-  .option('-f, --config <config>', 'an ini config file')
+  .option('-f, --config <config>', 'ini config file with database access credentials')
   .option('-s, --show', 'show complete objects')
   .option('    --sync', 'only show versions that are in sync')
   .option('    --nsync', 'only show versions that are not in sync')
@@ -46,22 +46,31 @@ program
   .option('-n, --number <number>', 'number of latest versions to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
-// get config path from environment
-if (!program.config) {
-  program.help();
-}
-
-var config = program.config;
-
-// if relative, prepend current working dir
-if (config[0] !== '/') {
-  config = process.cwd() + '/' + config;
-}
-
-config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
-
 if (!program.database) { program.help(); }
 if (!program.collection) { program.help(); }
+
+var config = {};
+var dbCfg = { dbName: program.database };
+
+// if relative, prepend current working dir
+if (program.config) {
+  if (config[0] !== '/') {
+    config = process.cwd() + '/' + config;
+  }
+
+  config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+  if (config.database) {
+    dbCfg = {
+      dbName: program.database,
+      dbHost: config.database.path || config.database.host,
+      dbPort: config.database.port,
+      dbUser: config.database.user,
+      dbPass: config.database.pass,
+      authDb: config.database.authDb
+    };
+  }
+}
 
 if (program.sync && program.nsync) {
   console.error('error: --sync and --nsync are mutally exclusive');
@@ -230,16 +239,6 @@ function run(db) {
     process.exit();
   });
 }
-
-var database = config.database;
-var dbCfg = {
-  dbName: database.name || 'local',
-  dbHost: database.path || database.host,
-  dbPort: database.port,
-  dbUser: database.user,
-  dbPass: database.pass,
-  authDb: database.authDb
-};
 
 // open database
 _db(dbCfg, function(err, db) {
