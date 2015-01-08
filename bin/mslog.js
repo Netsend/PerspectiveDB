@@ -54,6 +54,7 @@ var dbCfg = { dbName: program.database };
 
 // if relative, prepend current working dir
 if (program.config) {
+  config = program.config;
   if (config[0] !== '/') {
     config = process.cwd() + '/' + config;
   }
