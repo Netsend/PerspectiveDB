@@ -80,6 +80,12 @@ function run(db) {
     // fetch last id
     coll.findOne({}, { sort: { $natural: -1 } }, function(err, lastItem) {
       if (err) { throw err; }
+      if (!lastItem) {
+        console.log('no item in collection: %s', dbName, collName);
+        process.exit(1);
+        return;
+      }
+
       db.collection(collName).update({ _id: lastItem._id }, update, function(err, updated) {
         if (err) {
           console.error('error', err, ts);
