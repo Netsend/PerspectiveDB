@@ -29,22 +29,11 @@ var _db = require('./_db');
 
 program
   .version('0.0.1')
-  .usage('-f config database.collection [timestamp]')
+  .usage('[-f config] database.collection [timestamp]')
   .description('set last oplog item or given timestamp on last item in given collection')
-  .option('-f, --config  <config>', 'an ini config file')
+  .option('-f, --config <config>', 'ini config file with database access credentials')
   .option('-v, --verbose', 'verbose')
   .parse(process.argv);
-
-if (!program.config) { program.help(); }
-
-var config = program.config;
-
-// if relative, prepend current working dir
-if (config[0] !== '/') {
-  config = process.cwd() + '/' + config;
-}
-
-config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
 
 var ns = program.args[0];
 if (!ns) {
@@ -58,6 +47,30 @@ if (parts.length < 2) {
 
 var dbName = parts[0];
 var collName = 'm3.' + parts.slice(1).join('.');
+
+var config = { database: { dbName: dbName } };
+var dbCfg = { dbName: dbName };
+
+// if relative, prepend current working dir
+if (program.config) {
+  config = program.config;
+  if (config[0] !== '/') {
+    config = process.cwd() + '/' + config;
+  }
+
+  config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+  if (config.database) {
+    dbCfg = {
+      dbName: program.database,
+      dbHost: config.database.path || config.database.host,
+      dbPort: config.database.port,
+      dbUser: config.database.user,
+      dbPass: config.database.pass,
+      authDb: config.database.authDb
+    };
+  }
+}
 
 // update last used oplog item
 function run(db) {
@@ -93,16 +106,6 @@ function run(db) {
     });
   }
 }
-
-var database = config.database;
-var dbCfg = {
-  dbName: dbName,
-  dbHost: database.path || database.host,
-  dbPort: database.port,
-  dbUser: database.user,
-  dbPass: database.pass,
-  authDb: database.authDb
-};
 
 // open database
 _db(dbCfg, function(err, db) {
