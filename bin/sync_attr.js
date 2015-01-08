@@ -39,7 +39,7 @@ program
   .option('-b, --database2 <database>', 'name of the database for collection2 if different from database1')
   .option('-c, --collection1 <collection>', 'name of the collection to report about')
   .option('-d, --collection2 <collection>', 'name of the collection to compare against if different from collection1')
-  .option('-f, --config <config>', 'an ini config file')
+  .option('-f, --config <config>', 'ini config file with database access credentials')
   .option('-m, --match <attrs>', 'comma separated list of attributes that should match', function(val) { return val.split(','); })
   .option('    --ids <ids>', 'comma separated list of (string) ids to copy attr from b.d to a.c', function(val) { return val.split(','); })
   .option('    --oids <oids>', 'comma separated list of object ids to copy attr from b.d to a.c', function(val) { return val.split(','); })

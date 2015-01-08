@@ -34,7 +34,7 @@ program
   .version(require('../package.json').version)
   .description('show snapshot collection status')
   .usage('[-ef] config\n         info.js [-e] -f config [dbname][.collname]')
-  .option('-f, --config <config>', 'an ini config file')
+  .option('-f, --config <config>', 'ini config file with database access credentials')
   .option('-e, --extended', 'show extended information')
   .parse(process.argv);
 
