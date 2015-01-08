@@ -32,7 +32,7 @@ var VersionedCollection = require('../lib/versioned_collection');
 
 program
   .version('0.1.0')
-  .usage('[-v] -a database [-b database] -c collection [-d collection] -f config')
+  .usage('[-f config] [-v] -a database [-b database] -c collection [-d collection]')
   .description('compare each item in collection1 with collection2')
   .option('-a, --database1 <database>', 'name of the database for collection1')
   .option('-b, --database2 <database>', 'name of the database for collection2 if different from database1')
@@ -53,16 +53,30 @@ if (!program.database1) { program.help(); }
 if (!program.database2) { program.database2 = program.database1; }
 if (!program.collection1) { program.help(); }
 if (!program.collection2) { program.collection2 = program.collection1; }
-if (!program.config) { program.help(); }
 
-var config = program.config;
+var config = {};
+var dbCfg = { dbName: program.database1 };
 
 // if relative, prepend current working dir
-if (config[0] !== '/') {
-  config = process.cwd() + '/' + config;
-}
+if (program.config) {
+  config = program.config;
+  if (config[0] !== '/') {
+    config = process.cwd() + '/' + config;
+  }
 
-config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+  config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+  if (config.database) {
+    dbCfg = {
+      dbName: program.database1,
+      dbHost: config.database.path || config.database.host,
+      dbPort: config.database.port,
+      dbUser: config.database.user,
+      dbPass: config.database.pass,
+      authDb: config.database.authDb
+    };
+  }
+}
 
 var excludeAttrs = {};
 (program.exclude || []).forEach(function(attr) {
@@ -264,16 +278,6 @@ function run(db) {
     db.close();
   });
 }
-
-var database = config.database;
-var dbCfg = {
-  dbName: database.name || 'local',
-  dbHost: database.path || database.host,
-  dbPort: database.port,
-  dbUser: database.user,
-  dbPass: database.pass,
-  authDb: database.authDb
-};
 
 // open database
 _db(dbCfg, function(err, db) {
