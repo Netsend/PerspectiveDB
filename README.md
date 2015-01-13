@@ -1,13 +1,22 @@
 # Mastersync, master-master replication
 
-Work in progress. First phase is to replicate MongoDB collections to other
+Work in progress.
+
+First phase is to replicate MongoDB collections to other
 MongoDB instances.
+
+Key features:
+* master-master replication like CouchDB but with transformations
+* built on the principles of owning your own data
+* privacy by design
+* [security by design](https://github.com/Netsend/mastersync/wiki/Mastersync-privilege-separation)
+* built for and on MongoDB (I hope to remove the MongoDB dependency in a later stage)
 
 See [wiki](https://github.com/Netsend/mastersync/wiki) for progress.
 
 # License
 
-Copyright 2014 Netsend.
+Copyright 2014, 2015 Netsend.
 
 This file is part of Mastersync.
 
