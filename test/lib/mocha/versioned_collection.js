@@ -4743,7 +4743,6 @@ describe('versioned_collection', function() {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
-        console.log(JSON.stringify(newLocalItems));
         if (err) { throw err; }
         should.equal(newLocalItems.length, 1);
         should.equal(newLocalItems[0]._m3._ack,true);
@@ -4838,6 +4837,51 @@ describe('versioned_collection', function() {
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
           { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
+        ]);
+        done();
+      });
+    });
+
+    it('should merge merges', function(done) {
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item4 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: 'II', _pa: ['B', 'C'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      vc._ensureLocalPerspective([ item1, item2, item3, item4 ], function(err, newLocalItems) {
+        if (err) { throw err; }
+        should.deepEqual(newLocalItems, [
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'I', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } },
+          { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: 'I', _pa: ['B', 'C'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } }
+        ]);
+        done();
+      });
+    });
+
+    it('needs a merge item in the snapshot collection for further testing', function(done) {
+      var mergeId = 'fooMerge';
+      var vc = new VersionedCollection(db, collectionName);
+      var item1I  = { _id: { _id: mergeId, _v: 'A', _pe: 'I',  _pa: [],         _i: 1  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) } };
+      var item1II = { _id: { _id: mergeId, _v: 'A', _pe: 'II', _pa: []                 }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item2I  = { _id: { _id: mergeId, _v: 'B', _pe: 'I',  _pa: ['A'],      _i: 2  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) } };
+      var item2II = { _id: { _id: mergeId, _v: 'B', _pe: 'II', _pa: ['A']              }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item3I  = { _id: { _id: mergeId, _v: 'C', _pe: 'I',  _pa: ['A'],      _i: 3  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) }, some: 'attr' };
+      var item3II = { _id: { _id: mergeId, _v: 'C', _pe: 'II', _pa: ['A']              }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      var item4I  = { _id: { _id: mergeId, _v: 'D', _pe: 'I',  _pa: ['B', 'C'], _i: 4  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) } };
+      vc._snapshotCollection.insert([item1I, item1II, item2I, item2II, item3I, item3II, item4I], done);
+    });
+
+    it('should merge with another merged version', function(done) {
+      var mergeId = 'fooMerge';
+      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var item = { _id: { _id: mergeId, _v: 'E', _pe: 'II', _pa: ['B', 'C'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
+      vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
+        if (err) { throw err; }
+        should.strictEqual(newLocalItems.length, 1);
+        should.deepEqual(newLocalItems, [
+          { _id: { _co: '_ensureLocalPerspective', _id: mergeId, _v: 'E', _pe: 'I', _pa: ['B', 'C'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) }, some: 'attr' }
         ]);
         done();
       });
