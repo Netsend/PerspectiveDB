@@ -2465,6 +2465,28 @@ describe('versioned_collection', function() {
         o2: { _id: 'foo', _v: 'A' }
       });
     });
+
+    it('should create a new version even when the update modifier leads to the same result', function(done) {
+      var item = {
+        _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] },
+        _m3: { _ack: true },
+        bar: 'qux'
+      };
+      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      vc._createNewVersionByUpdateDoc(item, oplogItem, function(err, item) {
+        if (err) { throw err; }
+
+        // check if version is generated
+        var v = item._id._v;
+        v.should.match(/^[a-z0-9/+A-Z]{8}$/);
+        should.deepEqual(item, {
+          _id: { _co: '_createNewVersionByUpdateDoc', _id: 'foo', _v: v, _pe: '_local', _pa: ['A'], _lo: true },
+          _m3: { _ack: false, _op: new Timestamp(1414516132, 1) },
+          bar: 'baz'
+        });
+        done();
+      });
+    });
   });
 
   describe('mergeAndSave', function() {
