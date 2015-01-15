@@ -2369,8 +2369,8 @@ describe('versioned_collection', function() {
     });
   });
 
-  describe('createNewVersionByUpdateDoc', function() {
-    var collectionName = 'createNewVersionByUpdateDoc';
+  describe('_createNewVersionByUpdateDoc', function() {
+    var collectionName = '_createNewVersionByUpdateDoc';
 
     var dagItem = {
       _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] },
@@ -2382,17 +2382,17 @@ describe('versioned_collection', function() {
 
     it('should require dagItem to be an object', function() {
       var vc = new VersionedCollection(db, collectionName);
-      (function() { vc.createNewVersionByUpdateDoc(); }).should.throw('dagItem must be an object');
+      (function() { vc._createNewVersionByUpdateDoc(); }).should.throw('dagItem must be an object');
     });
 
     it('should require oplogItem to be an object', function() {
       var vc = new VersionedCollection(db, collectionName);
-      (function() { vc.createNewVersionByUpdateDoc({}); }).should.throw('oplogItem must be an object');
+      (function() { vc._createNewVersionByUpdateDoc({}); }).should.throw('oplogItem must be an object');
     });
 
     it('should require cb to be a function', function() {
       var vc = new VersionedCollection(db, collectionName);
-      (function() { vc.createNewVersionByUpdateDoc({}, {}); }).should.throw('cb must be a function');
+      (function() { vc._createNewVersionByUpdateDoc({}, {}); }).should.throw('cb must be a function');
     });
 
     it('should require op to be "u"', function(done) {
@@ -2404,7 +2404,7 @@ describe('versioned_collection', function() {
         o2: { _id: 'baz' },
         o: { $set: { qux: 'quux' } }
       };
-      vc.createNewVersionByUpdateDoc(dagItem, updateItem, function(err) {
+      vc._createNewVersionByUpdateDoc(dagItem, updateItem, function(err) {
         should.equal(err.message, 'oplogItem op must be "u"');
         done();
       });
@@ -2412,7 +2412,7 @@ describe('versioned_collection', function() {
 
     it('should require an o2 object', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc.createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u' }, function(err) {
+      vc._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u' }, function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of undefined');
         done();
       });
@@ -2420,7 +2420,7 @@ describe('versioned_collection', function() {
 
     it('should require oplogItem.o2._id', function(done) {
       var vc = new VersionedCollection(db, collectionName);
-      vc.createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u', o2: { } }, function(err) {
+      vc._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u', o2: { } }, function(err) {
         should.equal(err.message, 'missing oplogItem.o2._id');
         done();
       });
@@ -2433,7 +2433,7 @@ describe('versioned_collection', function() {
         o2: { _id: 'applyOplogItemTest' }
       };
       var vc = new VersionedCollection(db, collectionName);
-      vc.createNewVersionByUpdateDoc(dagItem, item, function(err) {
+      vc._createNewVersionByUpdateDoc(dagItem, item, function(err) {
         should.equal(err.message, 'oplogItem contains o._id');
         done();
       });
@@ -2441,7 +2441,7 @@ describe('versioned_collection', function() {
 
     it('should create a new version', function(done) {
       var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
-      vc.createNewVersionByUpdateDoc(dagItem, oplogItem, function(err, item) {
+      vc._createNewVersionByUpdateDoc(dagItem, oplogItem, function(err, item) {
         if (err) { throw err; }
 
         // check if version is generated
@@ -2449,7 +2449,7 @@ describe('versioned_collection', function() {
         v.should.match(/^[a-z0-9/+A-Z]{8}$/);
         delete item._id._v;
         should.deepEqual(item, {
-          _id: { _co: 'createNewVersionByUpdateDoc', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true },
+          _id: { _co: '_createNewVersionByUpdateDoc', _id: 'foo', _pe: '_local', _pa: ['A'], _lo: true },
           _m3: { _ack: false, _op: new Timestamp(1414516132, 1) },
           bar: 'baz'
         });
