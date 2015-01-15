@@ -62,7 +62,7 @@ if (program.config) {
 
   if (config.database) {
     dbCfg = {
-      dbName: program.database,
+      dbName: dbName,
       dbHost: config.database.path || config.database.host,
       dbPort: config.database.port,
       dbUser: config.database.user,
