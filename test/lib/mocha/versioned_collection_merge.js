@@ -3309,4 +3309,174 @@ describe('VersionedCollection._merge', function() {
       });
     });
   });
+
+  describe('regression', function() {
+    describe('non-symmetric multiple lca: error when fetching perspective bound lca\'s 3', function() {
+      var collectionName = '_mergeRegressionNonSymmetricMultipleLca';
+
+      ////// _pe I
+      var AI = {
+        _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] },
+        a: true,
+        some: 'secret'
+      };
+
+      var BI = {
+        _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'] },
+        a: 'foo',
+        b: true,
+        some: 'secret'
+      };
+
+      var CI = {
+        _id : { _id: 'foo', _v: 'C', _pe: 'I', _pa: ['A'] },
+        a: 'foo',
+        c: true,
+        some: 'secret'
+      };
+
+      var EI = {
+        _id : { _id: 'foo', _v: 'E', _pe: 'I', _pa: ['B'] },
+        a: 'foo',
+        b: 'foo',
+        e: true,
+        some: 'secret'
+      };
+
+      var GI = {
+        _id : { _id: 'foo', _v: 'G', _pe: 'I', _pa: [ 'C', 'E'] },
+        a: 'foo',
+        b: 'foo',
+        c: 'foo',
+        e: 'foo',
+        g: true,
+        some: 'secret'
+      };
+
+
+      ////// _pe II
+      var AII = {
+        _id : { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
+        a: true
+      };
+
+      var BII = {
+        _id : { _id: 'foo', _v: 'B', _pe: 'II', _pa: ['A'] },
+        a: 'foo',
+        b: true
+      };
+
+      var CII = {
+        _id : { _id: 'foo', _v: 'C', _pe: 'II', _pa: ['A'] },
+        a: 'foo',
+        c: true
+      };
+
+      var DII = {
+        _id : { _id: 'foo', _v: 'D', _pe: 'II', _pa: ['B', 'C'] },
+        a: 'foo',
+        b: 'foo',
+        c: 'foo',
+        d: true
+      };
+
+      var EII = {
+        _id : { _id: 'foo', _v: 'E', _pe: 'II', _pa: ['B'] },
+        a: 'foo',
+        b: 'foo',
+        e: true
+      };
+
+      var FII = {
+        _id : { _id: 'foo', _v: 'F', _pe: 'II', _pa: ['D', 'E'] },
+        a: 'foo',
+        b: 'foo',
+        c: 'foo',
+        d: 'foo',
+        e: 'foo',
+        f: true
+      };
+
+      var GII = {
+        _id : { _id: 'foo', _v: 'G', _pe: 'II', _pa: [ 'C', 'E'] },
+        a: 'foo',
+        b: 'foo',
+        c: 'foo',
+        e: 'foo',
+        g: true
+      };
+
+      var HII = {
+        _id : { _id: 'foo', _v: 'H', _pe: 'II', _pa: [ 'F', 'G'] },
+        a: 'foo',
+        b: 'foo',
+        c: 'foo',
+        d: 'foo',
+        e: 'foo',
+        f: 'foo',
+        g: 'foo',
+        h: true
+      };
+
+      // create the following structure, for _pe I and II:
+      // _pe I
+      //          E
+      //         / \
+      //        /   \
+      //       /     \
+      //      B       G
+      //     /       /
+      //    /       /
+      //   /       /
+      //  A---C----
+      //
+      // _pe II
+      //          E--------
+      //         / \       \
+      //        /   \       \
+      //       /     \       \
+      //      B---D---F---H---G
+      //     /   /           /
+      //    /   /           /
+      //   /   /           /
+      //  A---C------------
+      //
+      it('should save DAGs', function(done) {
+        var vc = new VersionedCollection(db, collectionName);
+        vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI, DII, EII, FII, GII, HII], done);
+      });
+
+      it('HII and GI = ff to HI', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { debug: false });
+        vc._merge(HII, GI, function(err, merged) {
+          if (err) { throw err; }
+          should.equal(merged.length, 2);
+          should.deepEqual(merged[0], {
+            _id : { _id: 'foo', _v: 'H', _pe: 'II', _pa: ['F', 'G'] },
+            a: 'foo',
+            b: 'foo',
+            c: 'foo',
+            d: 'foo',
+            e: 'foo',
+            f: 'foo',
+            g: 'foo',
+            h: true
+          });
+          should.deepEqual(merged[1], {
+            _id : { _id: 'foo', _v: 'H', _pe: 'I', _pa: ['F', 'G'] },
+            a: 'foo',
+            b: 'foo',
+            c: 'foo',
+            d: 'foo',
+            e: 'foo',
+            f: 'foo',
+            g: 'foo',
+            h: true,
+            some: 'secret'
+          });
+          done();
+        });
+      });
+    });
+  });
 });
