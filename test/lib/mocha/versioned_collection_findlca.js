@@ -23,6 +23,8 @@
 var should = require('should');
 
 var VersionedCollection = require('../../../lib/versioned_collection');
+var ConcatMongoCollection = require('../../../lib/concat_mongo_collection');
+var ArrayCollection = require('../../../lib/array_collection');
 
 var db;
 var databaseName = 'test_versioned_collection_findlca';
@@ -1831,9 +1833,8 @@ describe('VersionedCollection._findLCAs', function() {
 
       it('should find the version itself to be the lca of two roots from different perspectives with the same version', function(done) {
         var vc = new VersionedCollection(db, collectionName, { debug: false });
-
-        var VirtualCollection = require('../../../lib/virtual_collection');
-        var v = new VirtualCollection(vc._snapshotCollection, [itemIIA, itemIIB]);
+        var ac = new ArrayCollection([itemIIA, itemIIB], { debug: vc.debug });
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
 
         var newThis = {
           debug: vc.debug,
@@ -1841,7 +1842,7 @@ describe('VersionedCollection._findLCAs', function() {
           localPerspective: vc.localPerspective,
           versionKey: vc.versionKey,
           collectionName: vc.collectionName,
-          _snapshotCollection: v,
+          _snapshotCollection: vc._virtualCollection,
           _findLCAs: vc._findLCAs,
           _merge: vc._merge
         };
@@ -1854,9 +1855,6 @@ describe('VersionedCollection._findLCAs', function() {
     });
 
     describe('with virtual collection', function() {
-      var ConcatMongoCollection = require('../../../lib/concat_mongo_collection');
-      var ArrayCollection = require('../../../lib/array_collection');
-
       var collectionName = '_findLCAsRegressionNonSymmetricMultipleLca';
 
       var AI  = { _id: { _id: 'foo', _v: 'A', _pe: 'I',  _pa: [], _i: 1}, _m3: { _ack: true } };
