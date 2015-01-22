@@ -285,5 +285,24 @@ describe('concat_mongo_collection', function() {
         done();
       });
     });
+
+    it('should not emit data after being paused', function(done) {
+      var debug = false;
+      var ac1 = new ArrayCollection([A], { debug: debug });
+      var ac2 = new ArrayCollection([B], { debug: debug });
+      var cmc = new ConcatMongoCollection([ac1, ac2], { debug: debug });
+
+      var stream = cmc.find().stream();
+
+      stream.on('data', function() {
+        stream.pause();
+        stream.on('data', done);
+        setTimeout(function() {
+          stream.destroy();
+        }, 0);
+      });
+
+      stream.on('close', done);
+    });
   });
 });
