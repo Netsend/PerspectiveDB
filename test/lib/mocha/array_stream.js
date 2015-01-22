@@ -24,6 +24,21 @@ var should = require('should');
 
 var ArrayStream = require('../../../lib/array_stream');
 
+var db;
+var databaseName = 'test_array_stream';
+var Database = require('../../_database');
+
+// open database connection
+var database = new Database(databaseName);
+before(function(done) {
+  database.connect(function(err, dbc) {
+    db = dbc;
+    done(err);
+  });
+});
+
+after(database.disconnect.bind(database));
+
 describe('ArrayStream', function() {
   var vColl;
 
@@ -115,6 +130,8 @@ describe('ArrayStream', function() {
   });
 
   describe('pause', function() {
+    var collectionName = 'array_stream_pause';
+
     var C = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] }, _m3: { _ack: true } };
     var D = { _id: { _id: 'foo', _v: 'D', _pe: 'bar', _pa: ['B'] }, _m3: { _ack: false } };
 
@@ -168,6 +185,10 @@ describe('ArrayStream', function() {
       });
     });
 
+    it('needs some items in a real mongo collection to test behavior', function(done) {
+      db.collection(collectionName).insert([C, D], done);
+    });
+
     it('should pause and stop calling back', function(done) {
       var vc = new ArrayStream([C, D], { debug: false });
       var stream = vc.stream();
@@ -185,6 +206,94 @@ describe('ArrayStream', function() {
       });
 
       stream.on('close', done);
+    });
+
+    it('ensure mongo driver does not emit close after pause on last item', function(done) {
+      var stream = db.collection(collectionName).find().stream();
+
+      var received = [];
+      stream.on('data', function(item) {
+        received.push(item);
+
+        if (item._id._v === 'D') {
+          stream.pause();
+          done();
+        }
+      });
+
+      stream.on('close', function() {
+        throw new Error('unexpected stream closed while paused');
+      });
+    });
+
+    it('should not emit close after pause on last item (iff previous test succeeded)', function(done) {
+      var vc = new ArrayStream([C, D], { debug: false });
+      var stream = vc.stream();
+
+      var received = [];
+      stream.on('data', function(item) {
+        received.push(item);
+
+        if (item._id._v === 'D') {
+          stream.pause();
+          done();
+        }
+      });
+
+      stream.on('close', function() {
+        throw new Error('unexpected stream closed while paused');
+      });
+    });
+
+    it('ensure mongo driver does emit close after resume after pause on last item', function(done) {
+      var stream = db.collection(collectionName).find().stream();
+
+      function shouldNotBeCalled() {
+        throw new Error('unexpected stream closed while paused');
+      }
+
+      var received = [];
+      stream.on('data', function(item) {
+        received.push(item);
+
+        if (item._id._v === 'D') {
+          stream.pause();
+
+          setTimeout(function() {
+            stream.removeListener('close', shouldNotBeCalled);
+            stream.on('close', done);
+            stream.resume();
+          }, 10);
+        }
+      });
+
+      stream.on('close', shouldNotBeCalled);
+    });
+
+    it('should emit close after resume after pause on last item (iff previous test succeeded)', function(done) {
+      var vc = new ArrayStream([C, D], { debug: false });
+      var stream = vc.stream();
+
+      function shouldNotBeCalled() {
+        throw new Error('unexpected stream closed while paused');
+      }
+
+      var received = [];
+      stream.on('data', function(item) {
+        received.push(item);
+
+        if (item._id._v === 'D') {
+          stream.pause();
+
+          setTimeout(function() {
+            stream.removeListener('close', shouldNotBeCalled);
+            stream.on('close', done);
+            stream.resume();
+          }, 10);
+        }
+      });
+
+      stream.on('close', shouldNotBeCalled);
     });
   });
 
@@ -237,6 +346,32 @@ describe('ArrayStream', function() {
         stream.resume();
         done();
       });
+    });
+
+    it('should emit close only once', function(done) {
+      var items = [C, D];
+      var vc = new ArrayStream(items);
+
+      var stream = vc.stream();
+      stream.destroy();
+      stream.destroy();
+
+      stream.on('close', done);
+    });
+
+    it('should emit close only once, async', function(done) {
+      var items = [C, D];
+      var vc = new ArrayStream(items);
+
+      var stream = vc.stream();
+      process.nextTick(function() {
+        stream.destroy();
+        process.nextTick(function() {
+          stream.destroy();
+        });
+      });
+
+      stream.on('close', done);
     });
   });
 });
