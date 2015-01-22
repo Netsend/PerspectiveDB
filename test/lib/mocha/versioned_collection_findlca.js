@@ -1902,7 +1902,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BII and AI = A, should not append to found lcas after callback is called', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: true });
+        var vc = new VersionedCollection(db, collectionName, { debug: false });
         var ac = new ArrayCollection([BII], { debug: vc.debug });
         vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
 
