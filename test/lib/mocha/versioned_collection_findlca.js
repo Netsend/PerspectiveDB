@@ -1852,5 +1852,84 @@ describe('VersionedCollection._findLCAs', function() {
         });
       });
     });
+
+    describe('with virtual collection', function() {
+      var ConcatMongoCollection = require('../../../lib/concat_mongo_collection');
+      var ArrayCollection = require('../../../lib/array_collection');
+
+      var collectionName = '_findLCAsRegressionNonSymmetricMultipleLca';
+
+      var AI  = { _id: { _id: 'foo', _v: 'A', _pe: 'I',  _pa: [], _i: 1}, _m3: { _ack: true } };
+      var AII = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },       _m3: { _ack: false } };
+
+      var BII = { _id: { _id: 'foo', _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
+
+      // create the following structure, for _pe I and II:
+      // _pe I
+      //  A
+      //
+      // _pe II
+      //  A
+      //
+      it('should save DAGs', function(done) {
+        var vc = new VersionedCollection(db, collectionName);
+        vc._snapshotCollection.insert([AI, AII], done);
+      });
+
+      it('BII and AI = A', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { debug: false });
+        var ac = new ArrayCollection([BII], { debug: vc.debug });
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
+
+        // create a new context with _snapshotCollection set to _virtualCollection
+        var newThis = {
+          debug: vc.debug,
+          _hide: vc._hide,
+          databaseName: vc.databaseName,
+          localPerspective: vc.localPerspective,
+          versionKey: vc.versionKey,
+          collectionName: vc.collectionName,
+          _snapshotCollection: vc._virtualCollection,
+          _findLCAs: vc._findLCAs
+        };
+
+        newThis._findLCAs(BII, AI, function(err, lcas) {
+          if (err) { throw err; }
+          should.equal(lcas.length, 1);
+          should.deepEqual(lcas, ['A']);
+          done();
+        });
+      });
+
+      it('BII and AI = A, should not append to found lcas after callback is called', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { debug: true });
+        var ac = new ArrayCollection([BII], { debug: vc.debug });
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
+
+        // create a new context with _snapshotCollection set to _virtualCollection
+        var newThis = {
+          debug: vc.debug,
+          _hide: vc._hide,
+          databaseName: vc.databaseName,
+          localPerspective: vc.localPerspective,
+          versionKey: vc.versionKey,
+          collectionName: vc.collectionName,
+          _snapshotCollection: vc._virtualCollection,
+          _findLCAs: vc._findLCAs
+        };
+
+        newThis._findLCAs(BII, AI, function(err, lcas) {
+          if (err) { throw err; }
+          should.equal(lcas.length, 1);
+          should.deepEqual(lcas, ['A']);
+
+          setTimeout(function() {
+            should.equal(lcas.length, 1);
+            should.deepEqual(lcas, ['A']);
+            done();
+          }, 10);
+        });
+      });
+    });
   });
 });
