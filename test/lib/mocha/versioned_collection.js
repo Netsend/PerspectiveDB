@@ -4699,7 +4699,7 @@ describe('versioned_collection', function() {
     var collectionName = '_ensureLocalPerspective';
 
     it('should require the first item to have a perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
       vc._ensureLocalPerspective([ {} ], function(err) {
         should.equal(err.message, 'could not determine perspective');
         done();
