@@ -4699,7 +4699,7 @@ describe('versioned_collection', function() {
     var collectionName = '_ensureLocalPerspective';
 
     it('should require the first item to have a perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
       vc._ensureLocalPerspective([ {} ], function(err) {
         should.equal(err.message, 'could not determine perspective');
         done();
@@ -4707,7 +4707,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require all items to have the same perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err) {
@@ -4717,7 +4717,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return no new items if already local', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: [] } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4728,7 +4728,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a local clone if the snapshot collection is empty', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4745,14 +4745,14 @@ describe('versioned_collection', function() {
     });
 
     it('needs an item in the snapshot collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var itemI = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [], _i: 1  }, _m3: { _ack: true, _op: new Timestamp(1, 1) } };
       var itemII = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._snapshotCollection.insert([itemI, itemII], done);
     });
 
     it('should not create new items if item already exists (input _pe local)', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4762,7 +4762,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create new items if item already exists (input _pe non-local), but should return that existing item', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4786,7 +4786,7 @@ describe('versioned_collection', function() {
     });
 
     it('should fail if the snapshot collection has an item but no lca is found', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['X'] } };
       vc._ensureLocalPerspective([ item ], function(err) {
         should.equal(err.message, 'no lca found');
@@ -4795,7 +4795,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create new items if the new item is a child of what is in the snapshot collection but is already local', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4805,7 +4805,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a new item if it connects to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4815,7 +4815,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create multiple new items if they connect to each other and the first connects to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['B'] }, _m3: {} };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4849,7 +4849,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create multiple new items if the result in DAG having multiple heads', function(done) {
-      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
@@ -4865,7 +4865,7 @@ describe('versioned_collection', function() {
     });
 
     it('should merge merges', function(done) {
-      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { hide: true, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
@@ -5788,7 +5788,7 @@ describe('versioned_collection', function() {
       };
 
       it('should insert root and an non-locally created item', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
         var DAG = [AI, BI];
         vc._snapshotCollection.insert(DAG, {w: 1}, function(err, inserts) {
           if (err) { throw err; }
