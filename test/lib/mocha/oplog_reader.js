@@ -134,6 +134,35 @@ describe('OplogReader', function() {
       });
     });
 
+    it('should pause and resume', function(done) {
+      var or = new OplogReader(oplogColl, ns, { offset: offset });
+      var i = 0;
+      function errHandler() {
+        throw new Error('should not execute');
+      }
+      or.pause();
+      or.on('data', function() {
+        // pause and register error handler
+        or.pause();
+        or.on('data', errHandler);
+
+        // resume after a while
+        setTimeout(function() {
+          or.removeListener('data', errHandler);
+          or.resume();
+        }, 100);
+
+        i++;
+      });
+
+      or.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+
+      or.resume();
+    });
+
     it('should tail and not close', function(done) {
       var or = new OplogReader(oplogColl, ns, { offset: offset, tailable: true });
       var i = 0;
