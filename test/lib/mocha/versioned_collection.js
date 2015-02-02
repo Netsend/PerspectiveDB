@@ -97,7 +97,7 @@ describe('versioned_collection', function() {
 
     it('should set tmpCollectionName', function() {
       var vc = new VersionedCollection(db, 'foo');
-      should.equal(vc.tmpCollectionName, 'm3._m3tmp');
+      should.equal(vc.tmpCollectionName, 'm3._m3tmpfoo');
     });
 
     it('should open collection', function() {
