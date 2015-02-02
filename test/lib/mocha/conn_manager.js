@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014, 2015 Netsend.
  *
  * This file is part of Mastersync.
  *
@@ -21,6 +21,7 @@
 /*jshint -W068 */
 
 var net = require('net');
+var fs = require('fs');
 
 var should = require('should');
 
@@ -32,9 +33,9 @@ describe('connManager', function () {
       (function() { connManager.createId(); }).should.throw('conn must be an object');
     });
 
-    it('should default to "UNIX domain socket"', function() {
+    it('should default to "unknown socket"', function() {
       var result = connManager.createId({});
-      should.strictEqual(result, 'UNIX domain socket');
+      should.strictEqual(result, 'unknown socket');
     });
 
     it('should use remoteAddress', function() {
@@ -117,53 +118,110 @@ describe('connManager', function () {
   });
 
   describe('error', function () {
-    var host = '127.0.0.1';
-    var port = 54367;
+    describe('unix socket', function () {
+      var path = '/tmp/conn_manager_test.sock';
 
-    var server, conn;
-    var cm = connManager.create({ hide: true });
+      var server, conn;
+      var cm = connManager.create({ hide: true });
 
-    var incoming = 0;
-    function handler() {
-      incoming++;
-    }
+      var incoming = 0;
+      function handler() {
+        incoming++;
+      }
 
-    it('needs a server and connection for further testing', function(done) {
-      server = net.createServer(handler);
-      server.listen(port, host, function() {
-        conn = net.createConnection(port, host, done);
-        cm.register(conn, { reconnectOnError: true });
-      });
-    });
-
-    it('should try to reconnect on connection error in two seconds', function(done) {
-      this.timeout(10000);
-
-      should.strictEqual(incoming, 1);
-
-      conn.on('close', function(err) {
-        should.strictEqual(err, true);
-
-        // disable the server for 2 seconds to trigger next interval
-        server.close(function() {
-          should.strictEqual(incoming, 1);
-
-          setTimeout(function() {
-            should.strictEqual(incoming, 1);
-
-            server = net.createServer(handler);
-            server.listen(port, host);
-
-            // wait some time and see if it is reconnected
-            setTimeout(function() {
-              should.strictEqual(incoming, 2);
-              done();
-            }, 4100);
-          }, 2100);
+      it('needs a server and connection for further testing', function(done) {
+        try {
+          fs.unlinkSync(path);
+        } catch(err) {
+        }
+        server = net.createServer(handler);
+        server.listen(path, function() {
+          conn = net.createConnection(path, done);
+          conn.path = path;
+          cm.register(conn, { reconnectOnError: true });
         });
       });
 
-      conn.destroy(new Error('dummy error'));
+      it('should try to reconnect on connection error in two seconds', function(done) {
+        this.timeout(10000);
+
+        should.strictEqual(incoming, 1);
+
+        conn.on('close', function(err) {
+          should.strictEqual(err, true);
+
+          // disable the server for 2 seconds to trigger next interval
+          server.close(function() {
+            should.strictEqual(incoming, 1);
+
+            setTimeout(function() {
+              should.strictEqual(incoming, 1);
+
+              server = net.createServer(handler);
+              server.listen(path);
+
+              // wait some time and see if it is reconnected
+              setTimeout(function() {
+                should.strictEqual(incoming, 2);
+                done();
+              }, 4100);
+            }, 2100);
+          });
+        });
+
+        conn.destroy(new Error('dummy error'));
+      });
+    });
+
+    describe('inet socket', function () {
+      var host = '127.0.0.1';
+      var port = 54367;
+
+      var server, conn;
+      var cm = connManager.create({ hide: true });
+
+      var incoming = 0;
+      function handler() {
+        incoming++;
+      }
+
+      it('needs a server and connection for further testing', function(done) {
+        server = net.createServer(handler);
+        server.listen(port, host, function() {
+          conn = net.createConnection(port, host, done);
+          cm.register(conn, { reconnectOnError: true });
+        });
+      });
+
+      it('should try to reconnect on connection error in two seconds', function(done) {
+        this.timeout(10000);
+
+        should.strictEqual(incoming, 1);
+
+        conn.on('close', function(err) {
+          should.strictEqual(err, true);
+
+          // disable the server for 2 seconds to trigger next interval
+          server.close(function() {
+            should.strictEqual(incoming, 1);
+
+            setTimeout(function() {
+              should.strictEqual(incoming, 1);
+
+              server = net.createServer(handler);
+              server.listen(port, host);
+
+              // wait some time and see if it is reconnected
+              setTimeout(function() {
+                should.strictEqual(incoming, 2);
+                done();
+              }, 4100);
+            }, 2100);
+          });
+        });
+
+        conn.destroy(new Error('dummy error'));
+      });
     });
   });
 });
