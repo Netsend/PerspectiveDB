@@ -4910,6 +4910,182 @@ describe('versioned_collection', function() {
     });
 
     describe('regression', function() {
+      describe('independent but equal updates: should support merges with extra changes', function() {
+        var collectionName = '_ensureLocalPerspectiveRegressionIndependentEqualUpdates';
+
+        ////// _pe I
+        var AI = {
+          _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] },
+          a: true,
+          some: 'secret'
+        };
+
+        var BI = {
+          _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'] },
+          a: 'foo',
+          b: true,
+          some: 'secret'
+        };
+
+        var CI = {
+          _id : { _id: 'foo', _v: 'C', _pe: 'I', _pa: ['A'] },
+          a: 'foo',
+          c: true,
+          some: 'secret'
+        };
+
+        var DI = {
+          _id : { _id: 'foo', _v: 'D', _pe: 'I', _pa: ['B', 'C'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          d: true,
+          some: 'secret'
+        };
+
+        var EI = {
+          _id : { _id: 'foo', _v: 'E', _pe: 'I', _pa: ['B', 'C'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          e: true,
+          some: 'secret'
+        };
+
+        var FI = {
+          _id : { _id: 'foo', _v: 'F', _pe: 'I', _pa: [ 'D', 'E'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          d: 'foo',
+          e: 'foo',
+          f: true,
+          some: 'secret'
+        };
+
+
+        ////// _pe II
+        var AII = {
+          _id : { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] },
+          a: true
+        };
+
+        var BII = {
+          _id : { _id: 'foo', _v: 'B', _pe: 'II', _pa: ['A'] },
+          a: 'foo',
+          b: true
+        };
+
+        var CII = {
+          _id : { _id: 'foo', _v: 'C', _pe: 'II', _pa: ['A'] },
+          a: 'foo',
+          c: true
+        };
+
+        var DII = {
+          _id : { _id: 'foo', _v: 'D', _pe: 'II', _pa: ['B', 'C'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          d: true
+        };
+
+        var EII = {
+          _id : { _id: 'foo', _v: 'E', _pe: 'II', _pa: ['B', 'C'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          e: true
+        };
+
+        var FII = {
+          _id : { _id: 'foo', _v: 'F', _pe: 'II', _pa: ['D', 'E'] },
+          a: 'foo',
+          b: 'foo',
+          c: 'foo',
+          d: 'foo',
+          e: 'foo',
+          f: true
+        };
+
+        // create the following structure, for _pe I and II:
+        //
+        //     C---E
+        //    / \ / \
+        //   A   X   F
+        //    \ / \ /
+        //     B---D
+        //
+        // save only I:
+        //     C
+        //    / \
+        //   A   \
+        //    \   \
+        //     B---D
+        //
+        it('should save DAGs', function(done) {
+          var vc = new VersionedCollection(db, collectionName);
+          // save as if I and II had independent updates to B and C respectively and were bi-dir synced.
+          vc._snapshotCollection.insert([AI, AII, BI, CII, CI, BII], done);
+        });
+
+        it('merge DII, EII and FII to I', function(done) {
+          var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+          vc._ensureLocalPerspective([ DII, EII, FII ], function(err, newLocalItems) {
+            if (err) { throw err; }
+            should.strictEqual(newLocalItems.length, 3);
+            should.deepEqual(newLocalItems[0], {
+              _id : { _id: 'foo', _v: 'D', _pe: 'I', _pa: ['B', 'C'] },
+              a: 'foo',
+              b: 'foo',
+              c: 'foo',
+              d: true,
+              some: 'secret',
+              _m3: {
+                _ack: false,
+                _op: new Timestamp(0, 0)
+              }
+            });
+
+            /*
+            console.log(newLocalItems[0]);
+            console.log(newLocalItems[1]);
+            console.log(newLocalItems[2]);
+            */
+
+            should.deepEqual(newLocalItems[1], {
+              _id : { _co: '_ensureLocalPerspectiveRegressionIndependentEqualUpdates', _id: 'foo', _v: 'E', _pe: 'I', _pa: ['B', 'C'] },
+              a: 'foo',
+              b: 'foo',
+              c: 'foo',
+              e: true,
+              some: 'secret',
+              _m3: {
+                _ack: false,
+                _op: new Timestamp(0, 0)
+              }
+            });
+
+            should.deepEqual(newLocalItems[2], {
+              _id : { _id: 'foo', _v: 'F', _pe: 'I', _pa: ['D', 'E'] },
+              a: 'foo',
+              b: 'foo',
+              c: 'foo',
+              d: 'foo',
+              e: 'foo',
+              f: true,
+              some: 'secret',
+              _m3: {
+                _ack: false,
+                _op: new Timestamp(0, 0)
+              }
+            });
+            done();
+          });
+        });
+      });
+
+      // see https://github.com/Netsend/mastersync/issues/29
       describe('non-symmetric multiple lca: error when fetching perspective bound lca\'s 3', function() {
         var collectionName = '_ensureLocalPerspectiveRegressionNonSymmetricMultipleLca';
 
@@ -5046,7 +5222,7 @@ describe('versioned_collection', function() {
         });
 
         it('HII and GI = ff to HI', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
+          var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
           vc._ensureLocalPerspective([ EII, FII, GII, HII ], function(err, newLocalItems) {
             if (err) { throw err; }
             should.strictEqual(newLocalItems.length, 1);
