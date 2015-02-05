@@ -160,7 +160,10 @@ function fmtItem(item, parents) {
       parents.forEach(function(p) {
         var diff = VersionedCollection.diff(item, p);
         delete diff._id;
-        out += ' ' + p._id._v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p);
+        if (parents.length > 1) {
+          out += ' ' + p._id._v;
+        }
+        out += ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p);
       });
     }
   }
