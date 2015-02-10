@@ -746,8 +746,9 @@ describe('Replicator', function() {
           fooColl: {
             hooks: ['import_bar']
           },
-          barColl: {
-            hooks: ['import_bar']
+          'bar．Coll': {
+            hooks: ['import_bar'],
+            filter: { '＄in': [ 'quux', 'qux' ] }
           }
         }
       };
@@ -761,7 +762,7 @@ describe('Replicator', function() {
       });
     });
 
-    it('should return import config', function(done) {
+    it('should return import config and unescape "＄" (U+FF04) and "．" (U+FF0E) recursively', function(done) {
       Replicator.fetchFromDb(coll, 'import', 'bar', function(err, cfg) {
         if (err) { throw err; }
         should.deepEqual(cfg, {
@@ -772,8 +773,9 @@ describe('Replicator', function() {
             fooColl: {
               hooks: ['import_bar']
             },
-            barColl: {
-              hooks: ['import_bar']
+            'bar.Coll': {
+              hooks: ['import_bar'],
+              filter: { '$in': [ 'quux', 'qux' ] }
             }
           }
         });
