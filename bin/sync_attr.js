@@ -23,7 +23,7 @@
 var program = require('commander');
 var async = require('async');
 var mongodb = require('mongodb');
-var ObjectId = mongodb.ObjectId;
+var ObjectID = mongodb.ObjectID;
 
 var _db = require('./_db');
 var properties = require('properties');
@@ -109,10 +109,15 @@ function run(db) {
   var coll2 = db.db(program.database2).collection(program.collection2);
 
   if (program.ids || program.oids) {
-    var ids = program.ids.slice();
+    var ids = [];
+    if (program.ids) {
+      program.ids.forEach(function(id) {
+        ids.push(id);
+      });
+    }
     if (program.oids) {
       program.oids.forEach(function(oid) {
-        ids.push(new ObjectId(oid));
+        ids.push(new ObjectID(oid));
       });
     }
 
