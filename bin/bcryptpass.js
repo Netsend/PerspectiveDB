@@ -20,18 +20,14 @@
 
 'use strict';
 
-var fs = require('fs');
-
 var program = require('commander');
 var read = require('read');
 var User = require('array-bcrypt-user');
 
-var _db = require('./_db');
-
 program
-  .version('0.0.1')
+  .version('0.0.2')
   .usage('bcryptpass.js')
-  .description('return a bcrypt hash based on a username, password and (optional) realm')
+  .description('echo a minimal user object containing a username, password and optionally a realm')
   .parse(process.argv);
 
 read({ prompt: 'username:' }, function(err, username) {
@@ -55,19 +51,13 @@ read({ prompt: 'username:' }, function(err, username) {
         }
 
         var db = [];
-
-        try {
-          var user = new User(db, username, realm);
-          user.register(password, function(err) {
-            if (err) { console.error(err.message); process.exit(1); }
-
-            console.log(db[0]);
-            process.exit();
-          });
-        } catch(err) {
+        User.register(db, username, password, realm, function(err) {
           if (err) { console.error(err.message); process.exit(1); }
-        }
+
+          console.log(db[0]);
+          process.exit();
         });
       });
     });
+  });
 });
