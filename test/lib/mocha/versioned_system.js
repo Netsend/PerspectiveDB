@@ -24,6 +24,7 @@ var should = require('should');
 var Timestamp = require('mongodb').Timestamp;
 
 var VersionedSystem = require('../../../lib/versioned_system');
+var ArrayCollection = require('../../../lib/array_collection');
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
@@ -235,6 +236,52 @@ describe('VersionedSystem', function() {
       vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
         should.strictEqual(true, oplogOffset.equals(new Timestamp(12, 34)));
+        done();
+      });
+    });
+  });
+
+  describe('_verifyAuthRequest', function() {
+    it('should require req to be an object', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs._verifyAuthRequest(1); }).should.throw('req must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      var vs = new VersionedSystem(oplogColl);
+      (function() { vs._verifyAuthRequest({}, {}); }).should.throw('cb must be a function');
+    });
+
+    it('should error on non-shared collection', function(done) {
+      var users = new ArrayCollection([{ realm: 'foo', username: 'bar' }]);
+      var opts = { usersColl: users, hide: true };
+      var vs = new VersionedSystem(oplogColl, opts);
+      vs._vces = { 'foo.bar': true };
+      var req = {
+        database: 'foo',
+        collection: 'other',
+        username: 'bar',
+        password: 'bar'
+      };
+      vs._verifyAuthRequest(req, function(err) {
+        should.strictEqual(err.message, 'invalid credentials');
+        done();
+      });
+    });
+
+    it('should error run with invalid credentials', function(done) {
+      var users = new ArrayCollection([{ realm: 'foo', username: 'bar', password: 'abacadabra' }]);
+      var opts = { usersColl: users, hide: true };
+      var vs = new VersionedSystem(oplogColl, opts);
+      vs._vces = { 'foo.bar': true };
+      var req = {
+        database: 'foo',
+        collection: 'bar',
+        username: 'bar',
+        password: 'bar'
+      };
+      vs._verifyAuthRequest(req, function(err) {
+        should.strictEqual(err.message, 'invalid credentials');
         done();
       });
     });
