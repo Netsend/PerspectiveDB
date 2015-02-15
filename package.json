@@ -23,7 +23,7 @@
     "crc-32": "~0.2.2",
     "commander": "~2.3.0",
     "object-key-transform": "~0.0.1",
-    "mongo-bcrypt-user": "~0.0.4",
+    "mongo-bcrypt-user": "~2.0.2",
     "array-bcrypt-user": "~1.0.2",
     "ld-jsonstream": "~0.0.2",
     "read": "~1.0.5",
