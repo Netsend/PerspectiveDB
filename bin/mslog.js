@@ -142,7 +142,7 @@ function fmtItem(item, parents) {
       out += ' .';
     }
     if (item._m3.hasOwnProperty('_ack') && item._m3._ack) {
-      out += ' s';
+      out += ' a';
     } else {
       out += ' .';
     }
