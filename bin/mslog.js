@@ -39,8 +39,8 @@ program
   .option('    --oid <id>', 'show the log of one object id')
   .option('-f, --config <config>', 'ini config file with database access credentials')
   .option('-s, --show', 'show complete objects')
-  .option('    --sync', 'only show versions that are in sync')
-  .option('    --nsync', 'only show versions that are not in sync')
+  .option('    --ack', 'only show versions that are ackd')
+  .option('    --nack', 'only show versions that are not ackd')
   .option('-p, --patch', 'show patch compared to previous version')
   .option('    --pe <perspective>', 'perspective')
   .option('-n, --number <number>', 'number of latest versions to show, defaults to 10, 0 means unlimited')
@@ -73,8 +73,8 @@ if (program.config) {
   }
 }
 
-if (program.sync && program.nsync) {
-  console.error('error: --sync and --nsync are mutally exclusive');
+if (program.ack && program.nack) {
+  console.error('error: --ack and --nack are mutally exclusive');
   process.exit(1);
 }
 
@@ -188,8 +188,8 @@ function run(db) {
     selector['_id._pe'] = program.pe;
   }
 
-  if (program.sync) { selector['_m3._ack'] = true; }
-  if (program.nsync) { selector['_m3._ack'] = false; }
+  if (program.ack) { selector['_m3._ack'] = true; }
+  if (program.nack) { selector['_m3._ack'] = false; }
 
   var stream = coll.find(selector, opts).stream();
   var error;
