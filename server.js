@@ -23,6 +23,7 @@
 var path = require('path');
 var fs = require('fs');
 
+var async = require('async');
 var program = require('commander');
 var properties = require('properties');
 var keyFilter = require('object-key-filter');
@@ -31,30 +32,10 @@ var get = require('./lib/get_selector');
 var _db = require('./bin/_db');
 var VersionedSystem = require('./lib/versioned_system');
 var ArrayCollection = require('./lib/array_collection');
+var logger = require('./lib/logger');
 
+var log;
 var programName = path.basename(__filename);
-
-function sendPRs(vs, remotes) {
-  Object.keys(remotes).forEach(function(remoteKey) {
-    var remote = remotes[remoteKey];
-    var pr = {
-      username:   remote.username,
-      password:   remote.password,
-      path:       remote.path,
-      host:       remote.host,
-      port:       remote.port,
-      database:   remote.database,
-      collection: remote.collection
-    };
-    vs.sendPR(remote.vc, pr, function(err) {
-      if (err) {
-        console.error('%s: send pr error', programName, remote.vc, err);
-        return;
-      }
-      if (program.debug) { console.log('%s: sent pr', programName, remote.vc, JSON.stringify(pr)); }
-    });
-  });
-}
 
 program
   .version('0.0.3')
@@ -73,19 +54,44 @@ if (process.getuid() !== 0) {
   process.exit(1);
 }
 
+var startTime = new Date();
+
 // if relative, prepend current working dir
 if (configFile[0] !== '/') {
   configFile = process.cwd() + '/' + configFile;
+}
+
+var config = properties.parse(fs.readFileSync(configFile, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+var logCfg = get(config, 'log') || {};
+
+function sendPRs(vs, remotes) {
+  Object.keys(remotes).forEach(function(remoteKey) {
+    var remote = remotes[remoteKey];
+    var pr = {
+      username:   remote.username,
+      password:   remote.password,
+      path:       remote.path,
+      host:       remote.host,
+      port:       remote.port,
+      database:   remote.database,
+      collection: remote.collection
+    };
+
+    vs.sendPR(remote.vc, pr, function(err) {
+      if (err) {
+        log.err('send pr error ' +  remote.vc + ' ' + err);
+        return;
+      }
+      log.info('sent pr ' + remote.vc + ' ' + JSON.stringify(pr));
+    });
+  });
 }
 
 // filter password out request
 function debugReq(req) {
   return JSON.stringify(keyFilter(req, ['password'], true), null, 2);
 }
-
-var config = properties.parse(fs.readFileSync(configFile, { encoding: 'utf8' }), { sections: true, namespaces: true });
-
-console.time('runtime');
 
 // create a new mongodb like collection from an array
 function arrToColl(arr) {
@@ -127,7 +133,7 @@ function start(db) {
   (function(cb) {
     var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
 
-    var opts = { debug: program.verbose };
+    var opts = { log: log };
 
     var parts;
 
@@ -191,23 +197,94 @@ function start(db) {
         remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
       }
 
-      if (program.debug) { console.log('remote config', debugReq(remoteLogin || {})); }
+      log.info('remote config', debugReq(remoteLogin || {}));
     }
 
-    if (program.debug) { console.log('vs opts', JSON.stringify(opts)); }
+    log.info('vs opts', JSON.stringify(opts));
 
     var vs = new VersionedSystem(oplogColl, opts);
 
     // get all vc configs
-    if (program.debug) { console.log('init vc', get(config, 'vc')); }
+    var vcsCfg = get(config, 'vc');
+    log.info('init vcs', JSON.stringify(vcsCfg));
 
-    vs.initVCs(get(config, 'vc'), function(err) {
+    var tasks = [function(cb2) {
+      // ensure async even without any other tasks
+      process.nextTick(cb2);
+    }];
+
+    tasks.push(function(cb2) {
+      async.eachSeries(Object.keys(vcsCfg), function(dbName, cb3) {
+        async.eachSeries(Object.keys(vcsCfg[dbName]), function(collName, cb4) {
+          var vcCfg = vcsCfg[dbName][collName];
+          log.info(dbName, collName);
+
+          // ensure specific log configuration overrules the global log config
+          vcCfg.log = vcCfg.log || {};
+
+          var vcLog = {};
+
+          // set global log config
+          Object.keys(logCfg).forEach(function(key) {
+            vcLog[key] = logCfg[key];
+          });
+
+          // overrule with vc specific log config
+          Object.keys(vcCfg.log).forEach(function(key) {
+            vcLog[key] = vcCfg.log[key];
+          });
+
+          if (vcCfg.log.level) {
+            vcLog.mask = logger.levelToPrio(vcCfg.log.level);
+          }
+
+          var tasks2 = [function(cb2) {
+            // ensure async even without any other tasks
+            process.nextTick(cb2);
+          }];
+
+          if (vcCfg.log.file) {
+            tasks2.push(function(cb5) {
+              logger.openFile(vcCfg.log.file, function(err, f) {
+                if (err) { cb5(err); return; }
+                vcLog.file = f;
+                cb5();
+              });
+            });
+          } else {
+            vcLog.file = log.getFileStream();
+          }
+
+          if (vcCfg.log.error) {
+            tasks2.push(function(cb5) {
+              logger.openFile(vcCfg.log.error, function(err, f) {
+                if (err) { cb5(err); return; }
+                vcLog.error = f;
+                cb5();
+              });
+            });
+          } else {
+            vcLog.error = log.getErrorStream();
+          }
+
+          vcCfg.logCfg = vcLog;
+
+          async.parallel(tasks2, cb4);
+        }, cb3);
+      }, cb2);
+    });
+
+    tasks.push(function(cb2) {
+      vs.initVCs(vcsCfg, cb2);
+    });
+
+    async.series(tasks, function(err) {
       if (err) { cb(err); return; }
 
       // call either chroot or listen (listen calls chroot)
       var serverCfg = get(config, 'server');
       if (serverCfg && !serverCfg.disable) {
-        if (program.debug) { console.log('%s: preauth forking...', programName); }
+        log.info('preauth forking...');
 
         var opts2 = {
           serverConfig: serverCfg,
@@ -218,12 +295,12 @@ function start(db) {
 
           // find out if any remotes need to be initiated
           if (remoteLogin) {
-            console.log('pull requests, after 5 secs.', debugReq(remoteLogin));
+            log.notice('pull requests, after 5 secs.' + debugReq(remoteLogin));
             setTimeout(function() {
               sendPRs(vs, remoteLogin);
             }, 5000);
           }
-          console.log('%s: ready', programName);
+          log.notice('ready');
         });
       } else {
         // chroot
@@ -231,36 +308,35 @@ function start(db) {
 
         // find out if any remotes need to be initiated
         if (remoteLogin) {
-          console.log('pull requests, after 5 secs.', debugReq(remoteLogin));
+          log.notice('pull requests, after 5 secs.' + debugReq(remoteLogin));
           setTimeout(function() {
             sendPRs(vs, remoteLogin);
           }, 5000);
         }
-        console.log('%s: ready', programName);
+        log.notice('ready');
       }
     });
 
     process.once('SIGINT', function() {
-      console.log('received SIGINT shutting down... press CTRL+C again to force quit');
+      log.notice('received SIGINT shutting down... press CTRL+C again to force quit');
       vs.stop(cb);
     });
     process.once('SIGTERM', function() {
-      console.log('received SIGTERM shutting down... send another SIGTERM to force quit');
+      log.notice('received SIGTERM shutting down... send another SIGTERM to force quit');
       vs.stopTerm(cb);
     });
   })(function(err) {
     if (err) {
-      console.error.apply(this, arguments);
-      console.trace();
-      var d = new Date();
-      console.error(d.getTime(), d);
+      // append stack trace
+      Array.prototype.push.call(arguments, err.stack);
+      log.crit.apply(log, arguments);
       process.exit(6);
     }
-    if (program.debug) {
-      console.log(new Date(), 'server down');
-      console.timeEnd('runtime');
-    }
+
+    log.info(new Date(), 'server down');
+    log.info('runtime', new Date() - startTime);
     db.close();
+    log.close();
   });
 }
 
@@ -274,11 +350,23 @@ var dbCfg = {
   authDb: database.authDb
 };
 
-// open database
-_db(dbCfg, function(err, db) {
-  if (err) {
-    console.error('%s: db error:', programName, err);
-    process.exit(1);
-  }
-  start(db);
+logCfg.ident = programName;
+logCfg.mask = logger.levelToPrio(logCfg.level) || logger.NOTICE;
+
+logger(logCfg, function(err, l) {
+  if (err) { throw err; }
+
+  log = l;
+
+  // open database
+  _db(dbCfg, function(err, db) {
+    if (err) {
+      log.err('db', err);
+      log.close(function(err) {
+        if (err) { throw err; }
+      });
+      return;
+    }
+    start(db);
+  });
 });
