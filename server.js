@@ -58,8 +58,8 @@ function sendPRs(vs, remotes) {
 
 program
   .version('0.0.3')
-  .usage('[-d] config.ini')
-  .option('-d, --debug', 'show process information')
+  .usage('[-v] config.ini')
+  .option('-v, --verbose', 'be verbose')
   .parse(process.argv);
 
 var configFile = program.args[0];
@@ -127,7 +127,7 @@ function start(db) {
   (function(cb) {
     var oplogColl = db.db(config.database.oplogDb || 'local').collection(config.database.oplogCollection || 'oplog.$main');
 
-    var opts = { debug: program.debug };
+    var opts = { debug: program.verbose };
 
     var parts;
 
