@@ -205,12 +205,13 @@ function start(db) {
       if (err) { cb(err); return; }
 
       // call either chroot or listen (listen calls chroot)
-      if (get(config, 'server')) {
+      var serverCfg = get(config, 'server');
+      if (serverCfg && !serverCfg.disable) {
         if (program.debug) { console.log('%s: preauth forking...', programName); }
 
         var opts2 = {
-          serverConfig: get(config, 'server'),
-          chrootConfig: get(config, 'server')
+          serverConfig: serverCfg,
+          chrootConfig: serverCfg
         };
         vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', opts2, function(err) {
           if (err) { cb(err); return; }
