@@ -28,38 +28,50 @@ var fs = require('fs');
 
 program
   .version('0.1.0')
-  .usage('[-g] -c collection -f config')
+  .usage('[-g] [-f config] -c collection')
   .description('tail the given collection')
   .option('-d, --database <database>', 'name of the database')
   .option('-c, --collection <collection>', 'name of the collection')
-  .option('-f, --config <config>', 'an ini config file')
+  .option('-f, --config <config>', 'ini config file')
   .option('-o, --oplog', 'shortcut for "-d local -c oplog.$main"')
   .option('-n, --number <number>', 'the number of last items to show, defaults to 10')
   .option('-g, --follow', 'keep the cursor open (only on capped collections)')
   .parse(process.argv);
 
-if (!program.config) { program.help(); }
-if (!program.collection) { program.help(); }
+var config = {};
+var dbCfg = { dbName: program.database };
 
-var config = program.config;
 var collection = program.collection;
 
-// if relative, prepend current working dir
-if (config[0] !== '/') {
-  config = process.cwd() + '/' + config;
-}
-
-config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
-
-program.number = program.number || 10;
-
 if (program.oplog) {
-  config.database.name = 'local';
+  dbCfg.dbName = 'local';
   collection = 'oplog.$main';
 }
 
+// if relative, prepend current working dir
+if (program.config) {
+  config = program.config;
+  if (config[0] !== '/') {
+    config = process.cwd() + '/' + config;
+  }
+
+  config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });
+
+  if (config.database) {
+    dbCfg.dbHost = config.database.path || config.database.host;
+    dbCfg.dbPort = config.database.port;
+    dbCfg.dbUser = config.database.user;
+    dbCfg.dbPass = config.database.pass;
+    dbCfg.authDb = config.database.authDb;
+  }
+}
+
+if (!collection) { program.help(); }
+
+program.number = program.number || 10;
+
 function tail(db) {
-  var coll = db.db(config.database.name || 'local').collection(collection);
+  var coll = db.db(dbCfg.dbName || 'local').collection(collection);
 
   // start at the end
   coll.count(function(err, counter) {
@@ -103,16 +115,6 @@ function tail(db) {
     });
   });
 }
-
-var database = config.database;
-var dbCfg = {
-  dbName: database.name || 'local',
-  dbHost: database.path || database.host,
-  dbPort: database.port,
-  dbUser: database.user,
-  dbPass: database.pass,
-  authDb: database.authDb
-};
 
 // open database
 _db(dbCfg, function(err, db) {
