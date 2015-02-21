@@ -25,6 +25,9 @@ var Timestamp = require('mongodb').Timestamp;
 
 var VersionedSystem = require('../../../lib/versioned_system');
 var ArrayCollection = require('../../../lib/array_collection');
+var logger = require('../../../lib/logger');
+
+var silence = logger({ silence: true });
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
@@ -111,7 +114,7 @@ describe('VersionedSystem', function() {
           }
         }
       };
-      var vs = new VersionedSystem(oplogColl, { hide: true });
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       vs.initVCs(vcCfg, function(err) {
         should.strictEqual(err.message, 'abnormal termination');
         done();
@@ -201,7 +204,7 @@ describe('VersionedSystem', function() {
     });
 
     it('should require an oplog pointer in the versioned collection if it has items', function(done) {
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
       vs._ensureSnapshotAndOplogOffset(cfg, function(err) {
         should.strictEqual(err.message, 'vc contains snapshots but no oplog pointer');
@@ -215,7 +218,7 @@ describe('VersionedSystem', function() {
     });
 
     it('should callback with oplog pointer based on previous insert', function(done) {
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
       vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
@@ -254,7 +257,7 @@ describe('VersionedSystem', function() {
 
     it('should error on non-shared collection', function(done) {
       var users = new ArrayCollection([{ realm: 'foo', username: 'bar' }]);
-      var opts = { usersColl: users, hide: true };
+      var opts = { usersColl: users, log: silence };
       var vs = new VersionedSystem(oplogColl, opts);
       vs._vces = { 'foo.bar': true };
       var req = {
@@ -271,7 +274,7 @@ describe('VersionedSystem', function() {
 
     it('should error run with invalid credentials', function(done) {
       var users = new ArrayCollection([{ realm: 'foo', username: 'bar', password: 'abacadabra' }]);
-      var opts = { usersColl: users, hide: true };
+      var opts = { usersColl: users, log: silence };
       var vs = new VersionedSystem(oplogColl, opts);
       vs._vces = { 'foo.bar': true };
       var req = {
