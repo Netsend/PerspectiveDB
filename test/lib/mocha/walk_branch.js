@@ -66,14 +66,15 @@ describe('walkBranch', function() {
   //                   J <-- K
   it('should save DAG', function(done) {
     var vc = new VersionedCollection(db, collectionName);
-    vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K, I], {w: 1}, done);
+    vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K, I], done);
   });
 
   it('should find A after B', function(done) {
     var vc = new VersionedCollection(db, collectionName);
     var items = [];
-    walkBranch({ '_id._id': 'foo' }, B._id._v, vc.localPerspective, vc._snapshotCollection, function(item) {
+    walkBranch({ '_id._id': 'foo' }, B._id._v, vc.localPerspective, vc._snapshotCollection, function(item, cb) {
       items.push(item);
+      cb();
     }, function(err) {
       if (err) { throw err; }
       should.deepEqual(items, [B, A]);
@@ -84,11 +85,12 @@ describe('walkBranch', function() {
   it('should find F after G', function(done) {
     var vc = new VersionedCollection(db, collectionName);
     var items = [];
-    walkBranch({ '_id._id': 'foo' }, G._id._v, vc.localPerspective, vc._snapshotCollection, function(item, stream) {
+    walkBranch({ '_id._id': 'foo' }, G._id._v, vc.localPerspective, vc._snapshotCollection, function(item, cb) {
       items.push(item);
       if (item._id._v === 'F') {
-        stream.destroy();
+        cb(null, true);
       }
+      cb();
     }, function(err) {
       if (err) { throw err; }
       should.deepEqual(items, [G, F]);
@@ -99,11 +101,12 @@ describe('walkBranch', function() {
   it('should find H, G, F, E, D after I', function(done) {
     var vc = new VersionedCollection(db, collectionName);
     var items = [];
-    walkBranch({ '_id._id': 'foo' }, 'I', vc.localPerspective, vc._snapshotCollection, function(item, stream) {
+    walkBranch({ '_id._id': 'foo' }, 'I', vc.localPerspective, vc._snapshotCollection, function(item, cb) {
       items.push(item);
       if (item._id._v === 'D') {
-        stream.destroy();
+        cb(null, true);
       }
+      cb();
     }, function(err) {
       if (err) { throw err; }
       should.deepEqual(items, [I, H, G, F, E, D]);
@@ -115,11 +118,49 @@ describe('walkBranch', function() {
     var vc = new VersionedCollection(db, collectionName);
     var items = [];
     var selector = { '_id._id': 'foo', '_id._v': { $in: ['D', 'F', 'H', 'J', 'K', 'I'] } };
-    walkBranch(selector, 'I', vc.localPerspective, vc._snapshotCollection, function(item) {
+    walkBranch(selector, 'I', vc.localPerspective, vc._snapshotCollection, function(item, cb) {
       items.push(item);
+      cb();
     }, function(err) {
       if (err) { throw err; }
       should.deepEqual(items, [I, H, F, D]);
+      done();
+    });
+  });
+
+  it('should not race', function(done) {
+    var vc = new VersionedCollection(db, collectionName);
+    var items = [];
+    walkBranch({ '_id._id': 'foo' }, C._id._v, vc.localPerspective, vc._snapshotCollection, function(item, cb) {
+      if (item._id._v === 'C') {
+        setTimeout(function() {
+          items.push(item);
+          cb();
+        }, 10);
+      } else {
+        items.push(item);
+        cb();
+      }
+    }, function(err) {
+      if (err) { throw err; }
+      should.deepEqual(items, [C, B, A]);
+      done();
+    });
+  });
+
+  it('should propagate errors', function(done) {
+    var vc = new VersionedCollection(db, collectionName);
+    var items = [];
+    walkBranch({ '_id._id': 'foo' }, C._id._v, vc.localPerspective, vc._snapshotCollection, function(item, cb) {
+      items.push(item);
+      if (item._id._v === 'B') {
+        cb(new Error('foo'));
+      } else {
+        cb();
+      }
+    }, function(err) {
+      should.strictEqual(err.message, 'foo');
+      should.deepEqual(items, [C, B]);
       done();
     });
   });
