@@ -60,7 +60,7 @@ tasks.push(function(done) {
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
-  child = spawn(__dirname + '/../../../server.js', ['-d', __dirname + '/test_local_only.ini']);
+  child = spawn(__dirname + '/../../../server.js', ['-v', __dirname + '/test_local_only.ini']);
 
   child.on('close', function() {
     child.kill();

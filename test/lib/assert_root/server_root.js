@@ -61,7 +61,7 @@ tasks.push(function(done) {
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
-  child1 = spawn(__dirname + '/../../../server.js', ['-d', __dirname + '/test_server.ini']);
+  child1 = spawn(__dirname + '/../../../server.js', ['-v', __dirname + '/test_server.ini']);
 
   child1.stdout.setEncoding('utf8');
 
@@ -81,7 +81,7 @@ tasks.push(function(done) {
 });
 
 tasks.push(function(done) {
-  child2 = spawn(__dirname + '/../../../server.js', ['-d', __dirname + '/test_client.ini']);
+  child2 = spawn(__dirname + '/../../../server.js', ['-v', __dirname + '/test_client.ini']);
 
   child2.on('close', function() {
     child1.kill();
