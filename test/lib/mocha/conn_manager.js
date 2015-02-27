@@ -29,8 +29,8 @@ var connManager = require('../../../lib/conn_manager');
 
 describe('connManager', function () {
   describe('destination', function () {
-    it('should require conn to be an object', function() {
-      (function() { connManager.destination(); }).should.throw('conn must be an object');
+    it('should require socket to be an object', function() {
+      (function() { connManager.destination(); }).should.throw('socket must be an object');
     });
 
     it('should default to undefined', function() {
@@ -54,12 +54,14 @@ describe('connManager', function () {
       (function() { connManager.create().open(); }).should.throw('address must be a string');
     });
 
-    it('should add the given object to the connections', function() {
-      var conn = new net.Socket();
-      var cm = connManager.create();
-      cm.register(conn);
-      should.strictEqual(cm._conns.length, 1);
-      should.strictEqual(cm._conns[0], conn);
+    it('should callback with error if not reconnecting', function(done) {
+      var cm = connManager.create({ hide: true });
+      cm.open('/var/run/nonexisting.sock', {}, function(err, socket) {
+        should.strictEqual(err.message, 'connect ENOENT');
+        should.strictEqual(socket, null);
+        should.strictEqual(Object.keys(cm._conns).length, 1);
+        done();
+      });
     });
   });
 
@@ -211,17 +213,18 @@ describe('connManager', function () {
     });
   });
 
-  describe('register', function () {
-    it('should require conn to be an object', function() {
-      (function() { connManager.create().register(); }).should.throw('conn must be an object');
+  describe('registerIncoming', function () {
+    it('should require socket to be an object', function() {
+      (function() { connManager.create().registerIncoming(); }).should.throw('socket must be an object');
     });
 
     it('should add the given object to the connections', function() {
       var conn = new net.Socket();
       var cm = connManager.create();
-      cm.register(conn);
-      should.strictEqual(cm._conns.length, 1);
-      should.strictEqual(cm._conns[0], conn);
+      cm.registerIncoming(conn);
+      should.strictEqual(Object.keys(cm._conns).length, 1);
+      var connId = Object.keys(cm._conns)[0];
+      should.strictEqual(cm._conns[connId].s, conn);
     });
   });
 
@@ -238,16 +241,30 @@ describe('connManager', function () {
     var cm = connManager.create({ hide: true });
 
     it('needs a connection for further testing', function() {
-      cm.register(conn);
+      cm.registerIncoming(conn);
     });
 
     it('should remove all connections and call back', function(done) {
-      should.strictEqual(cm._conns.length, 1);
-      should.strictEqual(cm._conns[0], conn);
+      should.strictEqual(Object.keys(cm._conns).length, 1);
+      var connId = Object.keys(cm._conns)[0];
+      should.strictEqual(cm._conns[connId].s, conn);
 
       cm.close(function(err) {
         if (err) { throw err; }
-        should.strictEqual(cm._conns.length, 0);
+        should.strictEqual(Object.keys(cm._conns).length, 0);
+        done();
+      });
+    });
+
+    it('should close pending reconnects', function(done) {
+      // needs a new connection for further testing
+      cm.open('/tmp/some.sock', { reconnectOnError: true });
+
+      should.strictEqual(Object.keys(cm._conns).length, 1);
+
+      cm.close(function(err) {
+        if (err) { throw err; }
+        should.strictEqual(Object.keys(cm._conns).length, 0);
         done();
       });
     });
@@ -255,11 +272,11 @@ describe('connManager', function () {
 
   describe('_remove', function () {
     it('should require conn to be an object', function() {
-      (function() { connManager.create()._remove(); }).should.throw('conn must be an object');
+      (function() { connManager.create()._remove(); }).should.throw('connId must be a string');
     });
 
     it('should return false if connection is not found', function() {
-      var result = connManager.create({ hide: true })._remove({});
+      var result = connManager.create({ hide: true })._remove('');
       should.strictEqual(result, false);
     });
 
@@ -267,15 +284,16 @@ describe('connManager', function () {
     var cm = connManager.create();
 
     it('needs a connection for further testing', function() {
-      cm.register(conn);
+      cm.registerIncoming(conn);
     });
 
     it('should return true if connection is removed', function() {
-      should.strictEqual(cm._conns.length, 1);
-      should.strictEqual(cm._conns[0], conn);
+      should.strictEqual(Object.keys(cm._conns).length, 1);
+      var connId = Object.keys(cm._conns)[0];
+      should.strictEqual(cm._conns[connId].s, conn);
 
-      cm._remove(conn);
-      should.strictEqual(cm._conns.length, 0);
+      cm._remove(connId);
+      should.strictEqual(Object.keys(cm._conns).length, 0);
     });
   });
 });
