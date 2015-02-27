@@ -1,18 +1,18 @@
 {
   "name": "Mastersync",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "author": {
     "name": "Tim Kuijsten",
     "email": "tim@netsend.nl",
     "url": "https://github.com/timkuijsten"
   },
   "license": "AGPLv3",
-  "description": "master-master replication",
+  "description": "master-master replication with transformations",
   "keywords": [
     "master",
     "replication",
-    "mongo",
-    "oplog"
+    "transformation",
+    "mongodb"
   ],
   "dependencies": {
     "posix": "~2.0.0",
