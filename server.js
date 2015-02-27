@@ -38,9 +38,8 @@ var log;
 var programName = path.basename(__filename);
 
 program
-  .version('0.0.3')
-  .usage('[-v] config.ini')
-  .option('-v, --verbose', 'be verbose')
+  .version(require('./package.json').version)
+  .usage('config.ini')
   .parse(process.argv);
 
 var configFile = program.args[0];
