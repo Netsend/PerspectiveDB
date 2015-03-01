@@ -295,10 +295,8 @@ function start(db) {
 
           // find out if any remotes need to be initiated
           if (remoteLogin) {
-            log.notice('pull requests, after 5 secs.' + debugReq(remoteLogin));
-            setTimeout(function() {
-              sendPRs(vs, remoteLogin);
-            }, 5000);
+            log.notice('sending pull request', debugReq(remoteLogin));
+            sendPRs(vs, remoteLogin);
           }
           log.notice('ready');
         });
@@ -308,10 +306,8 @@ function start(db) {
 
         // find out if any remotes need to be initiated
         if (remoteLogin) {
-          log.notice('pull requests, after 5 secs.' + debugReq(remoteLogin));
-          setTimeout(function() {
-            sendPRs(vs, remoteLogin);
-          }, 5000);
+          log.notice('sending pull request', debugReq(remoteLogin));
+          sendPRs(vs, remoteLogin);
         }
         log.notice('ready');
       }
