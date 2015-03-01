@@ -29,6 +29,9 @@ var fetchItems = require('../../_fetch_items');
 
 var VersionedCollection = require('../../../lib/versioned_collection');
 var VersionedCollectionReader = require('../../../lib/versioned_collection_reader');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_versioned_collection';
@@ -37,13 +40,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('versioned_collection', function() {
   var vColl;
@@ -122,25 +134,25 @@ describe('versioned_collection', function() {
 
   describe('createReader', function() {
     it('should return a VersionedCollectionReader', function() {
-      var vc = new VersionedCollection(db, 'foo');
-      var vcr = vc.createReader({ follow: false });
+      var vc = new VersionedCollection(db, 'foo', { log: silence });
+      var vcr = vc.createReader({ follow: false, log: silence });
       should.strictEqual(vcr instanceof VersionedCollectionReader, true);
     });
   });
 
   describe('startAutoProcessing', function() {
     it('should require interval to be a number', function() {
-      var vc = new VersionedCollection(db, 'foo');
+      var vc = new VersionedCollection(db, 'foo', { log: silence });
       (function () { vc.startAutoProcessing({}); }).should.throwError('interval must be a number');
     });
 
     it('should run', function() {
-      var vc = new VersionedCollection(db, 'foo');
+      var vc = new VersionedCollection(db, 'foo', { log: silence });
       vc.startAutoProcessing();
     });
 
     it('should not crash when locked', function(done) {
-      var vc = new VersionedCollection(db, 'foo', { debug: false });
+      var vc = new VersionedCollection(db, 'foo', { log: silence });
       vc._locked = true;
       vc.startAutoProcessing(1);
       setTimeout(function() {
@@ -153,10 +165,10 @@ describe('versioned_collection', function() {
   describe('writable stream', function() {
     var collectionName = 'writableStream';
     var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
-    var opts = { localPerspective: 'I', remotes: ['II'], debug: false };
+    var opts = { localPerspective: 'I', remotes: ['II'], log: silence };
 
     it('should be a writable stream', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       should.strictEqual(vc instanceof Writable, true);
       done();
     });
@@ -187,7 +199,7 @@ describe('versioned_collection', function() {
     var barA = { _id: 'bar', _v: 'A', b: 3 };
 
     it('should add a new root (in empty snapshot)', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var ts = new Timestamp(0, 0);
       vc.saveCollectionItem(fooA, [], function(err, newObj) {
         if (err) { throw err; }
@@ -201,7 +213,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add a child', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.saveCollectionItem(fooB, ['A'], function(err, newObj) {
         if (err) { throw err; }
         should.deepEqual(newObj, {
@@ -214,7 +226,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add a new root (with existing items)', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.saveCollectionItem(barA, [], function(err, newObj) {
         if (err) { throw err; }
         should.deepEqual(newObj, {
@@ -246,12 +258,12 @@ describe('versioned_collection', function() {
     //         E <-- F <-- G
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(fooDAG, {w: 1}, done);
     });
 
     it('should find D and G', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: 'I' }, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: 'I', log: silence });
       var count = 0;
       vc.allHeads(function(id, heads) {
         count++;
@@ -279,12 +291,12 @@ describe('versioned_collection', function() {
     //        \  /  \
     //         E <-- F <-- G
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(barDAG, {w: 1}, done);
     });
 
     it('should find foo D and G, and bar D and G', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: 'I' }, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: 'I', log: silence });
       var count = 0;
       vc.allHeads(function(id, heads) {
         count++;
@@ -322,13 +334,13 @@ describe('versioned_collection', function() {
     var snapshotItems = [ fooA, fooB, fooC, fooD, fooE, barA, barB, barC, barD, barE ];
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(snapshotItems, {w: 1}, done);
     });
 
     // should update existing values, create new values and set ackd
     it('should run', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ackAncestorsAckd(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -368,18 +380,18 @@ describe('versioned_collection', function() {
     var snapshotItems = [ sFooA, sBarA, sBazA, sBazB ];
 
     it('should save collection items', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.insert(items, {w: 1}, done);
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(snapshotItems, {w: 1}, done);
     });
 
     // should update existing values, create new values and set ackd
     it('should run', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.copyCollectionOverSnapshot(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -421,12 +433,12 @@ describe('versioned_collection', function() {
     var D = { _id: { _id: 'foo', _v: 'D', _pe: 'bar', _pa: ['B'], _i: 6 }, _m3: { _ack: false } };
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, Ap, B, Bp, C, D], {w: 1}, done);
     });
 
     it('should find the latest version of foo', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('foo', function(err, item) {
         should.equal(err, null);
         should.deepEqual(item, Bp);
@@ -435,7 +447,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find the latest unackd version of foo', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('foo', false, function(err, item) {
         should.equal(err, null);
         should.equal(item, null);
@@ -444,7 +456,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find the latest ackd version of bar', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('bar', true, function(err, item) {
         should.equal(err, null);
         should.deepEqual(item, C);
@@ -453,7 +465,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find the latest version of bar, whether merged or not', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('bar', function(err, item) {
         should.equal(err, null);
         should.deepEqual(item, D);
@@ -462,7 +474,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find the latest un ackd version of bar', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('bar', false, function(err, item) {
         should.equal(err, null);
         should.deepEqual(item, D);
@@ -471,7 +483,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find the latest version of baz', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.lastByPerspective('baz', function(err, item) {
         should.equal(err, null);
         should.deepEqual(item, null);
@@ -490,7 +502,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require item\'s perspective to be different from the local perspective', function(done) {
-      var opts = { localPerspective: perspective, remotes: [perspective], hide: true };
+      var opts = { localPerspective: perspective, remotes: [perspective], log: silence };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: perspective, _pa: [] } };
 
@@ -503,7 +515,7 @@ describe('versioned_collection', function() {
 
     it('should save to the right collection and add new remotes', function(done) {
       this.timeout(10000);
-      var opts = { localPerspective: perspective, debug: false };
+      var opts = { localPerspective: perspective, log: silence };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
 
@@ -540,7 +552,7 @@ describe('versioned_collection', function() {
     });
 
     it('should clear the _lo flag', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'] };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName + 'ClearLo', opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [], _lo: true } };
 
@@ -574,7 +586,7 @@ describe('versioned_collection', function() {
     });
 
     it('should set _m3._ack to false', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'] };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName + 'M3False', opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: true } };
 
@@ -609,7 +621,7 @@ describe('versioned_collection', function() {
 
     /* test manually by removing the comments
     it('should retry when limit reached', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'], debug: false };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName + 'Limit', opts);
       var item = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
 
@@ -621,7 +633,7 @@ describe('versioned_collection', function() {
     */
 
     it('should add items in insertion order', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'] };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName + 'InsertionOrder', opts);
       var A = { _id: { _id: 'foo', _v: 'A', _pe: 'II', _pa: [] } };
       var B = { _id: { _id: 'bar', _v: 'B', _pe: 'II', _pa: [] } };
@@ -695,7 +707,7 @@ describe('versioned_collection', function() {
     var perspective = 'I';
 
     it('should add the item to the versioned collection and merge', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'], debug: false, hide: true };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item1 = { _id: { _id: 'foo', _v : 'A', _pe: 'I', _pa: [] }, foo : 'bar', _m3: { _ack: true , _op: new Timestamp(123456789, 1) } };
       var item2 = { _id: { _id: 'foo', _v : 'A', _pe: 'II', _pa: [] }};
@@ -724,7 +736,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert multiple items and callback when merged', function(done) {
-      var opts = { localPerspective: perspective, remotes: ['II'], debug: false, hide: true };
+      var opts = { localPerspective: perspective, remotes: ['II'], log: silence };
       var vc = new VersionedCollection(db, collectionName, opts);
       var item = { _id: { _id: 'foo', _v : 'B', _pe: 'II', _pa: ['A'] }, baz : 'fubar' };
 
@@ -764,7 +776,7 @@ describe('versioned_collection', function() {
     var collectionName = 'saveOplogItem';
 
     it('should callback with error on invalid oplog items', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.saveOplogItem({ foo: 'bar' }, function(err) {
         'invalid oplogItem'.should.equal(err.message);
         done();
@@ -775,7 +787,7 @@ describe('versioned_collection', function() {
       var doc = { _id: 'raboof', foo: 'bar' };
       var item = { ts : 123, op : 'i', ns : 'qux.raboof', o : { _id: 'raboof', foo: 'bar' } };
 
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.insert(doc, {w: 1}, function(err) {
         if (err) { throw err; }
         vc.saveOplogItem(item, function(err, newItem) {
@@ -795,7 +807,7 @@ describe('versioned_collection', function() {
       var doc = { _id: 'foo', foo: 'bar' };
       var item = { ts : 123, op : 'i', ns : 'qux.raboof', o : { _id: 'foo', foo: 'bar' } };
 
-      var vc = new VersionedCollection(db, 'a', { debug: false });
+      var vc = new VersionedCollection(db, 'a', { log: silence });
       vc._queueLimit = 0;
       vc._collection.insert(doc, {w: 1}, function(err) {
         if (err) { throw err; }
@@ -820,7 +832,7 @@ describe('versioned_collection', function() {
         'o' : { '_id' : 'foo' }
       };
       // first clear the oplog collection
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._clearSnapshot(function() {
         vc.saveOplogItem(item, function(err, newItem) {
           should.equal(newItem._id._id, 'foo');
@@ -871,7 +883,7 @@ describe('versioned_collection', function() {
         }
       ];
 
-      var vc = new VersionedCollection(db, 'saveOplogItemSequential', { debug: false });
+      var vc = new VersionedCollection(db, 'saveOplogItemSequential', { log: silence });
       var lastItem = 0;
       var version1, version2, version3, version4;
       vc.saveOplogItem(oplogExamples[0], function(err, newItem) {
@@ -959,12 +971,12 @@ describe('versioned_collection', function() {
     var collectionName = '_save';
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._save(); }).should.throw('cb must be a function');
     });
 
     it('should error on missing doc', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._save(null, function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of null');
         done();
@@ -972,7 +984,7 @@ describe('versioned_collection', function() {
     });
 
     it('should error on invalid doc', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._save([], function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of undefined');
         done();
@@ -1005,12 +1017,12 @@ describe('versioned_collection', function() {
     var collectionName = '_syncDAGItemWithCollection';
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._syncDAGItemWithCollection(); }).should.throw('cb must be a function');
     });
 
     it('should error on missing doc', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._syncDAGItemWithCollection(null, function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of null');
         done();
@@ -1018,7 +1030,7 @@ describe('versioned_collection', function() {
     });
 
     it('should error on invalid doc', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._syncDAGItemWithCollection([], function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of undefined');
         done();
@@ -1026,7 +1038,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert in collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var vDoc = { _id: { _id: 'foo', _v: 'A' }, bar: 'baz' };
       vc._syncDAGItemWithCollection(vDoc, function(err) {
         if (err) { throw err; }
@@ -1040,7 +1052,7 @@ describe('versioned_collection', function() {
     });
 
     it('should delete from collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var vDoc = { _id: { _id: 'foo', _v: 'A', _d: true }, bar: 'baz' };
       vc._syncDAGItemWithCollection(vDoc, function(err) {
         if (err) { throw err; }
@@ -1063,22 +1075,22 @@ describe('versioned_collection', function() {
     };
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A], {w: 1}, done);
     });
 
     it('should require version to be string', function() {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.resolveVersionToIncrement(); }).should.throw('version must be a string');
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.resolveVersionToIncrement(''); }).should.throw('cb must be a function');
     });
 
     it('should error if version could not be resolved', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.resolveVersionToIncrement('X', function(err) {
         should.equal(err.message, 'version could not be resolved to an increment');
         done();
@@ -1086,7 +1098,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return with i = 2', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.resolveVersionToIncrement('A', function(err, i) {
         if (err) { throw err; }
         should.strictEqual(i, 2);
@@ -1099,12 +1111,12 @@ describe('versioned_collection', function() {
     var collectionName = 'rebuild';
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.rebuild({}); }).should.throw('cb must be a function');
     });
 
     it('should copy over all documents and copy back versions', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var items = [
         { _id: 'bar', bar: 'qux' },
         { _id: 'baz', raboof: 'foobar', _v: 'A' },
@@ -1197,24 +1209,24 @@ describe('versioned_collection', function() {
     var collectionName = 'ensureSnapshotCollection';
 
     it('should require size to be a number', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.ensureSnapshotCollection(function() {}); }).should.throw('size must be a number');
     });
 
     it('should require free to be a number', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.ensureSnapshotCollection(0, [], {}); }).should.throw('free must be a number');
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.ensureSnapshotCollection(0, 1); }).should.throw('cb must be a function');
     });
 
     it('should recreate if empty collection is not capped', function(done) {
       db.createCollection('m3.ensureSnapshotCollectionExists', function(err) {
         if (err) { throw err; }
-        var vc = new VersionedCollection(db, 'ensureSnapshotCollectionExists', { hide: true });
+        var vc = new VersionedCollection(db, 'ensureSnapshotCollectionExists', { log: silence });
         vc.ensureSnapshotCollection(1024, function(err) {
           if (err) { throw err; }
           vc._snapshotCollection.isCapped(function(err, result) {
@@ -1227,7 +1239,7 @@ describe('versioned_collection', function() {
     });
 
     it('0.1: needs a document in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionFree', { debug: false });
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionFree', { log: silence });
       var docs = [];
       for (var i = 0; i < 120; i++) {
         docs.push({
@@ -1241,7 +1253,7 @@ describe('versioned_collection', function() {
     });
 
     it('0.2 should error if less than 5% is free', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionFree', { debug: false, hide: true });
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionFree', { log: silence });
       vc.ensureSnapshotCollection(4096, 60, function(err) {
         should.equal(err.message, 'not enough free space');
         done();
@@ -1261,7 +1273,7 @@ describe('versioned_collection', function() {
     });
 
     it('should error if non-empty collection exists that is not capped', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionExists', { hide: true });
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionExists', { log: silence });
       vc.ensureSnapshotCollection(1024, function(err) {
         should.equal(err.message, 'snapshot collection not capped');
         vc._snapshotCollection.isCapped(function(err, result) {
@@ -1273,12 +1285,12 @@ describe('versioned_collection', function() {
     });
 
     it('1.1: needs a document in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.insert({ _id: 'foo', foo: 'bar', _v: 'X' }, done);
     });
 
     it('1.2: should rebuild and create a capped collection with one document', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.isCapped(function(err) {
         should.strictEqual(err.message, 'collection test_versioned_collection.m3.ensureSnapshotCollection not found');
 
@@ -1297,7 +1309,7 @@ describe('versioned_collection', function() {
     });
 
     it('1.3: should have versioned he document in the normal collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.find().toArray(function(err, citems) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, vcitems) {
@@ -1318,7 +1330,7 @@ describe('versioned_collection', function() {
     });
 
     it('2: should error if collection exists but is too small', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ensureSnapshotCollection(16000, function(err) {
         should.equal(err.message, 'snapshot collection too small');
         done();
@@ -1326,7 +1338,7 @@ describe('versioned_collection', function() {
     });
 
     it('3: should not error or recreate if capped collection already exists and is big enough', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -1341,7 +1353,7 @@ describe('versioned_collection', function() {
     });
 
     it('4.1: should drop the collection and the versioned collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.drop(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.drop(function(err) {
@@ -1352,7 +1364,7 @@ describe('versioned_collection', function() {
     });
 
     it('4.2: should create an empty capped collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -1367,7 +1379,7 @@ describe('versioned_collection', function() {
     });
 
     it('5: should recreate if versioned collection exists but is too small and empty', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ensureSnapshotCollection(8192, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -1382,7 +1394,7 @@ describe('versioned_collection', function() {
     });
 
     it('6: should not error or recreate if capped collection already exists and is big enough', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -1397,7 +1409,7 @@ describe('versioned_collection', function() {
     });
 
     it('should use the provided size on new collections', function(done) {
-      var vc = new VersionedCollection(db, collectionName+'Size');
+      var vc = new VersionedCollection(db, collectionName+'Size', { log: silence });
       vc.ensureSnapshotCollection(123, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.options(function(err, options) {
@@ -1409,13 +1421,13 @@ describe('versioned_collection', function() {
     });
 
     it('7.1: needs a large document in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc');
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc', { log: silence });
       var item = { _id: 'foo', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux'] };
       vc._collection.insert(item, done);
     });
 
     it('7.2: should error when document is too large', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc');
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDoc', { log: silence });
       vc.ensureSnapshotCollection(4096, function(err) {
         should.strictEqual(/document is larger than capped size/.test(err.message), true);
         done();
@@ -1423,7 +1435,7 @@ describe('versioned_collection', function() {
     });
 
     it('8.1: needs multiple documents in the collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs');
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs', { log: silence });
       var item1 = { _id: 'foo', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
       var item2 = { _id: 'bar', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
       var item3 = { _id: 'baz', foo: 'bar', _v: 'X', baz: ['qux','qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux', 'qux']};
@@ -1432,7 +1444,7 @@ describe('versioned_collection', function() {
     });
 
     it('8.2: should only have the last document (since capped size allows only room for 1)', function(done) {
-      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs');
+      var vc = new VersionedCollection(db, 'ensureSnapshotCollectionLargeDocs', { log: silence });
       vc.ensureSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, vcitems) {
@@ -1450,17 +1462,17 @@ describe('versioned_collection', function() {
     var collectionName = 'processQueues';
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc.processQueues({}); }).should.throw('cb must be a function');
     });
 
     it('should run', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.processQueues(done);
     });
 
     it('should error when locked', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.processQueues(function(err) {
         if (err) { throw err; }
       });
@@ -1477,7 +1489,7 @@ describe('versioned_collection', function() {
     it('should create a new empty object', function() {
       var dagItem = {};
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.cloneDAGItem(dagItem);
       should.strictEqual(result == dagItem, false);
       should.deepEqual(dagItem, {});
@@ -1486,7 +1498,7 @@ describe('versioned_collection', function() {
     it('should create a shallow copy of _id._id with a date object', function() {
       var dagItem = { _id: { _id: new Date(123456789) } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.cloneDAGItem(dagItem);
       should.strictEqual(result == dagItem, false);
       should.strictEqual(result._id._id == dagItem._id._id, true);
@@ -1497,7 +1509,7 @@ describe('versioned_collection', function() {
       var oid = '0000007b1a5fe5c91e000002';
       var dagItem = { _id: { _id: new ObjectID(oid) } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.cloneDAGItem(dagItem);
       should.strictEqual(result == dagItem, false);
       should.strictEqual(result._id._id == dagItem._id._id, true);
@@ -1507,7 +1519,7 @@ describe('versioned_collection', function() {
     it('should create a new _id', function() {
       var dagItem = { _id: { _id: 'A', _v: 'A', _pa: [], _lo: true, _i: 10, _d: true }, a: 'b', _m3: { _ack: true } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.cloneDAGItem(dagItem);
       should.strictEqual(result == dagItem, false);
       should.strictEqual(result._id == dagItem._id, false);
@@ -1517,7 +1529,7 @@ describe('versioned_collection', function() {
     it('should create a new _m3', function() {
       var dagItem = { _id: { _id: 'A', _v: 'A', _pa: [], _lo: true, _i: 10, _d: true }, a: 'b', _m3: { _ack: true } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.cloneDAGItem(dagItem);
       should.strictEqual(result == dagItem, false);
       should.strictEqual(result._m3 == dagItem._m3, false);
@@ -1532,7 +1544,7 @@ describe('versioned_collection', function() {
       var dagItem1 = {};
       var dagItem2 = {};
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, true);
       should.deepEqual(dagItem1, {});
@@ -1543,7 +1555,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new Date(123456789) };
       var dagItem2 = { foo: new Date(123456789) };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, true);
       should.deepEqual(dagItem1, { foo: new Date(123456789) });
@@ -1554,7 +1566,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new Date(123456780) };
       var dagItem2 = { foo: new Date(123456789) };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, false);
       should.deepEqual(dagItem1, { foo: new Date(123456780) });
@@ -1566,7 +1578,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { _id: { _id: new ObjectID(oid) } };
       var dagItem2 = { _id: { _id: new ObjectID(oid) } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, true);
       should.deepEqual(dagItem1, { _id: { _id: new ObjectID(oid) } });
@@ -1578,7 +1590,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new ObjectID(oid) };
       var dagItem2 = { foo: new ObjectID('0000007b1a5fe5c91e000003') };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, false);
       should.deepEqual(dagItem1, { foo: new ObjectID(oid) });
@@ -1590,7 +1602,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new ObjectID(oid) };
       var dagItem2 = { foo: new ObjectID('0000007b1a5fe5c91e000003') };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, false);
       should.deepEqual(dagItem1, { foo: new ObjectID(oid) });
@@ -1601,7 +1613,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new Date(123456789), _m3: { _ack: false } };
       var dagItem2 = { foo: new Date(123456789), _m3: { _ack: false } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, true);
       should.deepEqual(dagItem1, { foo: new Date(123456789), _m3: { _ack: false } });
@@ -1612,7 +1624,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { foo: new Date(123456780), _m3: { _ack: true } };
       var dagItem2 = { foo: new Date(123456789), _m3: { _ack: false } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, false);
       should.deepEqual(dagItem1, { foo: new Date(123456780), _m3: { _ack: true } });
@@ -1623,7 +1635,7 @@ describe('versioned_collection', function() {
       var dagItem1 = { _id: { _id: 'A', _v: 'A', _pa: [], _lo: true, _i: 10, _d: true } };
       var dagItem2 = { _id: { _id: 'A', _v: 'A', _pa: [], _lo: true, _i: 11, _d: true } };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItems(dagItem1, dagItem2);
       should.strictEqual(result, false);
       should.deepEqual(dagItem1, { _id: { _id: 'A', _v: 'A', _pa: [], _lo: true, _i: 10, _d: true } });
@@ -1675,7 +1687,7 @@ describe('versioned_collection', function() {
       var dagItem = { };
       var collectionItem = {};
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, true);
     });
@@ -1684,7 +1696,7 @@ describe('versioned_collection', function() {
       var dagItem = { foo: new Date(123456789) };
       var collectionItem = { foo: new Date(123456789) };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, true);
     });
@@ -1693,7 +1705,7 @@ describe('versioned_collection', function() {
       var dagItem = { foo: new Date(123456780) };
       var collectionItem = { foo: new Date(123456789) };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, false);
     });
@@ -1703,7 +1715,7 @@ describe('versioned_collection', function() {
       var dagItem = { _id: { _id: new ObjectID(oid) } };
       var collectionItem = { _id: new ObjectID(oid) };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, true);
     });
@@ -1713,7 +1725,7 @@ describe('versioned_collection', function() {
       var dagItem = { foo: new ObjectID(oid) };
       var collectionItem = { foo: new ObjectID('0000007b1a5fe5c91e000003') };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, false);
     });
@@ -1723,7 +1735,7 @@ describe('versioned_collection', function() {
       var dagItem = { foo: new ObjectID(oid) };
       var collectionItem = { foo: new ObjectID('0000007b1a5fe5c91e000003') };
 
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var result = vc.compareDAGItemWithCollectionItem(dagItem, collectionItem);
       should.strictEqual(result, false);
     });
@@ -1733,26 +1745,26 @@ describe('versioned_collection', function() {
     var collectionName = 'versionDoc';
 
     it('should create a new _id object with the original _id nested', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var myDoc = vc.versionDoc({ _id: 1 });
       myDoc._id._id.should.equal(1);
     });
 
     it('should not alter the original object', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var doc = { _id: 'findById' };
       vc.versionDoc(doc);
       doc.should.have.property('_id', 'findById');
     });
 
     it('should have generated a _v property', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var myDoc = vc.versionDoc({ _id: 1 });
       myDoc._id._v.should.match(/^[a-z0-9/+A-Z]{8}$/);
     });
 
     it('should move _v property', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var myDoc = vc.versionDoc({ _id: 1, _v: 'A' }, true);
       should.equal(myDoc._id._v, 'A');
       should.equal(myDoc._v, null);
@@ -1900,22 +1912,22 @@ describe('versioned_collection', function() {
     var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
 
     it('should require dagItem to be an object', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._createNewVersionByUpdateDoc(); }).should.throw('dagItem must be an object');
     });
 
     it('should require oplogItem to be an object', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._createNewVersionByUpdateDoc({}); }).should.throw('oplogItem must be an object');
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._createNewVersionByUpdateDoc({}, {}); }).should.throw('cb must be a function');
     });
 
     it('should require op to be "u"', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var updateItem  = {
         ts: 123,
         op: 'i',
@@ -1930,7 +1942,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require an o2 object', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u' }, function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of undefined');
         done();
@@ -1938,7 +1950,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require oplogItem.o2._id', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u', o2: { } }, function(err) {
         should.equal(err.message, 'missing oplogItem.o2._id');
         done();
@@ -1951,7 +1963,7 @@ describe('versioned_collection', function() {
         op: 'u',
         o2: { _id: 'applyOplogItemTest' }
       };
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createNewVersionByUpdateDoc(dagItem, item, function(err) {
         should.equal(err.message, 'oplogItem contains o._id');
         done();
@@ -1959,7 +1971,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a new version', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createNewVersionByUpdateDoc(dagItem, oplogItem, function(err, item) {
         if (err) { throw err; }
 
@@ -1991,7 +2003,7 @@ describe('versioned_collection', function() {
         _m3: { _ack: true },
         bar: 'qux'
       };
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createNewVersionByUpdateDoc(item, oplogItem, function(err, item) {
         if (err) { throw err; }
 
@@ -2032,22 +2044,22 @@ describe('versioned_collection', function() {
     //                  \
     //                   J <-- K
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K], {w: 1}, done);
     });
 
     it('should require dagItems to be an array', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function () { vc.mergeAndSave({}); }).should.throwError('dagItems must be an array');
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function () { vc.mergeAndSave([], []); }).should.throwError('cb must be a function');
     });
 
     it('should require all ids to be equal', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var items = [{ _id: { _id: 'foo', _pe: 'I' } }, { _id: { _id: 'bar', _pe: 'I' } }];
       vc.mergeAndSave(items, function(err) {
         should.deepEqual(err.message, 'ids must be equal');
@@ -2056,7 +2068,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require all perspectives to be equal', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var items = [{ _id: { _id: 'foo', _pe: 'I' } }, { _id: { _id: 'foo', _pe: 'II' } }];
       vc.mergeAndSave(items, function(err) {
         should.deepEqual(err.message, 'perspectives must be equal');
@@ -2065,7 +2077,7 @@ describe('versioned_collection', function() {
     });
 
     it('should merge D, G, K by creating two merges', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc.mergeAndSave([D, G, K], function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -2175,12 +2187,12 @@ describe('versioned_collection', function() {
     var C = { _id : { _id: 'foo', _v: 'C', _pa: ['B'], _pe: '_local', _i: 4 }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
 
     it('needs a capped collection and A', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, C], {w: 1}, done);
     });
 
     it('should ack', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._setAckd('foo', 'A', '_local', new Timestamp(0, 0), function(err) {
         if (err) { throw err; }
         done();
@@ -2188,7 +2200,7 @@ describe('versioned_collection', function() {
     });
 
     it('should have set the item ackd', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.find({}, { sort: { '_id._v': 1 } }).toArray(function(err, items) {
         if (err) { throw err; }
         should.deepEqual(items.length, 3);
@@ -2218,12 +2230,12 @@ describe('versioned_collection', function() {
     var D = { _id : { _id: 'foo', _v: 'D', _pa: ['C'], _i: 3 } };
 
     it('needs a capped collection and A', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(A, {w: 1}, done);
     });
 
     it('should return 1 by default', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._getNextIncrement(function(err, i) {
         if (err) { throw err; }
         should.equal(i, 1);
@@ -2232,7 +2244,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return 1 if no item with increment exists', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._getNextIncrement(function(err, i) {
         if (err) { throw err; }
         should.equal(i, 1);
@@ -2241,7 +2253,7 @@ describe('versioned_collection', function() {
     });
 
     it('needs B, C and D', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([B, C, D], {w: 1}, function(err, inserts) {
         if (err) { throw err; }
         should.equal(inserts.length, 3);
@@ -2250,7 +2262,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return the highest increment in the snapshot collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._getNextIncrement(function(err, i) {
         if (err) { throw err; }
         should.equal(i, 5);
@@ -2263,7 +2275,7 @@ describe('versioned_collection', function() {
     var collectionName = '_clearSnapshot';
 
     it('should fail to determine size if not provided and collection and snapshotCollection don\'t exist', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._clearSnapshot(function(err) {
         should.equal(err.message, 'could not determine size');
         done();
@@ -2271,7 +2283,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a new capped collection based on collection size', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.insert({ foo: 'bar' }, {w: 1}, function(err, inserts) {
         if (err) { throw err; }
         should.equal(inserts.length, 1);
@@ -2290,7 +2302,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create an empty capped collection of 3M', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._clearSnapshot(1024*1024*3, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -2303,7 +2315,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a new capped collection based on snapshot size', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert({ foo: 'bar' }, {w: 1}, function(err, inserts) {
         if (err) { throw err; }
         should.equal(inserts.length, 1);
@@ -2331,17 +2343,17 @@ describe('versioned_collection', function() {
     var collectionName = '_createSnapshotCollection';
 
     it('should require size to be a number', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._createSnapshotCollection(function() {}); }).should.throw('size must be a number');
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._createSnapshotCollection(0, []); }).should.throw('cb must be a function');
     });
 
     it('should create a collection which is capped, has the right size and an index', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createSnapshotCollection(4096, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.stats(function(err, stats) {
@@ -2365,7 +2377,7 @@ describe('versioned_collection', function() {
     });
 
     it('should throw an error if the snapshot collection already exists', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._createSnapshotCollection(4096, function(err) {
         should.equal(err.message, 'Collection m3._createSnapshotCollection already exists. Currently in strict mode.');
         done();
@@ -2377,7 +2389,7 @@ describe('versioned_collection', function() {
     var collectionName = '_ensureIndex';
 
     it('should create an index if the collection does not exist yet', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureIndex(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.indexInformation(function(err, ixNfo) {
@@ -2393,7 +2405,7 @@ describe('versioned_collection', function() {
     });
 
     it('2: should not create more than one index', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureIndex(function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.indexInformation(function(err, ixNfo) {
@@ -2433,17 +2445,17 @@ describe('versioned_collection', function() {
     var collectionName = '_ensureVersion';
 
     it('should require item', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._ensureVersion(); }).should.throw('Cannot read property \'_id\' of undefined');
     });
 
     it('should require item._id to be an object', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._ensureVersion({ _id: 'foo' }); }).should.throw('item._id must be an object');
     });
 
     it('should create and return version if it does not exist yet', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = { _id: { } };
       var v = vc._ensureVersion(item);
       v.should.match(/^[a-z0-9/+A-Z]{8}$/);
@@ -2451,7 +2463,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not change existing versions', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = { _id: { _v: 'foo' } };
       var v = vc._ensureVersion(item);
       should.equal(v, null);
@@ -3008,12 +3020,12 @@ describe('versioned_collection', function() {
     //                  \
     //                   J <-- K
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K, I], {w: 1}, done);
     });
 
     it('should find A to be an ancestor of B', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(A._id._v, B, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3022,7 +3034,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find A to be an ancestor of A', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(A._id._v, A, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3031,7 +3043,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find C to be an ancestor of C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(C._id._v, C, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3040,7 +3052,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find B to be an ancestor of C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(B._id._v, C, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3049,7 +3061,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find A to be an ancestor of C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(A._id._v, C, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3058,7 +3070,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find C to not be an ancestor of E', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(C._id._v, E, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, false);
@@ -3067,7 +3079,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find B to be an ancestor of E', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(B._id._v, E, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3076,7 +3088,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find A to be an ancestor of E', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(A._id._v, E, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3085,7 +3097,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find F to not be an ancestor of E', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(F._id._v, E, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, false);
@@ -3094,7 +3106,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find E to be an ancestor of F', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(E._id._v, F, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3103,7 +3115,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find B to be an ancestor of F', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(B._id._v, F, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3112,7 +3124,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find C to be an ancestor of F', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(C._id._v, F, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, true);
@@ -3121,7 +3133,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find D to not be an ancestor of C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(D._id._v, C, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, false);
@@ -3130,7 +3142,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find D to not be an ancestor of C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(D._id._v, C, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, false);
@@ -3139,7 +3151,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find D to not be an ancestor of G', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._isAncestorOf(D._id._v, G, function(err, isAncestor) {
         should.equal(err, null);
         should.strictEqual(isAncestor, false);
@@ -3150,7 +3162,7 @@ describe('versioned_collection', function() {
     describe('three parents', function() {
       // J, H, G, F, D
       it('should find J to not be an ancestor of I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._isAncestorOf(J._id._v, I, function(err, isAncestor) {
           should.equal(err, null);
           should.strictEqual(isAncestor, false);
@@ -3159,7 +3171,7 @@ describe('versioned_collection', function() {
       });
 
       it('should find H to not be an ancestor of I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._isAncestorOf(H._id._v, I, function(err, isAncestor) {
           should.equal(err, null);
           should.strictEqual(isAncestor, true);
@@ -3168,7 +3180,7 @@ describe('versioned_collection', function() {
       });
 
       it('should find G to not be an ancestor of I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._isAncestorOf(G._id._v, I, function(err, isAncestor) {
           should.equal(err, null);
           should.strictEqual(isAncestor, true);
@@ -3177,7 +3189,7 @@ describe('versioned_collection', function() {
       });
 
       it('should find F to not be an ancestor of I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._isAncestorOf(F._id._v, I, function(err, isAncestor) {
           should.equal(err, null);
           should.strictEqual(isAncestor, true);
@@ -3186,7 +3198,7 @@ describe('versioned_collection', function() {
       });
 
       it('should find D to not be an ancestor of I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._isAncestorOf(D._id._v, I, function(err, isAncestor) {
           should.equal(err, null);
           should.strictEqual(isAncestor, true);
@@ -3199,7 +3211,7 @@ describe('versioned_collection', function() {
   describe('_ensureSamePerspective', function(){
     var collectionName = '_ensureSamePerspective';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureSamePerspective(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3207,7 +3219,7 @@ describe('versioned_collection', function() {
     });
 
     it('should callback with perspective of items when they are the same', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
       vc._ensureSamePerspective([{ item: item1},{ item: item2}], function(err, per) {
@@ -3217,7 +3229,7 @@ describe('versioned_collection', function() {
     });
 
     it('should callback with error if perspectives are not the same', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] } };
       vc._ensureSamePerspective([{ item: item1},{ item: item2}], function(err) {
@@ -3230,7 +3242,7 @@ describe('versioned_collection', function() {
   describe('_ensureM3', function(){
     var collectionName = '_ensureM3';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureM3(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3238,7 +3250,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add m3 to items that have no m3', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
       vc._ensureM3([{ item: item1},{ item: item2}], function(err) {
@@ -3250,7 +3262,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not change m3 of items that have m3', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(1, 2) } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(3, 4) } };
       vc._ensureM3([{ item: item1},{ item: item2}], function(err) {
@@ -3265,7 +3277,7 @@ describe('versioned_collection', function() {
   describe('_checkAncestry', function() {
     var collectionName = '_checkAncestry';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._checkAncestry(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3273,7 +3285,7 @@ describe('versioned_collection', function() {
     });
 
     it('should extract all items and return these', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
       vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems) {
@@ -3284,7 +3296,7 @@ describe('versioned_collection', function() {
     });
 
     it('should throw an error when root is preceded', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'foo', _pa: [] } };
       vc._checkAncestry([{ item: item1},{ item: item2}], function(err) {
@@ -3295,7 +3307,7 @@ describe('versioned_collection', function() {
     });
 
     it('should collect items in DAGs and return these', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
       vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs) {
@@ -3309,7 +3321,7 @@ describe('versioned_collection', function() {
     });
 
     it('should record new roots and return these', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'bar', _v: 'B', _pe: 'foo', _pa: [] } };
       vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs, newRoots) {
@@ -3320,7 +3332,7 @@ describe('versioned_collection', function() {
     });
 
     it('should connect new roots if previous item is a deletion', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [], _d: true } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
       vc._checkAncestry([{ item: item1},{ item: item2}], function(err, allItems, DAGs) {
@@ -3338,7 +3350,7 @@ describe('versioned_collection', function() {
   describe('_ensureVirtualCollection', function(){
     var collectionName = '_ensureVirtualCollection';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureVirtualCollection(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3346,7 +3358,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a virtual collection if none exists', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       should.equal(vc._virtualCollection, null);
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
@@ -3354,7 +3366,6 @@ describe('versioned_collection', function() {
       vc._ensureVirtualCollection([item1, item2, item3], function(err) {
         if (err) { throw err; }
         vc._virtualCollection.find().toArray(function(err, items) {
-          console.log(JSON.stringify(items));
           should.deepEqual(items, [
             {'_id':{'_id':'foo','_v':'A','_pe':'bar','_pa':[]}},
             {'_id':{'_id':'foo','_v':'B','_pe':'bar','_pa':[]}},
@@ -3365,7 +3376,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create a virtual collection if one already exists', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       should.equal(vc._virtualCollection, null);
       vc._ensureAllInDAG([{item: item1}], function(err){
@@ -3390,7 +3401,7 @@ describe('versioned_collection', function() {
   describe('_checkParentsInVirtualCollection', function() {
     var collectionName = '_checkParentsInVirtualCollection';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._checkParentsInVirtualCollection(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3398,7 +3409,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return without error if parent is found', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: ['A'] } };
 
@@ -3414,7 +3425,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return error if parent is not found', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: 'bar', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: ['A'] } };
       var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
@@ -3433,7 +3444,7 @@ describe('versioned_collection', function() {
   describe('_mergeNewHeads', function() {
     var collectionName = '_mergeNewHeads';
     it('should callback immediately when no items are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._mergeNewHeads(null, null, function(err) {
         if (err) { throw err; }
         done();
@@ -3441,7 +3452,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require newRoots', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
       vc._mergeNewHeads([item1, item2], null, function(err) {
@@ -3455,7 +3466,7 @@ describe('versioned_collection', function() {
   describe('_syncLocalHeadsWithCollection', function(){
     var collectionName = '_syncLocalHeadsWithCollection';
     it('should callback immediately when no newLocalHeads are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._syncLocalHeadsWithCollection(null, function(err) {
         if (err) { throw err; }
         done();
@@ -3466,7 +3477,7 @@ describe('versioned_collection', function() {
   describe('_ensureIntoSnapshot', function(){
     var collectionName = '_ensureIntoSnapshot';
     it('should require perspective', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureIntoSnapshot(null, null, null, function(err) {
         if (err && err.message!=='provide perspective') { throw err; }
         should.equal(err.message, 'provide perspective');
@@ -3475,7 +3486,7 @@ describe('versioned_collection', function() {
     });
 
     it('should callback immediately when no localItems are passed', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureIntoSnapshot('foo', null, null, function(err) {
         if (err) { throw err; }
         done();
@@ -3483,7 +3494,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert items into snapshot', function(done){
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
       var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
@@ -3506,7 +3517,7 @@ describe('versioned_collection', function() {
 
     it('should not insert items into snapshot twice', function(done){
       var collectionName = '_ensureIntoSnapshot2';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
       var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
       var item3 = { _id: { _id: 'foo', _v: 'C', _pe: 'bar', _pa: ['B'] } };
@@ -3549,18 +3560,17 @@ describe('versioned_collection', function() {
       var collectionName = '_ensureAllInDAGOnePe';
 
       it('should require all items to have the same perspective', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: 'bar', _pa: [] } };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
-          console.log(err.message);
           should.equal(err.message, 'perspective mismatch');
           done();
         });
       });
 
       it('should require to have one root', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: [] } };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
@@ -3570,7 +3580,7 @@ describe('versioned_collection', function() {
       });
 
       it('should mark the extra head as conflict', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
         var item3 = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['A'] } };
@@ -3588,7 +3598,7 @@ describe('versioned_collection', function() {
 
       it('should insert both items with root', function(done) {
         var collectionName = '_ensureAllInDAGOnePe2';
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'] } };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
@@ -3619,7 +3629,7 @@ describe('versioned_collection', function() {
       });
 
       it('should append item to previous items, fast-forward', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: ['B'] } };
         vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
@@ -3649,7 +3659,7 @@ describe('versioned_collection', function() {
         // expected state after: A---B---C---X
         //                            \     /
         //                             D----
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['B'], _lo: true } };
         vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
@@ -3687,7 +3697,7 @@ describe('versioned_collection', function() {
         var collectionName = '_ensureAllInDAGOnePeDeleteMemory';
 
         it('should not accept absence of referenced parent', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var B = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['C']} };
           vc._ensureAllInDAG([{ item: A }, { item: B }], function(err) {
@@ -3697,7 +3707,7 @@ describe('versioned_collection', function() {
         });
 
         it('should not accept any non-connected items', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: ['C'] } };
           vc._ensureAllInDAG([{ item: A }], function(err) {
             should.equal(err.message, 'parent not found');
@@ -3706,7 +3716,7 @@ describe('versioned_collection', function() {
         });
 
         it('should not accept any non-deleted items preceding a root', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var A = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var B = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A']} };
           var C = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: [] } };
@@ -3717,7 +3727,7 @@ describe('versioned_collection', function() {
         });
 
         it('should accept new root if preceded by a deleted item and set as parent', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { debug: false });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var A  = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] } };
           var Bd = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['A'], _d: true } };
           var C  = { _id: { _id: 'foo', _v: 'C', _pe: '_local', _pa: [] } };
@@ -3758,7 +3768,7 @@ describe('versioned_collection', function() {
         var collectionName = '_ensureAllInDAGOnePeDeleteSaved';
 
         it('needs a new root', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { debug: false });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var D = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: [] } };
           vc._ensureAllInDAG([{ item: D }], function(err) {
             if (err) { throw err; }
@@ -3784,7 +3794,7 @@ describe('versioned_collection', function() {
         });
 
         it('should not accept any (non-deleted) items preceding a root', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var E  = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: [] } };
           vc._ensureAllInDAG([{ item: E }], function(err) {
             should.equal(err.message, 'different root already in snapshot');
@@ -3793,7 +3803,7 @@ describe('versioned_collection', function() {
         });
 
         it('should delete item from collection', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { debug: false });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var item = { _id: { _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _d: true } };
           vc._ensureAllInDAG([{ item: item }], function(err) {
             if (err) { throw err; }
@@ -3815,7 +3825,7 @@ describe('versioned_collection', function() {
         });
 
         it('should accept a new root if preceding item is a deletion', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { debug: false });
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           var F  = { _id: { _id: 'foo', _v: 'F', _pe: '_local', _pa: [] } };
           vc._ensureAllInDAG([{ item: F }], function(err) {
             if (err) { throw err; }
@@ -3847,7 +3857,7 @@ describe('versioned_collection', function() {
       var collectionName = '_ensureAllInDAGOnePeMultiId';
 
       it('should insert both items with root', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'X', _pe: '_local', _pa: [] } };
         var item2 = { _id: { _id: 'bar', _v: 'Y', _pe: '_local', _pa: [] } };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
@@ -3883,7 +3893,7 @@ describe('versioned_collection', function() {
       });
 
       it('should append item to previous items, fast-forward', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'B', _pe: '_local', _pa: ['X'] } };
         var item2 = { _id: { _id: 'bar', _v: 'C', _pe: '_local', _pa: ['Y'] } };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
@@ -3919,7 +3929,7 @@ describe('versioned_collection', function() {
       });
 
       it('should append item and create merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: 'foo', _v: 'D', _pe: '_local', _pa: ['X'], _lo: true }, d: true };
         var item2 = { _id: { _id: 'bar', _v: 'D', _pe: '_local', _pa: ['Y'], _lo: true }, d: true };
         vc._ensureAllInDAG([{ item: item1 }, { item: item2 }], function(err) {
@@ -3978,7 +3988,7 @@ describe('versioned_collection', function() {
       var collectionName = '_ensureAllInDAGMultiplePe';
 
       it('should insert both items with root', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'bar', _pa: [] } };
         var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'bar', _pa: ['A'] } };
         database.createCappedColl(vc.snapshotCollectionName, function(err) {
@@ -4020,7 +4030,7 @@ describe('versioned_collection', function() {
       });
 
       it('should append item to previous items, fast-forward', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'bar', _pa: ['B'] } };
         vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
@@ -4061,7 +4071,7 @@ describe('versioned_collection', function() {
         //                       A'--B'--C'--X'
         //                            \     /
         //                             D'---
-        var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'D', _pe: 'bar', _pa: ['B'] } };
         vc._ensureAllInDAG([{ item: item1 }], function(err) {
           if (err) { throw err; }
@@ -4098,7 +4108,7 @@ describe('versioned_collection', function() {
 
       it('should insert all heads in the collection', function(done) {
         var collName = collectionName + 'multiRemote';
-        var vc = new VersionedCollection(db, collName, { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collName, { log: silence });
 
         var item1 = { _id: { _id: 'multi1', _v: 'A', _pe: 'remote', _pa: [] } };
         var item2 = { _id: { _id: 'multi2', _v: 'A', _pe: 'remote', _pa: [] } };
@@ -4145,7 +4155,7 @@ describe('versioned_collection', function() {
 
       it('needs a new local version', function(done) {
         var collName = collectionName + 'multiRemote';
-        var vc = new VersionedCollection(db, collName, { debug: false });
+        var vc = new VersionedCollection(db, collName, { log: silence });
 
         var item = { _id: { _id: 'multi1', _v: 'B', _pe: '_local', _pa: ['A'] } };
 
@@ -4179,7 +4189,7 @@ describe('versioned_collection', function() {
 
       it('should accept same root from different perspective', function(done) {
         var collName = collectionName + 'multiRemote';
-        var vc = new VersionedCollection(db, collName, { debug: false });
+        var vc = new VersionedCollection(db, collName, { log: silence });
 
         var item = { _id: { _id: 'multi1', _v: 'A', _pe: 'remote2', _pa: [] }, foo: 'bar' };
 
@@ -4218,7 +4228,7 @@ describe('versioned_collection', function() {
     var collectionName = '_ensureLocalPerspective';
 
     it('should require the first item to have a perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       vc._ensureLocalPerspective([ {} ], function(err) {
         should.equal(err.message, 'could not determine perspective');
         done();
@@ -4226,7 +4236,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require all items to have the same perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err) {
@@ -4236,7 +4246,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return no new items if already local', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: [] } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4247,7 +4257,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a local clone if the snapshot collection is empty', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: true, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4264,14 +4274,14 @@ describe('versioned_collection', function() {
     });
 
     it('needs an item in the snapshot collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var itemI = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [], _i: 1  }, _m3: { _ack: true, _op: new Timestamp(1, 1) } };
       var itemII = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._snapshotCollection.insert([itemI, itemII], done);
     });
 
     it('should not create new items if item already exists (input _pe local)', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'I', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4281,7 +4291,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create new items if item already exists (input _pe non-local), but should return that existing item', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4293,7 +4303,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create new items if item already exists (input _pe new perspective), but should return existing item', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'III', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4305,7 +4315,7 @@ describe('versioned_collection', function() {
     });
 
     it('should fail if the snapshot collection has an item but no lca is found', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['X'] } };
       vc._ensureLocalPerspective([ item ], function(err) {
         should.equal(err.message, 'no lca found');
@@ -4314,7 +4324,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create new items if the new item is a child of what is in the snapshot collection but is already local', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4324,7 +4334,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create a new item if it connects to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4334,7 +4344,7 @@ describe('versioned_collection', function() {
     });
 
     it('should create multiple new items if they connect to each other and the first connects to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: {} };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['B'] }, _m3: {} };
       vc._ensureLocalPerspective([ item1, item2 ], function(err, newLocalItems) {
@@ -4348,14 +4358,14 @@ describe('versioned_collection', function() {
     });
 
     it('needs a deleted item for further testing', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'I', _pa: ['A'], _d: true, _i: 2 }, _m3: { _ack: true, _op: new Timestamp(24, 1) } };
       vc._snapshotCollection.insert([item], done);
     });
 
 
     it('should work with (root) items of previously deleted items', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
 
       var item = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: [] } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
@@ -4368,7 +4378,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not create multiple new items if the result in DAG having multiple heads', function(done) {
-      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
@@ -4384,7 +4394,7 @@ describe('versioned_collection', function() {
     });
 
     it('should merge merges', function(done) {
-      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
@@ -4403,7 +4413,7 @@ describe('versioned_collection', function() {
 
     it('needs a merge item in the snapshot collection for further testing', function(done) {
       var mergeId = 'fooMerge';
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item1I  = { _id: { _id: mergeId, _v: 'A', _pe: 'I',  _pa: [],         _i: 1  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) } };
       var item1II = { _id: { _id: mergeId, _v: 'A', _pe: 'II', _pa: []                 }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2I  = { _id: { _id: mergeId, _v: 'B', _pe: 'I',  _pa: ['A'],      _i: 2  }, _m3: { _ack: true,  _op: new Timestamp(1, 1) } };
@@ -4416,7 +4426,7 @@ describe('versioned_collection', function() {
 
     it('should merge with another merged version', function(done) {
       var mergeId = 'fooMerge';
-      var vc = new VersionedCollection(db, collectionName, { debug: false, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
       var item = { _id: { _id: mergeId, _v: 'E', _pe: 'II', _pa: ['B', 'C'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       vc._ensureLocalPerspective([ item ], function(err, newLocalItems) {
         if (err) { throw err; }
@@ -4543,13 +4553,13 @@ describe('versioned_collection', function() {
         //     B---D
         //
         it('should save DAGs', function(done) {
-          var vc = new VersionedCollection(db, collectionName);
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           // save as if I and II had independent updates to B and C respectively and were bi-dir synced.
           vc._snapshotCollection.insert([AI, AII, BI, CII, CI, BII], done);
         });
 
         it('merge DII, EII and FII to I', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+          var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
           vc._ensureLocalPerspective([ DII, EII, FII ], function(err, newLocalItems) {
             if (err) { throw err; }
             should.strictEqual(newLocalItems.length, 3);
@@ -4736,12 +4746,12 @@ describe('versioned_collection', function() {
         //  A---C------------
         //
         it('should save DAGs', function(done) {
-          var vc = new VersionedCollection(db, collectionName);
+          var vc = new VersionedCollection(db, collectionName, { log: silence });
           vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI, DII], done);
         });
 
         it('HII and GI = ff to HI', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { hide: true, localPerspective: 'I' });
+          var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
           vc._ensureLocalPerspective([ EII, FII, GII, HII ], function(err, newLocalItems) {
             if (err) { throw err; }
             should.strictEqual(newLocalItems.length, 1);
@@ -4778,7 +4788,7 @@ describe('versioned_collection', function() {
 
       var items = [A, B, C];
 
-      var vc = new VersionedCollection(db, collectionName, { hide: true, debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureOneHead(items, function(err, nonConflictedHeads) {
         if (err) { throw err; }
         should.deepEqual(nonConflictedHeads, [A]);
@@ -4787,7 +4797,7 @@ describe('versioned_collection', function() {
     });
 
     it('should return B as head', function(done){
-      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { debug: false, hide: true, localPerspective: 'I' });
+      var vc = new VersionedCollection(db, '_ensureLocalPerspective2', { log: silence, localPerspective: 'I' });
       var item1 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'A', _pe: 'II', _pa: [] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item2 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'B', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
       var item3 = { _id: { _id: new ObjectID('f00000000000000000000000'), _v: 'C', _pe: 'II', _pa: ['A'] }, _m3: { _ack: false, _op: new Timestamp(0, 0) } };
@@ -4810,7 +4820,7 @@ describe('versioned_collection', function() {
     var D = { _id: { _id: 'foo', _v: 'D', _pe: 'I', _pa: ['A'] }, _m3: { s:2, _ack: false, _op: new Timestamp(0, 0) }, foo4: '2' };
 
     it('should mark C and D as conflict', function(done){
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureLocalPerspective([ A, B, C, D ], function(err, newLocalItems) {
         if (err) { throw err; }
         vc._ensureOneHead(newLocalItems, function(err){
@@ -4825,7 +4835,7 @@ describe('versioned_collection', function() {
     });
 
     it('should mark C and D as conflict and write it to snapshotcollection', function(done){
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG([ {item: A}, {item: B}, {item: C}, {item: D} ], function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -4893,7 +4903,7 @@ describe('versioned_collection', function() {
     var collectionName = '_applyOplogItem';
 
     it('should require an object on the item', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogItem({ }, function(err) {
         should.equal('missing oplogItem.o', err.message);
         done();
@@ -4901,7 +4911,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require a document with an _id', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogItem({ o: { } }, function(err) {
         should.equal('unsupported operator: undefined', err.message);
         done();
@@ -4918,7 +4928,7 @@ describe('versioned_collection', function() {
       };
 
       it('should insert a new item into the DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName + 'InsertWithColl', { debug: false, hide: true });
+        var vc = new VersionedCollection(db, collectionName + 'InsertWithColl', { log: silence });
         // first make sure doc exists in the collection
         vc._applyOplogItem(oplogItem, function(err) {
           if (err) { throw err; }
@@ -4962,7 +4972,7 @@ describe('versioned_collection', function() {
       };
 
       it('should insert a new item into the DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName + 'UpdateFullDocWithColl', { hide: true });
+        var vc = new VersionedCollection(db, collectionName + 'UpdateFullDocWithColl', { log: silence });
         // first make sure doc exists in the collection
         vc._snapshotCollection.insert(dagRoot, {w: 1}, function(err, inserts) {
           if (err) { throw err; }
@@ -5007,7 +5017,7 @@ describe('versioned_collection', function() {
       var dagRoot = { _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] }, qux: 'quux', _m3: { _ack: true, _op: new Timestamp(1414516132, 1) } };
 
       it('should insert a new item into the DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName + 'UpdateModifierWithColl', { hide: true });
+        var vc = new VersionedCollection(db, collectionName + 'UpdateModifierWithColl', { log: silence });
         // first make sure doc exists in the collection
         vc._snapshotCollection.insert(dagRoot, {w: 1}, function(err, inserts) {
           if (err) { throw err; }
@@ -5066,12 +5076,12 @@ describe('versioned_collection', function() {
     };
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._applyOplogInsertItem(); }).should.throw('cb must be a function');
     });
 
     it('should require op to be "i" (or "u")', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var updateItem  = {
         op: 'd'
       };
@@ -5082,7 +5092,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require oplogItem.o._id', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogInsertItem({ o: { }, op: 'i' }, function(err) {
         should.equal(err.message, 'missing oplogItem.o._id');
         done();
@@ -5090,7 +5100,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add to DAG and copy to collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogInsertItem(oplogItem, function(err) {
         should.equal(err, null);
 
@@ -5126,7 +5136,7 @@ describe('versioned_collection', function() {
     });
 
     it('should complain about existing parent and don\'t add to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogInsertItem(oplogItem, function(err) {
         should.equal(err.message, 'previous version of item not a deletion');
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5138,7 +5148,7 @@ describe('versioned_collection', function() {
     });
 
     it('should set _ack to true if version and attributes match', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
 
       var oplogItem = {
         ts: new Timestamp(1414516126, 1),
@@ -5190,7 +5200,7 @@ describe('versioned_collection', function() {
     });
 
     it('needs new doc in the normal collection for further testing', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._collection.insert(doc, {w: 1}, function(err, inserts) {
         if (err) { throw err; }
         should.equal(inserts.length, 1);
@@ -5199,7 +5209,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert a new item into the DAG and copy to collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogInsertItem(oplogItem2, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5246,7 +5256,7 @@ describe('versioned_collection', function() {
     });
 
     it('needs deletion item in DAG and delete item from collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = {
         _id: { _co: '_applyOplogInsertItem', _id: 'foo', _v: 'E', _pe: '_local', _pa: ['D'], _i: 3, _d: true },
         _m3: { _ack: true, _op: new Timestamp(1414516144, 1) }
@@ -5258,7 +5268,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not complain about existing parent (deletion) and add new root to DAG with prev item as parent', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogInsertItem(oplogItem, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5306,12 +5316,12 @@ describe('versioned_collection', function() {
     };
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._applyOplogUpdateFullDoc(); }).should.throw('cb must be a function');
     });
 
     it('should require op to be "u" or ("i")', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var updateItem  = {
         op: 'd'
       };
@@ -5322,7 +5332,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require oplogItem.o._id', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateFullDoc({ o: {}, op: 'u' }, function(err) {
         should.equal(err.message, 'missing oplogItem.o._id');
         done();
@@ -5330,7 +5340,7 @@ describe('versioned_collection', function() {
     });
 
     it('should complain about missing parent and don\'t add to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateFullDoc(oplogItem, function(err) {
         should.equal(err.message, 'previous version of item not found');
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5342,7 +5352,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert root into DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = {
         _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [], _lo: true },
         _m3: { _ack: true, _op: new Timestamp(1414516187, 1) },
@@ -5362,7 +5372,7 @@ describe('versioned_collection', function() {
         o: { _id: 'foo', qux: 'quux', foo: time }
       };
 
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateFullDoc(item, function(err) {
         should.equal(err, null);
 
@@ -5392,7 +5402,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert a new item into the DAG that was already in the collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateFullDoc(oplogItem, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5427,7 +5437,7 @@ describe('versioned_collection', function() {
         qux: 'quux'
       };
 
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert(item, function(err, inserted) {
         if (err) { throw err; }
         should.equal(inserted.length, 1);
@@ -5442,7 +5452,7 @@ describe('versioned_collection', function() {
         o: { _id: 'foo', qux: 'quux', _v: 'X' }
       };
 
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateFullDoc(item, function(err) {
         should.equal(err, null);
 
@@ -5483,7 +5493,7 @@ describe('versioned_collection', function() {
       };
 
       it('should insert root and an non-locally created item', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
         var DAG = [AI, BI];
         vc._snapshotCollection.insert(DAG, {w: 1}, function(err, inserts) {
           if (err) { throw err; }
@@ -5493,7 +5503,7 @@ describe('versioned_collection', function() {
       });
 
       it('should merge if multiple heads are created and copy merge to collection', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+        var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
         var oplogItem = {
           ts: new Timestamp(1414511144, 1),
           op: 'u',
@@ -5574,12 +5584,12 @@ describe('versioned_collection', function() {
     var oplogItem = { ts: new Timestamp(999, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._applyOplogUpdateModifier(); }).should.throw('cb must be a function');
     });
 
     it('should complain about missing parent and don\'t add to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateModifier(oplogItem, function(err) {
         should.equal(err.message, 'previous version of doc not found');
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5591,7 +5601,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert root into DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = {
         _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] },
         _m3: { _ack: true },
@@ -5605,7 +5615,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add new item to DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateModifier(oplogItem, function(err) {
         if (err) { throw err; }
         // check if added to the DAG
@@ -5628,7 +5638,7 @@ describe('versioned_collection', function() {
     });
 
     it('should ack and then insert a new parent into the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogUpdateModifier(oplogItem, function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5688,7 +5698,7 @@ describe('versioned_collection', function() {
         o:  { $set: { baz: 'quux' } }
       };
 
-      var vc = new VersionedCollection(db, collName, { debug: false, hide: true });
+      var vc = new VersionedCollection(db, collName, { log: silence });
       vc._snapshotCollection.insert(item, function(err) {
         if (err) { throw err; }
         vc._applyOplogUpdateModifier(oplogItem2, function(err) {
@@ -5745,12 +5755,12 @@ describe('versioned_collection', function() {
     };
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       (function() { vc._applyOplogDeleteItem(); }).should.throw('cb must be a function');
     });
 
     it('should require op to be "d"', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var updateItem  = {
         op: 'i',
         o: { qux: 'quux' }
@@ -5762,7 +5772,7 @@ describe('versioned_collection', function() {
     });
 
     it('should require oplogItem.o._id', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogDeleteItem({ o: {}, op: 'd' }, function(err) {
         should.equal(err.message, 'missing oplogItem.o._id');
         done();
@@ -5770,7 +5780,7 @@ describe('versioned_collection', function() {
     });
 
     it('should complain about missing parent and don\'t add to the DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogDeleteItem(oplogItem, function(err) {
         should.equal(err.message, 'previous version of doc not found');
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -5782,7 +5792,7 @@ describe('versioned_collection', function() {
     });
 
     it('should insert parent into DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = {
         _id: { _id: 'foo', _v: 'A', _pe: '_local', _pa: [] },
         bar: 'qux',
@@ -5792,7 +5802,7 @@ describe('versioned_collection', function() {
     });
 
     it('should add to DAG and don\'t complain about item missing in collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._applyOplogDeleteItem(oplogItem, function(err) {
         if (err) { throw err; }
 
@@ -5821,7 +5831,7 @@ describe('versioned_collection', function() {
     });
 
     it('should work with deleted items that have no version', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { debug: false });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var item = { ts: new Timestamp(123, 1), op: 'd', o: { _id: 'foo' } };
       vc._applyOplogDeleteItem(item, function(err) {
         if (err) { throw err; }
@@ -5875,17 +5885,17 @@ describe('versioned_collection', function() {
     };
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._snapshotCollection.insert([fooAI, barAI, barBI, fooBI], {w: 1}, done);
     });
 
     it('should require cb to be a function', function() {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       (function() { vc._findLastAckdOrLocallyCreated(); }).should.throw('cb must be a function');
     });
 
     it('should find last foo item is a locally created item', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._findLastAckdOrLocallyCreated('foo', function(err, obj) {
         if (err) { throw err; }
         should.deepEqual(obj, {
@@ -5896,7 +5906,7 @@ describe('versioned_collection', function() {
     });
 
     it('should find last bar item is a ackd item', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._findLastAckdOrLocallyCreated('bar', function(err, obj) {
         if (err) { throw err; }
         should.deepEqual(obj, {
@@ -5908,7 +5918,7 @@ describe('versioned_collection', function() {
     });
 
     it('should not find a parent for baz', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._findLastAckdOrLocallyCreated('baz', function(err, item) {
         if (err) { throw err; }
         should.equal(item, null);
@@ -5942,7 +5952,7 @@ describe('versioned_collection', function() {
     };
 
     it('should callback with null when no timestamps', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.maxOplogPointer(function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, null);
@@ -5951,12 +5961,12 @@ describe('versioned_collection', function() {
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._snapshotCollection.insert([barAI], {w: 1}, done);
     });
 
     it('should callback with null when no timestamps greater than 0, 0', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.maxOplogPointer(function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, null);
@@ -5965,12 +5975,12 @@ describe('versioned_collection', function() {
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._snapshotCollection.insert([fooAI, barBI, fooBI], {w: 1}, done);
     });
     
     it('should callback with the max oplog pointer of the versioned collection', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, debug: false });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.maxOplogPointer(function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, barBI._m3._op);
@@ -6004,7 +6014,7 @@ describe('versioned_collection', function() {
         '_m3' : { '_ack' : false, '_op' : new Timestamp(0, 0) } };
 
     it('should callback with null when no snapshots', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.determineRemoteOffset('euromastercontracts', function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, null);
@@ -6013,12 +6023,12 @@ describe('versioned_collection', function() {
     });
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._snapshotCollection.insert(snapshots, {w: 1}, done);
     });
 
     it('should callback with the last received snapshot version for the perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.determineRemoteOffset('euromastercontracts', function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, 'X2Sx6rXK');
@@ -6027,12 +6037,12 @@ describe('versioned_collection', function() {
     });
 
     it('should save extra DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc._snapshotCollection.insert(extraSnapshot, {w: 1}, done);
     });
 
     it('should callback with the new last received snapshot version for the perspective', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective });
+      var vc = new VersionedCollection(db, collectionName, { localPerspective: perspective, log: silence });
       vc.determineRemoteOffset('euromastercontracts', function(err, result) {
         if (err) { throw err; }
         should.deepEqual(result, 'sZCqUpY6');
