@@ -30,9 +30,12 @@ var fs = require('fs');
 var should = require('should');
 
 var VersionedSystem = require('../../../lib/versioned_system');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db, oplogDb, oplogColl;
-var databaseName = 'test_versioned_system';
+var databaseName = 'test_versioned_system_chroot';
 var oplogDatabase = 'local';
 
 var databaseNames = [databaseName, 'foo', 'bar'];
@@ -41,16 +44,25 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedSystem chroot', function() {
   it('should require user to be a string', function() {
@@ -64,7 +76,7 @@ describe('VersionedSystem chroot', function() {
   });
 
   it('should chroot', function() {
-    var vs = new VersionedSystem(oplogColl);
+    var vs = new VersionedSystem(oplogColl, { log: silence });
 
     var ls = fs.readdirSync('/');
     should.strictEqual(true, ls.length > 4);
