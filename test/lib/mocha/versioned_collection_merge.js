@@ -24,6 +24,9 @@ var should = require('should');
 var ObjectID = require('mongodb').ObjectID;
 
 var VersionedCollection = require('../../../lib/versioned_collection');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_versioned_collection_merge';
@@ -32,13 +35,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedCollection._merge', function() {
   var idFoo = new ObjectID('f00000000000000000000000');
@@ -100,12 +112,12 @@ describe('VersionedCollection._merge', function() {
     //  AII---DII
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, C, D, AII, DII], {w: 1}, done);
     });
 
     it('should err on id mismatch', function(done) {
-      var opts = { hide: true };
+      var opts = { log: silence };
       var item1 = { _id : { _id: idFoo, _v: 'X', _pe: 'I', _pa: [] }, _m3: { _ack: true } };
       var item2 = { _id : { _id: 'bar', _v: 'Y', _pe: 'I', _pa: [] }, _m3: { _ack: true } };
 
@@ -117,7 +129,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('A and A', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(A, A, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -135,7 +147,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('A and B', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(A, B, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -155,7 +167,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('A and C', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(A, C, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -175,7 +187,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('C and B', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(C, B, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -195,7 +207,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('A and D', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(A, D, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -215,7 +227,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('B and D, should not conflict and not set _id._d', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(B, D, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -234,7 +246,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('B and DII, should conflict on quux', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(B, DII, function(err, merged) {
         should.equal(err.message, 'merge conflict');
         should.deepEqual(merged, [['qux'],['bar','qux']]);
@@ -243,7 +255,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('C and D, should merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(C, D, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
@@ -322,12 +334,12 @@ describe('VersionedCollection._merge', function() {
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, C, D, E, F], {w: 1}, done);
     });
 
     it('A and A = ff to A', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(A, A, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -344,8 +356,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('B and C = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
-      console.log(B);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(B, C, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -363,7 +374,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('E and B = ff to E', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(E, B, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -382,7 +393,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('D and E = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(D, E, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -396,7 +407,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('E and D = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(E, D, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -414,7 +425,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('E and F = ff to F', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(E, F, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -433,7 +444,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('F and E = ff to F', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(F, E, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -448,7 +459,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('virtual merge vm1 and vm2 = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var vm1 = { // add c: 'foo'
         _id : { _id: idFoo, _pe: 'I', _pa: ['A'] },
         foo: 'bar',
@@ -501,12 +512,12 @@ describe('VersionedCollection._merge', function() {
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, B, Cd], {w: 1}, done);
     });
 
     it('B and C = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(B, Cd, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -520,7 +531,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('C and B = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(Cd, B, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -567,12 +578,12 @@ describe('VersionedCollection._merge', function() {
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, Bd, Cd], {w: 1}, done);
     });
 
     it('B and C = merge, delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(Bd, Cd, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -643,12 +654,12 @@ describe('VersionedCollection._merge', function() {
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, BI, AII, BII, CId, CIId], {w: 1}, done);
     });
 
     it('BI and CII = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CIId, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -670,7 +681,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BII and CI = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BII, CId, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -692,7 +703,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('CI and BII = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(CId, BII, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -714,7 +725,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('CII and BI = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(CIId, BI, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -793,12 +804,12 @@ describe('VersionedCollection._merge', function() {
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, BId, AII, BIId, CId, CIId], {w: 1}, done);
     });
 
     it('BI and CII = merge, delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BId, CIId, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -820,7 +831,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BII and CI = merge, delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BIId, CId, function(err, merged) {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
@@ -913,12 +924,12 @@ describe('VersionedCollection._merge', function() {
     // AI <-- BI <-- EI
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, BI, EI, AII, CII, BII, DII], {w: 1}, done);
     });
 
     it('AI and AII = ff to AI, ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -946,7 +957,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and AI = ff to AII, ff to AI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -974,7 +985,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and DII = merged ff to DI, ff to DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1001,7 +1012,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EI and DII = merges based on BI, BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1027,7 +1038,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EI and BI = ff to EI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1045,7 +1056,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and CII = unversioned DI and DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged[0], {
@@ -1072,7 +1083,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('virtual merge vm1 and vm2 = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       var vm1 = { // add c: 'foo'
         _id : { _id: idFoo, _pe: 'I', _pa: ['A'] },
         foo: 'bar'
@@ -1092,7 +1103,7 @@ describe('VersionedCollection._merge', function() {
     //////////////////// DELETE AI ON PURPOSE
 
     it('should error on missing lca', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.remove({ '_id._v': 'A', '_id._pe': 'I' }, {w: 1}, function(err, deleted) {
         if (err) { throw err; }
         should.equal(deleted, 1);
@@ -1215,12 +1226,12 @@ describe('VersionedCollection._merge', function() {
     //  AI <-- BI <---------- CI
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, AII, BI, BII, CII, CI], {w: 1}, done);
     });
 
     it('AI and AI = ff to AI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1236,7 +1247,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AI and BI = ff to BI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1252,7 +1263,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and AI = ff to BI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1268,7 +1279,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and AII = ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1282,7 +1293,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and BII = ff to BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, BII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1296,7 +1307,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BII and AII = ff to BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BII, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1310,7 +1321,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AI and AII = ff to AI, ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1331,7 +1342,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and AI = ff to AII, ff to AI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1352,7 +1363,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and BI = merged ff to BII, ff to BI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1372,7 +1383,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and AII = ff to BI, merged ff to BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1392,7 +1403,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and CII = merged ff to CI, ff to CII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1412,7 +1423,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('CII and BI = ff to CII, merged ff to CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(CII, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1432,7 +1443,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BII and CII = ff to CII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BII, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1446,7 +1457,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('CII and BII = ff to CII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(CII, BII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1460,7 +1471,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and CI = ff to CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1476,7 +1487,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('CI and BI = ff to CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(CI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1609,12 +1620,12 @@ describe('VersionedCollection._merge', function() {
     // AI <-- BI
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, BI, AII, BII, CI, CII, DII, DI, EII, EI, FII, FI], {w: 1}, done);
     });
 
     it('AI and AII = ff to AI, ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1636,7 +1647,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and CII = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1656,7 +1667,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('DI and EII = merge based on BI and CII, merge based on BII and CII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(DI, EII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1676,7 +1687,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EII and DI = merge based on BII and CII, merge based on BI and CII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EII, DI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1696,7 +1707,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EI and FII = merge ff to FI, ff to FII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EI, FII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1717,7 +1728,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('FII and EI = ff to FII, merge ff to FI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(FII, EI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1740,7 +1751,7 @@ describe('VersionedCollection._merge', function() {
     /////////// BREAK THE GRAPH BY DELETING CI ON PURPOSE
 
     it('should remove CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.remove(CI, {w: 1}, function(err, deleted) {
         if (err) { throw err; }
         should.equal(deleted, 1);
@@ -1749,7 +1760,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('DI and EII = error on missing CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(DI, EII, function(err) {
         should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: I, II');
         done();
@@ -1757,7 +1768,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EII and DI = error on missing CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EII, DI, function(err) {
         should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: II, I');
         done();
@@ -1842,12 +1853,12 @@ describe('VersionedCollection._merge', function() {
     //
     // AII
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AII, AI, BI, CI, DI, EI, FI], {w: 1}, done);
     });
 
     it('AII and FI = merged ff to FII, ff to FI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, FI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1872,7 +1883,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and CI = merged ff to CII, ff to CI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, CI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -1893,7 +1904,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AI and AII = ff to AI, ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -2105,12 +2116,12 @@ describe('VersionedCollection._merge', function() {
     //                  EII <------ GII
     //
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI, AII, BII, CII, DII, EII, FII, GII ], {w: 1}, done);
     });
 
     it('GI and FI = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(GI, FI, function(err, merged) {
         if (err) { throw err; }
         should.equal(merged.length, 1);
@@ -2129,7 +2140,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('GII and FI = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(GII, FI, function(err, merged) {
         if (err) { throw err; }
         should.equal(merged.length, 2);
@@ -2156,7 +2167,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('AII and HI = merged ff to HII, ff to HI', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(AII, HI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -2187,7 +2198,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('GIc and FIc = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(GIc, FIc, function(err, merged) {
         should.equal(err.message, 'merge conflict');
         should.deepEqual(merged, ['d', 'e']);
@@ -2215,7 +2226,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('GII and FI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName+'RecursiveLcaOrder');
+        var vc = new VersionedCollection(db, collectionName+'RecursiveLcaOrder', { log: silence });
         vc._merge(GII, FI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2242,7 +2253,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('FII and GI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName+'RecursiveLcaOrder');
+        var vc = new VersionedCollection(db, collectionName+'RecursiveLcaOrder', { log: silence });
         vc._merge(FI, GII, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2543,12 +2554,12 @@ describe('VersionedCollection._merge', function() {
       var collectionName = '_mergeDoubleCrissCrossThreeMergesOnePerspective';
 
       it('should save DAG I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI, II, JI, IIc, JIc], {w: 1}, done);
       });
 
       it('FI and GI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(FI, GI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 1);
@@ -2567,7 +2578,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('II and JI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(II, JI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 1);
@@ -2588,7 +2599,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('IIc and JIc = conflict', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(IIc, JIc, function(err, merged) {
           should.equal(err.message, 'merge conflict');
           should.equal(merged.length, 1);
@@ -2602,12 +2613,12 @@ describe('VersionedCollection._merge', function() {
       var collectionName = '_mergeDoubleCrissCrossThreeMergesTwoPerspectives';
 
       it('should save DAG topologically sorted per perspective only', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AII, BII, AI, BI, CI, CII, DII, EII, FII, GII, DI, EI, FI, GI, FIc, GIc, HI, II, HII, III, JII, JI, IIc, JIc], {w: 1}, done);
       });
 
       it('FII and GI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(FII, GI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2634,7 +2645,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('HI and III = merged ff to II, ff to III', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(HI, III, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2664,7 +2675,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('II and III = ff to II, ff to III', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(II, III, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2695,7 +2706,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('JIc and III = conflict', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(JIc, III, function(err, merged) {
           should.equal(err.message, 'merge conflict');
           should.equal(merged.length, 2);
@@ -2705,7 +2716,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('JI and III = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(JI, III, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -2800,12 +2811,12 @@ describe('VersionedCollection._merge', function() {
     // AI <-- BI <-- EI
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, AII, CII, BI, BII, EI, DII], {w: 1}, done);
     });
 
     it('BI and DII = merged ff to DI, ff to DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -2826,7 +2837,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EI and DII = merges based on BI, BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -2937,12 +2948,12 @@ describe('VersionedCollection._merge', function() {
     // AI <-- BI <-- EI <-- FI <-- GI
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._snapshotCollection.insert([AI, AII, CII, BI, BII, EI, FI, DII, GI], {w: 1}, done);
     });
 
     it('BI and CII = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, CII, function(err, merged) {
         should.equal(err.message, 'merge conflict');
         should.deepEqual(merged, [['c'], ['c']]);
@@ -2951,7 +2962,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('BI and DII = merged ff to DI, ff to DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(BI, DII, function(err, merged) {
         if (err) { throw err; }
         should.equal(merged.length, 2);
@@ -2976,7 +2987,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('EI and DII = merges based on BI, BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -3000,7 +3011,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('FI and DII = merges based on BI, BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName);
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(FI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
@@ -3026,7 +3037,7 @@ describe('VersionedCollection._merge', function() {
     });
 
     it('GI and DII = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._merge(GI, DII, function(err, merged) {
         should.equal(err.message, 'merge conflict');
         should.deepEqual(merged, [['c'], ['c']]);
@@ -3159,12 +3170,12 @@ describe('VersionedCollection._merge', function() {
       var collectionName = '_mergeCrissCrossFourParentsOnePerspective';
 
       it('should save DAG I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, BI, CI, DI, EI, FI, GI], {w: 1}, done);
       });
 
       it('FI and GI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(FI, GI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 1);
@@ -3188,12 +3199,12 @@ describe('VersionedCollection._merge', function() {
       var collectionName = '_mergeCrissCrossFourParentsTwoPerspectives';
 
       it('should save DAG I and II', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, BI, CI, AII, BII, DI, CII, EI, DII, EII, FII, GII, FI, GI], {w: 1}, done);
       });
 
       it('FI and GII = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(FI, GII, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -3222,7 +3233,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('FII and GI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(FII, GI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -3251,7 +3262,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('GI and FII = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(GI, FII, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -3280,7 +3291,7 @@ describe('VersionedCollection._merge', function() {
       });
 
       it('GII and FI = merge', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(GII, FI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
@@ -3442,12 +3453,12 @@ describe('VersionedCollection._merge', function() {
       //  A---C------------
       //
       it('should save DAGs', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI, DII, EII, FII, GII, HII], done);
       });
 
       it('HII and GI = ff to HI', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._merge(HII, GI, function(err, merged) {
           if (err) { throw err; }
           should.equal(merged.length, 2);
