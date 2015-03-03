@@ -28,6 +28,9 @@ var should = require('should');
 
 var VersionedCollection = require('../../../lib/versioned_collection');
 var Replicator = require('../../../lib/replicator');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var dbImport, dbExport, dbFoo, dbBar, dbQux, dbRaboof;
 
@@ -37,18 +40,28 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
-    dbImport = dbs[0];
-    dbExport = dbs[1];
-    dbFoo    = dbs[2];
-    dbBar    = dbs[3];
-    dbQux    = dbs[4];
-    dbRaboof = dbs[5];
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbs) {
+      dbImport = dbs[0];
+      dbExport = dbs[1];
+      dbFoo    = dbs[2];
+      dbBar    = dbs[3];
+      dbQux    = dbs[4];
+      dbRaboof = dbs[5];
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
+
 
 describe('Replicator', function() {
   describe('bidirFrom', function() {
@@ -455,7 +468,7 @@ describe('Replicator', function() {
     var C =  { _id: { _co: collectionName, _id: 'foo', _v: 'C', _pe: 'dbExport', _pa: ['B'] } };
 
     it('should save DAG', function(done) {
-      var vc = new VersionedCollection(dbImport, collectionName);
+      var vc = new VersionedCollection(dbImport, collectionName, { log: silence });
       vc._snapshotCollection.insert([A, Ap, B, Bp, C], {w: 1}, done);
     });
 
@@ -496,7 +509,7 @@ describe('Replicator', function() {
     });
 
     it('should set last to false if last saved item not found from that perspective', function(done) {
-      var vc = new VersionedCollection(dbImport, collectionName);
+      var vc = new VersionedCollection(dbImport, collectionName, { log: silence });
       Replicator.getTailOptions({
         import: { 'dbx': { 'dby.collX': true, 'dby.collZ': true } },
         export: {
@@ -530,8 +543,8 @@ describe('Replicator', function() {
     });
 
     it('should return all options for one pair of import and export vcs', function(done) {
-      var vcImport = new VersionedCollection(dbImport, 'collX');
-      var vcExport = new VersionedCollection(dbExport, 'collX');
+      var vcImport = new VersionedCollection(dbImport, 'collX', { log: silence });
+      var vcExport = new VersionedCollection(dbExport, 'collX', { log: silence });
 
       // insert some filter in dbImport from dbExport
       vcImport._snapshotCollection.insert([A, Ap], {w: 1}, function(err, inserts) {
@@ -597,17 +610,17 @@ describe('Replicator', function() {
       };
 
       // create versioned collections
-      var vcFooBaz = new VersionedCollection(dbFoo, 'baz');
-      var vcFooQuux = new VersionedCollection(dbFoo, 'quux');
+      var vcFooBaz = new VersionedCollection(dbFoo, 'baz', { log: silence });
+      var vcFooQuux = new VersionedCollection(dbFoo, 'quux', { log: silence });
 
-      var vcBarBaz = new VersionedCollection(dbBar, 'baz');
-      var vcBarQuux = new VersionedCollection(dbBar, 'quux');
+      var vcBarBaz = new VersionedCollection(dbBar, 'baz', { log: silence });
+      var vcBarQuux = new VersionedCollection(dbBar, 'quux', { log: silence });
 
-      var vcQuxBaz = new VersionedCollection(dbQux, 'baz');
-      var vcQuxQuux = new VersionedCollection(dbQux, 'quux');
+      var vcQuxBaz = new VersionedCollection(dbQux, 'baz', { log: silence });
+      var vcQuxQuux = new VersionedCollection(dbQux, 'quux', { log: silence });
 
-      var vcRaboofBaz = new VersionedCollection(dbRaboof, 'baz');
-      var vcRaboofQuux = new VersionedCollection(dbRaboof, 'quux');
+      var vcRaboofBaz = new VersionedCollection(dbRaboof, 'baz', { log: silence });
+      var vcRaboofQuux = new VersionedCollection(dbRaboof, 'quux', { log: silence });
 
       Replicator.getTailOptions(config, {
         'foo.baz':     vcFooBaz,
