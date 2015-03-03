@@ -26,6 +26,9 @@ if (process.getuid() !== 0) {
 }
 
 var VersionedSystem = require('../../../lib/versioned_system');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
@@ -38,17 +41,26 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    db2 = dbs[1];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      db2 = dbs[1];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedSystem', function() {
   describe('initVCs root', function() {
@@ -64,6 +76,7 @@ describe('VersionedSystem', function() {
       var vcCfg = {
         test2: {
           someColl: {
+            logCfg: { silence: true },
             dbPort: 27019,
             debug: false,
             autoProcessInterval: 50,
@@ -72,7 +85,7 @@ describe('VersionedSystem', function() {
         }
       };
 
-      var vs = new VersionedSystem(oplogColl, { debug: false });
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       vs.initVCs(vcCfg, function(err) {
         if (err) { throw err; }
 
