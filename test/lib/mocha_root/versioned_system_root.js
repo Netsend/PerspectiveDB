@@ -30,9 +30,12 @@ var mongodb = require('mongodb');
 
 var Timestamp = mongodb.Timestamp;
 var VersionedSystem = require('../../../lib/versioned_system');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db, db2, oplogDb, oplogColl;
-var databaseName = 'test_versioned_system';
+var databaseName = 'test_versioned_system_root';
 var databaseName2 = 'test2';
 var oplogDatabase = 'local';
 
@@ -42,17 +45,26 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    db2 = dbs[1];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      db2 = dbs[1];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedSystem', function() {
   describe('initVCs root', function() {
@@ -68,15 +80,15 @@ describe('VersionedSystem', function() {
       var vcCfg = {
         test2: {
           someColl: {
+            logCfg: { silence: true },
             dbPort: 27019,
-            debug: false,
             autoProcessInterval: 50,
             size: 1
           }
         }
       };
 
-      var vs = new VersionedSystem(oplogColl, { debug: false });
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       vs.initVCs(vcCfg, function(err, oplogReaders) {
         if (err) { throw err; }
 
@@ -158,13 +170,13 @@ describe('VersionedSystem', function() {
       var cfg = {};
       cfg[databaseName] = {};
       cfg[databaseName][collName] = {
+        logCfg: { silence: true },
         dbPort: 27019,
-        debug: false,
         autoProcessInterval: 50,
         size: 1
       };
 
-      var vs = new VersionedSystem(localOplogColl);
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
         db.collection('m3.' + collName).insert(snapshotItem, function(err) {
@@ -179,13 +191,13 @@ describe('VersionedSystem', function() {
       var cfg = {};
       cfg[databaseName] = {};
       cfg[databaseName][collName] = {
+        logCfg: { silence: true },
         dbPort: 27019,
-        debug: false,
         autoProcessInterval: 50,
         size: 1
       };
 
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
         vs.info(function(err, result) {
@@ -204,13 +216,13 @@ describe('VersionedSystem', function() {
       var cfg = {};
       cfg[databaseName] = {};
       cfg[databaseName][collName] = {
+        logCfg: { silence: true },
         dbPort: 27019,
-        debug: false,
         autoProcessInterval: 100,
         size: 1
       };
 
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
         var opts = { extended: true };
@@ -231,13 +243,13 @@ describe('VersionedSystem', function() {
       var cfg = {};
       cfg[databaseName] = {};
       cfg[databaseName][collName] = {
+        logCfg: { silence: true },
         dbPort: 27019,
-        debug: false,
         autoProcessInterval: 50,
         size: 1
       };
 
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
         var opts = { nsList: Object.keys(vs._vces) };
@@ -257,13 +269,13 @@ describe('VersionedSystem', function() {
       var cfg = {};
       cfg[databaseName] = {};
       cfg[databaseName][collName] = {
+        logCfg: { silence: true },
         dbPort: 27019,
-        debug: false,
         autoProcessInterval: 50,
         size: 1
       };
 
-      var vs = new VersionedSystem(localOplogColl, { hide: true });
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       vs.initVCs(cfg, function(err) {
         if (err) { throw err; }
         var opts = { extended: false, nsList: Object.keys(vs._vces) };
