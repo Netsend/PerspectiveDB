@@ -27,7 +27,7 @@ var VersionedSystem = require('../../../lib/versioned_system');
 var ArrayCollection = require('../../../lib/array_collection');
 var logger = require('../../../lib/logger');
 
-var silence = logger({ silence: true });
+var silence;
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system';
@@ -40,17 +40,27 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    db2 = dbs[1];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      db2 = dbs[1];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
+
 
 describe('VersionedSystem', function() {
   describe('constructor', function() {
@@ -107,20 +117,20 @@ describe('VersionedSystem', function() {
     });
 
     it('should fail if not running as root', function(done) {
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       var vcCfg = {
         someDb: {
           someColl: {
-            size: 10
+            size: 10,
+            logCfg: { silence: true }
           }
         }
       };
-      var vs = new VersionedSystem(oplogColl, { log: silence });
       vs.initVCs(vcCfg, function(err) {
         should.strictEqual(err.message, 'abnormal termination');
         done();
       });
     });
-
 
     /////
     // See versioned_system_root for further testing
@@ -183,7 +193,7 @@ describe('VersionedSystem', function() {
     });
 
     it('should create snapshot and callback with max oplog item (since snapshot was empty)', function(done) {
-      var vs = new VersionedSystem(localOplogColl);
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
       vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
@@ -234,7 +244,7 @@ describe('VersionedSystem', function() {
     });
 
     it('should callback with oplog pointer based on previous insert', function(done) {
-      var vs = new VersionedSystem(localOplogColl);
+      var vs = new VersionedSystem(localOplogColl, { log: silence });
       var cfg = { dbName: 'foo', collectionName: 'bar', size: 2 };
       vs._ensureSnapshotAndOplogOffset(cfg, function(err, oplogOffset) {
         if (err) { throw err; }
