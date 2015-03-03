@@ -66,7 +66,7 @@ tasks.push(function(done) {
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.once('message', function(msg) {
-    assert.strictEqual(msg, 'init');
+    assert.strictEqual(msg, 'log1');
     child.kill();
   });
 });
@@ -79,8 +79,12 @@ tasks.push(function(done) {
   child.stderr.on('data', function(data) {
     buff = Buffer.concat([buff, data]);
   });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
   child.on('exit', function(code, sig) {
-    assert(/msg must be an object/.test(buff.toString()));
+    assert(/logCfg must be an object/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
@@ -89,7 +93,7 @@ tasks.push(function(done) {
   child.send(0);
 });
 
-// should fail if first message does not contain a db name
+// should fail if third message does not contain a db name
 tasks.push(function(done) {
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
@@ -104,7 +108,17 @@ tasks.push(function(done) {
     done();
   });
 
-  child.send({});
+  child.once('message', function() {
+    child.send('errFile');
+    child.once('message', function() {
+      child.send({});
+    });
+  });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.send({ console: true });
 });
 
 // should fail if first message does not contain a collectionName
@@ -122,12 +136,22 @@ tasks.push(function(done) {
     done();
   });
 
-  child.send({
-    dbName: 'test',
-    dbPort: 27019,
-    chrootUser: 'test',
-    chrootNewRoot: '/var/empty'
+  child.once('message', function() {
+    child.send('errFile');
+    child.once('message', function() {
+      child.send({
+        dbName: 'test',
+        dbPort: 27019,
+        chrootUser: 'test',
+        chrootNewRoot: '/var/empty'
+      });
+    });
   });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.send({ console: true });
 });
 
 // should fail if not executed as root
@@ -145,13 +169,23 @@ tasks.push(function(done) {
     done();
   });
 
-  child.send({
-    dbName: 'test',
-    dbPort: 27019,
-    collectionName: 'test',
-    chrootUser: 'test',
-    chrootNewRoot: '/var/empty'
+  child.once('message', function() {
+    child.send('errFile');
+    child.once('message', function() {
+      child.send({
+        dbName: 'test',
+        dbPort: 27019,
+        collectionName: 'test',
+        chrootUser: 'test',
+        chrootNewRoot: '/var/empty'
+      });
+    });
   });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.send({ console: true });
 });
 
 async.series(tasks, function(err) {
