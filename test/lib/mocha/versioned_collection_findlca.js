@@ -25,6 +25,9 @@ var should = require('should');
 var VersionedCollection = require('../../../lib/versioned_collection');
 var ConcatMongoCollection = require('../../../lib/concat_mongo_collection');
 var ArrayCollection = require('../../../lib/array_collection');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_versioned_collection_findlca';
@@ -33,13 +36,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedCollection._findLCAs', function() {
   describe('one perspective', function() {
@@ -61,12 +73,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \     \             
       //         E <-- F <-- G
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert(DAG, {w: 1}, done);
       });
 
       it('should require itemX', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(null, null, function(err) {
           should.equal('provide itemX', err.message);
           done();
@@ -74,7 +86,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemY', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({}, null, function(err) {
           should.equal('provide itemY', err.message);
           done();
@@ -82,7 +94,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemX._id', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({}, {}, function(err) {
           should.equal('missing itemX._id', err.message);
           done();
@@ -90,7 +102,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemY._id', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: {} }, {}, function(err) {
           should.equal('missing itemY._id', err.message);
           done();
@@ -98,7 +110,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemX._id to be an object', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: 'foo' }, { _id: {} }, function(err) {
           should.equal('itemX._id must be an object', err.message);
           done();
@@ -106,7 +118,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemY._id to be an object', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: {} }, { _id: 'foo' }, function(err) {
           should.equal('itemY._id must be an object', err.message);
           done();
@@ -114,7 +126,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemX._id._id to equal itemY._id._id', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: { _id: 1 } }, { _id: { _id: 2 } }, function(err) {
           should.equal('itemX._id._id must equal itemY._id._id', err.message);
           done();
@@ -122,7 +134,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemX._id._pe', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: { _pe: '' } }, { _id: {} }, function(err) {
           should.equal('missing itemX._id._pe', err.message);
           done();
@@ -130,7 +142,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should require itemY._id._pe', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { hide: true });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs({ _id: { _pe: 'I' } }, { _id: { _pe: '' } }, function(err) {
           should.equal('missing itemY._id._pe', err.message);
           done();
@@ -138,7 +150,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('A and B = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(A, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [A._id._v]);
@@ -147,7 +159,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('B and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(B, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -156,7 +168,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('C and D = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(C, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -165,7 +177,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and D = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -174,7 +186,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('C and E = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(C, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -183,7 +195,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and F = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, F, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -192,7 +204,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and G = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, G, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [F._id._v]);
@@ -201,7 +213,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and C = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, C, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -210,7 +222,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and E = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -219,7 +231,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and D = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -228,7 +240,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('G and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(G, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -240,7 +252,7 @@ describe('VersionedCollection._findLCAs', function() {
       var H = { _id : { _id: 'foo', _v: 'H', _pe: 'I', _pa: [] } };
 
       it('should not find disconnected roots', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         // add not connected nodes
         vc._snapshotCollection.insert([GII, H], { w: 1 }, function(err, inserts) {
           if (err) { throw err; }
@@ -254,7 +266,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should not find disconnected by perspective', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         // add not connected nodes
         vc._findLCAs(GII, C, function(err, lca) {
           should.equal(err, null);
@@ -281,12 +293,12 @@ describe('VersionedCollection._findLCAs', function() {
       //  \     \     \
       //   B <-- D <-- F
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert(DAG, {w: 1}, done);
       });
 
       it('D and E = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -313,12 +325,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \  /  \             
       //         E <-- F <-- G
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert(DAG, {w: 1}, done);
       });
 
       it('C and E = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(C, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [E._id._v]);
@@ -327,7 +339,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and F = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, F, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -336,7 +348,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and C = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, C, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -345,7 +357,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and E = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [E._id._v]);
@@ -354,7 +366,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and D = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [E._id._v]);
@@ -363,7 +375,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('G and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(G, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -390,12 +402,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \  /  \  /          
       //         D <-- F
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([A, B, C, D, E, F, G], {w: 1}, done);
       });
 
       it('A and B = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(A, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [A._id._v]);
@@ -404,7 +416,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('B and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(B, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -413,7 +425,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('C and D = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(C, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -422,7 +434,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and D = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -431,7 +443,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('C and E = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(C, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -440,7 +452,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and F = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, F, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -449,7 +461,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and G = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, G, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [F._id._v]);
@@ -458,7 +470,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and C = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, C, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v]);
@@ -467,7 +479,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and E = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -476,7 +488,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and D = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -485,7 +497,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('G and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(G, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -494,7 +506,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and F = C and D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, F, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [C._id._v, D._id._v]);
@@ -528,12 +540,12 @@ describe('VersionedCollection._findLCAs', function() {
       //                  \
       //                   J <-- K
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K, I, L], {w: 1}, done);
       });
 
       it('J and K = J', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(J, K, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['J']);
@@ -542,7 +554,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('I and K = H', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(I, K, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['H']);
@@ -551,7 +563,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('I and G = G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(I, G, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G']);
@@ -560,7 +572,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('I and D = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(I, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['D']);
@@ -569,7 +581,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('I and L = I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(I, L, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['I']);
@@ -578,7 +590,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('L and C = C', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(L, C, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['C']);
@@ -587,7 +599,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('L and J = H', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(L, J, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['H']);
@@ -617,12 +629,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \ /   \ / \         
       //         D <-- G <-- J
       it('should save DAG mixed branches', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([B, C, D, F, E, H, G, I, J], {w: 1}, done);
       });
 
       it('J and H = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(J, H, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['E']);
@@ -631,7 +643,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('G and E = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(G, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -640,7 +652,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('F and E = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(F, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -649,7 +661,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and F = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, F, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -658,7 +670,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('J and I = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(J, I, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G', 'E']);
@@ -667,7 +679,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('I and J = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(I, J, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G', 'E']);
@@ -676,7 +688,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('A and B = no error because A is not in the database, but direct ancestor of B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(A, B, function(err, lcas) {
           should.equal(err, null);
           should.deepEqual(lcas, ['A']);
@@ -685,7 +697,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('B and A = no error because A is not in the database, but direct ancestor of B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(B, A, function(err, lcas) {
           should.equal(err, null);
           should.deepEqual(lcas, ['A']);
@@ -694,7 +706,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('B and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(B, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -703,7 +715,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('H and B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(H, B, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -712,7 +724,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('B and H = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(B, H, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [B._id._v]);
@@ -721,7 +733,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('H and E = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(H, E, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [E._id._v]);
@@ -730,7 +742,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('E and H = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(E, H, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [E._id._v]);
@@ -739,7 +751,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('J and D = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(J, D, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -748,7 +760,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('D and J = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(D, J, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, [D._id._v]);
@@ -777,12 +789,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \ /   \ / \         
       //         D <-- G <-- J
       it('should save DAG mixed branches and mixed perspectives', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([BI, CI, DI, FI, EI, HI, GI, II, JI], {w: 1}, done);
       });
 
       it('vm1 B and vm2 B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'I', _pa: ['B'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['B'] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -793,7 +805,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm1 B and vm2 A = error because AI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'I', _pa: ['B'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['A'] } };
         vc._findLCAs(vm1, vm2, function(err) {
@@ -803,7 +815,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm1 C, D and vm2 G = C and D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'I', _pa: ['C', 'D'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['G'] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -814,7 +826,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('two vm\'s without parents = []', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'I', _pa: [] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: [] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -825,7 +837,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm without parents and GI = []', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: [] } };
         vc._findLCAs(vm, GI, function(err, lca) {
           should.equal(err, null);
@@ -836,7 +848,7 @@ describe('VersionedCollection._findLCAs', function() {
 
 
       it('vm C, D and GI = C and D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['C', 'D'] } };
         vc._findLCAs(vm, GI, function(err, lca) {
           should.equal(err, null);
@@ -846,7 +858,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm J and II = E, G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['J'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -856,7 +868,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm E, F, G and II = E, F, G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['E', 'F', 'G'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -866,7 +878,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm H, I, J and JI = I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['H', 'I', 'J'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -876,7 +888,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm G, H and II = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['G', 'H'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -886,7 +898,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm I, J and FI = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'I', _pa: ['I', 'J'] } };
         vc._findLCAs(vm, FI, function(err, lca) {
           should.equal(err, null);
@@ -940,7 +952,7 @@ describe('VersionedCollection._findLCAs', function() {
       //          EI <-- FI <-- GI <---------------------------- HI <-- SI <-- JI 
       //
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var DAG = [
           AI, BI, CI, EI, FI, GI,
           AII, BII, CII, EII, FII, GII,
@@ -951,7 +963,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('should not find nodes that are not in the DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var item1 = { _id : { _id: 'foo', _v: 'r1', _pe: 'I', _pa: [] } };
         var item2 = { _id : { _id: 'foo', _v: 'r2', _pe: 'II', _pa: [] } };
         vc._findLCAs(item1, item2, function(err, lca) {
@@ -962,7 +974,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('GII and RI = G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(GII, RI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G']);
@@ -971,7 +983,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('LII and RI = R', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(LII, RI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['R']);
@@ -980,7 +992,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('RII and MI = R', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(RII, MI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['R']);
@@ -989,7 +1001,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('LII and MI = L', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(LII, MI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['L']);
@@ -998,7 +1010,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('KII and MI = K', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(KII, MI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['K']);
@@ -1007,7 +1019,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('KII and HI = H', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(KII, HI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['H']);
@@ -1016,7 +1028,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('HII and HI = H', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(HII, HI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['H']);
@@ -1025,7 +1037,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('PII and QII = N', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(PII, QII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['N']);
@@ -1034,7 +1046,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('PII and MI = J', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(PII, MI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['J']);
@@ -1043,7 +1055,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('QII and MI = L', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(QII, MI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['L']);
@@ -1052,7 +1064,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AI and AII = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AI, AII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['A']);
@@ -1061,7 +1073,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AII and AI = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AII, AI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['A']);
@@ -1070,7 +1082,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and BII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, BII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1079,7 +1091,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AI and AII = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AI, AII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['A']);
@@ -1088,7 +1100,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AII and AI = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AII, AI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['A']);
@@ -1097,7 +1109,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and BII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, BII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1106,7 +1118,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BII and BI = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BII, BI, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1115,7 +1127,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FI and BII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FI, BII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1126,7 +1138,7 @@ describe('VersionedCollection._findLCAs', function() {
       /////////// BREAK THE GRAPH ON PURPOSE
 
       it('should remove GII', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.remove(GII, {w: 1}, function(err, deleted) {
           if (err) { throw err; }
           should.equal(deleted, 1);
@@ -1135,7 +1147,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FI and HII = [] because link GII is missing', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FI, HII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, []);
@@ -1197,12 +1209,12 @@ describe('VersionedCollection._findLCAs', function() {
       // AI <-- BI
 
       it('should save DAG', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, BI, AII, BII, CII, DII, DI, EII, EI, FII, FI], {w: 1}, done);
       });
 
       it('EI and DII = error because CI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EI, DII, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: I, II');
           done();
@@ -1210,7 +1222,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('EII and DI = error (becaue CI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EII, DI, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: II, I');
           done();
@@ -1218,7 +1230,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('DII and EI = error becaue CI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(DII, EI, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: II, I');
           done();
@@ -1226,7 +1238,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('DI and EII = error becaue CI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(DI, EII, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: I, II');
           done();
@@ -1234,7 +1246,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AI and AII = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AI, AII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['A']);
@@ -1243,7 +1255,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and CII = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, CII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['A']);
@@ -1252,7 +1264,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FI and DII = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FI, DII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['D']);
@@ -1261,7 +1273,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FII and DI = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FII, DI, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['D']);
@@ -1270,7 +1282,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('DII and FI = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(DII, FI, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['D']);
@@ -1279,7 +1291,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('DI and FII = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(DI, FII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['D']);
@@ -1288,7 +1300,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FI and EII = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FI, EII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['E']);
@@ -1297,7 +1309,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FII and EI = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FII, EI, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['E']);
@@ -1306,7 +1318,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('EII and FI = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EII, FI, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['E']);
@@ -1315,7 +1327,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('EI and FII = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EI, FII, function(err, merged) {
           should.equal(err, null);
           should.deepEqual(merged, ['E']);
@@ -1453,7 +1465,7 @@ describe('VersionedCollection._findLCAs', function() {
       //          E <------- G
       //
       it('save the DAG topologically sorted but perspectives mixed', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var DAG = [BI, BII, CII, DII, CI, DI, EI, FI, GI, EII, FII, GII ];
         vc._snapshotCollection.insert(DAG, {w: 1}, function(err, inserts) {
           if (err) { throw err; }
@@ -1463,7 +1475,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('GII and FI = C, D, E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(GII, FI, function(err, lcas) {
           should.equal(err, null);
           should.deepEqual(lcas, ['E', 'C', 'D']);
@@ -1504,12 +1516,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \ /   \ / \         
       //         D <-- G <-- J
       it('should save DAG mixed branches and mixed perspectives', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AII, BII, CII, DII, BI, CI, FII, EII, DI, FI, HII, EI, HI, GI, GII, III, JII, II, JI], {w: 1}, done);
       });
 
       it('JI and HII = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(JI, HII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['E']);
@@ -1518,7 +1530,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('GI and EII = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(GI, EII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -1527,7 +1539,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('FI and EII = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(FI, EII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -1536,7 +1548,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('EI and FII = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EI, FII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['F']);
@@ -1545,7 +1557,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('JI and III = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(JI, III, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G', 'E']);
@@ -1554,7 +1566,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('II and JII = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(II, JII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['G', 'E']);
@@ -1563,7 +1575,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AI and BII = error because AI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AI, BII, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: I, II');
           done();
@@ -1571,7 +1583,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BII and AI = error because AI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BII, AI, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
           done();
@@ -1579,7 +1591,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('AII and BI = error because AI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(AII, BI, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
           done();
@@ -1587,7 +1599,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and AII = error because AII is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, AII, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: I, II');
           done();
@@ -1595,7 +1607,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and BII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, BII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1604,7 +1616,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('HI and BII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(HI, BII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1613,7 +1625,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BI and HII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(BI, HII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['B']);
@@ -1622,7 +1634,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('HI and EII = E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(HI, EII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['E']);
@@ -1631,7 +1643,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('EI and HII = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(EI, HII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['E']);
@@ -1640,7 +1652,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('JI and DII = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(JI, DII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['D']);
@@ -1649,7 +1661,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('DI and JII = D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._findLCAs(DI, JII, function(err, lca) {
           should.equal(err, null);
           should.deepEqual(lca, ['D']);
@@ -1689,12 +1701,12 @@ describe('VersionedCollection._findLCAs', function() {
       //        \ /   \ / \         
       //         D <-- G <-- J
       it('should save DAG mixed branches and mixed perspectives', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AII, BII, CII, DII, BI, CI, FII, EII, DI, FI, HII, EI, HI, GI, GII, III, JII, II, JI], {w: 1}, done);
       });
 
       it('vm1 B and vm2 B = B', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'II', _pa: ['B'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['B'] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -1705,7 +1717,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm1 B and vm2 A = error because AI is not in the database', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'II', _pa: ['B'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['A'] } };
         vc._findLCAs(vm1, vm2, function(err) {
@@ -1715,7 +1727,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm1 C, D and vm2 G = C and D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'II', _pa: ['C', 'D'] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'I', _pa: ['G'] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -1726,7 +1738,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('two vm\'s without parents = []', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm1 = { _id : { _id: 'foo', _pe: 'I', _pa: [] } };
         var vm2 = { _id : { _id: 'foo', _pe: 'II', _pa: [] } };
         vc._findLCAs(vm1, vm2, function(err, lca) {
@@ -1737,7 +1749,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm without parents and GI = []', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: [] } };
         vc._findLCAs(vm, GI, function(err, lca) {
           should.equal(err, null);
@@ -1747,7 +1759,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm C, D pe III and GI = []', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'III', _pa: ['C', 'D'] } };
         vc._findLCAs(vm, GI, function(err, lca) {
           should.equal(err, null);
@@ -1757,7 +1769,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm C, D and GI = C and D', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['C', 'D'] } };
         vc._findLCAs(vm, GI, function(err, lca) {
           should.equal(err, null);
@@ -1767,7 +1779,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm J and II = E, G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['J'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -1777,7 +1789,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm E, F, G and II = E, F, G', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['E', 'F', 'G'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -1787,7 +1799,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm H, I, J and JI = I', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['H', 'I', 'J'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -1797,7 +1809,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm G, H and II = G and E', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['G', 'H'] } };
         vc._findLCAs(vm, II, function(err, lca) {
           should.equal(err, null);
@@ -1807,7 +1819,7 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('vm I, J and FI = F', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var vm = { _id : { _id: 'foo', _pe: 'II', _pa: ['I', 'J'] } };
         vc._findLCAs(vm, FI, function(err, lca) {
           should.equal(err, null);
@@ -1826,18 +1838,18 @@ describe('VersionedCollection._findLCAs', function() {
       var itemIIB = {'_id':{'_co':'foo','_id':'A','_v':'p3oGRFGC','_pa':['Hr+ojSYQ'],'_pe':'test2'}};
 
       it('needs the following items', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         var DAG = [itemIA, itemIB];
         vc._snapshotCollection.insert(DAG, { w: 1 }, done);
       });
 
       it('should find the version itself to be the lca of two roots from different perspectives with the same version', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false });
-        var ac = new ArrayCollection([itemIIA, itemIIB], { debug: vc.debug });
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        var ac = new ArrayCollection([itemIIA, itemIIB]);
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
 
         var newThis = {
-          debug: vc.debug,
+          _log: silence,
           databaseName: vc.databaseName,
           localPerspective: vc.localPerspective,
           versionKey: vc.versionKey,
@@ -1870,19 +1882,18 @@ describe('VersionedCollection._findLCAs', function() {
       //  A
       //
       it('should save DAGs', function(done) {
-        var vc = new VersionedCollection(db, collectionName);
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
         vc._snapshotCollection.insert([AI, AII], done);
       });
 
       it('BII and AI = A', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false });
-        var ac = new ArrayCollection([BII], { debug: vc.debug });
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        var ac = new ArrayCollection([BII]);
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
 
         // create a new context with _snapshotCollection set to _virtualCollection
         var newThis = {
-          debug: vc.debug,
-          _hide: vc._hide,
+          _log: silence,
           databaseName: vc.databaseName,
           localPerspective: vc.localPerspective,
           versionKey: vc.versionKey,
@@ -1900,14 +1911,13 @@ describe('VersionedCollection._findLCAs', function() {
       });
 
       it('BII and AI = A, should not append to found lcas after callback is called', function(done) {
-        var vc = new VersionedCollection(db, collectionName, { debug: false });
-        var ac = new ArrayCollection([BII], { debug: vc.debug });
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac], { debug: vc.debug });
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        var ac = new ArrayCollection([BII]);
+        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
 
         // create a new context with _snapshotCollection set to _virtualCollection
         var newThis = {
-          debug: vc.debug,
-          _hide: vc._hide,
+          _log: silence,
           databaseName: vc.databaseName,
           localPerspective: vc.localPerspective,
           versionKey: vc.versionKey,
