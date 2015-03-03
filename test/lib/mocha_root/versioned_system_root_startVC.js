@@ -29,6 +29,9 @@ var should = require('should');
 
 var VersionedSystem = require('../../../lib/versioned_system');
 var OplogReader = require('../../../lib/oplog_reader');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system_startVC';
@@ -41,42 +44,51 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    db2 = dbs[1];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      db2 = dbs[1];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedSystem', function() {
   describe('_startVC root', function() {
     it('should require config to be an object', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       (function() { vs._startVC(); }).should.throw('config must be an object');
     });
 
     it('should require cb to be an object', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       (function() { vs._startVC({}); }).should.throw('cb must be a function');
     });
 
     it('should require config.dbName to be a string', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       (function() { vs._startVC({}, function() {}); }).should.throw('config.dbName must be a string');
     });
 
     it('should require config.collectionName to be a string', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       (function() { vs._startVC({ dbName: 'foo' }, function() {}); }).should.throw('config.collectionName must be a string');
     });
 
     it('should require config.size to be a number', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       var config = {
         dbName: 'foo',
         collectionName: 'bar'
@@ -85,8 +97,9 @@ describe('VersionedSystem', function() {
     });
 
     it('should require config.size to be larger than 0', function() {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       var config = {
+        logCfg: { silence: true },
         dbName: 'foo',
         collectionName: 'bar',
         size: 0
@@ -95,8 +108,9 @@ describe('VersionedSystem', function() {
     });
 
     it('should convert the config.size from MB to B', function(done) {
-      var vs = new VersionedSystem(oplogColl);
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       var config = {
+        logCfg: { silence: true },
         dbName: 'foo',
         collectionName: 'bar',
         size: 1
@@ -109,8 +123,9 @@ describe('VersionedSystem', function() {
     });
 
     it('should rebuild and callback with a vce and oplog reader', function(done) {
-      var vs = new VersionedSystem(oplogColl, { debug: false });
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       var config= {
+        logCfg: { silence: true },
         dbName: 'test2_startVC',
         collectionName: 'bar',
         dbPort: 27019,
@@ -135,6 +150,7 @@ describe('VersionedSystem', function() {
 
     it('should rebuild a new snapshot collection', function(done) {
       var config= {
+        logCfg: { silence: true },
         dbName: 'test2_startVC',
         collectionName: 'someColl',
         dbPort: 27019,
@@ -143,7 +159,7 @@ describe('VersionedSystem', function() {
         autoProcessInterval: 50,
         size: 1
       };
-      var vs = new VersionedSystem(oplogColl, { debug: false });
+      var vs = new VersionedSystem(oplogColl, { log: silence });
       vs._startVC(config, function(err, vc, or) {
         if (err) { throw err; }
 
