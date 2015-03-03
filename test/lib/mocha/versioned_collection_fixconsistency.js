@@ -25,6 +25,9 @@ var Timestamp = require('mongodb').Timestamp;
 var async = require('async');
 
 var VersionedCollection = require('../../../lib/versioned_collection');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_versioned_collection_fixconsistency';
@@ -33,23 +36,32 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedCollection.fixConsistency', function() {
   describe('processBatchSize', function() {
     it('should default processBatchSize to 500', function () {
-      var vc = new VersionedCollection(db, 'processBatchSize', { });
+      var vc = new VersionedCollection(db, 'processBatchSize', { log: silence });
       should.equal(vc._processBatchSize, 500);
     });
 
     it('should set processBatchSize', function () {
-      var vc = new VersionedCollection(db, 'processBatchSize', { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, 'processBatchSize', { processBatchSize: 3, log: silence });
       should.equal(vc._processBatchSize, 3);
     });
   });
@@ -61,8 +73,8 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should not add the same version twice with _ensureAllInDAG', function(done) {
       var collectionName = 'fixConsistency2';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
-      var vc2 = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
+      var vc2 = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
         if (err) { throw err; }
         vc2._ensureAllInDAG([{ item: A }, { item: B }, { item:C }], function(err) {
@@ -86,8 +98,8 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should run fixConsistency without errors', function(done) {
       var collectionName = 'fixConsistency';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
-      var vc2 = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
+      var vc2 = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG(allItems, function(err) {
         if (err) { throw err; }
         vc2.fixConsistency('I', function(err) {
@@ -103,10 +115,10 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should fix consistency when crashed after 1 item _ensureSamePerspective', function(done) {
       var collectionName = 'fixConsistency_ensureSamePerspective';
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(firstItem, function(err){
         if (err) { throw err; }
-        var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+        var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
         vc2.fixConsistency('I', function(err) {
           if (err) { throw err; }
           vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -120,12 +132,12 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should fix consistency when crashed after 1 item _ensureM3', function(done) {
       var collectionName = 'fixConsistency_ensureM3';
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err){
         if (err) { throw err; }
         vc._ensureM3(firstItem, function(err) {
           if (err) { throw err; }
-          var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+          var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
           vc2.fixConsistency('I', function(err) {
             if (err) { throw err; }
             vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -140,14 +152,14 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should fix consistency when crashed after 1 item _checkAncestry', function(done) {
       var collectionName = 'fixConsistency_checkAncestry';
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err){
         if (err) { throw err; }
         vc._ensureM3(allItems, function(err) {
           if (err) { throw err; }
           vc._checkAncestry(firstItem, function(err) {
             if (err) { throw err; }
-            var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+            var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
             vc2.fixConsistency('I', function(err) {
               if (err) { throw err; }
               vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -165,7 +177,7 @@ describe('VersionedCollection.fixConsistency', function() {
     it('should fix consistency when crashed after 1 item _ensureVirtualCollection', function(done) {
       var collectionName = 'fixConsistency_ensureVirtualCollection';
       var localItems, remoteItems;
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err, perspective){
         vc._ensureM3(allItems, function(err) {
           if (err) { throw err; }
@@ -186,7 +198,7 @@ describe('VersionedCollection.fixConsistency', function() {
               });
             }, function(err) {
               if (err && err.message!=='crash after first item') { throw err; }
-              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
               vc2.fixConsistency('I', function(err) {
                 if (err) { throw err; }
                 vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -204,7 +216,7 @@ describe('VersionedCollection.fixConsistency', function() {
     it('should fix consistency when crashed after 1 item _checkParentsInVirtualCollection', function(done) {
       var collectionName = 'fixConsistency_checkParentsInVirtualCollection';
       var localItems, remoteItems;
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err, perspective){
         vc._ensureM3(allItems, function(err) {
           if (err) { throw err; }
@@ -228,7 +240,7 @@ describe('VersionedCollection.fixConsistency', function() {
               });
             }, function(err) {
               if (err && err.message!=='crash after first item') { throw err; }
-              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
               vc2.fixConsistency('I', function(err) {
                 if (err) { throw err; }
                 vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -246,7 +258,7 @@ describe('VersionedCollection.fixConsistency', function() {
     it('should fix consistency when crashed after 1 item _ensureLocalPerspective', function(done) {
       var collectionName = 'fixConsistency_ensureLocalPerspective';
       var localItems, remoteItems;
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err, perspective){
         if (err) { throw err; }
         vc._ensureM3(allItems, function(err) {
@@ -275,7 +287,7 @@ describe('VersionedCollection.fixConsistency', function() {
               });
             }, function(err) {
               if (err && err.message!=='crash after first item') { throw err; }
-              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
               vc2.fixConsistency('I', function(err) {
                 if (err) { throw err; }
                 vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -304,7 +316,7 @@ describe('VersionedCollection.fixConsistency', function() {
       var localItems = [];
       var remoteItems = [];
 
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems, function(err, perspective){
         vc._ensureM3(allItems, function(err) {
           if (err) { throw err; }
@@ -350,7 +362,7 @@ describe('VersionedCollection.fixConsistency', function() {
               });
             }, function(err) {
               if (err && err.message!=='crash after ensureOneHead of first DAG item') { throw err; }
-              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
               vc2.fixConsistency('I', function(err) {
                 if (err) { throw err; }
                 vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -382,7 +394,7 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should insert item into snapshot to merge with in next test', function(done) {
       var collectionName = 'fixConsistency_mergeNewHeads';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG([{ item: A0}], function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items) {
@@ -400,7 +412,7 @@ describe('VersionedCollection.fixConsistency', function() {
       var localItems = [];
       var remoteItems = [];
 
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems0, function(err, perspective){
         if (err) { throw err; }
         vc._ensureM3(allItems0, function(err) {
@@ -453,7 +465,7 @@ describe('VersionedCollection.fixConsistency', function() {
               });
             }, function(err) {
               if (err && err.message!=='crash after mergeNewHeads of first newHead') { throw err; }
-              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+              var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
               vc2.fixConsistency('I', function(err) {
                 if (err) { throw err; }
                 vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -473,7 +485,7 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should insert item into snapshot to merge with in next test', function(done) {
       var collectionName = 'fixConsistency_ensureIntoSnapshot';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG([{ item: A0}], function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items0) {
@@ -492,7 +504,7 @@ describe('VersionedCollection.fixConsistency', function() {
       var localItems2 = [];
       var remoteItems2 = [];
 
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems0, function(err, perspective){
         if (err) { throw err; }
         vc._ensureM3(allItems0, function(err) {
@@ -549,7 +561,7 @@ describe('VersionedCollection.fixConsistency', function() {
               // 'crash' after 1 remote item
               vc._snapshotCollection.insert(remoteItems2[0], {w: 1, comment: '_insertIntoSnapshot_crashafter' }, function(err) {
                 if (err) { throw err; }
-                var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+                var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
                 vc2.fixConsistency('I', function(err) {
                   if (err) { throw(err); }
                   vc2._snapshotCollection.find().toArray(function(err, items) {
@@ -577,7 +589,7 @@ describe('VersionedCollection.fixConsistency', function() {
 
     it('should insert item into snapshot to merge with in next test', function(done) {
       var collectionName = 'fixConsistency_syncLocalHeadsWithCollection';
-      var vc = new VersionedCollection(db, collectionName, { hide: true });
+      var vc = new VersionedCollection(db, collectionName, { log: silence });
       vc._ensureAllInDAG([{ item: A2}], function(err) {
         if (err) { throw err; }
         vc._snapshotCollection.find().toArray(function(err, items0) {
@@ -596,7 +608,7 @@ describe('VersionedCollection.fixConsistency', function() {
       var localItems = [];
       var remoteItems = [];
 
-      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+      var vc = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
       vc._ensureSamePerspective(allItems2, function(err, perspective){
         vc._ensureM3(allItems2, function(err) {
           if (err) { throw err; }
@@ -653,7 +665,7 @@ describe('VersionedCollection.fixConsistency', function() {
                 // 'crash' after 1 new local head
                 vc._syncLocalHeadsWithCollection([newLocalHeads[0]], function(err){
                   if (err) { throw err; }
-                  var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3 });
+                  var vc2 = new VersionedCollection(db, collectionName, { processBatchSize: 3, log: silence });
                   vc2._collection.find().toArray(function(err, items) {
                     should.deepEqual(items, [{'_id':'foo','_v':'A'}]);
                     vc2.fixConsistency('I', function(err) {
