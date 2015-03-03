@@ -32,6 +32,9 @@ var should = require('should');
 var BSONStream = require('bson-stream');
 
 var VersionedSystem = require('../../../lib/versioned_system');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system_root_listen';
@@ -44,17 +47,26 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseNames);
 before(function(done) {
-  database.connect(function(err, dbs) {
+  logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
-    db = dbs[0];
-    db2 = dbs[1];
-    oplogDb = db.db(oplogDatabase);
-    oplogColl = oplogDb.collection('oplog.$main');
-    done();
+    silence = l;
+    database.connect(function(err, dbs) {
+      if (err) { throw err; }
+      db = dbs[0];
+      db2 = dbs[1];
+      oplogDb = db.db(oplogDatabase);
+      oplogColl = oplogDb.collection('oplog.$main');
+      done();
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('VersionedSystem listen', function() {
   it('should require user to be a string', function() {
@@ -113,15 +125,15 @@ describe('VersionedSystem listen', function() {
     var cfg = {
       'test2_versioned_system_root_listen': {
         baz: {
+          logCfg: { silence: true },
           dbPort: 27019,
-          debug: false,
           autoProcessInterval: 100,
           size: 1
         }
       }
     };
 
-    var vs = new VersionedSystem(oplogColl, { usersDb: db.databaseName, replicationDb: db.databaseName, debug: false });
+    var vs = new VersionedSystem(oplogColl, { usersDb: db.databaseName, replicationDb: db.databaseName, log: silence });
     vs.initVCs(cfg, true, function(err) {
       if (err) { throw err; }
 
