@@ -26,6 +26,21 @@ var fs = require('fs');
 var should = require('should');
 
 var connManager = require('../../../lib/conn_manager');
+var logger = require('../../../lib/logger');
+
+var silence;
+
+before(function(done) {
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    done();
+  });
+});
+
+after(function(done) {
+  silence.close(done);
+});
 
 describe('connManager', function () {
   describe('destination', function () {
@@ -55,7 +70,7 @@ describe('connManager', function () {
     });
 
     it('should callback with error if not reconnecting', function(done) {
-      var cm = connManager.create({ hide: true });
+      var cm = connManager.create({ log: silence });
       cm.open('/var/run/nonexisting.sock', {}, function(err, socket) {
         should.strictEqual(err.message, 'connect ENOENT');
         should.strictEqual(socket, null);
@@ -69,7 +84,10 @@ describe('connManager', function () {
     describe('unix socket', function () {
       var path = '/tmp/conn_manager_test.sock';
 
-      var cm = connManager.create({ hide: true });
+      var cm;
+      it('needs a manager and connection for further testing', function() {
+        cm = connManager.create({ log: silence });
+      });
 
       it('should not retry', function(done) {
         // setup a server
@@ -158,12 +176,16 @@ describe('connManager', function () {
       var port = 54367;
 
       var server;
-      var cm = connManager.create({ hide: true });
 
       var incoming = 0;
       function handler() {
         incoming++;
       }
+
+      var cm;
+      it('needs a manager and connection for further testing', function() {
+        cm = connManager.create({ log: silence });
+      });
 
       it('needs a server for further testing', function(done) {
         server = net.createServer(handler);
@@ -220,7 +242,7 @@ describe('connManager', function () {
 
     it('should add the given object to the connections', function() {
       var conn = new net.Socket();
-      var cm = connManager.create();
+      var cm = connManager.create({ log: silence });
       cm.registerIncoming(conn);
       should.strictEqual(Object.keys(cm._conns).length, 1);
       var connId = Object.keys(cm._conns)[0];
@@ -238,7 +260,10 @@ describe('connManager', function () {
     });
 
     var conn = new net.Socket();
-    var cm = connManager.create({ hide: true });
+    var cm;
+    it('needs a manager and connection for further testing', function() {
+      cm = connManager.create({ log: silence });
+    });
 
     it('needs a connection for further testing', function() {
       cm.registerIncoming(conn);
@@ -276,14 +301,14 @@ describe('connManager', function () {
     });
 
     it('should return false if connection is not found', function() {
-      var result = connManager.create({ hide: true })._remove('');
+      var result = connManager.create({ log: silence })._remove('');
       should.strictEqual(result, false);
     });
 
     var conn = new net.Socket();
-    var cm = connManager.create();
-
-    it('needs a connection for further testing', function() {
+    var cm;
+    it('needs a manager and connection for further testing', function() {
+      cm = connManager.create({ log: silence });
       cm.registerIncoming(conn);
     });
 
