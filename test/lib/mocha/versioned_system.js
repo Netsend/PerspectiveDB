@@ -283,7 +283,7 @@ describe('VersionedSystem', function() {
     });
 
     it('should error run with invalid credentials', function(done) {
-      var users = new ArrayCollection([{ realm: 'foo', username: 'bar', password: 'abacadabra' }]);
+      var users = new ArrayCollection([{ realm: 'foo', username: 'bar', password: 'abacadabra' }], { log: silence });
       var opts = { usersColl: users, log: silence };
       var vs = new VersionedSystem(oplogColl, opts);
       vs._vces = { 'foo.bar': true };
