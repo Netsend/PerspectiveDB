@@ -25,21 +25,34 @@ var should = require('should');
 var ConcatMongoCollection = require('../../../lib/concat_mongo_collection');
 var ConcatMongoCursor = require('../../../lib/concat_mongo_cursor');
 var ArrayCollection = require('../../../lib/array_collection');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_concat_mongo_collection';
 var Database = require('../../_database');
 
 // open database connection
-var database = new Database(databaseName);
+var database = new Database(databaseName, { log: silence });
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
+
 
 describe('concat_mongo_collection', function() {
   describe('constructor', function() {
@@ -58,16 +71,12 @@ describe('concat_mongo_collection', function() {
       (function () { new ConcatMongoCursor([{}], 1); }).should.throwError('opts must be an object');
     });
 
-    it('should require opts.debug to be a boolean', function() {
-      (function () { new ConcatMongoCursor([{}], { debug: 1 }); }).should.throwError('opts.debug must be a boolean');
-    });
-
-    it('should require opts.hide to be a boolean', function() {
-      (function () { new ConcatMongoCursor([{}], { hide: 1 }); }).should.throwError('opts.hide must be a boolean');
+    it('should require opts.log to be an object', function() {
+      (function () { new ConcatMongoCursor([{}], { log: 1 }); }).should.throwError('opts.log must be an object');
     });
 
     it('should require that all elements in colls are objects', function() {
-      (function () { new ConcatMongoCursor([{}, 1, {}], { hide: true }); }).should.throwError('colls must only contain objects');
+      (function () { new ConcatMongoCursor([{}, 1, {}], { log: silence }); }).should.throwError('colls must only contain objects');
     });
 
     it('should construct', function() {
@@ -95,15 +104,15 @@ describe('concat_mongo_collection', function() {
 
     it('should require cb to be a function', function() {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       (function() { vc.findOne(); }).should.throw('cb must be a function');
     });
 
     it('should find an item in the second collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       vc.findOne({ '_id._v': 'C' }, function(err, item) {
         if (err) { throw err; }
         should.deepEqual(item, C);
@@ -113,8 +122,8 @@ describe('concat_mongo_collection', function() {
 
     it('should find an item in the first collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       vc.findOne({ '_id._v': 'A' }, function(err, item) {
         if (err) { throw err; }
         should.deepEqual(item, A);
@@ -124,8 +133,8 @@ describe('concat_mongo_collection', function() {
 
     it('should not find an item', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       vc.findOne({ '_id._v': 'X' }, function(err, item) {
         if (err) { throw err; }
         should.deepEqual(item, null);
@@ -151,16 +160,16 @@ describe('concat_mongo_collection', function() {
 
     it('should return a ConcatMongoCursor', function() {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var result = vc.find();
       should.equal(result instanceof ConcatMongoCursor, true);
     });
 
     it('should support find with stream', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find().stream();
 
       var received = [];
@@ -176,8 +185,8 @@ describe('concat_mongo_collection', function() {
 
     it('should support find with stream, twice', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find({}, { sort: { '$natural': -1 } }).stream();
 
       var received = [];
@@ -204,8 +213,8 @@ describe('concat_mongo_collection', function() {
 
     it('should support stream pause and resume on first collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find({}).stream();
 
       var received = [];
@@ -225,8 +234,8 @@ describe('concat_mongo_collection', function() {
 
     it('should support stream pause and destroy on first collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find({}).stream();
 
       var received = [];
@@ -246,8 +255,8 @@ describe('concat_mongo_collection', function() {
 
     it('should support stream pause and resume on second collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find({}).stream();
 
       var received = [];
@@ -267,8 +276,8 @@ describe('concat_mongo_collection', function() {
 
     it('should support stream pause and destroy on second collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoCollection([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoCollection([coll1, coll2], { log: silence });
       var s = vc.find({}).stream();
 
       var received = [];
@@ -287,10 +296,9 @@ describe('concat_mongo_collection', function() {
     });
 
     it('should not emit data after being paused', function(done) {
-      var debug = false;
-      var ac1 = new ArrayCollection([A], { debug: debug });
-      var ac2 = new ArrayCollection([B], { debug: debug });
-      var cmc = new ConcatMongoCollection([ac1, ac2], { debug: debug });
+      var ac1 = new ArrayCollection([A], { log: silence });
+      var ac2 = new ArrayCollection([B], { log: silence });
+      var cmc = new ConcatMongoCollection([ac1, ac2], { log: silence });
 
       var stream = cmc.find().stream();
 
