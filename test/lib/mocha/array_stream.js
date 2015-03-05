@@ -23,6 +23,9 @@
 var should = require('should');
 
 var ArrayStream = require('../../../lib/array_stream');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_array_stream';
@@ -31,13 +34,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('ArrayStream', function() {
   var vColl;
@@ -58,7 +70,7 @@ describe('ArrayStream', function() {
 
     it('should stream asc', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -74,7 +86,7 @@ describe('ArrayStream', function() {
 
     it('should stream only once', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items, { debug: false });
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
 
@@ -95,7 +107,7 @@ describe('ArrayStream', function() {
     it('should filter', function(done) {
       var items = [C, D];
       var selector = { foo: { $in: [ 'bar', 'quux' ] } };
-      var vc = new ArrayStream(items, { filter: selector, debug: false });
+      var vc = new ArrayStream(items, { filter: selector, log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -113,7 +125,7 @@ describe('ArrayStream', function() {
     it('should filter nested namespaces', function(done) {
       var items = [C, D];
       var selector = { '_id._v': { $in: [ 'B', 'D' ] } };
-      var vc = new ArrayStream(items, { filter: selector, debug: false });
+      var vc = new ArrayStream(items, { filter: selector, log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -137,7 +149,7 @@ describe('ArrayStream', function() {
 
     it('should pause and resume', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
 
@@ -164,7 +176,7 @@ describe('ArrayStream', function() {
     });
 
     it('should pause and destroy', function(done) {
-      var vc = new ArrayStream([C, D], { debug: false });
+      var vc = new ArrayStream([C, D], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -190,7 +202,7 @@ describe('ArrayStream', function() {
     });
 
     it('should pause and stop calling back', function(done) {
-      var vc = new ArrayStream([C, D], { debug: false });
+      var vc = new ArrayStream([C, D], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -227,7 +239,7 @@ describe('ArrayStream', function() {
     });
 
     it('should not emit close after pause on last item (iff previous test succeeded)', function(done) {
-      var vc = new ArrayStream([C, D], { debug: false });
+      var vc = new ArrayStream([C, D], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -271,7 +283,7 @@ describe('ArrayStream', function() {
     });
 
     it('should emit close after resume after pause on last item (iff previous test succeeded)', function(done) {
-      var vc = new ArrayStream([C, D], { debug: false });
+      var vc = new ArrayStream([C, D], { log: silence });
       var stream = vc.stream();
 
       function shouldNotBeCalled() {
@@ -303,7 +315,7 @@ describe('ArrayStream', function() {
 
     it('should destroy', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
 
@@ -326,7 +338,7 @@ describe('ArrayStream', function() {
 
     it('should destroy and don\'t resume', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
 
@@ -350,7 +362,7 @@ describe('ArrayStream', function() {
 
     it('should emit close only once', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
       stream.destroy();
@@ -361,7 +373,7 @@ describe('ArrayStream', function() {
 
     it('should emit close only once, async', function(done) {
       var items = [C, D];
-      var vc = new ArrayStream(items);
+      var vc = new ArrayStream(items, { log: silence });
 
       var stream = vc.stream();
       process.nextTick(function() {
