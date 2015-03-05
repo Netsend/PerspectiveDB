@@ -23,6 +23,23 @@
 var should = require('should');
 
 var RemoteTransform = require('../../../lib/remote_transform');
+var logger = require('../../../lib/logger');
+
+var silence;
+
+// open logger
+before(function(done) {
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    done();
+  });
+});
+
+after(function(done) {
+  silence.close(done);
+});
+
 
 describe('RemoteTransform', function() {
   it('should require remote to be a string', function() {
@@ -30,15 +47,11 @@ describe('RemoteTransform', function() {
   });
 
   it('should require opts to be an object', function() {
-    (function() { var rt = new RemoteTransform('', ''); return rt; }).should.throw('opts must be an object');
+    (function() { var rt = new RemoteTransform('', 1); return rt; }).should.throw('opts must be an object');
   });
 
-  it('should require opts.debug to be a boolean', function() {
-    (function() { var rt = new RemoteTransform('', { debug: '' }); return rt; }).should.throw('opts.debug must be a boolean');
-  });
-
-  it('should require opts.hide to be a boolean', function() {
-    (function() { var rt = new RemoteTransform('', { hide: '' }); return rt; }).should.throw('opts.hide must be a boolean');
+  it('should require opts.log to be an object', function() {
+    (function() { var rt = new RemoteTransform('', { log: '' }); return rt; }).should.throw('opts.log must be an object');
   });
 
   it('should construct', function() {
@@ -59,7 +72,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should reset _id._pe from baz to foo', function(done) {
-    var rt = new RemoteTransform('foo');
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(obj) {
       should.deepEqual(obj, { _id: { _pe: 'foo' } });
       done();
@@ -68,7 +81,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should emit an error if _id._pe can not be set', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('error', function(err) {
       should.strictEqual(err.message, 'Cannot set property \'_pe\' of undefined');
       done();
@@ -79,7 +92,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should emit an error if error is set as the only key', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('error', function(err) {
       should.strictEqual(err.message, 'some error');
       done();
@@ -90,7 +103,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should emit data when error is not the only key', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
       should.deepEqual(data, { error: 'some error', _id: { some: 'not only error', _pe: 'foo' } });
       done();
@@ -100,7 +113,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should strip _id._lo', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
       should.deepEqual(data, { _id: { _pe: 'foo' } });
       done();
@@ -110,7 +123,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should strip _id._i', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
       should.deepEqual(data, { _id: { _pe: 'foo' } });
       done();
@@ -120,7 +133,7 @@ describe('RemoteTransform', function() {
   });
 
   it('should strip _m3', function(done) {
-    var rt = new RemoteTransform('foo', { hide: true });
+    var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
       should.deepEqual(data, { _id: { bar: 'baz', _pe: 'foo' } });
       done();
@@ -153,6 +166,7 @@ describe('RemoteTransform', function() {
     var hooks = [hook1, hook2];
 
     var opts = {
+      log: silence,
       hooks: hooks,
       hooksOpts: hooksOpts
     };
