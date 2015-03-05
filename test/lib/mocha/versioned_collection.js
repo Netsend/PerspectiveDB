@@ -4627,27 +4627,27 @@ describe('versioned_collection', function() {
 
         ////// _pe I
         var AI = {
-          _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [] },
+          _id : { _id: 'foo', _v: 'A', _pe: 'I', _pa: [], _i: 1 },
           a: true,
           some: 'secret'
         };
 
         var BI = {
-          _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'] },
+          _id : { _id: 'foo', _v: 'B', _pe: 'I', _pa: ['A'], _i: 2 },
           a: 'foo',
           b: true,
           some: 'secret'
         };
 
         var CI = {
-          _id : { _id: 'foo', _v: 'C', _pe: 'I', _pa: ['A'] },
+          _id : { _id: 'foo', _v: 'C', _pe: 'I', _pa: ['A'], _i: 3 },
           a: 'foo',
           c: true,
           some: 'secret'
         };
 
         var EI = {
-          _id : { _id: 'foo', _v: 'E', _pe: 'I', _pa: ['B'] },
+          _id : { _id: 'foo', _v: 'E', _pe: 'I', _pa: ['B'], _i: 4 },
           a: 'foo',
           b: 'foo',
           e: true,
@@ -4655,7 +4655,7 @@ describe('versioned_collection', function() {
         };
 
         var GI = {
-          _id : { _id: 'foo', _v: 'G', _pe: 'I', _pa: [ 'C', 'E'] },
+          _id : { _id: 'foo', _v: 'G', _pe: 'I', _pa: [ 'C', 'E'], _i: 5 },
           a: 'foo',
           b: 'foo',
           c: 'foo',
@@ -4758,7 +4758,7 @@ describe('versioned_collection', function() {
         });
 
         it('HII and GI = ff to HI', function(done) {
-          var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
+          var vc = new VersionedCollection(db, collectionName, { log: cons, localPerspective: 'I' });
           vc._ensureLocalPerspective([ EII, FII, GII, HII ], function(err, newLocalItems) {
             if (err) { throw err; }
             should.strictEqual(newLocalItems.length, 1);
