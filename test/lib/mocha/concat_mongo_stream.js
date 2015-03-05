@@ -24,6 +24,9 @@ var should = require('should');
 
 var ArrayCollection = require('../../../lib/array_collection');
 var ConcatMongoStream = require('../../../lib/concat_mongo_stream');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_concat_mongo_stream';
@@ -32,13 +35,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('ConcatMongoStream', function() {
   var vColl;
@@ -59,22 +71,18 @@ describe('ConcatMongoStream', function() {
       (function () { new ConcatMongoStream([{}], 1); }).should.throwError('opts must be an object');
     });
 
-    it('should require opts.debug to be a boolean', function() {
-      (function () { new ConcatMongoStream([{}], { debug: 1 }); }).should.throwError('opts.debug must be a boolean');
-    });
-
-    it('should require opts.hide to be a boolean', function() {
-      (function () { new ConcatMongoStream([{}], { hide: 1 }); }).should.throwError('opts.hide must be a boolean');
+    it('should require opts.log to be an object', function() {
+      (function () { new ConcatMongoStream([{}], { log: 1 }); }).should.throwError('opts.log must be an object');
     });
 
     it('should require that all elements in colls are objects', function() {
-      (function () { new ConcatMongoStream([{}, 1, {}], { hide: true }); }).should.throwError('colls must only contain objects');
+      (function () { new ConcatMongoStream([{}, 1, {}], { log: silence }); }).should.throwError('colls must only contain objects');
     });
 
     it('should construct', function() {
       var coll1 = db.collection(collName1);
       var coll2 = db.collection(collName2);
-      (function() { vColl = new ConcatMongoStream([coll1, coll2]); }).should.not.throwError();
+      (function() { vColl = new ConcatMongoStream([coll1, coll2], { log: silence }); }).should.not.throwError();
     });
   });
 
@@ -94,8 +102,8 @@ describe('ConcatMongoStream', function() {
 
     it('should stream asc and append by default', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -111,8 +119,8 @@ describe('ConcatMongoStream', function() {
 
     it('should stream only once (asc and append by default)', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
 
       var stream = vc.stream();
 
@@ -131,8 +139,8 @@ describe('ConcatMongoStream', function() {
 
     it('should stream only once (desc)', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false }, [null, { sort: { $natural: -1 } }]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 } }]);
 
       var stream = vc.stream();
 
@@ -156,8 +164,8 @@ describe('ConcatMongoStream', function() {
 
     it('should stream desc', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], {}, [null, { sort: { $natural: -1 } }]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 } }]);
       var stream = vc.stream();
 
       var received = [];
@@ -178,9 +186,9 @@ describe('ConcatMongoStream', function() {
 
     it('should stream desc and not have side effects', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
       var colls = [coll1, coll2];
-      var vc = new ConcatMongoStream(colls, {}, [null, { sort: { $natural: -1 } }]);
+      var vc = new ConcatMongoStream(colls, { log: silence }, [null, { sort: { $natural: -1 } }]);
       var stream = vc.stream();
 
       stream.on('close', function() {
@@ -192,9 +200,9 @@ describe('ConcatMongoStream', function() {
     });
 
     it('should stream desc (ArrayCollection first)', function(done) {
-      var coll1 = new ArrayCollection([C, D]);
+      var coll1 = new ArrayCollection([C, D], { log: silence });
       var coll2 = db.collection(collName1);
-      var vc = new ConcatMongoStream([coll1, coll2], {}, [null, { sort: { $natural: -1 } }]);
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 } }]);
       var stream = vc.stream();
 
       var received = [];
@@ -209,9 +217,9 @@ describe('ConcatMongoStream', function() {
 
     it('should filter', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
       var selector = { foo: { $in: [ 'bar', 'quux' ] } };
-      var vc = new ConcatMongoStream([coll1, coll2], {}, [selector]);
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [selector]);
       var stream = vc.stream();
 
       var received = [];
@@ -228,9 +236,9 @@ describe('ConcatMongoStream', function() {
 
     it('should filter nested namespaces', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
       var selector = { '_id._v': { $in: [ 'B', 'D' ] } };
-      var vc = new ConcatMongoStream([coll1, coll2], {}, [selector]);
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [selector]);
       var stream = vc.stream();
 
       var received = [];
@@ -248,8 +256,8 @@ describe('ConcatMongoStream', function() {
     describe('sort asc virtual item array', function() {
       it('empty', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCollection([]);
-        var vc = new ConcatMongoStream([coll2, coll1], {}, [null, { sort: { $natural: 1 } }]);
+        var coll2 = new ArrayCollection([], { log: silence });
+        var vc = new ConcatMongoStream([coll2, coll1], { log: silence }, [null, { sort: { $natural: 1 } }]);
         var stream = vc.stream();
 
         var received = [];
@@ -266,8 +274,8 @@ describe('ConcatMongoStream', function() {
     describe('sort desc virtual item array', function() {
       it('empty', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCollection([]);
-        var vc = new ConcatMongoStream([coll1, coll2], {}, [null, { sort: { $natural: -1 } }]);
+        var coll2 = new ArrayCollection([], { log: silence });
+        var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 } }]);
         var stream = vc.stream();
 
         var received = [];
@@ -292,8 +300,8 @@ describe('ConcatMongoStream', function() {
 
       it('should stream asc and sort collection on _id._i', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCollection([C, D]);
-        var vc = new ConcatMongoStream([coll1, coll2], { debug: false }, [null, { comment: 'test.index', sortIndex: '_id._i' }]);
+        var coll2 = new ArrayCollection([C, D], { log: silence });
+        var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { comment: 'test.index', sortIndex: '_id._i' }]);
         var stream = vc.stream();
 
         var received = [];
@@ -329,9 +337,9 @@ describe('ConcatMongoStream', function() {
     });
 
     it('should pause and resume virtual items and collection', function(done) {
-      var coll1 = new ArrayCollection([C, D]);
+      var coll1 = new ArrayCollection([C, D], { log: silence });
       var coll2 = db.collection(collName1);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false }, [null, { sort: { $natural: -1 }}]);
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 }}]);
 
       var stream = vc.stream();
 
@@ -373,8 +381,8 @@ describe('ConcatMongoStream', function() {
 
     it('should pause and resume collection and virtual items', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -406,8 +414,8 @@ describe('ConcatMongoStream', function() {
 
     it('should pause and destroy on first collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
 
       var stream = vc.stream();
 
@@ -435,8 +443,8 @@ describe('ConcatMongoStream', function() {
 
     it('should pause and destroy on second collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -459,8 +467,8 @@ describe('ConcatMongoStream', function() {
 
     it('should pause on first collection and stop calling back', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -480,8 +488,8 @@ describe('ConcatMongoStream', function() {
 
     it('should pause on second collection and stop calling back', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], { debug: false });
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
       var stream = vc.stream();
 
       var received = [];
@@ -515,8 +523,8 @@ describe('ConcatMongoStream', function() {
 
     it('should destroy while in first collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
 
       var stream = vc.stream();
 
@@ -540,8 +548,8 @@ describe('ConcatMongoStream', function() {
 
     it('should destroy while in second collection', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
 
       var stream = vc.stream();
 
@@ -566,8 +574,8 @@ describe('ConcatMongoStream', function() {
 
     it('should destroy and don\'t resume while in database', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence });
 
       var stream = vc.stream();
 
@@ -591,8 +599,8 @@ describe('ConcatMongoStream', function() {
 
     it('should destroy and don\'t resume while in virtual items', function(done) {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCollection([C, D]);
-      var vc = new ConcatMongoStream([coll1, coll2], {}, [null, { sort: { $natural: -1 } }]);
+      var coll2 = new ArrayCollection([C, D], { log: silence });
+      var vc = new ConcatMongoStream([coll1, coll2], { log: silence }, [null, { sort: { $natural: -1 } }]);
 
       var stream = vc.stream();
 
