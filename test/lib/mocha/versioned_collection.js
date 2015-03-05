@@ -31,7 +31,7 @@ var VersionedCollection = require('../../../lib/versioned_collection');
 var VersionedCollectionReader = require('../../../lib/versioned_collection_reader');
 var logger = require('../../../lib/logger');
 
-var silence;
+var cons, silence;
 
 var db;
 var databaseName = 'test_versioned_collection';
@@ -40,20 +40,27 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  logger({ silence: true }, function(err, l) {
+  logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
-    silence = l;
-    database.connect(function(err, dbc) {
-      db = dbc;
-      done(err);
+    cons = l;
+    logger({ silence: true }, function(err, l) {
+      if (err) { throw err; }
+      silence = l;
+      database.connect(function(err, dbc) {
+        db = dbc;
+        done(err);
+      });
     });
   });
 });
 
 after(function(done) {
-  silence.close(function(err) {
+  cons.close(function(err) {
     if (err) { throw err; }
-    database.disconnect(done);
+    silence.close(function(err) {
+      if (err) { throw err; }
+      database.disconnect(done);
+    });
   });
 });
 
