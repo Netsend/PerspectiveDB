@@ -24,6 +24,22 @@ var should = require('should');
 
 var ArrayCursor = require('../../../lib/array_cursor');
 var ArrayStream = require('../../../lib/array_stream');
+var logger = require('../../../lib/logger');
+
+var silence;
+
+// open logger
+before(function(done) {
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    done();
+  });
+});
+
+after(function(done) {
+  silence.close(done);
+});
 
 describe('ArrayCursor', function() {
   describe('constructor', function() {
@@ -43,7 +59,7 @@ describe('ArrayCursor', function() {
     describe('sort asc', function() {
       it('should find one from items', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.findOne({ '_id._v': 'C' }, function(err, item) {
           if (err) { throw err; }
@@ -54,7 +70,7 @@ describe('ArrayCursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.findOne({ '_id._v': 'X' }, function(err, item) {
           if (err) { throw err; }
@@ -67,7 +83,7 @@ describe('ArrayCursor', function() {
     describe('sort desc', function() {
       it('should find one from items', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items, { debug: false });
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.findOne({ '_id._v': 'C' }, { sort: { $natural: -1 }}, function(err, item) {
           if (err) { throw err; }
@@ -78,7 +94,7 @@ describe('ArrayCursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.findOne({ '_id._v': 'X' }, { sort: { $natural: -1 }}, function(err, item) {
           if (err) { throw err; }
@@ -104,7 +120,7 @@ describe('ArrayCursor', function() {
     describe('sort asc', function() {
       it('should find one from items', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.find({ '_id._v': 'C' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -115,7 +131,7 @@ describe('ArrayCursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.find({ '_id._v': 'X' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -126,7 +142,7 @@ describe('ArrayCursor', function() {
 
       it('should find multiple with nested filter', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.find({ '_id._pe': 'bar' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -139,7 +155,7 @@ describe('ArrayCursor', function() {
     describe('sort desc', function() {
       it('should find item', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.find({ '_id._v': { $in: ['B', 'C'] } }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -151,7 +167,7 @@ describe('ArrayCursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items);
+        var ac = new ArrayCursor(items, { log: silence });
 
         ac.find({ '_id._v': 'X' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -162,7 +178,7 @@ describe('ArrayCursor', function() {
 
       it('should find multiple with _id._pe bar', function(done) {
         var items = [C, D];
-        var ac = new ArrayCursor(items, { prepend: true });
+        var ac = new ArrayCursor(items, { prepend: true, log: silence });
 
         ac.find({ '_id._pe': 'bar' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -175,7 +191,7 @@ describe('ArrayCursor', function() {
 
   describe('stream', function() {
     it('should return an ArrayStream', function() {
-      var ac = new ArrayCursor([]);
+      var ac = new ArrayCursor([], { log: silence });
       var stream = ac.stream();
       should.equal(stream instanceof ArrayStream, true);
     });
