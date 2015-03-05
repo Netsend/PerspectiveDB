@@ -25,6 +25,9 @@ var should = require('should');
 var ConcatMongoCursor = require('../../../lib/concat_mongo_cursor');
 var ConcatMongoStream = require('../../../lib/concat_mongo_stream');
 var ArrayCursor = require('../../../lib/array_cursor');
+var logger = require('../../../lib/logger');
+
+var silence;
 
 var db;
 var databaseName = 'test_concat_mongo_cursor';
@@ -33,13 +36,22 @@ var Database = require('../../_database');
 // open database connection
 var database = new Database(databaseName);
 before(function(done) {
-  database.connect(function(err, dbc) {
-    db = dbc;
-    done(err);
+  logger({ silence: true }, function(err, l) {
+    if (err) { throw err; }
+    silence = l;
+    database.connect(function(err, dbc) {
+      db = dbc;
+      done(err);
+    });
   });
 });
 
-after(database.disconnect.bind(database));
+after(function(done) {
+  silence.close(function(err) {
+    if (err) { throw err; }
+    database.disconnect(done);
+  });
+});
 
 describe('concat_mongo_cursor', function() {
   describe('constructor', function() {
@@ -58,23 +70,19 @@ describe('concat_mongo_cursor', function() {
       (function () { new ConcatMongoCursor([{}], 1); }).should.throwError('opts must be an object');
     });
 
-    it('should require opts.debug to be a boolean', function() {
-      (function () { new ConcatMongoCursor([{}], { debug: 1 }); }).should.throwError('opts.debug must be a boolean');
-    });
-
-    it('should require opts.hide to be a boolean', function() {
-      (function () { new ConcatMongoCursor([{}], { hide: 1 }); }).should.throwError('opts.hide must be a boolean');
+    it('should require opts.log to be an object', function() {
+      (function () { new ConcatMongoCursor([{}], { log: 1 }); }).should.throwError('opts.log must be an object');
     });
 
     it('should require that all elements in colls are objects', function() {
-      (function () { new ConcatMongoCursor([{}, 1, {}], { hide: true }); }).should.throwError('colls must only contain objects');
+      (function () { new ConcatMongoCursor([{}, 1, {}], { log: silence }); }).should.throwError('colls must only contain objects');
     });
 
     it('should construct', function() {
       var coll1 = db.collection(collName1);
       var coll2 = db.collection(collName2);
       var cmc;
-      (function() { cmc = new ConcatMongoCursor([coll1, coll2]); }).should.not.throwError();
+      (function() { cmc = new ConcatMongoCursor([coll1, coll2], { log: silence }); }).should.not.throwError();
     });
   });
 
@@ -96,8 +104,8 @@ describe('concat_mongo_cursor', function() {
     describe('sort asc', function() {
       it('should find one from second collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'C' }, function(err, item) {
           if (err) { throw err; }
@@ -108,8 +116,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'X' }, function(err, item) {
           if (err) { throw err; }
@@ -120,8 +128,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find one from db collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'B' }, function(err, item) {
           if (err) { throw err; }
@@ -134,8 +142,8 @@ describe('concat_mongo_cursor', function() {
     describe('sort desc', function() {
       it('should find one from second collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'C' }, { sort: { $natural: -1 }}, function(err, item) {
           if (err) { throw err; }
@@ -146,8 +154,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'X' }, { sort: { $natural: -1 }}, function(err, item) {
           if (err) { throw err; }
@@ -158,8 +166,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find one from db collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.findOne({ '_id._v': 'B', '_id._pe': 'foo' }, { sort: { $natural: -1 }}, function(err, item) {
           if (err) { throw err; }
@@ -175,8 +183,8 @@ describe('concat_mongo_cursor', function() {
 
     it('should return a ConcatMongoCursor', function() {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCursor([]);
-      var vc = new ConcatMongoCursor([coll1, coll2]);
+      var coll2 = new ArrayCursor([], { log: silence });
+      var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
       var result = vc.find();
       should.equal(result instanceof ConcatMongoCursor, true);
     });
@@ -200,8 +208,8 @@ describe('concat_mongo_cursor', function() {
     describe('sort asc', function() {
       it('should find one from second collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'C' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -212,8 +220,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'X' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -224,8 +232,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find multiple from db collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'B' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -236,8 +244,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find multiple with perspective bar', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._pe': 'bar' }).toArray(function(err, items) {
           if (err) { throw err; }
@@ -250,8 +258,8 @@ describe('concat_mongo_cursor', function() {
     describe('sort desc', function() {
       it('should find one from each collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': { $in: ['B', 'C'] } }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -265,8 +273,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should not find any non-existing item', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'X' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -277,8 +285,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find one from db collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'B', '_id._pe': 'foo' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -289,8 +297,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find multiple from db collection', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll1, coll2]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
 
         vc.find({ '_id._v': 'B' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -301,8 +309,8 @@ describe('concat_mongo_cursor', function() {
 
       it('should find multiple with perspective bar with second collection first', function(done) {
         var coll1 = db.collection(collName1);
-        var coll2 = new ArrayCursor([C, D]);
-        var vc = new ConcatMongoCursor([coll2, coll1]);
+        var coll2 = new ArrayCursor([C, D], { log: silence });
+        var vc = new ConcatMongoCursor([coll2, coll1], { log: silence });
 
         vc.find({ '_id._pe': 'bar' }, { sort: { $natural: -1 }}).toArray(function(err, items) {
           if (err) { throw err; }
@@ -318,8 +326,8 @@ describe('concat_mongo_cursor', function() {
 
     it('should return a ConcatMongoStream', function() {
       var coll1 = db.collection(collName1);
-      var coll2 = new ArrayCursor([]);
-      var vc = new ConcatMongoCursor([coll1, coll2]);
+      var coll2 = new ArrayCursor([], { log: silence });
+      var vc = new ConcatMongoCursor([coll1, coll2], { log: silence });
       var stream = vc.stream();
       should.equal(stream instanceof ConcatMongoStream, true);
     });
