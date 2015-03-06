@@ -35,6 +35,8 @@ var tasks = [];
 
 // should require serverConfig.port to be a number
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stderr = '';
@@ -64,6 +66,8 @@ tasks.push(function(done) {
 
 // should not start if socket path is taken by a regular file
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   // ensure normal file
   if (fs.existsSync('/var/run/ms-1234.sock')) {
     fs.unlinkSync('/var/run/ms-1234.sock');
@@ -103,6 +107,8 @@ tasks.push(function(done) {
 
 // should open a socket and chroot
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   // remove any previously created socket
   if (fs.existsSync('/var/run/ms-1234.sock')) {
     fs.unlink('/var/run/ms-1234.sock');
@@ -144,6 +150,8 @@ tasks.push(function(done) {
 
 // should remove any previously created sockets
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
   var stdout = '';
@@ -178,6 +186,8 @@ tasks.push(function(done) {
 
 // should disconnect after receiving more than 1KB of data without newlines
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   // remove any previously created socket
   if (fs.existsSync('/var/run/ms-1234.sock')) {
     fs.unlink('/var/run/ms-1234.sock');
@@ -245,6 +255,8 @@ tasks.push(function(done) {
 
 // should not parse objects larger than max length
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   // remove any previously created socket
   if (fs.existsSync('/var/run/ms-1234.sock')) {
     fs.unlink('/var/run/ms-1234.sock');
@@ -303,6 +315,8 @@ tasks.push(function(done) {
 
 // should make socket world writable
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   // remove any previously created socket
   if (fs.existsSync('/var/run/ms-1234.sock')) {
     fs.unlink('/var/run/ms-1234.sock');
@@ -345,6 +359,8 @@ tasks.push(function(done) {
 
 // should pass auth request to parent
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var authReq = {
     username: 'foo',
     password: 'bar',
@@ -401,6 +417,8 @@ tasks.push(function(done) {
 
 // should open a port on the local network interface by default
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var authReq = {
     username: 'foo',
     password: 'bar',
