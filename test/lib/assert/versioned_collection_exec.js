@@ -27,6 +27,8 @@ var tasks = [];
 
 // should fail if required directly
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   assert.throws(function () {
     require('./../../../lib/versioned_collection_exec');
   }, /this module should be invoked via child_process.fork/);
@@ -35,6 +37,8 @@ tasks.push(function(done) {
 
 // should fail if spawned
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.spawn('node', [__dirname + '/../../../lib/versioned_collection_exec']);
 
   var buff = new Buffer(0);
@@ -51,6 +55,8 @@ tasks.push(function(done) {
 
 // should not fail if forked
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
@@ -73,6 +79,8 @@ tasks.push(function(done) {
 
 // should fail if first message is not an object
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
@@ -95,6 +103,8 @@ tasks.push(function(done) {
 
 // should fail if third message does not contain a db name
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
@@ -123,6 +133,8 @@ tasks.push(function(done) {
 
 // should fail if first message does not contain a collectionName
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
@@ -156,6 +168,8 @@ tasks.push(function(done) {
 
 // should fail if not executed as root
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
 
   var buff = new Buffer(0);
