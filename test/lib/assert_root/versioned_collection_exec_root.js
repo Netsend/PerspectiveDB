@@ -25,6 +25,8 @@ if (process.getuid() !== 0) {
 
 var assert = require('assert');
 var net = require('net');
+var fs = require('fs');
+var os = require('os');
 var childProcess = require('child_process');
 
 var async = require('async');
@@ -85,14 +87,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         dbName: 'test_vce_root',
         dbPort: 27019,
         collectionName: 'test',
@@ -101,6 +98,7 @@ tasks.push(function(done) {
       });
       break;
     default:
+      console.error(msg);
       throw new Error('unknown state');
     }
   });
@@ -129,14 +127,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         dbName: 'test_vce_root',
         dbPort: 27019,
         collectionName: 'test',
@@ -145,8 +138,58 @@ tasks.push(function(done) {
       });
       break;
     default:
+      console.error(msg);
       throw new Error('unknown state');
     }
+  });
+});
+
+// should accept writable stream for log files (regression)
+tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
+  var logFile = fs.createWriteStream(os.tmpdir() + 'vce-test.log', { flags: 'a' });
+
+  logFile.on('open', function() {
+    var child = childProcess.spawn(process.execPath, [__dirname + '/../../../lib/versioned_collection_exec'], {
+      cwd: '/',
+      env: {},
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc', logFile]
+    });
+
+    //child.stdout.pipe(process.stdout);
+    child.stderr.pipe(process.stderr);
+
+    var stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', function(data) { stderr += data; });
+
+    child.on('exit', function(code, sig) {
+      assert.strictEqual(stderr.length, 0);
+      assert.strictEqual(code, 0);
+      assert.strictEqual(sig, null);
+      done();
+    });
+
+    // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+    child.on('message', function(msg) {
+      switch(msg) {
+      case 'init':
+        child.send({
+          logCfg: { console: true },
+          dbName: 'test_vce_root',
+          dbPort: 27019,
+          collectionName: 'test'
+        });
+        break;
+      case 'listen':
+        child.kill();
+        break;
+      default:
+        console.error(msg);
+        throw new Error('unknown state');
+      }
+    });
   });
 });
 
@@ -173,14 +216,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         hookPaths: ['foo', 'bar'],
         dbName: 'test_vce_root',
         dbPort: 27019,
@@ -218,14 +256,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         dbName: 'test_vce_root',
         dbPort: 27019,
         collectionName: 'test',
@@ -265,14 +298,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         hookPaths: ['hooks'],
         dbName: 'test_vce_root',
         dbPort: 27019,
@@ -333,14 +361,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true },
         dbName: 'test_vce_root',
         dbPort: 27019,
         collectionName: 'test',
@@ -435,6 +458,7 @@ tasks.push(function(done) {
   server.listen(port, host);
 
   var vcCfg = {
+    logCfg: { console: true },
     dbName: 'test_vce_root',
     dbPort: 27019,
     debug: false,
@@ -473,12 +497,6 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send(vcCfg);
       break;
@@ -526,6 +544,7 @@ tasks.push(function(done) {
   server.listen(port, host);
 
   var vcCfg = {
+    logCfg: { console: true },
     dbName: 'test_vce_root',
     dbPort: 27019,
     debug: false,
@@ -557,12 +576,6 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send(vcCfg);
       break;
@@ -602,6 +615,7 @@ tasks.push(function(done) {
   server.listen(port, host);
 
   var vcCfg = {
+    logCfg: { console: true },
     dbName: 'test_vce_root',
     dbPort: 27019,
     debug: false,
@@ -626,12 +640,6 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send(vcCfg);
       break;
@@ -725,6 +733,7 @@ tasks.push(function(done) {
   server.listen(port, host);
 
   var vcCfg = {
+    logCfg: { console: true },
     hookPaths: ['hooks'],
     dbName: 'test_vce_root_hook_push',
     dbPort: 27019,
@@ -751,12 +760,6 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send(vcCfg);
       break;
@@ -897,14 +900,9 @@ tasks.push(function(done) {
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
-    case 'log1':
-      child.send({ console: true, mask: logger.DEBUG });
-      break;
-    case 'log2':
-      child.send('errFile');
-      break;
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         hookPaths: ['hooks'],
         dbName: 'test_vce_root_hook_pull',
         dbPort: 27019,

@@ -72,7 +72,7 @@ tasks.push(function(done) {
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.once('message', function(msg) {
-    assert.strictEqual(msg, 'log1');
+    assert.strictEqual(msg, 'init');
     child.kill();
   });
 });
@@ -92,13 +92,17 @@ tasks.push(function(done) {
   //child.stderr.pipe(process.stderr);
 
   child.on('exit', function(code, sig) {
-    assert(/logCfg must be an object/.test(buff.toString()));
+    assert(/msg must be an object/.test(buff.toString()));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
   });
 
-  child.send(0);
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.once('message', function(msg) {
+    assert.strictEqual(msg, 'init');
+    child.send(0);
+  });
 });
 
 // should fail if third message does not contain a db name
@@ -118,17 +122,14 @@ tasks.push(function(done) {
     done();
   });
 
-  child.once('message', function() {
-    child.send('errFile');
-    child.once('message', function() {
-      child.send({});
-    });
-  });
-
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
 
-  child.send({ console: true });
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.once('message', function(msg) {
+    assert.strictEqual(msg, 'init');
+    child.send({});
+  });
 });
 
 // should fail if first message does not contain a collectionName
@@ -148,22 +149,62 @@ tasks.push(function(done) {
     done();
   });
 
-  child.once('message', function() {
-    child.send('errFile');
-    child.once('message', function() {
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
       child.send({
         dbName: 'test',
         dbPort: 27019,
         chrootUser: 'test',
         chrootNewRoot: '/var/empty'
       });
-    });
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should fail if first message does not contain a logCfg
+tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/versioned_collection_exec.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
+  var child = childProcess.fork(__dirname + '/../../../lib/versioned_collection_exec', { silent: true });
+
+  var buff = new Buffer(0);
+  child.stderr.on('data', function(data) {
+    buff = Buffer.concat([buff, data]);
+  });
+  child.on('exit', function(code, sig) {
+    assert(/msg.logCfg must be an object/.test(buff.toString()));
+    assert.strictEqual(code, 8);
+    assert.strictEqual(sig, null);
+    done();
   });
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
 
-  child.send({ console: true });
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        dbName: 'test',
+        dbPort: 27019,
+        collectionName: 'test',
+        chrootUser: 'test',
+        chrootNewRoot: '/var/empty'
+      });
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
+  });
 });
 
 // should fail if not executed as root
@@ -183,23 +224,26 @@ tasks.push(function(done) {
     done();
   });
 
-  child.once('message', function() {
-    child.send('errFile');
-    child.once('message', function() {
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
       child.send({
+        logCfg: { console: true },
         dbName: 'test',
         dbPort: 27019,
         collectionName: 'test',
         chrootUser: 'test',
         chrootNewRoot: '/var/empty'
       });
-    });
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
   });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  child.send({ console: true });
 });
 
 async.series(tasks, function(err) {
