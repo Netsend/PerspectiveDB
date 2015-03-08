@@ -31,6 +31,7 @@ var async = require('async');
 var Timestamp = require('mongodb').Timestamp;
 
 var tasks = [];
+var tasks2 = [];
 
 var dbServer, dbClient;
 var databaseNames = ['testserver', 'test_client'];
@@ -51,6 +52,8 @@ var child1, child2;
 
 // should insert some dummies in the collection to version on the server side
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/server_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   var coll = dbServer.collection('someColl');
   var item1 = { foo: 'bar', someKey: 'someVal', someOtherKey: 'B' };
   var item2 = { foo: 'baz', someKey: 'someVal' };
@@ -62,6 +65,8 @@ tasks.push(function(done) {
 
 // should start a server and a client, the client should login and get some data from the server
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/server_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   child1 = spawn(__dirname + '/../../../server.js', [__dirname + '/test_server.ini']);
 
   child1.stdout.setEncoding('utf8');
@@ -82,12 +87,9 @@ tasks.push(function(done) {
 });
 
 tasks.push(function(done) {
-  child2 = spawn(__dirname + '/../../../server.js', [__dirname + '/test_client.ini']);
+  console.log('test l' + new Error().stack.split('\n')[1].match(/server_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
 
-  child2.on('close', function() {
-    child1.kill();
-    done();
-  });
+  child2 = spawn(__dirname + '/../../../server.js', [__dirname + '/test_client.ini']);
 
   child2.stdout.setEncoding('utf8');
 
@@ -97,6 +99,9 @@ tasks.push(function(done) {
   child2.on('close', function(code, sig) {
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
+
+    child1.once('close', done);
+    child1.kill();
   });
 
   var i = 0;
@@ -112,6 +117,8 @@ tasks.push(function(done) {
 
 // should have sent, saved and ackd dummies
 tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/server_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
   dbServer.collection('someColl').find().toArray(function(err, collServerItems) {
     if (err) { done(err); }
     assert.strictEqual(collServerItems.length, 3);
