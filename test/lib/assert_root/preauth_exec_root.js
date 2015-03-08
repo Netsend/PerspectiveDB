@@ -31,7 +31,7 @@ var childProcess = require('child_process');
 var async = require('async');
 
 var tasks = [];
-//var tasks2 = [];
+var tasks2 = [];
 
 // should require serverConfig.port to be a number
 tasks.push(function(done) {
@@ -202,11 +202,14 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
-    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
+    assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
 
   child.on('message', function(msg) {
     switch (msg) {
@@ -230,7 +233,7 @@ tasks.push(function(done) {
         setTimeout(function() {
           ms.write(pattern, function(err) {
             if (err) {
-              assert(/EPIPE|This socket is closed/.test(err.message));
+              assert(/EPIPE|This socket is closed|This socket has been ended by the other party/.test(err.message));
               assert(i >= 127 && i <= 132);
               child.kill();
             } else {
@@ -245,7 +248,7 @@ tasks.push(function(done) {
       flood(ms);
 
       ms.on('error', function(err) {
-        assert(/EPIPE|ECONNRESET|This socket is closed/.test(err.message));
+        assert(/EPIPE|ECONNRESET|This socket is closed|This socket has been ended by the other party/.test(err.message));
       });
       break;
     }
@@ -271,7 +274,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('exit', function(code, sig) {
-    assert(/preauth_exec: connection error: "Error: more than maxBytes received"/.test(stderr));
+    assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
