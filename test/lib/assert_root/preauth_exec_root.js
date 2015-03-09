@@ -30,8 +30,42 @@ var childProcess = require('child_process');
 
 var async = require('async');
 
+var logger = require('../../../lib/logger');
+
 var tasks = [];
 var tasks2 = [];
+
+// should require logCfg.to be an object
+tasks.push(function(done) {
+  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
+
+  //child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('close', function(code, sig) {
+    assert(/msg.logCfg must be an object/.test(stderr));
+    assert.strictEqual(code, 8);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        logCfg: 'foo'
+      });
+      break;
+    case 'listen':
+      break;
+    }
+  });
+});
 
 // should require serverConfig.port to be a number
 tasks.push(function(done) {
@@ -56,6 +90,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 'foo'
         }
@@ -98,6 +133,7 @@ tasks.push(function(done) {
       switch (msg) {
       case 'init':
         child.send({
+          logCfg: { console: true, mask: logger.DEBUG },
           serverConfig: {
             port: 1234
           }
@@ -123,10 +159,11 @@ tasks.push(function(done) {
   //child.stdout.pipe(process.stdout);
 
   var stdout = '';
-  var stderr = '';
   child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
   child.stdout.on('data', function(data) { stdout += data; });
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
@@ -139,6 +176,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -146,7 +184,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
       child.kill();
       break;
     }
@@ -176,6 +214,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -209,7 +248,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
+    assert(/preauth .*: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -219,6 +258,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -226,7 +266,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
 
       var ms = net.createConnection('/var/run/ms-1234.sock');
 
@@ -281,7 +321,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
+    assert(/preauth .*: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -291,6 +331,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -298,7 +339,7 @@ tasks.push(function(done) {
       break;
     case 'listen':
       assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth_exec: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
 
       var ms = net.createConnection('/var/run/ms-1234.sock');
 
@@ -351,6 +392,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -401,6 +443,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
@@ -458,6 +501,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
+        logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
           port: 1234
         }
