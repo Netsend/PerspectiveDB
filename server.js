@@ -228,6 +228,12 @@ function start(db) {
             vcLog[key] = logCfg[key];
           });
 
+          var gfile = log.getFileStream();
+          var gerror = log.getErrorStream();
+
+          if (gfile) { vcLog.file = gfile; }
+          if (gerror) { vcLog.error = gerror; }
+
           // overrule with vc specific log config
           Object.keys(vcCfg.log).forEach(function(key) {
             vcLog[key] = vcCfg.log[key];
@@ -285,11 +291,23 @@ function start(db) {
       if (serverCfg && !serverCfg.disable) {
         log.info('preauth forking...');
 
-        var opts2 = {
+        var preauthOpts = {
+          logCfg: logCfg,
           serverConfig: serverCfg,
           chrootConfig: serverCfg
         };
-        vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', opts2, function(err) {
+
+        preauthOpts.logCfg = {};
+
+        // copy global log config
+        Object.keys(logCfg).forEach(function(key) {
+          preauthOpts.logCfg[key] = logCfg[key];
+        });
+
+        preauthOpts.logCfg.file = log.getFileStream();
+        preauthOpts.logCfg.error = log.getErrorStream();
+
+        vs.listen(get(config, 'main.user') || 'nobody', get(config, 'main.chroot') || '/var/empty', preauthOpts, function(err) {
           if (err) { cb(err); return; }
 
           // find out if any remotes need to be initiated

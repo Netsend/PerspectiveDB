@@ -34,7 +34,7 @@ var BSONStream = require('bson-stream');
 var VersionedSystem = require('../../../lib/versioned_system');
 var logger = require('../../../lib/logger');
 
-var silence;
+var silence, debug;
 
 var db, db2, oplogDb, oplogColl;
 var databaseName = 'test_versioned_system_root_listen';
@@ -50,13 +50,17 @@ before(function(done) {
   logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
     silence = l;
-    database.connect(function(err, dbs) {
+    logger({ console: true, mask: logger.DEBUG }, function(err, l) {
       if (err) { throw err; }
-      db = dbs[0];
-      db2 = dbs[1];
-      oplogDb = db.db(oplogDatabase);
-      oplogColl = oplogDb.collection('oplog.$main');
-      done();
+      debug = l;
+      database.connect(function(err, dbs) {
+        if (err) { throw err; }
+        db = dbs[0];
+        db2 = dbs[1];
+        oplogDb = db.db(oplogDatabase);
+        oplogColl = oplogDb.collection('oplog.$main');
+        done();
+      });
     });
   });
 });
@@ -110,7 +114,7 @@ describe('VersionedSystem listen', function() {
 
   it('should require initVCs() first', function() {
     var vs = new VersionedSystem(oplogColl);
-    (function() { vs.listen('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
+    (function() { vs.listen('nobody', '/var/run', { logCfg: {}, serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
   });
 
   it('should chroot, disconnect invalid auth request and auth valid auth requests', function(done) {
@@ -138,7 +142,7 @@ describe('VersionedSystem listen', function() {
       if (err) { throw err; }
 
       // should chroot
-      vs.listen('nobody', '/var/run', { serverConfig: { port: 1234 } }, function(err) {
+      vs.listen('nobody', '/var/run', { logCfg: { console: true, mask: logger.CRIT }, serverConfig: { port: 1234 } }, function(err) {
         if (err) { throw err; }
 
         should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
