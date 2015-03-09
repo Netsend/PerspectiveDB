@@ -39,10 +39,13 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
+  //child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
   var stderr = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert(/msg.serverConfig.port must be a number/.test(stderr));
     assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
@@ -77,13 +80,13 @@ tasks.push(function(done) {
 
     var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-    var stdout = '';
+    //child.stderr.pipe(process.stderr);
+    //child.stdout.pipe(process.stdout);
+
     var stderr = '';
-    child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
-    child.stdout.on('data', function(data) { stdout += data; });
     child.stderr.on('data', function(data) { stderr += data; });
-    child.on('exit', function(code, sig) {
+    child.on('close', function(code, sig) {
       assert(/path already exists and is not a socket/.test(stderr));
       assert.strictEqual(code, 8);
       assert.strictEqual(sig, null);
@@ -116,14 +119,16 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
+  child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
   var stdout = '';
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
-  child.stderr.pipe(process.stderr);
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -154,14 +159,13 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
   child.stderr.pipe(process.stderr);
-  child.stdout.on('data', function(data) { stdout += data; });
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -195,21 +199,21 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
+  //child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
   var stdout = '';
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
 
   child.on('message', function(msg) {
     switch (msg) {
@@ -267,13 +271,16 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
+  //child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
   var stdout = '';
   var stderr = '';
   child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert(/preauth_exec: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -327,14 +334,13 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
   child.stderr.pipe(process.stderr);
-  child.stdout.on('data', function(data) { stdout += data; });
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -378,14 +384,13 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
   child.stderr.pipe(process.stderr);
-  child.stdout.on('data', function(data) { stdout += data; });
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -436,14 +441,13 @@ tasks.push(function(done) {
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
   child.stderr.pipe(process.stderr);
-  child.stdout.on('data', function(data) { stdout += data; });
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
-  child.on('exit', function(code, sig) {
+  child.on('close', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
