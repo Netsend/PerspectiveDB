@@ -82,14 +82,14 @@ function sendPRs(vs, remotes) {
         log.err('send pr error ' +  remote.vc + ' ' + err);
         return;
       }
-      log.info('sent pr ' + remote.vc + ' ' + JSON.stringify(pr));
+      log.info('sent pr %j %j', remote.vc, pr);
     });
   });
 }
 
 // filter password out request
 function debugReq(req) {
-  return JSON.stringify(keyFilter(req, ['password'], true), null, 2);
+  return keyFilter(req, ['password'], true);
 }
 
 // create a new mongodb like collection from an array
@@ -196,16 +196,16 @@ function start(db) {
         remoteLogin = properties.parse(fs.readFileSync(remoteLogin, { encoding: 'utf8' }), { sections: true, namespaces: true }).remotes;
       }
 
-      log.info('remote config', debugReq(remoteLogin || {}));
+      log.info('remote config %j', debugReq(remoteLogin || {}));
     }
 
-    log.info('vs opts', JSON.stringify(opts));
+    log.info('vs opts %j', opts);
 
     var vs = new VersionedSystem(oplogColl, opts);
 
     // get all vc configs
     var vcsCfg = get(config, 'vc');
-    log.info('init vcs', JSON.stringify(vcsCfg));
+    log.info('init vcs %j', vcsCfg);
 
     var tasks = [function(cb2) {
       // ensure async even without any other tasks
@@ -312,7 +312,7 @@ function start(db) {
 
           // find out if any remotes need to be initiated
           if (remoteLogin) {
-            log.notice('sending pull request', debugReq(remoteLogin));
+            log.notice('sending pull request %j', debugReq(remoteLogin));
             sendPRs(vs, remoteLogin);
           }
           log.notice('ready');
@@ -323,7 +323,7 @@ function start(db) {
 
         // find out if any remotes need to be initiated
         if (remoteLogin) {
-          log.notice('sending pull request', debugReq(remoteLogin));
+          log.notice('sending pull request %j', debugReq(remoteLogin));
           sendPRs(vs, remoteLogin);
         }
         log.notice('ready');
