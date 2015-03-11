@@ -94,7 +94,7 @@ function debugReq(req) {
 
 // create a new mongodb like collection from an array
 function arrToColl(arr) {
-  return new ArrayCollection(arr, { debug: program.debug });
+  return new ArrayCollection(arr, { log: log });
 }
 
 // load from config file itself
