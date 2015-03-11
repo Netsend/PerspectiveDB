@@ -295,4 +295,17 @@ describe('logger', function () {
       log.notice('foo');
     });
   });
+
+  it('should open a file by fd', function(done) {
+    var path = '/tmp/sometest2';
+
+    var ws = fs.createWriteStream(path);
+
+    ws.on('open', function() {
+      logger({ file: ws.fd }, function(err, l) {
+        if (err) { throw err; }
+        l.close(done);
+      });
+    });
+  });
 });
