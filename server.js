@@ -346,7 +346,7 @@ function start(db) {
       process.exit(6);
     }
 
-    log.info(new Date(), 'server down');
+    log.notice('server down %s', new Date());
     log.info('runtime', new Date() - startTime);
     db.close();
     log.close();
@@ -370,6 +370,8 @@ logger(logCfg, function(err, l) {
   if (err) { throw err; }
 
   log = l;
+
+  log.notice('server started %s', startTime);
 
   // open database
   _db(dbCfg, function(err, db) {
