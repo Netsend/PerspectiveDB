@@ -248,7 +248,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth .*: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
+    assert(/preauth .*: ldjsonstream error UNIX domain socket Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -321,7 +321,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth .*: ldjsonstream error: Error: more than maxBytes received/.test(stderr));
+    assert(/preauth .*: ldjsonstream error UNIX domain socket Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
