@@ -94,6 +94,9 @@ describe('connManager', function () {
         try {
           fs.unlinkSync(path);
         } catch(err) {
+          if (err.code !== 'ENOENT') {
+            throw err;
+          }
         }
 
         var incoming = 0;
@@ -125,6 +128,9 @@ describe('connManager', function () {
         try {
           fs.unlinkSync(path);
         } catch(err) {
+          if (err.code !== 'ENOENT') {
+            throw err;
+          }
         }
 
         var incoming = 0;
