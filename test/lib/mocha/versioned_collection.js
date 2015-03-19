@@ -4754,12 +4754,12 @@ describe('versioned_collection', function() {
         //
         it('should save DAGs', function(done) {
           var vc = new VersionedCollection(db, collectionName, { log: silence });
-          vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI, DII], done);
+          vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI], done);
         });
 
         it('HII and GI = ff to HI', function(done) {
           var vc = new VersionedCollection(db, collectionName, { log: cons, localPerspective: 'I' });
-          vc._ensureLocalPerspective([ EII, FII, GII, HII ], function(err, newLocalItems) {
+          vc._ensureLocalPerspective([ DII, EII, FII, GII, HII ], function(err, newLocalItems) {
             if (err) { throw err; }
             should.strictEqual(newLocalItems.length, 1);
             should.deepEqual(newLocalItems[0], {
