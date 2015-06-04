@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014, 2015 Netsend.
  *
  * This file is part of Mastersync.
  *
