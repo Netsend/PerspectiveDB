@@ -39,7 +39,7 @@ program
   .option('-c, --collection1 <collection>', 'name of the collection to report about')
   .option('-d, --collection2 <collection>', 'name of the collection to compare against if different from collection1')
   .option('-f, --config <config>', 'ini config file with database access credentials')
-  .option('-m, --match <attrs>', 'comma separated list of attributes to should match', function(val) { return val.split(','); })
+  .option('-m, --match <attrs>', 'comma separated list of attributes that should match', function(val) { return val.split(','); })
   .option('-i, --include <attrs>', 'comma separated list of attributes to include in comparison', function(val) { return val.split(','); })
   .option('-e, --exclude <attrs>', 'comma separated list of attributes to exclude in comparison', function(val) { return val.split(','); })
   .option('-s  --showid', 'print id of missing and unequal items')
