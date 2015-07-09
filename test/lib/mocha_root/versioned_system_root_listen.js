@@ -114,7 +114,7 @@ describe('VersionedSystem listen', function() {
 
   it('should require initVCs() first', function() {
     var vs = new VersionedSystem(oplogColl);
-    (function() { vs.listen('nobody', '/var/run', { logCfg: {}, serverConfig: { port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
+    (function() { vs.listen('nobody', '/var/run', { logCfg: {}, serverConfig: { host: '127.0.0.1', port: 1234 } }, function(err) { if (err) { throw err; } }); }).should.throw('run initVCs first');
   });
 
   it('should chroot, disconnect invalid auth request and auth valid auth requests', function(done) {
@@ -142,7 +142,7 @@ describe('VersionedSystem listen', function() {
       if (err) { throw err; }
 
       // should chroot
-      vs.listen('nobody', '/var/run', { logCfg: { console: true, mask: logger.CRIT }, serverConfig: { port: 1234 } }, function(err) {
+      vs.listen('nobody', '/var/run', { logCfg: { console: true, mask: logger.CRIT }, serverConfig: { host: '127.0.0.1', port: 1234 } }, function(err) {
         if (err) { throw err; }
 
         should.strictEqual(true, fs.existsSync('/ms-1234.sock'));
