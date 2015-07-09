@@ -466,7 +466,7 @@ tasks.push(function(done) {
   });
 });
 
-// should open a port on the local network interface by default
+// should open a port on the local network interface
 tasks.push(function(done) {
   console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
 
@@ -503,6 +503,7 @@ tasks.push(function(done) {
       child.send({
         logCfg: { console: true, mask: logger.DEBUG },
         serverConfig: {
+          host: '127.0.0.1',
           port: 1234
         }
       });
