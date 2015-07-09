@@ -201,7 +201,7 @@ describe('VersionedSystem', function() {
 
         db.db('foo').collectionNames(function(err, info) {
           if (err) { throw err; }
-          should.strictEqual(info[2].name, 'foo.m3.bar');
+          should.strictEqual(info[2].name, 'm3.bar');
           should.strictEqual(info[2].options.size, 2);
           done();
         });
