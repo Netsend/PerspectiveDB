@@ -4565,7 +4565,7 @@ describe('versioned_collection', function() {
           vc._snapshotCollection.insert([AI, AII, BI, CII, CI, BII], done);
         });
 
-        it('merge DII, EII and FII to I', function(done) {
+        xit('merge DII, EII and FII to I', function(done) {
           var vc = new VersionedCollection(db, collectionName, { log: silence, localPerspective: 'I' });
           vc._ensureLocalPerspective([ DII, EII, FII ], function(err, newLocalItems) {
             if (err) { throw err; }
@@ -4757,7 +4757,7 @@ describe('versioned_collection', function() {
           vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI], done);
         });
 
-        it('HII and GI = ff to HI', function(done) {
+        xit('HII and GI = ff to HI', function(done) {
           var vc = new VersionedCollection(db, collectionName, { log: cons, localPerspective: 'I' });
           vc._ensureLocalPerspective([ DII, EII, FII, GII, HII ], function(err, newLocalItems) {
             if (err) { throw err; }
