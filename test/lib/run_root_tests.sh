@@ -5,10 +5,10 @@ cd "$dir" || exit 1
 
 for i in `ls assert_root/*.js`; do
   echo "\nTEST node root $i"
-  node "$i"
+  node "$i" || exit "$?"
 done
 
 for i in `ls mocha_root/*.js`; do
   echo "\nTEST mocha root $i"
-  mocha "$i"
+  mocha "$i" || exit "$?"
 done

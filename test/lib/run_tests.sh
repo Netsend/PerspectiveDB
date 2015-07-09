@@ -8,5 +8,5 @@ mocha mocha/
 
 for i in `ls assert/*.js`; do
   echo "\nTEST node $i"
-  node "$i"
+  node "$i" || exit "$?"
 done
