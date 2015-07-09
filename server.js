@@ -332,7 +332,7 @@ function start(db) {
 
     process.once('SIGINT', function() {
       log.notice('received SIGINT shutting down... press CTRL+C again to force quit');
-      vs.stop(cb);
+      vs.stopTerm(cb);
     });
     process.once('SIGTERM', function() {
       log.notice('received SIGTERM shutting down... send another SIGTERM to force quit');
