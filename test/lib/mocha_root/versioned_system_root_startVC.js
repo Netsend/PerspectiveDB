@@ -115,10 +115,17 @@ describe('VersionedSystem', function() {
         collectionName: 'bar',
         size: 1
       };
-      vs._startVC(config, function(err) {
+      vs._startVC(config, function(err, vce) {
         if (err) { throw err; }
         should.strictEqual(config.size, 1048576);
-        done();
+        vce.on('close', function(code) {
+          if (code !== 0) {
+            done(new Error('exit code %s', code));
+          } else {
+            done();
+          }
+        });
+        vce.kill();
       });
     });
 
@@ -131,12 +138,19 @@ describe('VersionedSystem', function() {
         dbPort: 27019,
         size: 1
       };
-      vs._startVC(config, function(err, vc, or) {
+      vs._startVC(config, function(err, vce, or) {
         if (err) { throw err; }
-        should.strictEqual(vc.pid !== process.pid, true);
-        should.strictEqual(vc.pid > 1, true);
+        should.strictEqual(vce.pid !== process.pid, true);
+        should.strictEqual(vce.pid > 1, true);
         should.strictEqual(or instanceof OplogReader, true);
-        done();
+        vce.on('close', function(code) {
+          if (code !== 0) {
+            done(new Error('exit code %s', code));
+          } else {
+            done();
+          }
+        });
+        vce.kill();
       });
     });
 
@@ -160,7 +174,7 @@ describe('VersionedSystem', function() {
         size: 1
       };
       var vs = new VersionedSystem(oplogColl, { log: silence });
-      vs._startVC(config, function(err, vc, or) {
+      vs._startVC(config, function(err, vce, or) {
         if (err) { throw err; }
 
         // oplog reader should never end
@@ -171,7 +185,7 @@ describe('VersionedSystem', function() {
         or.on('data', function() {
           i++;
           if (i >= 2) {
-            // check if items are ackd, but give vc some time to process oplog items first
+            // check if items are ackd, but give vce some time to process oplog items first
             setTimeout(function() {
               db2.collection('m3.someColl').find().toArray(function(err, items) {
                 if (err) { throw err; }
@@ -205,7 +219,14 @@ describe('VersionedSystem', function() {
                   },
                 _m3: { _ack: true }
                 });
-                done();
+                vce.on('close', function(code) {
+                  if (code !== 0) {
+                    done(new Error('exit code %s', code));
+                  } else {
+                    done();
+                  }
+                });
+                vce.kill();
               });
             }, 60);
           }

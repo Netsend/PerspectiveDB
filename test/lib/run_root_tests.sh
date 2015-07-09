@@ -10,5 +10,6 @@ done
 
 for i in `ls mocha_root/*.js`; do
   echo "\nTEST mocha root $i"
+  sleep 2
   mocha "$i" || exit "$?"
 done

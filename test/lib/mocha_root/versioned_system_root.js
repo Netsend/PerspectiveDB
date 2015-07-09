@@ -96,7 +96,8 @@ describe('VersionedSystem', function() {
 
         // oplog reader should never end
         var or = oplogReaders['test2.someColl'];
-        or.on('end', function() { throw new Error('oplog reader closed'); });
+        var illegalEnd = function() { throw new Error('oplog reader closed'); };
+        or.on('end', illegalEnd);
 
         // should detect two updates in test2.someColl and set ackd
         var i = 0;
@@ -137,7 +138,8 @@ describe('VersionedSystem', function() {
                   },
                 _m3: { _ack: true }
                 });
-                done();
+                or.removeListener('end', illegalEnd);
+                vs.stopTerm(done);
               });
             }, 60);
           }
@@ -181,7 +183,10 @@ describe('VersionedSystem', function() {
         if (err) { throw err; }
         db.collection('m3.' + collName).insert(snapshotItem, function(err) {
           if (err) { throw err; }
-          db.collection(collName).insert(item, done);
+          db.collection(collName).insert(item, function(err) {
+            if (err) { throw err; }
+            vs.stopTerm(done);
+          });
         });
       });
     });
@@ -206,7 +211,7 @@ describe('VersionedSystem', function() {
           should.strictEqual(result[ns].collection.capped, undefined);
           should.strictEqual(result[ns].snapshotCollection.count, 1);
           should.strictEqual(result[ns].snapshotCollection.capped, true);
-          done();
+          vs.stopTerm(done);
         });
       });
     });
@@ -233,7 +238,7 @@ describe('VersionedSystem', function() {
           should.strictEqual(result[ns].snapshotCollection.count, 1);
           should.strictEqual(result[ns].snapshotCollection.capped, true);
           should.strictEqual(result[ns].extended.ack, 0);
-          done();
+          vs.stopTerm(done);
         });
       });
     });
@@ -259,7 +264,7 @@ describe('VersionedSystem', function() {
           should.strictEqual(result[ns].collection.capped, undefined);
           should.strictEqual(result[ns].snapshotCollection.count, 1);
           should.strictEqual(result[ns].snapshotCollection.capped, true);
-          done();
+          vs.stopTerm(done);
         });
       });
     });
@@ -285,7 +290,7 @@ describe('VersionedSystem', function() {
           should.strictEqual(result[ns].collection.capped, undefined);
           should.strictEqual(result[ns].snapshotCollection.count, 1);
           should.strictEqual(result[ns].snapshotCollection.capped, true);
-          done();
+          vs.stopTerm(done);
         });
       });
     });

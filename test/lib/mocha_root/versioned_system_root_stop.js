@@ -90,7 +90,7 @@ describe('VersionedSystem', function() {
         if (err) { throw err; }
 
         setTimeout(function() {
-          vs.stop(done);
+          vs.stopTerm(done);
         }, 100);
       });
     });
