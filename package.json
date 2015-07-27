@@ -15,6 +15,8 @@
     "mongodb"
   ],
   "dependencies": {
+    "level": "~1.2.0",
+    "sublevel": "~2.4.0",
     "posix": "~2.0.0",
     "mongo-key-escaper": "~0.0.3",
     "properties": "~1.2.1",
