@@ -6,7 +6,7 @@
     "email": "tim@netsend.nl",
     "url": "https://github.com/timkuijsten"
   },
-  "license": "AGPLv3",
+  "license": "AGPL-3.0",
   "description": "master-master replication with transformations",
   "keywords": [
     "master",
@@ -16,7 +16,7 @@
   ],
   "dependencies": {
     "level": "~1.2.0",
-    "sublevel": "~2.4.0",
+    "bson": "~0.2.22",
     "posix": "~2.0.0",
     "mongo-key-escaper": "~0.0.3",
     "properties": "~1.2.1",
@@ -38,6 +38,7 @@
     "through2": "~0.6.3",
     "bson-stream": "~0.0.4",
     "mocha": ">=1.21.4",
+    "rimraf": "~2.4.2",
     "should": ">=1.2.2"
   },
   "repository": {
