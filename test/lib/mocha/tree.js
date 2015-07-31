@@ -21,6 +21,7 @@
 var should = require('should');
 var rimraf = require('rimraf');
 var level = require('level');
+var BSON = require('bson').BSONPure.BSON;
 
 var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
@@ -39,7 +40,7 @@ before(function(done) {
       // ensure a db at start
       rimraf(dbPath, function(err) {
         if (err) { throw err; }
-        db = level(dbPath, { keyEncoding: 'binary' });
+        db = level(dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' });
         done();
       });
     });
@@ -100,34 +101,6 @@ describe('Tree', function() {
 
     it('should construct', function() {
       (function() { tree = new Tree(db, 'foo'); }).should.not.throwError();
-    });
-  });
-
-  describe('bton', function() {
-    it('should require b to be a buffer', function() {
-      (function() { Tree.bton({}); }).should.throw('b must be a buffer');
-    });
-
-    it('should convert a 6 byte LE Buffer to a number', function() {
-      should.strictEqual(Tree.bton(new Buffer([9, 0, 0, 0, 0, 0])), 9);
-    });
-  });
-
-  describe('ntob', function() {
-    it('should require n to be a number', function() {
-      (function() { Tree.ntob({}); }).should.throw('n must be a number');
-    });
-
-    it('should require size to be a number', function() {
-      (function() { Tree.ntob(0, {}); }).should.throw('size must be a number');
-    });
-
-    it('should convert to a 6 byte LE Buffer', function() {
-      should.strictEqual(Tree.ntob(9, 6).toString(), new Buffer([9, 0, 0, 0, 0, 0]).toString());
-    });
-
-    it('should not err if size > 6', function() {
-      should.strictEqual(Tree.ntob(9, 7).toString(), new Buffer([9, 0, 0, 0, 0, 0, 0]).toString());
     });
   });
 
@@ -271,14 +244,14 @@ describe('Tree', function() {
     });
 
     it('should remove the prefix "f00ba4" and read the last 6 bytes by default', function() {
-      var t = new Tree(db, name, { log: cons });
+      var t = new Tree(db, name, { log: silence });
       // contains the number 8 in the last 6 bytes LE
       var b = new Buffer('f00ba400080000000000', 'hex');
       t._getIFromIKey(b).should.equal(8);
     });
 
     it('should remove the prefix "f00ba4" and read the last 2 bytes', function() {
-      var t = new Tree(db, name, { iSize: 2, log: cons });
+      var t = new Tree(db, name, { iSize: 2, log: silence });
       // contains the number 8 in the last 2 bytes LE
       var b = new Buffer('f00ba4000800', 'hex');
       t._getIFromIKey(b).should.equal(8);
@@ -295,12 +268,12 @@ describe('Tree', function() {
     });
 
     it('should prepend "idx/i0x00_getIKey0x00" as a prefix and use 6 bytes for i by default', function() {
-      var t = new Tree(db, name, { log: cons });
+      var t = new Tree(db, name, { log: silence });
       t._getIKey(8).toString('hex').should.equal('6964782f69005f676574494b657900080000000000');
     });
 
     it('should prepend "idx/i0x00_getIKey0x00" as a prefix and use 2 bytes for i', function() {
-      var t = new Tree(db, name, { iSize: 2, log: cons });
+      var t = new Tree(db, name, { iSize: 2, log: silence });
       t._getIKey(8).toString('hex').should.equal('6964782f69005f676574494b6579000800');
     });
   });
@@ -315,24 +288,24 @@ describe('Tree', function() {
     });
 
     it('should save a buffer type id directly and read v as base64', function() {
-      var t = new Tree(db, name, { log: cons });
+      var t = new Tree(db, name, { log: silence });
       // YWJjWFla == abcovXYZ
-      t._getHeadKey({ id: new Buffer([1, 2, 4]), v: 'YWJjWFla' }).toString().should.equal('idx/heads\u0000_getHeadKey\u0000\u0001\u0002\u0004\u0000abcXYZ');
+      t._getHeadKey({ id: new Buffer([1, 2, 4]), v: 'YWJjWFla' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000\u0001\u0002\u0004\u0000abcXYZ');
     });
 
     it('should transform a string type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: 'foo', v: 'YWJj' }).toString().should.equal('idx/heads\u0000_getHeadKey\u0000foo\u0000abc');
+      t._getHeadKey({ id: 'foo', v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000foo\u0000abc');
     });
 
     it('should transform a function type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: function() { return true; }, v: 'YWJj' }).toString().should.equal('idx/heads\u0000_getHeadKey\u0000function () { return true; }\u0000abc');
+      t._getHeadKey({ id: function() { return true; }, v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000function () { return true; }\u0000abc');
     });
 
     it('should transform a boolean type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: true, v: 'YWJj' }).toString().should.equal('idx/heads\u0000_getHeadKey\u0000true\u0000abc');
+      t._getHeadKey({ id: true, v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000true\u0000abc');
     });
   });
 
@@ -382,10 +355,10 @@ describe('Tree', function() {
       store an object in the I index:
       {                 i  d  x  /  i     _  n  e  x  t  I     2
         key:   <Buffer 69 64 78 2f 69 00 5f 6e 65 78 74 49 00 02 00 00 00 00 00>,
-        value: 'A'
+        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
-      t._db.put(t._getIKey(2), 'A', done);
+      t._db.put(t._getIKey(2), BSON.serialize({ _b: 'A' }), done);
     });
 
     it('should give an increased i', function(done) {
@@ -403,10 +376,10 @@ describe('Tree', function() {
       store an object in the I index:
       {                 i  d  x  /  i     _  n  e  x  t  I     2
         key:   <Buffer 69 64 78 2f 69 00 5f 6e 65 78 74 49 00 02 00 00 00 00 00>,
-        value: 'A'
+        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
-      t._db.put(t._getIKey(20), 'A', done);
+      t._db.put(t._getIKey(20), BSON.serialize({ _b: 'A' }), done);
     });
 
     it('should return the highest increment in the snapshot collection', function(done) {
@@ -435,12 +408,12 @@ describe('Tree', function() {
   describe('_validParents', function() {
     var name = '_validParents';
 
+    // use 24-bit version numbers (base 64)
     var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['A'] } };
-    var item3 = { _h: { id: 'XI', v: 'Cccc', i: 3, pa: ['B'] } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
 
     it('should accept roots in an empty database', function(done) {
-      var t = new Tree(db, name, { log: silence });
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item1, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
@@ -449,7 +422,7 @@ describe('Tree', function() {
     });
 
     it('should not accept non-roots in an empty database', function(done) {
-      var t = new Tree(db, name, { log: silence });
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item2, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
@@ -457,19 +430,19 @@ describe('Tree', function() {
       });
     });
 
-    it('needs an item in the database and head and i index', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: cons });
-      t._dbData.put(t._getDataStoreKey(item1._h), item1, function(err) {
+    it('needs an item in the database and head- and i index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._db.put(t._getDataStoreKey(item1._h), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
-        t._idxI.put(Tree.ntob(item1._h.i), t._getHeadKey(item1._h), function(err) {
+        t._db.put(t._getIKey(item1._h.i), t._getHeadKey(item1._h), function(err) {
           if (err) { throw err; }
-          t._idxHeads.put(t._getHeadKey(item1._h), item1._h.i, done);
+          t._db.put(t._getHeadKey(item1._h), t._getIKey(item1._h.i), done);
         });
       });
     });
 
     it('should not accept roots in a non-empty database', function(done) {
-      var t = new Tree(db, name, { log: cons });
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item1, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
@@ -477,13 +450,79 @@ describe('Tree', function() {
       });
     });
 
-    it('should accept non-roots in a non-empty database', function(done) {
-      var t = new Tree(db, name, { log: cons });
+    it('should accept connecting non-roots in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item2, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
         done();
       });
+    });
+  });
+
+  describe('_write', function() {
+    var name = '_write';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { _h: { id: 'XI', v: 'Aaaa', pa: [] }, _b: { some: 'body' } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, _b: { more: 'body' } };
+    var item3 = { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, _b: { more2: 'body' } };
+
+    it('should not accept a non-root in an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.on('error', function(err) {
+        should.strictEqual(err.message, 'item is not connected to the DAG');
+        done();
+      });
+      t.write(item2);
+    });
+
+    it('should accept new root and follow up in an empty database and increment i', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.once('data', function(obj) {
+        should.strictEqual(obj._h.i, 1);
+        t.once('data', function(obj) {
+          should.strictEqual(obj._h.i, 2);
+          done();
+        });
+      });
+      t.write(item1);
+      t.write(item2);
+    });
+
+    it('should have created an id + version index and an id + i index', function(done) {
+      var s = db.createReadStream();
+      s.on('data', function(obj) {
+        console.log(obj);
+        done();
+      });
+    });
+
+    it('should accept an existing root item without incrementing i', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: cons });
+      t.once('data', function(obj) {
+        should.strictEqual(obj._h.i, 1);
+        done();
+      });
+      t.write(item1);
+    });
+
+    it('should accept an existing item without incrementing i', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.once('data', function(obj) {
+        should.strictEqual(obj._h.i, 2);
+        done();
+      });
+      t.write(item2);
+    });
+
+    it('should accept new item that forks', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.once('data', function(obj) {
+        should.strictEqual(obj._h.i, 3);
+        done();
+      });
+      t.write(item3);
     });
   });
 });
