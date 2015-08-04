@@ -320,34 +320,34 @@ describe('Tree', function() {
     });
   });
 
-  describe('_getHeadKey', function() {
-    var name = '_getHeadKey';
+  describe('_composeHeadKey', function() {
+    var name = '_composeHeadKey';
 
     it('should require id to be (convertiable to) a string', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 2, log: silence });
-      (function() { t._getHeadKey(null, 'YWJj'); }).should.throw('Cannot read property \'toString\' of null');
+      (function() { t._composeHeadKey(null, 'YWJj'); }).should.throw('Cannot read property \'toString\' of null');
     });
 
     it('should require that v matches the vSize', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 2, log: silence });
-      (function() { t._getHeadKey('foo', 'YWJj'); }).should.throw('v is too short or too long');
+      (function() { t._composeHeadKey('foo', 'YWJj'); }).should.throw('v is too short or too long');
     });
 
     it('should transform a string type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._getHeadKey('foo', 'YWJj').toString('hex').should.equal('0b5f676574486561644b6579000303666f6f0003616263');
+      t._composeHeadKey('foo', 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b6579000303666f6f0003616263');
     });
 
     it('should transform a function type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._getHeadKey(function() { return true; }, 'YWJj').toString('hex').should.equal('0b5f676574486561644b657900031c66756e6374696f6e202829207b2072657475726e20747275653b207d0003616263');
+      t._composeHeadKey(function() { return true; }, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b657900031c66756e6374696f6e202829207b2072657475726e20747275653b207d0003616263');
     });
 
     it('should transform a boolean type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._getHeadKey(true, 'YWJj').toString('hex').should.equal('0b5f676574486561644b6579000304747275650003616263');
+      t._composeHeadKey(true, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b6579000304747275650003616263');
     });
   });
 
@@ -476,9 +476,9 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t._db.put(t._getDataStoreKey(item1._h), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
-        t._db.put(t._getIKey(item1._h.i), t._getHeadKey(item1._h), function(err) {
+        t._db.put(t._getIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
           if (err) { throw err; }
-          t._db.put(t._getHeadKey(item1._h), t._getIKey(item1._h.i), done);
+          t._db.put(t._composeHeadKey(item1._h.id, item1._h.v), t._getIKey(item1._h.i), done);
         });
       });
     });
