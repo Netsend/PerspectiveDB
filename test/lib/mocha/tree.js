@@ -410,8 +410,8 @@ describe('Tree', function() {
       var t = new Tree(db, name, { log: silence });
       /*
       store an object in the I index:
-      {                 i  d  x  /  i     _  n  e  x  t  I     2
-        key:   <Buffer 69 64 78 2f 69 00 5f 6e 65 78 74 49 00 02 00 00 00 00 00>,
+      {                    _  n  e  x  t  I                          2
+        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 02>,
         value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
@@ -431,8 +431,8 @@ describe('Tree', function() {
       var t = new Tree(db, name, { log: silence });
       /*
       store an object in the I index:
-      {                 i  d  x  /  i     _  n  e  x  t  I     2
-        key:   <Buffer 69 64 78 2f 69 00 5f 6e 65 78 74 49 00 02 00 00 00 00 00>,
+      {                    _  n  e  x  t  I                         20
+        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 14>,
         value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
