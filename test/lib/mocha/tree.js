@@ -71,12 +71,14 @@ describe('Tree', function() {
       (function() { tree = new Tree(db, {}); }).should.throw('name must be a string');
     });
 
-    it('should require name to not contain 0x00', function() {
-      (function() { tree = new Tree(db, 'foo\x00bar'); }).should.throw('name must not contain 0x00');
-    });
-
-    it('should require name to not contain 0xff', function() {
-      (function() { tree = new Tree(db, 'foo\xffbar'); }).should.throw('name must not contain 0xff');
+    it('should require name to not exceed 255 bytes', function() {
+      var name = '';
+      for (var i = 0; i < 254; i++) {
+        name += 'a';
+      }
+      // trick it with the last character taking two bytes making the total byte length 256
+      name += '\u00bd';
+      (function() { tree = new Tree(db, name); }).should.throw('name must not exceed 255 bytes');
     });
 
     it('should require opts to be an object', function() {
@@ -101,6 +103,46 @@ describe('Tree', function() {
 
     it('should construct', function() {
       (function() { tree = new Tree(db, 'foo'); }).should.not.throwError();
+    });
+  });
+
+  describe('getPrefix', function() {
+    var p;
+
+    it('should require name to be a string', function() {
+      (function() { p = Tree.getPrefix({}); }).should.throw('name must be a string');
+    });
+
+    it('should require name to not exceed 255 bytes', function() {
+      var name = '';
+      for (var i = 0; i < 254; i++) {
+        name += 'a';
+      }
+      // trick it with the last character taking two bytes making the total byte length 256
+      name += '\u00bd';
+      (function() { p = Tree.getPrefix(name); }).should.throw('name must not exceed 255 bytes');
+    });
+
+    it('should require type to be a numner', function() {
+      (function() { p = Tree.getPrefix(''); }).should.throw('type must be a number');
+    });
+
+    it('should require type to be >= 1', function() {
+      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 1 to 3');
+    });
+
+    it('should require type to be <= 3', function() {
+      (function() { p = Tree.getPrefix('', 0x04); }).should.throw('type must be in the subkey range of 1 to 3');
+    });
+
+    it('should return the right prefix with an empty name', function() {
+      p = Tree.getPrefix('', 0x03);
+      should.strictEqual(p.toString('hex'), new Buffer([0,0,3]).toString('hex'));
+    });
+
+    it('should return the right prefix with a non-empty name', function() {
+      p = Tree.getPrefix('abc', 0x02);
+      should.strictEqual(p.toString('hex'), new Buffer([3,97,98,99,0,2]).toString('hex'));
     });
   });
 
