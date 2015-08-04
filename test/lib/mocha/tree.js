@@ -300,23 +300,23 @@ describe('Tree', function() {
     });
   });
 
-  describe('_getIKey', function() {
-    var name = '_getIKey';
+  describe('_composeIKey', function() {
+    var name = '_composeIKey';
 
     it('should require i to be a number', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { log: silence });
-      (function() { t._getIKey({}); }).should.throw('i must be a number');
+      (function() { t._composeIKey({}); }).should.throw('i must be a number');
     });
 
     it('should prepend ikey prefix to i and use 6 bytes for i by default', function() {
       var t = new Tree(db, name, { log: silence });
-      t._getIKey(8).toString('hex').should.equal('085f676574494b6579000206000000000008');
+      t._composeIKey(8).toString('hex').should.equal('0c5f636f6d706f7365494b6579000206000000000008');
     });
 
     it('should prepend ikey prefix to i and use 2 bytes for i', function() {
       var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._getIKey(8).toString('hex').should.equal('085f676574494b65790002020008');
+      t._composeIKey(8).toString('hex').should.equal('0c5f636f6d706f7365494b65790002020008');
     });
   });
 
@@ -404,7 +404,7 @@ describe('Tree', function() {
         value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
-      t._db.put(t._getIKey(2), BSON.serialize({ _b: 'A' }), done);
+      t._db.put(t._composeIKey(2), BSON.serialize({ _b: 'A' }), done);
     });
 
     it('should give an increased i', function(done) {
@@ -425,7 +425,7 @@ describe('Tree', function() {
         value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
       }
       */
-      t._db.put(t._getIKey(20), BSON.serialize({ _b: 'A' }), done);
+      t._db.put(t._composeIKey(20), BSON.serialize({ _b: 'A' }), done);
     });
 
     it('should return the highest increment in the snapshot collection', function(done) {
@@ -480,9 +480,9 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t._db.put(t._composeDsKey(item1._h), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
-        t._db.put(t._getIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
+        t._db.put(t._composeIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
           if (err) { throw err; }
-          t._db.put(t._composeHeadKey(item1._h.id, item1._h.v), t._getIKey(item1._h.i), done);
+          t._db.put(t._composeHeadKey(item1._h.id, item1._h.v), t._composeIKey(item1._h.i), done);
         });
       });
     });
