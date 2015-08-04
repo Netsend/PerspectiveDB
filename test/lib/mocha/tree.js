@@ -309,14 +309,14 @@ describe('Tree', function() {
       (function() { t._getIKey({}); }).should.throw('i must be a number');
     });
 
-    it('should prepend "idx/i0x00_getIKey0x00" as a prefix and use 6 bytes for i by default', function() {
+    it('should prepend ikey prefix to i and use 6 bytes for i by default', function() {
       var t = new Tree(db, name, { log: silence });
-      t._getIKey(8).toString('hex').should.equal('6964782f69005f676574494b657900080000000000');
+      t._getIKey(8).toString('hex').should.equal('085f676574494b6579000206000000000008');
     });
 
-    it('should prepend "idx/i0x00_getIKey0x00" as a prefix and use 2 bytes for i', function() {
+    it('should prepend ikey prefix to i and use 2 bytes for i', function() {
       var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._getIKey(8).toString('hex').should.equal('6964782f69005f676574494b6579000800');
+      t._getIKey(8).toString('hex').should.equal('085f676574494b65790002020008');
     });
   });
 
