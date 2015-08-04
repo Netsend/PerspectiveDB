@@ -9,7 +9,6 @@ type must be serialized in little-endian format.
 
 ""      0 byte
 byte    1 byte (8-bits)
-lnum    6 bytes (48-bits unsigned integer LE)
 
 
 Non-terminals
@@ -26,12 +25,16 @@ subkey  ::=
   |   "\x01" dskey             data store key type
   |   "\x02" ikey              i index key type
   |   "\x03" headkey           head index key type
-ikey    ::=  lnum              i key
-dskey   ::=  string lnum       data store key is comprised of the document id
-                               plus an lnum
-headkey ::=  string lnum       head key is comprised of the document id plus an
-                               lnum which corresponds to the version of the
-                               document
+ikey    ::=  lbeint            i key
+dskey   ::=  string lbeint     data store key is comprised of the value id plus
+                               an lbeint
+headkey ::=  string lbeint     head key is comprised of the id of the value plus
+                               an lbeint which corresponds to the version of the
+                               value
+lbeint  ::=  byte (byte*) ""    Large int - The byte is the number of bytes in
+                                (byte*). The (byte*) is one to 255 bytes written
+                                that should be interpreted as an unsigned
+                                integer in big endian format.
 string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
                                     (byte*) + 1 (for the trailing '\x00'). The
                                     (byte*) is zero or more UTF-8 encoded
