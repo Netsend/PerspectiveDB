@@ -1,0 +1,38 @@
+Key spec.
+
+The following grammar specifies the keys used for storing each DAG in a B-tree.
+
+Basic Types
+
+The following basic types are used as terminals in the rest of the grammar. Each
+type must be serialized in little-endian format.
+
+""      0 byte
+byte    1 byte (8-bits)
+lnum    6 bytes (48-bits unsigned integer LE)
+
+
+Non-terminals
+
+The following specifies the rest of the key grammar. Note that quoted strings
+represent terminals, and should be interpreted with C semantics (e.g. "\x01"
+represents the byte 0000 0001). Also note that we use the * operator as
+shorthand for repetition (e.g. ("\x01"*2) is "\x01\x01"). When used as a unary
+operator, * means that the repetition can occur 0 or more times.
+
+key     ::=  name subkey ""    key is comprised of a name followed by a subkey
+name    ::=  string            name of the keyspace
+subkey  ::=
+  |   "\x01" dskey             data store key type
+  |   "\x02" ikey              i index key type
+  |   "\x03" headkey           head index key type
+ikey    ::=  lnum              i key
+dskey   ::=  string lnum       data store key is comprised of the document id
+                               plus an lnum
+headkey ::=  string lnum       head key is comprised of the document id plus an
+                               lnum which corresponds to the version of the
+                               document
+string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
+                                    (byte*) + 1 (for the trailing '\x00'). The
+                                    (byte*) is zero or more UTF-8 encoded
+                                    characters. Can be at most 255 bytes.
