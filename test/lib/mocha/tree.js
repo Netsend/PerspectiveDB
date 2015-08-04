@@ -351,31 +351,35 @@ describe('Tree', function() {
     });
   });
 
-  describe('_getDataStoreKey', function() {
-    var name = '_getDataStoreKey';
+  describe('_composeDsKey', function() {
+    var name = '_composeDsKey';
 
-    it('should save a buffer type id directly and pad i to 48 bits LE', function() {
-      var t = new Tree(db, name);
-      // prefix is data\u0000_getDataStoreKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._getDataStoreKey({ id: new Buffer([1, 2, 4]), i: 257 }).toString('hex').should.equal('64617461005f6765744461746153746f72654b65790001020400010100000000');
+    it('should require id to be (convertiable to) a string', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      (function() { t._composeDsKey(null, 1); }).should.throw('Cannot read property \'toString\' of null');
     });
 
-    it('should transform a string type id into a buffer and pad i to 48 bits LE', function() {
-      var t = new Tree(db, name);
-      // prefix is data\u0000_getDataStoreKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._getDataStoreKey({ id: 'foo', i: 257 }).toString('hex').should.equal('64617461005f6765744461746153746f72654b657900666f6f00010100000000');
+    it('should require i to be a number', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      (function() { t._composeDsKey('foo', {}); }).should.throw('i must be a number');
     });
 
-    it('should transform a function type id into a buffer and pad i to 48 bits LE', function() {
-      var t = new Tree(db, name);
-      // prefix is data\u0000_getDataStoreKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._getDataStoreKey({ id: function() { return true; }, i: 257 }).toString('hex').should.equal('64617461005f6765744461746153746f72654b65790066756e6374696f6e202829207b2072657475726e20747275653b207d00010100000000');
+    it('should transform a string type id into a buffer and pad i to a lbeint', function() {
+      var t = new Tree(db, name, { log: silence });
+      t._composeDsKey('foo', 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000103666f6f0006000000000101');
     });
 
-    it('should transform a boolean type id into a buffer and pad i to 48 bits LE', function() {
+    it('should transform a function type id into a buffer and pad i to a lbeint', function() {
+      var t = new Tree(db, name, { log: silence });
+      t._composeDsKey(function() { return true; }, 257).toString('hex').should.equal('0d5f636f6d706f736544734b657900011c66756e6374696f6e202829207b2072657475726e20747275653b207d0006000000000101');
+    });
+
+    it('should transform a boolean type id into a buffer and pad i to a lbeint', function() {
       var t = new Tree(db, name);
-      // prefix is data\u0000_getDataStoreKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._getDataStoreKey({ id: true, i: 257 }).toString('hex').should.equal('64617461005f6765744461746153746f72654b6579007472756500010100000000');
+      // prefix is data\u0000_composeDsKey\u0000 which is 64617461005f6765744461746153746f72654b657900
+      t._composeDsKey(true, 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000104747275650006000000000101');
     });
   });
 
@@ -474,7 +478,7 @@ describe('Tree', function() {
 
     it('needs an item in the database and head- and i index', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._db.put(t._getDataStoreKey(item1._h), BSON.serialize(item1), function(err) {
+      t._db.put(t._composeDsKey(item1._h), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
         t._db.put(t._getIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
           if (err) { throw err; }
