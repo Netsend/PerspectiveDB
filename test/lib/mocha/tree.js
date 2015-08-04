@@ -323,31 +323,31 @@ describe('Tree', function() {
   describe('_getHeadKey', function() {
     var name = '_getHeadKey';
 
-    it('should require that the header matches the vSize', function() {
+    it('should require id to be (convertiable to) a string', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 2, log: silence });
-      (function() { t._getHeadKey({ id: 'foo', v: 'YWJj' }); }).should.throw('header.v is too short');
+      (function() { t._getHeadKey(null, 'YWJj'); }).should.throw('Cannot read property \'toString\' of null');
     });
 
-    it('should save a buffer type id directly and read v as base64', function() {
-      var t = new Tree(db, name, { log: silence });
-      // YWJjWFla == abcovXYZ
-      t._getHeadKey({ id: new Buffer([1, 2, 4]), v: 'YWJjWFla' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000\u0001\u0002\u0004\u0000abcXYZ');
+    it('should require that v matches the vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      (function() { t._getHeadKey('foo', 'YWJj'); }).should.throw('v is too short or too long');
     });
 
     it('should transform a string type id into a buffer and pad base64 v to 3 bytes', function() {
-      var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: 'foo', v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000foo\u0000abc');
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._getHeadKey('foo', 'YWJj').toString('hex').should.equal('0b5f676574486561644b6579000303666f6f0003616263');
     });
 
     it('should transform a function type id into a buffer and pad base64 v to 3 bytes', function() {
-      var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: function() { return true; }, v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000function () { return true; }\u0000abc');
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._getHeadKey(function() { return true; }, 'YWJj').toString('hex').should.equal('0b5f676574486561644b657900031c66756e6374696f6e202829207b2072657475726e20747275653b207d0003616263');
     });
 
     it('should transform a boolean type id into a buffer and pad base64 v to 3 bytes', function() {
-      var t = new Tree(db, name, { vSize: 3 });
-      t._getHeadKey({ id: true, v: 'YWJj' }).toString().should.equal('idx/head\u0000_getHeadKey\u0000true\u0000abc');
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._getHeadKey(true, 'YWJj').toString('hex').should.equal('0b5f676574486561644b6579000304747275650003616263');
     });
   });
 

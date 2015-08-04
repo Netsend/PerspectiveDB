@@ -1,6 +1,7 @@
 Key spec.
 
-The following grammar specifies the keys used for storing each DAG in a B-tree.
+The following grammar specifies the keys used for storing each DAG and
+appropriate keys in a B-tree.
 
 Basic Types
 
