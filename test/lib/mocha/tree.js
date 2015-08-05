@@ -211,6 +211,371 @@ describe('Tree', function() {
     });
   });
 
+  describe('parseKey', function() {
+    it('should require key to be a buffer', function() {
+      (function() { Tree.parseKey({}); }).should.throw('key must be a buffer');
+    });
+
+    it('should require subkey to be above 0x00', function() {
+      var b = new Buffer('00000000', 'hex');
+      (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
+    });
+
+    it('should require subkey to be beneath 0x04', function() {
+      var b = new Buffer('00000400', 'hex');
+      (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
+    });
+
+    it('should err if name is smaller than specified length', function() {
+      var b = new Buffer('026100010100', 'hex');
+      (function() { Tree.parseKey(b); }).should.throw('expected a null byte after name');
+    });
+
+    it('should err if name is bigger than specified length', function() {
+      var b = new Buffer('01618100010100', 'hex');
+      (function() { Tree.parseKey(b); }).should.throw('expected a null byte after name');
+    });
+
+    describe('dskey', function() {
+      it('should err if i length is zero', function() {
+        var b = new Buffer('000001000000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('i must be at least one byte');
+      });
+
+      it('should err if i is bigger than specified length', function() {
+        var b = new Buffer('0000010000010000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after i');
+      });
+
+      it('should err if i is smaller than specified length (1)', function() {
+        var b = new Buffer('000001000001', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      it('should err if i is smaller than specified length (2)', function() {
+        var b = new Buffer('00000100000200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      describe('i 1,', function() {
+        it('name 0, id 0', function() {
+          var b = new Buffer('00000100000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x01,
+            id: new Buffer(0),
+            i: 0,
+          });
+        });
+
+        it('name 1, id 0', function() {
+          var b = new Buffer('0161000100000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([97]),
+            type: 0x01,
+            id: new Buffer(0),
+            i: 0,
+          });
+        });
+
+        it('name 0, id 1', function() {
+          var b = new Buffer('0000010160000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x01,
+            id: new Buffer([96]),
+            i: 0,
+          });
+        });
+
+        it('name 1, id 1', function() {
+          var b = new Buffer('016000010159000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([96]),
+            type: 0x01,
+            id: new Buffer([89]),
+            i: 0,
+          });
+        });
+
+      });
+
+      describe('i 3,', function() {
+        it('name 0, id 0', function() {
+          var b = new Buffer('000001000003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x01,
+            id: new Buffer(0),
+            i: 0x235761
+          });
+        });
+
+        it('name 3, id 0', function() {
+          var b = new Buffer('032357610001000003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 97]),
+            type: 0x01,
+            id: new Buffer(0),
+            i: 0x235761
+          });
+        });
+
+        it('name 0, id 3', function() {
+          var b = new Buffer('000001032357600003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x01,
+            id: new Buffer([35, 87, 96]),
+            i: 0x235761
+          });
+        });
+
+        it('name 3, id 3', function() {
+          var b = new Buffer('032357600001032357590003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 96]),
+            type: 0x01,
+            id: new Buffer([35, 87, 89]),
+            i: 0x235761
+          });
+        });
+      });
+
+      it('should decode id to "hex" string', function() {
+        var b = new Buffer('0000030144000100', 'hex');
+        var obj = Tree.parseKey(b, 'hex');
+        should.deepEqual(obj, {
+          name: new Buffer([]),
+          type: 0x03,
+          id: '44',
+          v: 0
+        });
+      });
+
+      it('should decode id to "base64" string', function() {
+        var b = new Buffer('0000030144000100', 'hex');
+        var obj = Tree.parseKey(b, 'base64');
+        should.deepEqual(obj, {
+          name: new Buffer([]),
+          type: 0x03,
+          id: 'RA==',
+          v: 0
+        });
+      });
+    });
+
+    describe('ikey', function() {
+      it('should err if i length is zero', function() {
+        var b = new Buffer('00000200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('i must be at least one byte');
+      });
+
+      it('should err if i is bigger than specified length', function() {
+        var b = new Buffer('000002010000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after i');
+      });
+
+      it('should err if i is smaller than specified length (1)', function() {
+        var b = new Buffer('00000201', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      it('should err if i is smaller than specified length (2)', function() {
+        var b = new Buffer('0000020200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      describe('i 1,', function() {
+        it('name 0', function() {
+          var b = new Buffer('0000020100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x02,
+            i: 0,
+          });
+        });
+
+        it('name 1', function() {
+          var b = new Buffer('016100020100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([97]),
+            type: 0x02,
+            i: 0,
+          });
+        });
+      });
+
+      describe('i 3,', function() {
+        it('name 0', function() {
+          var b = new Buffer('00000203235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x02,
+            i: 0x235761
+          });
+        });
+
+        it('name 3', function() {
+          var b = new Buffer('03235761000203235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 97]),
+            type: 0x02,
+            i: 0x235761
+          });
+        });
+      });
+    });
+
+    describe('headkey', function() {
+      it('should err if v length is zero', function() {
+        var b = new Buffer('000003000000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('v must be at least one byte');
+      });
+
+      it('should err if v is bigger than specified length', function() {
+        var b = new Buffer('0000030000010000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after v');
+      });
+
+      it('should err if v is smaller than specified length (1)', function() {
+        var b = new Buffer('000003000001', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      it('should err if v is smaller than specified length (2)', function() {
+        var b = new Buffer('00000300000200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      describe('v 1,', function() {
+        it('name 0, id 0', function() {
+          var b = new Buffer('00000300000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x03,
+            id: new Buffer(0),
+            v: 0,
+          });
+        });
+
+        it('name 1, id 0', function() {
+          var b = new Buffer('0161000300000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([97]),
+            type: 0x03,
+            id: new Buffer(0),
+            v: 0,
+          });
+        });
+
+        it('name 0, id 1', function() {
+          var b = new Buffer('0000030160000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x03,
+            id: new Buffer([96]),
+            v: 0,
+          });
+        });
+
+        it('name 1, id 1', function() {
+          var b = new Buffer('016000030159000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([96]),
+            type: 0x03,
+            id: new Buffer([89]),
+            v: 0,
+          });
+        });
+      });
+
+      describe('v 3,', function() {
+        it('name 0, id 0', function() {
+          var b = new Buffer('000003000003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x03,
+            id: new Buffer(0),
+            v: 0x235761
+          });
+        });
+
+        it('name 3, id 0', function() {
+          var b = new Buffer('032357610003000003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 97]),
+            type: 0x03,
+            id: new Buffer(0),
+            v: 0x235761
+          });
+        });
+
+        it('name 0, id 3', function() {
+          var b = new Buffer('000003032357600003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x03,
+            id: new Buffer([35, 87, 96]),
+            v: 0x235761
+          });
+        });
+
+        it('name 3, id 3', function() {
+          var b = new Buffer('032357600003032357590003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 96]),
+            type: 0x03,
+            id: new Buffer([35, 87, 89]),
+            v: 0x235761
+          });
+        });
+      });
+    });
+
+    it('should decode v to "hex" string', function() {
+      var b = new Buffer('000003000003235761', 'hex');
+      var obj = Tree.parseKey(b, null, 'hex');
+      should.deepEqual(obj, {
+        name: new Buffer([]),
+        type: 0x03,
+        id: new Buffer([]),
+        v: '235761'
+      });
+    });
+
+    it('should decode v to "base64" string', function() {
+      var b = new Buffer('000003000003235761', 'hex');
+      var obj = Tree.parseKey(b, null, 'base64');
+      should.deepEqual(obj, {
+        name: new Buffer([]),
+        type: 0x03,
+        id: new Buffer([]),
+        v: 'I1dh'
+      });
+    });
+  });
+
   describe('getRange', function() {
     it('should require prefix to be a buffer', function() {
       (function() { Tree.getRange([]); }).should.throw('prefix must be a buffer');
@@ -278,8 +643,6 @@ describe('Tree', function() {
   });
 
   describe('_decomposeIKey', function() {
-    var name = '_decomposeIKey';
-
     it('should require b to be a buffer', function() {
       var t = new Tree(db, '', { log: silence });
       (function() { t._decomposeIKey({}); }).should.throw('b must be a buffer');
@@ -489,7 +852,7 @@ describe('Tree', function() {
 
     it('needs an item in the database and head- and i index', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._db.put(t._composeDsKey(item1._h), BSON.serialize(item1), function(err) {
+      t._db.put(t._composeDsKey(item1._h.id, item1._h.i), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
         t._db.put(t._composeIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
           if (err) { throw err; }
@@ -499,7 +862,7 @@ describe('Tree', function() {
     });
 
     it('should not accept roots in a non-empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var t = new Tree(db, name, { vSize: 3, log: cons });
       t._validParents(item1, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
