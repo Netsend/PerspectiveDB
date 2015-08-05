@@ -20,6 +20,7 @@
 
 var should = require('should');
 var rimraf = require('rimraf');
+var async = require('async');
 var level = require('level');
 var BSON = require('bson').BSONPure.BSON;
 
@@ -61,6 +62,152 @@ after(function(done) {
 });
 
 describe('Tree', function() {
+  describe('verify ordering of used database', function() {
+    var bytes = [
+      [ 0x00 ],
+      [ 0x00, 0x00 ],
+      [ 0x00, 0x01 ],
+      [ 0x00, 0xfe ],
+      [ 0x00, 0xff ],
+      [ 0x01 ],
+      [ 0x01, 0x00 ],
+      [ 0x01, 0x01 ],
+      [ 0x01, 0xfe ],
+      [ 0x01, 0xff ],
+      [ 0xfe ],
+      [ 0xfe, 0x00 ],
+      [ 0xfe, 0x01 ],
+      [ 0xfe, 0xfe ],
+      [ 0xfe, 0xff ],
+      [ 0xff ],
+      [ 0xff, 0x00 ],
+      [ 0xff, 0x01 ],
+      [ 0xff, 0xfe ],
+      [ 0xff, 0xff ]
+    ];
+
+    it('insert bytes in parallel', function(done) {
+      // do a parallel insert
+      bytes.reverse();
+      async.each(bytes, function(b, cb) {
+        db.put(new Buffer(b), null, cb);
+      }, done);
+      bytes.reverse();
+    });
+
+    it('should sort increasing, "0x00" after "", >= ""', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ gte: new Buffer([]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort increasing, "0x00" after "", > ""', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ gt: new Buffer([]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort increasing, "0x00" after "", >= 0x00', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ gte: new Buffer([0x00]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort increasing, "0x00" after "", > 0x00', function(done) {
+      var i = 1;
+      var it = db.createKeyStream({ gt: new Buffer([0x00]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort decreasing, "" before "0xff", <= 0xff 0xff 0xff', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ lte: new Buffer([0xff, 0xff, 0xff]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort decreasing, "" before "0xff", < 0xff 0xff 0xff', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ lt: new Buffer([0xff, 0xff, 0xff]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort decreasing, <= 0xff 0xff', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ lte: new Buffer([0xff, 0xff]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length, i);
+        done();
+      });
+    });
+
+    it('should sort decreasing, < 0xff 0xff', function(done) {
+      var i = 0;
+      var it = db.createKeyStream({ lt: new Buffer([0xff, 0xff]) });
+      it.on('data', function(key) {
+        should.strictEqual(new Buffer(bytes[i]).toString('hex'), key.toString('hex'));
+        i++;
+      });
+
+      it.on('end', function() {
+        should.strictEqual(bytes.length - 1, i);
+        done();
+      });
+    });
+  });
+
   describe('constructor', function() {
     var tree;
     it('should require db to be an object', function() {
@@ -880,7 +1027,7 @@ describe('Tree', function() {
       });
     });
 
-    it('needs an item in the database and head- and i index', function(done) {
+    it('needs item1 in dskey, ikey and headkey', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t._db.put(t._composeDsKey(item1._h.id, item1._h.i), BSON.serialize(item1), function(err) {
         if (err) { throw err; }
@@ -891,9 +1038,18 @@ describe('Tree', function() {
       });
     });
 
-    it('should not accept roots in a non-empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: cons });
+    it('should accept a root that is already in the database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item1, function(err, valid) {
+        if (err) { throw err; }
+        should.strictEqual(valid, true);
+        done();
+      });
+    });
+
+    it('should not accept a new root in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: cons });
+      t._validParents({ _h: { id: 'XI', v: 'Zzzz', pa: [] } }, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
         done();
