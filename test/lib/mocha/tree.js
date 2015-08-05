@@ -576,6 +576,36 @@ describe('Tree', function() {
     });
   });
 
+  describe('getIKeyRange', function() {
+    it('should work with a zero byte name and default iSize = 6', function() {
+      var t = new Tree(db, '');
+      var p = t.getIKeyRange();
+      should.strictEqual(p.s.toString('hex'), '000002');
+      should.strictEqual(p.e.toString('hex'), '00000207ffffffffffffff');
+    });
+
+    it('should use iSize + 1 for 0xff end sequence', function() {
+      var t = new Tree(db, '', { iSize: 1 });
+      var p = t.getIKeyRange();
+      should.strictEqual(p.s.toString('hex'), '000002');
+      should.strictEqual(p.e.toString('hex'), '00000202ffff');
+    });
+
+    it('should work with a single byte name', function() {
+      var t = new Tree(db, 'a', { iSize: 1 });
+      var p = t.getIKeyRange();
+      should.strictEqual(p.s.toString('hex'), '01610002');
+      should.strictEqual(p.e.toString('hex'), '0161000202ffff');
+    });
+
+    it('should work with a multi byte name', function() {
+      var t = new Tree(db, 'abc', { iSize: 1 });
+      var p = t.getIKeyRange();
+      should.strictEqual(p.s.toString('hex'), '036162630002');
+      should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
+    });
+  });
+
   describe('getRange', function() {
     it('should require prefix to be a buffer', function() {
       (function() { Tree.getRange([]); }).should.throw('prefix must be a buffer');
