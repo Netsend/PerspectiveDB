@@ -753,6 +753,59 @@ describe('Tree', function() {
     });
   });
 
+  describe('getHeadKeyRange', function() {
+    describe('no id', function() {
+      it('should work with a zero byte name', function() {
+        var t = new Tree(db, '');
+        var p = t.getHeadKeyRange();
+        should.strictEqual(p.s.toString('hex'), '000003');
+        should.strictEqual(p.e.toString('hex'), '000003ff');
+      });
+
+      it('should work with a single byte name', function() {
+        var t = new Tree(db, 'a');
+        var p = t.getHeadKeyRange();
+        should.strictEqual(p.s.toString('hex'), '01610003');
+        should.strictEqual(p.e.toString('hex'), '01610003ff');
+      });
+
+      it('should work with a multi byte name', function() {
+        var t = new Tree(db, 'abc');
+        var p = t.getHeadKeyRange();
+        should.strictEqual(p.s.toString('hex'), '036162630003');
+        should.strictEqual(p.e.toString('hex'), '036162630003ff');
+      });
+    });
+
+    describe('with id', function() {
+      it('should require id to be a buffer', function() {
+        var t = new Tree(db, '');
+        (function() { t.getHeadKeyRange([]); }).should.throw('id must be a buffer if provided');
+      });
+
+      it('should work with a zero byte name', function() {
+        var t = new Tree(db, '');
+        var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '00000301cb');
+        should.strictEqual(p.e.toString('hex'), '00000301cbff');
+      });
+
+      it('should work with a single byte name', function() {
+        var t = new Tree(db, 'a');
+        var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '0161000301cb');
+        should.strictEqual(p.e.toString('hex'), '0161000301cbff');
+      });
+
+      it('should work with a multi byte name', function() {
+        var t = new Tree(db, 'abc');
+        var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '03616263000301cb');
+        should.strictEqual(p.e.toString('hex'), '03616263000301cbff');
+      });
+    });
+  });
+
   describe('getRange', function() {
     it('should require prefix to be a buffer', function() {
       (function() { Tree.getRange([]); }).should.throw('prefix must be a buffer');
