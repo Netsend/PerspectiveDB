@@ -1,7 +1,7 @@
 Key spec.
 
 The following grammar specifies the keys used for storing each DAG and
-appropriate keys in a B-tree.
+related keys in a B-tree.
 
 Basic Types
 
@@ -20,25 +20,24 @@ represents the byte 0000 0001). Also note that we use the * operator as
 shorthand for repetition (e.g. ("\x01"*2) is "\x01\x01"). When used as a unary
 operator, * means that the repetition can occur 0 or more times.
 
-key     ::=  name subkey ""    key is comprised of a name followed by a subkey
-name    ::=  string            name of the keyspace
+key     ::=  name subkey ""       any key is a name followed by a subkey
+name    ::=  string               name of the key space
 subkey  ::=
-  |   "\x01" dskey             data store key type
-  |   "\x02" ikey              i index key type
-  |   "\x03" headkey           head index key type
-dskey   ::=  id ival           data store key is comprised of the value id plus
-                               an increment
-ikey    ::=  ival              i key
-headkey ::=  id version        head key is comprised of the id plus a version
-id      ::=  string            unique identifier for an object
-ival    ::=  lbeint            i, monotonically increasing number local to this
-                               keyspace
-version ::=  lbeint            unique in this keyspace
-lbeint  ::=  byte (byte*)       Large int - The byte is the number of bytes in
-                                (byte*). The (byte*) is one to 255 bytes written
-                                that should be interpreted as an unsigned
-                                integer in big endian format.
-string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
-                                    (byte*) + 1 (for the trailing '\x00'). The
-                                    (byte*) is zero or more UTF-8 encoded
-                                    characters. Can be at most 255 bytes.
+  |       "\x01\x00" id ival      dskey, data store key
+  |       "\x02\x00" ival         ikey, i index key
+  |       "\x03\x00" id version   headkey, head index key
+ival    ::=  lbeint               i value, local monotonically increasing number
+id      ::=  string               used to identify dskey values
+version ::=  lbeint               version number
+lbeint  ::=  byte (byte*)         Large int - The byte is the number of bytes in
+                                  (byte*). The (byte*) is one to 255 bytes written
+                                  that should be interpreted as an unsigned
+                                  integer in big endian format.
+string  ::=  byte (byte*) "\x00"  String - The byte is the number bytes in the
+                                  (byte*) + 1 (for the trailing '\x00'). The
+                                  (byte*) is zero or more UTF-8 encoded
+                                  characters. Can be at most 255 bytes.
+
+
+
+Copied from http://bsonspec.org/spec.html and modified by Tim Kuijsten
