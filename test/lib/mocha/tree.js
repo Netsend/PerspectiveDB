@@ -859,6 +859,12 @@ describe('Tree', function() {
     });
   });
 
+  describe('_ensureString', function() {
+  });
+
+  describe('_idToB', function() {
+  });
+
   describe('_decomposeIKey', function() {
     it('should require b to be a buffer', function() {
       var t = new Tree(db, '', { log: silence });
@@ -1114,23 +1120,110 @@ describe('Tree', function() {
       t.write(item2);
     });
 
-    it('should accept new root and follow up in an empty database and increment i', function(done) {
+    it('should accept a new root plus update item in an empty database and increment i twice', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.once('data', function(obj) {
-        should.strictEqual(obj._h.i, 1);
-        t.once('data', function(obj) {
+      var i = 0;
+      t.on('data', function(obj) {
+        if (i === 0) {
+          should.strictEqual(obj._h.i, 1);
+        }
+        if (i > 0) {
           should.strictEqual(obj._h.i, 2);
           done();
-        });
+        }
+        i++;
       });
       t.write(item1);
       t.write(item2);
     });
 
-    it('should have created an id + version index and an id + i index', function(done) {
-      var s = db.createReadStream();
+    it('inspect keys: should have created two dskeys with incremented i values', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getDsKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
       s.on('data', function(obj) {
-        console.log(obj);
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8');
+        var val = BSON.deserialize(obj.value);
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 1);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 2);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('inspect keys: should have one headkey with the latest version and corresponding ikey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getHeadKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var val = Tree.parseKey(obj.value, 'utf8');
+
+        should.strictEqual(key.type, 0x03);
+        should.strictEqual(key.id, 'XI');
+        should.strictEqual(key.v, 'Bbbb');
+
+        should.strictEqual(val.type, 0x02);
+        should.strictEqual(val.i, 2);
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('inspect keys: should have two ikeys with the corresponding headkey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getIKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8');
+        var val = Tree.parseKey(obj.value, 'utf8', 'base64');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 1);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Aaaa');
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 2);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Bbbb');
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
         done();
       });
     });
