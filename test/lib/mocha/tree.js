@@ -1078,18 +1078,9 @@ describe('Tree', function() {
       });
     });
 
-    it('should accept a root that is already in the database', function(done) {
+    it('should not accept a root in a non-empty database, even if it\'s already in the database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t._validParents(item1, function(err, valid) {
-        if (err) { throw err; }
-        should.strictEqual(valid, true);
-        done();
-      });
-    });
-
-    it('should not accept a new root in a non-empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: cons });
-      t._validParents({ _h: { id: 'XI', v: 'Zzzz', pa: [] } }, function(err, valid) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
         done();
@@ -1145,7 +1136,7 @@ describe('Tree', function() {
     });
 
     it('should accept an existing root item without incrementing i', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: cons });
+      var t = new Tree(db, name, { vSize: 3, log: silence });
       t.once('data', function(obj) {
         should.strictEqual(obj._h.i, 1);
         done();
