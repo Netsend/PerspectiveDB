@@ -1172,6 +1172,128 @@ describe('Tree', function() {
     });
   });
 
+  describe('_isNewChild', function() {
+    var name = '_isNewChild';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
+    var item3 = { _h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'] } };
+    var item4 = { _h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'] } };
+
+    var itemA = { _h: { id: 'XI', v: 'Xxxx', i: 1, pa: [] } };
+
+    it('should accept roots in an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item1, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, true);
+        done();
+      });
+    });
+
+    it('should not accept non-roots in an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item2, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, false);
+        done();
+      });
+    });
+
+    it('needs item1 in dskey, ikey, headkey and vkey', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var dsKey = t._composeDsKey(item1._h.id, item1._h.i);
+      var headKey = t._composeHeadKey(item1._h.id, item1._h.v);
+      var iKey = t._composeIKey(item1._h.i);
+      var vKey = t._composeVKey(item1._h.v);
+
+      t._db.put(dsKey, BSON.serialize(item1), function(err) {
+        if (err) { throw err; }
+        t._db.put(iKey, headKey, function(err) {
+          if (err) { throw err; }
+          t._db.put(headKey, iKey, function(err) {
+            if (err) { throw err; }
+            t._db.put(vKey, dsKey, done);
+          });
+        });
+      });
+    });
+
+    it('should not accept a new root in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(itemA, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, false);
+        done();
+      });
+    });
+
+    it('should not accept an existing root in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item1, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, false);
+        done();
+      });
+    });
+
+    it('should accept new connecting non-roots in a non-empty database (fast-forward)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item2, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, true);
+        done();
+      });
+    });
+
+    it('should accept new connecting non-roots in a non-empty database (fork)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item4, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, true);
+        done();
+      });
+    });
+
+    it('should not accept non-connecting non-roots in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item3, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, false);
+        done();
+      });
+    });
+
+    it('needs item2 in dskey, ikey, headkey and vkey', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var dsKey = t._composeDsKey(item2._h.id, item2._h.i);
+      var headKey = t._composeHeadKey(item2._h.id, item2._h.v);
+      var iKey = t._composeIKey(item2._h.i);
+      var vKey = t._composeVKey(item2._h.v);
+
+      t._db.put(dsKey, BSON.serialize(item2), function(err) {
+        if (err) { throw err; }
+        t._db.put(iKey, headKey, function(err) {
+          if (err) { throw err; }
+          t._db.put(headKey, iKey, function(err) {
+            if (err) { throw err; }
+            t._db.put(vKey, dsKey, done);
+          });
+        });
+      });
+    });
+
+    it('should not accept existing connecting non-roots in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isNewChild(item2, function(err, isNewChild) {
+        if (err) { throw err; }
+        should.strictEqual(isNewChild, false);
+        done();
+      });
+    });
+  });
+
   describe('_validParents', function() {
     var name = '_validParents';
 
