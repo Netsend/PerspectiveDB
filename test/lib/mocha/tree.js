@@ -1228,16 +1228,21 @@ describe('Tree', function() {
       });
     });
 
-    it('should accept an existing root item without incrementing i', function(done) {
+    it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.once('data', function(obj) {
-        should.strictEqual(obj._h.i, 1);
-        done();
+      var ok;
+      t.on('error', function(err) {
+        should.strictEqual(err.message, 'item is not connected to the DAG');
+        ok = true;
       });
       t.write(item1);
+      t.on('end', function() {
+        should.strictEqual(ok, true);
+        done();
+      });
     });
 
-    it('should accept an existing item without incrementing i', function(done) {
+    it('should not accept an existing item', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.once('data', function(obj) {
         should.strictEqual(obj._h.i, 2);
