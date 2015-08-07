@@ -767,23 +767,21 @@ describe('Tree', function() {
     });
 
     it('should decode v to "hex" string', function() {
-      var b = new Buffer('000003000003235761', 'hex');
+      var b = new Buffer('00000403235761', 'hex');
       var obj = Tree.parseKey(b, null, 'hex');
       should.deepEqual(obj, {
         name: new Buffer([]),
-        type: 0x03,
-        id: new Buffer([]),
+        type: 0x04,
         v: '235761'
       });
     });
 
     it('should decode v to "base64" string', function() {
-      var b = new Buffer('000003000003235761', 'hex');
+      var b = new Buffer('00000403235761', 'hex');
       var obj = Tree.parseKey(b, null, 'base64');
       should.deepEqual(obj, {
         name: new Buffer([]),
-        type: 0x03,
-        id: new Buffer([]),
+        type: 0x04,
         v: 'I1dh'
       });
     });
