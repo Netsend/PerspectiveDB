@@ -1294,61 +1294,6 @@ describe('Tree', function() {
     });
   });
 
-  describe('_validParents', function() {
-    var name = '_validParents';
-
-    // use 24-bit version numbers (base 64)
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
-
-    it('should accept roots in an empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validParents(item1, function(err, valid) {
-        if (err) { throw err; }
-        should.strictEqual(valid, true);
-        done();
-      });
-    });
-
-    it('should not accept non-roots in an empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validParents(item2, function(err, valid) {
-        if (err) { throw err; }
-        should.strictEqual(valid, false);
-        done();
-      });
-    });
-
-    it('needs item1 in dskey, ikey and headkey', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._db.put(t._composeDsKey(item1._h.id, item1._h.i), BSON.serialize(item1), function(err) {
-        if (err) { throw err; }
-        t._db.put(t._composeIKey(item1._h.i), t._composeHeadKey(item1._h.id, item1._h.v), function(err) {
-          if (err) { throw err; }
-          t._db.put(t._composeHeadKey(item1._h.id, item1._h.v), t._composeIKey(item1._h.i), done);
-        });
-      });
-    });
-
-    it('should not accept a root in a non-empty database, even if it\'s already in the database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validParents(item1, function(err, valid) {
-        if (err) { throw err; }
-        should.strictEqual(valid, false);
-        done();
-      });
-    });
-
-    it('should accept connecting non-roots in a non-empty database', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validParents(item2, function(err, valid) {
-        if (err) { throw err; }
-        should.strictEqual(valid, true);
-        done();
-      });
-    });
-  });
-
   describe('_write', function() {
     var name = '_write';
 
