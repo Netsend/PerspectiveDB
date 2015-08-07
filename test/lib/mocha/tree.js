@@ -1497,5 +1497,186 @@ describe('Tree', function() {
       });
       t.write(item4);
     });
+
+    it('inspect keys: should have created four dskeys with incremented i values', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getDsKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8');
+        var val = BSON.deserialize(obj.value);
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 1);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 2);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
+        }
+        if (i === 3) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 3);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3 }, _b: { more2: 'body' } });
+        }
+        if (i === 4) {
+          should.strictEqual(key.type, 0x01);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.i, 4);
+          should.deepEqual(val, { _h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4 }, _b: { more3: 'b' } });
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 4);
+        done();
+      });
+    });
+
+    it('inspect keys: should have two headkey with the latest versions and corresponding ikey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getHeadKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var val = Tree.parseKey(obj.value, 'utf8');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x03);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.v, 'Bbbb');
+
+          should.strictEqual(val.type, 0x02);
+          should.strictEqual(val.i, 2);
+        }
+
+        if (i === 2) {
+          should.strictEqual(key.type, 0x03);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.v, 'Dddd');
+
+          should.strictEqual(val.type, 0x02);
+          should.strictEqual(val.i, 4);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('inspect keys: should have four ikeys with the corresponding headkey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getIKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8');
+        var val = Tree.parseKey(obj.value, 'utf8', 'base64');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 1);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Aaaa');
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 2);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Bbbb');
+        }
+        if (i === 3) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 3);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Cccc');
+        }
+        if (i === 4) {
+          should.strictEqual(key.type, 0x02);
+          should.strictEqual(key.i, 4);
+
+          should.strictEqual(val.type, 0x03);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.v, 'Dddd');
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 4);
+        done();
+      });
+    });
+
+    it('inspect keys: should have four vkeys with the corresponding dskey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getVKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var val = Tree.parseKey(obj.value, 'utf8');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Aaaa');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 1);
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Bbbb');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 2);
+        }
+        if (i === 3) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Cccc');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 3);
+        }
+        if (i === 4) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Dddd');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 4);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 4);
+        done();
+      });
+    });
   });
 });
