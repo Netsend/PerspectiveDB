@@ -1356,31 +1356,31 @@ describe('Tree', function() {
     var item1 = { _h: { id: 'XI', v: 'Aaaa', pa: [] }, _b: { some: 'body' } };
     var item2 = { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, _b: { more: 'body' } };
     var item3 = { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, _b: { more2: 'body' } };
+    var item4 = { _h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, _b: { more3: 'b' } };
 
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not connected to the DAG');
+        should.strictEqual(err.message, 'item is not a new leaf');
         done();
       });
       t.write(item2);
     });
 
-    it('should accept a new root plus update item in an empty database and increment i twice', function(done) {
+    it('should accept a new root and a new leaf in an empty database and increment i twice', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       t.on('data', function(obj) {
-        if (i === 0) {
-          should.strictEqual(obj._h.i, 1);
-        }
-        if (i > 0) {
-          should.strictEqual(obj._h.i, 2);
-          done();
-        }
         i++;
+        should.strictEqual(obj._h.i, i);
+      });
+      t.on('finish', function() {
+        should.strictEqual(i, 2);
+        done();
       });
       t.write(item1);
       t.write(item2);
+      t.end();
     });
 
     it('inspect keys: should have created two dskeys with incremented i values', function(done) {
@@ -1474,36 +1474,83 @@ describe('Tree', function() {
       });
     });
 
+    it('inspect keys: should have two vkeys with the corresponding dskey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getVKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var val = Tree.parseKey(obj.value, 'utf8');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Aaaa');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 1);
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x04);
+          should.strictEqual(key.v, 'Bbbb');
+
+          should.strictEqual(val.type, 0x01);
+          should.strictEqual(val.id, 'XI');
+          should.strictEqual(val.i, 2);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
     it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var ok;
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not connected to the DAG');
-        ok = true;
-      });
-      t.write(item1);
-      t.on('end', function() {
-        should.strictEqual(ok, true);
+        should.strictEqual(err.message, 'item is not a new leaf');
         done();
       });
+      t.end(item1);
+      // expect that streams do not emit a finish after an error occurred
+      t.on('finish', done);
+      // nor should a data event happen
+      t.on('data', done);
     });
 
-    it('should not accept an existing item', function(done) {
+    it('should not accept an existing non-root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.once('data', function(obj) {
-        should.strictEqual(obj._h.i, 2);
+      t.on('error', function(err) {
+        should.strictEqual(err.message, 'item is not a new leaf');
         done();
       });
-      t.write(item2);
+      t.end(item2);
+      // expect that streams do not emit a finish after an error occurred
+      t.on('finish', done);
+      // nor should a data event happen
+      t.on('data', done);
     });
 
-    it('should accept new item that forks', function(done) {
+    it('should accept new item (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.once('data', function(obj) {
+      t.on('data', function(obj) {
         should.strictEqual(obj._h.i, 3);
         done();
       });
       t.write(item3);
+    });
+
+    it('should accept new item (fast-forward)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.on('data', function(obj) {
+        should.strictEqual(obj._h.i, 4);
+        done();
+      });
+      t.write(item4);
     });
   });
 });
