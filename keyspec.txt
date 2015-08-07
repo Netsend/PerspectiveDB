@@ -23,9 +23,10 @@ operator, * means that the repetition can occur 0 or more times.
 key     ::=  name subkey ""       any key is a name followed by a subkey
 name    ::=  string               name of the key space
 subkey  ::=
-  |       "\x01\x00" id ival      dskey, data store key
-  |       "\x02\x00" ival         ikey, i index key
-  |       "\x03\x00" id version   headkey, head index key
+  |       "\x01" id ival          dskey, data store key
+  |       "\x02" ival             ikey, i index key
+  |       "\x03" id version       headkey, head index key
+  |       "\x04" version          vkey, version index key
 ival    ::=  lbeint               i value, local monotonically increasing number
 id      ::=  string               used to identify dskey values
 version ::=  lbeint               version number
