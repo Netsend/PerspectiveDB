@@ -274,17 +274,17 @@ describe('Tree', function() {
       (function() { p = Tree.getPrefix(''); }).should.throw('type must be a number');
     });
 
-    it('should require type to be >= 1', function() {
-      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 1 to 3');
+    it('should require type to be >= 0x01', function() {
+      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 0x01 to 0x04');
     });
 
-    it('should require type to be <= 3', function() {
-      (function() { p = Tree.getPrefix('', 0x04); }).should.throw('type must be in the subkey range of 1 to 3');
+    it('should require type to be <= 0x04', function() {
+      (function() { p = Tree.getPrefix('', 0x05); }).should.throw('type must be in the subkey range of 0x01 to 0x04');
     });
 
     it('should return the right prefix with an empty name', function() {
-      p = Tree.getPrefix('', 0x03);
-      should.strictEqual(p.toString('hex'), new Buffer([0,0,3]).toString('hex'));
+      p = Tree.getPrefix('', 0x04);
+      should.strictEqual(p.toString('hex'), new Buffer([0,0,4]).toString('hex'));
     });
 
     it('should return the right prefix with a non-empty name', function() {
@@ -368,8 +368,8 @@ describe('Tree', function() {
       (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
     });
 
-    it('should require subkey to be beneath 0x04', function() {
-      var b = new Buffer('00000400', 'hex');
+    it('should require subkey to be <= 0x04', function() {
+      var b = new Buffer('00000500', 'hex');
       (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
     });
 
@@ -700,6 +700,72 @@ describe('Tree', function() {
       });
     });
 
+    describe('vkey', function() {
+      it('should err if v length is zero', function() {
+        var b = new Buffer('00000400', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('v must be at least one byte');
+      });
+
+      it('should err if v is bigger than specified length', function() {
+        var b = new Buffer('000004010000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after v');
+      });
+
+      it('should err if v is smaller than specified length (1)', function() {
+        var b = new Buffer('00000401', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      it('should err if v is smaller than specified length (2)', function() {
+        var b = new Buffer('0000040200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      describe('v 1,', function() {
+        it('name 0', function() {
+          var b = new Buffer('0000040100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x04,
+            v: 0,
+          });
+        });
+
+        it('name 1', function() {
+          var b = new Buffer('016100040100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([97]),
+            type: 0x04,
+            v: 0,
+          });
+        });
+      });
+
+      describe('v 3,', function() {
+        it('name 0', function() {
+          var b = new Buffer('00000403235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x04,
+            v: 0x235761
+          });
+        });
+
+        it('name 3', function() {
+          var b = new Buffer('03235761000403235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 97]),
+            type: 0x04,
+            v: 0x235761
+          });
+        });
+      });
+    });
+
     it('should decode v to "hex" string', function() {
       var b = new Buffer('000003000003235761', 'hex');
       var obj = Tree.parseKey(b, null, 'hex');
@@ -750,6 +816,36 @@ describe('Tree', function() {
       var p = t.getIKeyRange();
       should.strictEqual(p.s.toString('hex'), '036162630002');
       should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
+    });
+  });
+
+  describe('getVKeyRange', function() {
+    it('should work with a zero byte name and default vSize = 6', function() {
+      var t = new Tree(db, '');
+      var p = t.getVKeyRange();
+      should.strictEqual(p.s.toString('hex'), '000004');
+      should.strictEqual(p.e.toString('hex'), '00000407ffffffffffffff');
+    });
+
+    it('should use vSize + 1 for 0xff end sequence', function() {
+      var t = new Tree(db, '', { vSize: 1 });
+      var p = t.getVKeyRange();
+      should.strictEqual(p.s.toString('hex'), '000004');
+      should.strictEqual(p.e.toString('hex'), '00000402ffff');
+    });
+
+    it('should work with a single byte name', function() {
+      var t = new Tree(db, 'a', { vSize: 1 });
+      var p = t.getVKeyRange();
+      should.strictEqual(p.s.toString('hex'), '01610004');
+      should.strictEqual(p.e.toString('hex'), '0161000402ffff');
+    });
+
+    it('should work with a multi byte name', function() {
+      var t = new Tree(db, 'abc', { vSize: 1 });
+      var p = t.getVKeyRange();
+      should.strictEqual(p.s.toString('hex'), '036162630004');
+      should.strictEqual(p.e.toString('hex'), '03616263000402ffff');
     });
   });
 
@@ -914,6 +1010,36 @@ describe('Tree', function() {
     it('should prepend ikey prefix to i and use 2 bytes for i', function() {
       var t = new Tree(db, name, { iSize: 2, log: silence });
       t._composeIKey(8).toString('hex').should.equal('0c5f636f6d706f7365494b65790002020008');
+    });
+  });
+
+  describe('_composeVKey', function() {
+    var name = '_composeVKey';
+
+    it('should require v to be a number or a base64 string', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { log: silence });
+      (function() { t._composeVKey({}); }).should.throw('v must be a number or a base64 string');
+    });
+
+    it('should prepend vkey prefix to v and use 6 bytes for v by default', function() {
+      var t = new Tree(db, name, { log: silence });
+      t._composeVKey(8).toString('hex').should.equal('0c5f636f6d706f7365564b6579000406000000000008');
+    });
+
+    it('should prepend vkey prefix to v and use 2 bytes for v', function() {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      t._composeVKey(8).toString('hex').should.equal('0c5f636f6d706f7365564b65790004020008');
+    });
+
+    it('should require provided base64 version to match vSize', function() {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      (function() { t._composeVKey('YWJj'); }).should.throw('v must be the same size as the configured vSize');
+    });
+
+    it('should accept base64 version', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._composeVKey('YWJj').toString('hex').should.equal('0c5f636f6d706f7365564b6579000403616263');
     });
   });
 
