@@ -959,38 +959,6 @@ describe('Tree', function() {
   describe('_idToB', function() {
   });
 
-  describe('_decomposeIKey', function() {
-    it('should require b to be a buffer', function() {
-      var t = new Tree(db, '', { log: silence });
-      (function() { t._decomposeIKey({}); }).should.throw('b must be a buffer');
-    });
-
-    it('should require b to be of subkey type 0x02', function() {
-      var t = new Tree(db, '', { log: silence });
-      var b = new Buffer('00000300', 'hex');
-      (function() { t._decomposeIKey(b); }).should.throw('b key must be of key subtype 0x02');
-    });
-
-    it('should check if the given length matches the configured iSize length', function() {
-      var t = new Tree(db, '', { log: silence });
-      var b = new Buffer('0000020100', 'hex');
-      (function() { t._decomposeIKey(b); }).should.throw('ikey length differs from iSize');
-    });
-
-    it('should check if the given length matches the configured iSize length (with a single byte name)', function() {
-      var t = new Tree(db, 'a', { log: silence });
-      var b = new Buffer('016100020100', 'hex');
-      (function() { t._decomposeIKey(b); }).should.throw('ikey length differs from iSize');
-    });
-
-    it('should read i', function() {
-      var t = new Tree(db, 'a', { iSize: 2, log: silence });
-      // contains the number 8 in the last 2 bytes BE
-      var b = new Buffer('01610002020008', 'hex');
-      t._decomposeIKey(b).should.equal(8);
-    });
-  });
-
   describe('_composeIKey', function() {
     var name = '_composeIKey';
 
