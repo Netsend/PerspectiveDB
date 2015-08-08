@@ -967,7 +967,45 @@ describe('Tree', function() {
     });
   });
 
-  describe('_idToB', function() {
+  describe('_toBuffer', function() {
+    it('should accept strings', function() {
+      var b = Tree._toBuffer('a');
+      should.strictEqual(Buffer.isBuffer(b), true);
+      should.strictEqual(b.toString('hex'), '61');
+    });
+
+    it('should accept numbers', function() {
+      var b = Tree._toBuffer(9);
+      should.strictEqual(Buffer.isBuffer(b), true);
+      should.strictEqual(b.toString('hex'), '09');
+    });
+
+    it('should accept an array', function() {
+      var b = Tree._toBuffer([9, 8]);
+      should.strictEqual(Buffer.isBuffer(b), true);
+      should.strictEqual(b.toString('hex'), '0908');
+    });
+
+    it('should return the original buffer', function() {
+      var a = new Buffer('ab');
+      var b = Tree._toBuffer(a);
+      should.strictEqual(Buffer.isBuffer(b), true);
+      should.strictEqual(a, b);
+    });
+
+    it('should try to call toString if input type is something different', function() {
+      var b = Tree._toBuffer(function() { return 1; });
+      should.strictEqual(Buffer.isBuffer(b), true);
+      should.strictEqual(b.toString('utf8'), 'function () { return 1; }');
+    });
+
+    it('should throw an error on "undefined" values', function() {
+      (function() { Tree._ensureString(undefined); }).should.throw('Cannot read property \'toString\' of undefined');
+    });
+
+    it('should throw an error on "null" values', function() {
+      (function() { Tree._ensureString(null); }).should.throw('Cannot read property \'toString\' of null');
+    });
   });
 
   describe('_composeIKey', function() {
