@@ -954,6 +954,17 @@ describe('Tree', function() {
   });
 
   describe('_ensureString', function() {
+    it('should return the string itself if input type is already a string', function() {
+      should.strictEqual(Tree._ensureString('a'), 'a');
+    });
+
+    it('should try to call toString if input type is not a string', function() {
+      should.strictEqual(Tree._ensureString(9), '9');
+    });
+
+    it('should throw an error if not convertible to string', function() {
+      (function() { Tree._ensureString(null); }).should.throw('Cannot read property \'toString\' of null');
+    });
   });
 
   describe('_idToB', function() {
