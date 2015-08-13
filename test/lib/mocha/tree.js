@@ -953,6 +953,16 @@ describe('Tree', function() {
     });
   });
 
+  describe('getHeads', function() {
+    // simple test, test further after write tests are done
+    var name = 'getHeads';
+    it('should return a readable stream', function() {
+      var t = new Tree(db, name, { log: cons });
+      var p = t.getHeads();
+      should.strictEqual(typeof p.on, 'function');
+    });
+  });
+
   describe('_ensureString', function() {
     it('should return the string itself if input type is already a string', function() {
       should.strictEqual(Tree._ensureString('a'), 'a');
@@ -1563,6 +1573,41 @@ describe('Tree', function() {
       var i = 0;
       var r = t.getHeadKeyRange();
       var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var val = Tree.parseKey(obj.value, 'utf8');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x03);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.v, 'Bbbb');
+
+          should.strictEqual(val.type, 0x02);
+          should.strictEqual(val.i, 2);
+        }
+
+        if (i === 2) {
+          should.strictEqual(key.type, 0x03);
+          should.strictEqual(key.id, 'XI');
+          should.strictEqual(key.v, 'Dddd');
+
+          should.strictEqual(val.type, 0x02);
+          should.strictEqual(val.i, 4);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('inspect keys (with getHeads): should have two headkey with the latest versions and corresponding ikey as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var s = t.getHeads();
       s.on('data', function(obj) {
         i++;
 
