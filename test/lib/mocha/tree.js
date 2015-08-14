@@ -956,10 +956,24 @@ describe('Tree', function() {
   describe('getHeads', function() {
     // simple test, test further after write tests are done
     var name = 'getHeads';
-    it('should return a readable stream', function() {
-      var t = new Tree(db, name, { log: cons });
+    it('should return a readable stream', function(done) {
+      var t = new Tree(db, name, { log: silence });
       var p = t.getHeads();
       should.strictEqual(typeof p.on, 'function');
+      p.on('close', done);
+      p.destroy();
+    });
+  });
+
+  describe('getHeadKeys', function() {
+    // simple test
+    var name = 'getHeadKeys';
+    it('should return a readable stream', function(done) {
+      var t = new Tree(db, name, { log: silence });
+      var p = t.getHeadKeys();
+      should.strictEqual(typeof p.on, 'function');
+      p.on('close', done);
+      p.destroy();
     });
   });
 
