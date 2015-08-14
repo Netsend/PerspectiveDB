@@ -977,6 +977,53 @@ describe('Tree', function() {
     });
   });
 
+  describe('getDsKeyByVersion', function() {
+    var name = 'getDsKeyByVersion';
+
+    var item = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+
+    it('should require version to be a number or a base64 string', function() {
+      var t = new Tree(db, name, { log: silence });
+      (function() { t.getDsKeyByVersion({}); }).should.throw('version must be a number or a base64 string');
+    });
+
+    it('should return with null if the index is empty', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getDsKeyByVersion('Aaaa', function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey, null);
+        done();
+      });
+    });
+
+    it('needs an entry in vkey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var vKey = t._composeVKey(item._h.v);
+      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+
+      t._db.put(vKey, dsKey, done);
+    });
+
+    it('should find the version', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getDsKeyByVersion('Aaaa', function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey.toString('hex'), t._composeDsKey(item._h.id, item._h.i).toString('hex'));
+        done();
+      });
+    });
+
+    it('should return null if version is not found', function(done) {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      t.getDsKeyByVersion(8, function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey, null);
+        done();
+      });
+    });
+  });
+
   describe('_ensureString', function() {
     it('should return the string itself if input type is already a string', function() {
       should.strictEqual(Tree._ensureString('a'), 'a');
