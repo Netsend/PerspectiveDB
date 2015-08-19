@@ -1050,6 +1050,98 @@ describe('Tree', function() {
     });
   });
 
+  describe('createReadStream', function() {
+    var name = 'createReadStream';
+
+    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
+
+    it('should return a readable stream', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream();
+      should.strictEqual(typeof r.on, 'function');
+    });
+
+    it('needs item1 in dskey, ikey, headkey and vkey', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var dsKey = t._composeDsKey(item1._h.id, item1._h.i);
+      var headKey = t._composeHeadKey(item1._h.id, item1._h.v);
+      var iKey = t._composeIKey(item1._h.i);
+      var vKey = t._composeVKey(item1._h.v);
+
+      t._db.put(dsKey, BSON.serialize(item1), function(err) {
+        if (err) { throw err; }
+        t._db.put(iKey, headKey, function(err) {
+          if (err) { throw err; }
+          t._db.put(headKey, iKey, function(err) {
+            if (err) { throw err; }
+            t._db.put(vKey, dsKey, done);
+          });
+        });
+      });
+    });
+
+    it('should emit item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream();
+      r.on('data', function(obj) {
+        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+        done();
+      });
+
+      // should stay open
+      r.on('end', done);
+    });
+
+    it('should emit existing items and then automatically emit any newly written items', function(done) {
+      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream();
+      r.once('data', function(obj) {
+        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+
+        t.write(item2);
+        r.once('data', function(obj) {
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          done();
+        });
+      });
+
+      // should stay open
+      r.on('end', done);
+    });
+
+    it('should start emitting at offset 1', function(done) {
+      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream(1);
+      r.once('data', function(obj) {
+        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+
+        r.once('data', function(obj) {
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          done();
+        });
+      });
+
+      // should stay open
+      r.on('end', done);
+    });
+
+    it('should start emitting at offset 2', function(done) {
+      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream(2);
+      r.once('data', function(obj) {
+        should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+        done();
+      });
+
+      // should stay open
+      r.on('end', done);
+    });
+  });
+
   describe('_ensureString', function() {
     it('should return the string itself if input type is already a string', function() {
       should.strictEqual(Tree._ensureString('a'), 'a');
