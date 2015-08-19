@@ -827,6 +827,20 @@ describe('Tree', function() {
       should.strictEqual(p.s.toString('hex'), '0361626300020103');
       should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
     });
+
+    it('should work with maxI 4', function() {
+      var t = new Tree(db, 'abc', { iSize: 1 });
+      var p = t.getIKeyRange({ maxI: 4 });
+      should.strictEqual(p.s.toString('hex'), '036162630002');
+      should.strictEqual(p.e.toString('hex'), '0361626300020204ff');
+    });
+
+    it('should work with minI 5 and maxI 2', function() {
+      var t = new Tree(db, 'abc', { iSize: 1 });
+      var p = t.getIKeyRange({ minI: 5, maxI: 2 });
+      should.strictEqual(p.s.toString('hex'), '0361626300020105');
+      should.strictEqual(p.e.toString('hex'), '0361626300020202ff');
+    });
   });
 
   describe('getVKeyRange', function() {
