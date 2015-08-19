@@ -1114,7 +1114,7 @@ describe('Tree', function() {
     it('should start emitting at offset 1', function(done) {
       // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream(1);
+      var r = t.createReadStream({ i: 1 });
       r.once('data', function(obj) {
         should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
 
@@ -1131,7 +1131,7 @@ describe('Tree', function() {
     it('should start emitting at offset 2', function(done) {
       // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream(2);
+      var r = t.createReadStream({ i: 2 });
       r.once('data', function(obj) {
         should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
         done();
@@ -1139,6 +1139,23 @@ describe('Tree', function() {
 
       // should stay open
       r.on('end', done);
+    });
+
+    it('should close if close option is given', function(done) {
+      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var r = t.createReadStream({ close: true });
+
+      var i = 0;
+      r.on('data', function() {
+        i++;
+      });
+
+      // should stay open
+      r.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
     });
   });
 
