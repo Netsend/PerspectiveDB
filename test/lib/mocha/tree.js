@@ -1540,7 +1540,7 @@ describe('Tree', function() {
       var i = 0;
       t.on('data', function(obj) {
         i++;
-        should.strictEqual(obj._h.i, i);
+        should.strictEqual(BSON.deserialize(obj)._h.i, i);
       });
       t.on('finish', function() {
         should.strictEqual(i, 2);
@@ -1706,7 +1706,7 @@ describe('Tree', function() {
     it('should accept new item (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('data', function(obj) {
-        should.strictEqual(obj._h.i, 3);
+        should.strictEqual(BSON.deserialize(obj)._h.i, 3);
         done();
       });
       t.write(item3);
@@ -1715,7 +1715,7 @@ describe('Tree', function() {
     it('should accept new item (fast-forward)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('data', function(obj) {
-        should.strictEqual(obj._h.i, 4);
+        should.strictEqual(BSON.deserialize(obj)._h.i, 4);
         done();
       });
       t.write(item4);
