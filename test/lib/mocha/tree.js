@@ -1408,8 +1408,8 @@ describe('Tree', function() {
     });
   });
 
-  describe('_write', function() {
-    var name = '_write';
+  describe('_transform', function() {
+    var name = '_transform';
 
     // use 24-bit version numbers (base 64)
     var item1 = { _h: { id: 'XI', v: 'Aaaa', pa: [] }, _b: { some: 'body' } };
