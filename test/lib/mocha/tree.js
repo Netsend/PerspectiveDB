@@ -815,6 +815,18 @@ describe('Tree', function() {
       should.strictEqual(p.s.toString('hex'), '036162630002');
       should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
     });
+
+    it('should require opts to be an object', function() {
+      var t = new Tree(db, 'abc', { iSize: 1 });
+      (function() { t.getIKeyRange(null); }).should.throw('opts must be an object');
+    });
+
+    it('should work with minI 3', function() {
+      var t = new Tree(db, 'abc', { iSize: 1 });
+      var p = t.getIKeyRange({ minI: 3 });
+      should.strictEqual(p.s.toString('hex'), '0361626300020103');
+      should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
+    });
   });
 
   describe('getVKeyRange', function() {
