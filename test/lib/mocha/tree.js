@@ -1211,12 +1211,9 @@ describe('Tree', function() {
       r.on('close', done);
     });
 
-    it('should emit close after the first item is written in the database', function(done) {
+    it('needs item1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
-      should.strictEqual(typeof r.on, 'function');
-      t.write(item1);
-      r.on('close', done);
+      t.write(item1, done);
     });
 
     it('should emit item1', function(done) {
@@ -1229,7 +1226,6 @@ describe('Tree', function() {
         should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
       });
 
-      // should stay open
       r.on('close', function() {
         should.strictEqual(i, 1);
         done();
@@ -1241,6 +1237,8 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var r = t.createReadStream();
 
+      t.write(item2);
+
       var i = 0;
       r.on('data', function(obj) {
         i++;
@@ -1249,9 +1247,6 @@ describe('Tree', function() {
         }
       });
 
-      t.write(item2);
-
-      // should stay open
       r.on('close', function() {
         should.strictEqual(i, 1);
         done();
@@ -1276,7 +1271,6 @@ describe('Tree', function() {
         }
       });
 
-      // should stay open
       r.on('close', function() {
         should.strictEqual(i, 2);
         done();
@@ -1304,8 +1298,10 @@ describe('Tree', function() {
         }
       });
 
-      // should stay open
-      r.on('close', done);
+      r.on('close', function() {
+        should.strictEqual(i, 3);
+        done();
+      });
     });
 
     it('should use opts.i and start emitting at offset 2', function(done) {
@@ -1325,8 +1321,10 @@ describe('Tree', function() {
         }
       });
 
-      // should stay open
-      r.on('close', done);
+      r.on('close', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
     });
 
     it('should use opts.v and start emitting at offset 2', function(done) {
@@ -1346,14 +1344,18 @@ describe('Tree', function() {
         }
       });
 
-      // should stay open
-      r.on('close', done);
+      r.on('close', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
     });
 
-    it('should emit existing items and any new items that were added after the last data event was fired, if opts.keepOpen', function(done) {
+    it('should emit the existing items but not any new items that are added after the readable stream is opened', function(done) {
       // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var r = t.createReadStream({ keepOpen: true });
+
+      t.write(item4);
 
       var i = 0;
       r.on('data', function(obj) {
@@ -1361,7 +1363,6 @@ describe('Tree', function() {
 
         if (i === 3) {
           should.deepEqual({ _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } }, BSON.deserialize(obj));
-          setTimeout(function() { t.write(item4); }, 1);
         }
 
         if (i > 3) {
@@ -1370,9 +1371,9 @@ describe('Tree', function() {
         }
       });
 
-      // should stay open
       r.on('close', function() {
-        throw new Error('close should not be fired');
+        should.strictEqual(i, 3);
+        done();
       });
     });
   });
