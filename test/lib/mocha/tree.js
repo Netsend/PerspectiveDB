@@ -1466,6 +1466,12 @@ describe('Tree', function() {
       // prefix is data\u0000_composeDsKey\u0000 which is 64617461005f6765744461746153746f72654b657900
       t._composeDsKey(true, 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000104747275650006000000000101');
     });
+
+    it('should accept buffer type id', function() {
+      var t = new Tree(db, name);
+      // prefix is data\u0000_composeDsKey\u0000 which is 64617461005f6765744461746153746f72654b657900
+      t._composeDsKey(new Buffer('true'), 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000104747275650006000000000101');
+    });
   });
 
   describe('_nextI', function() {
@@ -1941,10 +1947,11 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys (with getHeads): should have two headKeys with the latest versions and corresponding ikey as value', function(done) {
+    it('inspect keys: should have two headKeys with the latest versions and corresponding ikey as value', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      var s = t.getHeads(new Buffer('XI'));
+      var r = t.getHeadKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
       s.on('data', function(obj) {
         i++;
 
@@ -1969,8 +1976,7 @@ describe('Tree', function() {
           should.strictEqual(val.i, 4);
         }
       });
-
-      s.on('end', function() {
+      s.on('close', function() {
         should.strictEqual(i, 2);
         done();
       });
