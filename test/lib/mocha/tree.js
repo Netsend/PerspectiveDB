@@ -982,25 +982,102 @@ describe('Tree', function() {
   describe('getHeads', function() {
     // simple test, test further after write tests are done
     var name = 'getHeads';
-    it('should return a readable stream', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      var p = t.getHeads();
-      should.strictEqual(typeof p.on, 'function');
-      p.on('close', done);
-      p.destroy();
-    });
-  });
 
-  describe('getHeadKeys', function() {
-    // simple test
-    var name = 'getHeadKeys';
-    it('should return a readable stream', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      var p = t.getHeadKeys();
-      should.strictEqual(typeof p.on, 'function');
-      p.on('close', done);
-      p.destroy();
+    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
+    var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
+    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } };
+
+    it('should require id to be a buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeads({}); }).should.throw('id must be a buffer');
     });
+
+    it('should require iterator to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeads(); }).should.throw('iterator must be a function');
+    });
+
+    it('should require cb to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeads(function() {}); }).should.throw('cb must be a function');
+    });
+
+    it('should call cb directly with an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeads(function() {}, done);
+    });
+
+    it('needs item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item1, done);
+    });
+
+    it('should iterate over item1, the only head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item) {
+        i++;
+        if (i > 0) { should.deepEqual(BSON.deserialize(item), item1); }
+      }, function() {
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('needs item2, ff', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item2, done);
+    });
+
+    it('should iterate over item2, the only head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item) {
+        i++;
+        if (i > 0) { should.deepEqual(BSON.deserialize(item), item2); }
+      }, function() {
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('needs item3, fork', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item3, done);
+    });
+
+    it('should iterate over item2 and item3, the only heads', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item) {
+        i++;
+        if (i === 1) { should.deepEqual(BSON.deserialize(item), item2); }
+        if (i > 1) { should.deepEqual(BSON.deserialize(item), item3); }
+      }, function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('needs item4, ff', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item4, done);
+    });
+
+    it('should iterate over item3 and item4, the only heads', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item) {
+        i++;
+        if (i === 1) { should.deepEqual(BSON.deserialize(item), item3); }
+        if (i > 1) { should.deepEqual(BSON.deserialize(item), item4); }
+      }, function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
   });
 
   describe('getDsKeyByVersion', function() {
