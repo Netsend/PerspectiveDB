@@ -1941,10 +1941,10 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys (with getHeads): should have two headkey with the latest versions and corresponding ikey as value', function(done) {
+    it('inspect keys (with getHeads): should have two headKeys with the latest versions and corresponding ikey as value', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      var s = t.getHeads();
+      var s = t.getHeads(new Buffer('XI'));
       s.on('data', function(obj) {
         i++;
 
