@@ -1050,6 +1050,70 @@ describe('Tree', function() {
     });
   });
 
+  describe('getByVersion', function() {
+    var name = 'getByVersion';
+
+    var item = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+
+    it('should require version to be a number or a base64 string', function() {
+      var t = new Tree(db, name, { log: silence });
+      (function() { t.getByVersion({}); }).should.throw('version must be a number or a base64 string');
+    });
+
+    it('should return with null if the index is empty', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getByVersion('Aaaa', function(err, found) {
+        if (err) { throw err; }
+        should.strictEqual(found, null);
+        done();
+      });
+    });
+
+    it('needs an entry in vkey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var vKey = t._composeVKey(item._h.v);
+      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+
+      t._db.put(vKey, dsKey, done);
+    });
+
+    it('should err if version in index but item not in dskey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getByVersion('Aaaa', function(err) {
+        console.log(err);
+        err.message.match('NotFoundError: Key not found in database');
+        done();
+      });
+    });
+
+    it('needs an entry in dskey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+
+      t._db.put(dsKey, BSON.serialize(item), done);
+    });
+
+    it('should find the item by version', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getByVersion('Aaaa', function(err, found) {
+        if (err) { throw err; }
+        should.deepEqual(BSON.deserialize(found), item);
+        done();
+      });
+    });
+
+    it('should return null if version is not found', function(done) {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      t.getByVersion(8, function(err, found) {
+        if (err) { throw err; }
+        should.strictEqual(found, null);
+        done();
+      });
+    });
+  });
+
   describe('createReadStream', function() {
     var name = 'createReadStream';
 
