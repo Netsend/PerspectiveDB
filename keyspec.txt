@@ -31,13 +31,13 @@ ival    ::=  lbeint               i value, local monotonically increasing number
 id      ::=  string               used to identify dskey values
 version ::=  lbeint               version number
 lbeint  ::=  byte (byte*)         Large int - The byte is the number of bytes in
-                                  (byte*). The (byte*) is one to 255 bytes written
+                                  (byte*). The (byte*) is one to 254 bytes written
                                   that should be interpreted as an unsigned
                                   integer in big endian format.
 string  ::=  byte (byte*) "\x00"  String - The byte is the number bytes in the
                                   (byte*) + 1 (for the trailing '\x00'). The
                                   (byte*) is zero or more UTF-8 encoded
-                                  characters. Can be at most 255 bytes.
+                                  characters. Can be at most 254 bytes.
 
 
 The values for the given keys are as follows:
