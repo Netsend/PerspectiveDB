@@ -218,14 +218,14 @@ describe('Tree', function() {
       (function() { tree = new Tree(db, {}); }).should.throw('name must be a string');
     });
 
-    it('should require name to not exceed 255 bytes', function() {
+    it('should require name to not exceed 254 bytes', function() {
       var name = '';
       for (var i = 0; i < 254; i++) {
         name += 'a';
       }
-      // trick it with the last character taking two bytes making the total byte length 256
+      // trick it with the last character taking two bytes making the total byte length 255
       name += '\u00bd';
-      (function() { tree = new Tree(db, name); }).should.throw('name must not exceed 255 bytes');
+      (function() { tree = new Tree(db, name); }).should.throw('name must not exceed 254 bytes');
     });
 
     it('should require opts to be an object', function() {
@@ -260,14 +260,14 @@ describe('Tree', function() {
       (function() { p = Tree.getPrefix({}); }).should.throw('name must be a string');
     });
 
-    it('should require name to not exceed 255 bytes', function() {
+    it('should require name to not exceed 254 bytes', function() {
       var name = '';
       for (var i = 0; i < 254; i++) {
         name += 'a';
       }
-      // trick it with the last character taking two bytes making the total byte length 256
+      // trick it with the last character taking two bytes making the total byte length 255
       name += '\u00bd';
-      (function() { p = Tree.getPrefix(name); }).should.throw('name must not exceed 255 bytes');
+      (function() { p = Tree.getPrefix(name); }).should.throw('name must not exceed 254 bytes');
     });
 
     it('should require type to be a numner', function() {
