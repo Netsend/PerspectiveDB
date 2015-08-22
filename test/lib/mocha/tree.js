@@ -1191,188 +1191,142 @@ describe('Tree', function() {
     });
   });
 
-  describe('createReadStream', function() {
-    var name = 'createReadStream';
+  describe('iterateInsertionOrder', function() {
+    var name = 'iterateInsertionOrder';
 
     var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
     var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
     var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
-    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } };
 
-    it('should return a readable stream', function() {
+    it('should require iterator to be a function', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
-      should.strictEqual(typeof r.on, 'function');
+      (function() { t.iterateInsertionOrder(); }).should.throw('iterator must be a function');
     });
 
-    it('should emit close if database is empty', function(done) {
+    it('should require cb to be a function', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
-      r.on('close', done);
+      (function() { t.iterateInsertionOrder(function() {}); }).should.throw('cb must be a function');
+    });
+
+    it('should require i to be a number', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.iterateInsertionOrder({ i: 'a' }, function() { }, function() { }); }).should.throw('opts.i must be a number');
+    });
+
+    it('should call cb directly with an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.iterateInsertionOrder(function() {}, done);
     });
 
     it('needs item1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.write(item1, done);
+      t.end(item1, done);
     });
 
-    it('should emit item1', function(done) {
+    it('should iterate over item1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder(function(obj, next) {
         i++;
         should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
-      });
-
-      r.on('close', function() {
+        next();
+      }, function(err) {
+        if (err) { throw err; }
         should.strictEqual(i, 1);
         done();
       });
     });
 
-    it('should emit the existing item but no new items that are added after the readable stream is opened', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+    it('should emit the existing item but no new items that are added while the iterator is running', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
-
-      t.write(item2);
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder(function(obj, next) {
         i++;
         if (i > 0) {
           should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
         }
-      });
-
-      r.on('close', function() {
+        t.write(item2, next);
+      }, function(err) {
+        if (err) { throw err; }
         should.strictEqual(i, 1);
-        done();
-      });
-    });
-
-    it('should emit existing items and no new items that are added while the last data event is fired', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream();
-
-      var i = 0;
-      r.on('data', function(obj) {
-        i++;
-        if (i === 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
-        }
-
-        if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
-          t.write(item3);
-        }
-      });
-
-      r.on('close', function() {
-        should.strictEqual(i, 2);
         done();
       });
     });
 
     it('should use opts.i and start emitting at offset 1', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream({ i: 1 });
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder({ i: 1 }, function(obj, next) {
         i++;
         if (i === 1) {
           should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
         }
 
-        if (i === 2) {
+        if (i > 1) {
           should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
         }
-
-        if (i > 2) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } }, BSON.deserialize(obj));
-        }
-      });
-
-      r.on('close', function() {
-        should.strictEqual(i, 3);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
         done();
       });
     });
 
     it('should use opts.i and start emitting at offset 2', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream({ i: 2 });
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder({ i: 2 }, function(obj, next) {
         i++;
-        if (i === 1) {
+        if (i > 0) {
           should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
         }
-
-        if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } }, BSON.deserialize(obj));
-        }
-      });
-
-      r.on('close', function() {
-        should.strictEqual(i, 2);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
         done();
       });
     });
 
     it('should use opts.v and start emitting at offset 2', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream({ v: 'Bbbb' });
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder({ v: 'Bbbb' }, function(obj, next) {
         i++;
-        if (i === 1) {
+        if (i > 0) {
           should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
         }
-
-        if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } }, BSON.deserialize(obj));
-        }
-      });
-
-      r.on('close', function() {
-        should.strictEqual(i, 2);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
         done();
       });
     });
 
-    it('should emit the existing items but not any new items that are added after the readable stream is opened', function(done) {
-      // open readable stream, which should emit item1, then write item2 and expect item2 in the readable stream
+    it('should emit the existing item but no new items that are added while the iterator is running the first time of many', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var r = t.createReadStream({ keepOpen: true });
-
-      t.write(item4);
 
       var i = 0;
-      r.on('data', function(obj) {
+      t.iterateInsertionOrder(function(obj, next) {
         i++;
-
-        if (i === 3) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } }, BSON.deserialize(obj));
+        if (i === 1) {
+          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+          t.write(item3, next);
         }
-
-        if (i > 3) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } }, BSON.deserialize(obj));
-          done();
+        if (i > 1) {
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
         }
-      });
-
-      r.on('close', function() {
-        should.strictEqual(i, 3);
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
         done();
       });
     });
