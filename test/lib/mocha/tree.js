@@ -979,6 +979,83 @@ describe('Tree', function() {
     });
   });
 
+  describe('getHeadVersions', function() {
+    // simple test, test further after write tests are done
+    var name = 'getHeadVersions';
+
+    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
+    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
+    var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
+    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } };
+
+    it('should require id to be a buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeadVersions({}); }).should.throw('id must be a buffer');
+    });
+
+    it('should require cb to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeadVersions(new Buffer(0)); }).should.throw('cb must be a function');
+    });
+
+    it('should call cb directly with an empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeadVersions(new Buffer(0), done);
+    });
+
+    it('needs item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item1, done);
+    });
+
+    it('should return item1 version, the only head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeadVersions(new Buffer('XI'), function(err, versions) {
+        should.deepEqual([item1._h.v], versions);
+        done();
+      });
+    });
+
+    it('needs item2, ff', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item2, done);
+    });
+
+    it('should return item2 version, the only head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeadVersions(new Buffer('XI'), function(err, versions) {
+        should.deepEqual([item2._h.v], versions);
+        done();
+      });
+    });
+
+    it('needs item3, fork', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item3, done);
+    });
+
+    it('should return item2 and item3 versions, the only heads', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeadVersions(new Buffer('XI'), function(err, versions) {
+        should.deepEqual([item2._h.v, item3._h.v], versions);
+        done();
+      });
+    });
+
+    it('needs item4, ff', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item4, done);
+    });
+
+    it('should iterate over item3 and item4, the only heads', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getHeadVersions(new Buffer('XI'), function(err, versions) {
+        should.deepEqual([item3._h.v, item4._h.v], versions);
+        done();
+      });
+    });
+  });
+
   describe('getHeads', function() {
     // simple test, test further after write tests are done
     var name = 'getHeads';
