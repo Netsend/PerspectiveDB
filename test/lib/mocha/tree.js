@@ -1818,6 +1818,7 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var dsKey = t._composeDsKey(item1._h.id, item1._h.i);
       var headKey = t._composeHeadKey(item1._h.id, item1._h.v);
+      var headVal = t._composeHeadVal(item1);
       var iKey = t._composeIKey(item1._h.i);
       var vKey = t._composeVKey(item1._h.v);
 
@@ -1825,7 +1826,7 @@ describe('Tree', function() {
         if (err) { throw err; }
         t._db.put(iKey, headKey, function(err) {
           if (err) { throw err; }
-          t._db.put(headKey, iKey, function(err) {
+          t._db.put(headKey, headVal, function(err) {
             if (err) { throw err; }
             t._db.put(vKey, dsKey, done);
           });
@@ -1972,7 +1973,7 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys: should have one headkey with the latest version and corresponding ikey as value', function(done) {
+    it('inspect keys: should have one head key with the latest version and corresponding head value', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       var r = t.getHeadKeyRange();
@@ -1981,13 +1982,12 @@ describe('Tree', function() {
         i++;
 
         var key = Tree.parseKey(obj.key, 'utf8', 'base64');
-        var val = Tree.parseKey(obj.value, 'utf8');
+        var val = Tree.parseHeadVal(obj.value);
 
         should.strictEqual(key.type, 0x03);
         should.strictEqual(key.id, 'XI');
         should.strictEqual(key.v, 'Bbbb');
 
-        should.strictEqual(val.type, 0x02);
         should.strictEqual(val.i, 2);
       });
 
@@ -2154,7 +2154,7 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys: should have two headkey with the latest versions and corresponding ikey as value', function(done) {
+    it('inspect keys: should have two headkey with the latest versions and corresponding value', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       var r = t.getHeadKeyRange();
@@ -2163,14 +2163,13 @@ describe('Tree', function() {
         i++;
 
         var key = Tree.parseKey(obj.key, 'utf8', 'base64');
-        var val = Tree.parseKey(obj.value, 'utf8');
+        var val = Tree.parseHeadVal(obj.value, 'utf8');
 
         if (i === 1) {
           should.strictEqual(key.type, 0x03);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.v, 'Bbbb');
 
-          should.strictEqual(val.type, 0x02);
           should.strictEqual(val.i, 2);
         }
 
@@ -2179,7 +2178,6 @@ describe('Tree', function() {
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.v, 'Dddd');
 
-          should.strictEqual(val.type, 0x02);
           should.strictEqual(val.i, 4);
         }
       });
@@ -2190,7 +2188,7 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys: should have two headKeys with the latest versions and corresponding ikey as value', function(done) {
+    it('inspect keys: should have two headKeys with the latest versions and corresponding value', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       var r = t.getHeadKeyRange();
@@ -2199,14 +2197,13 @@ describe('Tree', function() {
         i++;
 
         var key = Tree.parseKey(obj.key, 'utf8', 'base64');
-        var val = Tree.parseKey(obj.value, 'utf8');
+        var val = Tree.parseHeadVal(obj.value, 'utf8');
 
         if (i === 1) {
           should.strictEqual(key.type, 0x03);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.v, 'Bbbb');
 
-          should.strictEqual(val.type, 0x02);
           should.strictEqual(val.i, 2);
         }
 
@@ -2215,7 +2212,6 @@ describe('Tree', function() {
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.v, 'Dddd');
 
-          should.strictEqual(val.type, 0x02);
           should.strictEqual(val.i, 4);
         }
       });
