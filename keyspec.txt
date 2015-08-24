@@ -38,12 +38,15 @@ string  ::=  byte (byte*) "\x00"  String - The byte is the number bytes in the
                                   (byte*) + 1 (for the trailing '\x00'). The
                                   (byte*) is zero or more UTF-8 encoded
                                   characters. Can be at most 254 bytes.
+opts    ::=  byte                 option bits, single byte:
+                                    0x01 = conflict, when a merge with this item
+                                    failed
 
 
 The values for the given keys are as follows:
 key: "\x01", value: BSON serialized javascript object
 key: "\x02", value: key of subtype "\x03"
-key: "\x03", value: key of subtype "\x02"
+key: "\x03", value: opts ival
 key: "\x04", value: key of subtype "\x01"
 
 
