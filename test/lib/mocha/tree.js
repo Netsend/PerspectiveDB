@@ -1225,10 +1225,22 @@ describe('Tree', function() {
       (function() { t.iterateInsertionOrder(function() {}); }).should.throw('cb must be a function');
     });
 
-    it('should require i to be a number', function() {
+    it('should require opts.i to be a number', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 3, log: silence });
       (function() { t.iterateInsertionOrder({ i: 'a' }, function() { }, function() { }); }).should.throw('opts.i must be a number');
+    });
+
+    it('should require opts.v to match vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.iterateInsertionOrder({ v: 'a' }, function() { }, function() { }); }).should.throw('opts.v must be the same size as the configured vSize');
+    });
+
+    it('should require raw to be a buffer', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.iterateInsertionOrder({ raw: 'a' }, function() { }, function() { }); }).should.throw('opts.raw must be a boolean');
     });
 
     it('should call cb directly with an empty database', function(done) {
@@ -1241,13 +1253,28 @@ describe('Tree', function() {
       t.end(item1, done);
     });
 
+    it('should emit raw buffers', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder({ raw: true }, function(obj, next) {
+        i++;
+        should.strictEqual(Buffer.isBuffer(obj), true);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
     it('should iterate over item1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
       t.iterateInsertionOrder(function(obj, next) {
         i++;
-        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
         next();
       }, function(err) {
         if (err) { throw err; }
@@ -1263,7 +1290,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder(function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
         }
         t.write(item2, next);
       }, function(err) {
@@ -1280,11 +1307,11 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ i: 1 }, function(obj, next) {
         i++;
         if (i === 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
         }
 
         if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1301,7 +1328,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ i: 2 }, function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1318,7 +1345,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ v: 'Bbbb' }, function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1335,11 +1362,11 @@ describe('Tree', function() {
       t.iterateInsertionOrder(function(obj, next) {
         i++;
         if (i === 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
           t.write(item3, next);
         }
         if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, BSON.deserialize(obj));
+          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
         }
       }, function(err) {
         if (err) { throw err; }
