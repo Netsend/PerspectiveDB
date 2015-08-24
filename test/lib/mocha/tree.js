@@ -1654,6 +1654,32 @@ describe('Tree', function() {
     });
   });
 
+  describe('_composeHeadVal', function() {
+    var name = '_composeHeadVal';
+
+    it('should require item to be an object', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      (function() { t._composeHeadVal(null); }).should.throw('item must be an object');
+    });
+
+    it('should require item._h.i to exist', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      (function() { t._composeHeadVal({ foo: 'bar' }); }).should.throw('item._h.i must be a number');
+    });
+
+    it('should set option byte to 0 and i to 4', function() {
+      var t = new Tree(db, name, { iSize: 3, log: silence });
+      t._composeHeadVal({ _h: { i: 4 } }).toString('hex').should.equal('0003000004');
+    });
+
+    it('should set conflict option byte and i to 4', function() {
+      var t = new Tree(db, name, { iSize: 3, log: silence });
+      t._composeHeadVal({ _h: { i: 4, c: true } }).toString('hex').should.equal('0103000004');
+    });
+  });
+
   describe('_composeDsKey', function() {
     var name = '_composeDsKey';
 
