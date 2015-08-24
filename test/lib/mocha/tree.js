@@ -1127,11 +1127,21 @@ describe('Tree', function() {
     var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
     var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
     var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
-    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } };
+    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'], c: true }, _b: { some: 'more2' } };
 
-    it('should require id to be a buffer', function() {
+    it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.getHeads({}); }).should.throw('id must be a buffer');
+      (function() { t.getHeads(0); }).should.throw('opts must be an object');
+    });
+
+    it('should require opts.id to be a buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeads({ id: {} }); }).should.throw('opts.id must be a buffer');
+    });
+
+    it('should require opts.skipConflicts to be a boolean', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.getHeads({ skipConflicts: {} }); }).should.throw('opts.skipConflicts must be a boolean');
     });
 
     it('should require iterator to be a function', function() {
@@ -1159,7 +1169,7 @@ describe('Tree', function() {
       var i = 0;
       t.getHeads(function(item, next) {
         i++;
-        if (i > 0) { should.deepEqual(BSON.deserialize(item), item1); }
+        if (i > 0) { should.deepEqual(item, item1); }
         next();
       }, function() {
         should.strictEqual(i, 1);
@@ -1177,7 +1187,7 @@ describe('Tree', function() {
       var i = 0;
       t.getHeads(function(item, next) {
         i++;
-        if (i > 0) { should.deepEqual(BSON.deserialize(item), item2); }
+        if (i > 0) { should.deepEqual(item, item2); }
         next();
       }, function() {
         should.strictEqual(i, 1);
@@ -1195,8 +1205,8 @@ describe('Tree', function() {
       var i = 0;
       t.getHeads(function(item, next) {
         i++;
-        if (i === 1) { should.deepEqual(BSON.deserialize(item), item2); }
-        if (i > 1) { should.deepEqual(BSON.deserialize(item), item3); }
+        if (i === 1) { should.deepEqual(item, item2); }
+        if (i > 1) { should.deepEqual(item, item3); }
         next();
       }, function() {
         should.strictEqual(i, 2);
@@ -1214,8 +1224,8 @@ describe('Tree', function() {
       var i = 0;
       t.getHeads(function(item, next) {
         i++;
-        if (i === 1) { should.deepEqual(BSON.deserialize(item), item3); }
-        if (i > 1) { should.deepEqual(BSON.deserialize(item), item4); }
+        if (i === 1) { should.deepEqual(item, item3); }
+        if (i > 1) { should.deepEqual(item, item4); }
         next();
       }, function() {
         should.strictEqual(i, 2);
@@ -1228,9 +1238,22 @@ describe('Tree', function() {
       var i = 0;
       t.getHeads(function(item, next) {
         i++;
-        if (i === 1) { should.deepEqual(BSON.deserialize(item), item3); }
-        if (i > 1) { should.deepEqual(BSON.deserialize(item), item4); }
+        if (i === 1) { should.deepEqual(item, item3); }
+        if (i > 1) { should.deepEqual(item, item4); }
         next(false);
+      }, function() {
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should not emit conflicting heads if skipConflicts is true', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads({ skipConflicts: true }, function(item, next) {
+        i++;
+        if (i > 0) { should.deepEqual(item, item3); }
+        next();
       }, function() {
         should.strictEqual(i, 1);
         done();
