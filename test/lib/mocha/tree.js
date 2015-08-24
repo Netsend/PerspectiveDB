@@ -787,6 +787,71 @@ describe('Tree', function() {
     });
   });
 
+  describe('parseHeadIndexValue', function() {
+    it('should err if value is not a buffer', function() {
+      var b = new Buffer('00000200', 'hex');
+      (function() { Tree.parseHeadIndexValue(''); }).should.throw('value must be a buffer');
+    });
+
+    it('should err if value does not contain i', function() {
+      var b = new Buffer('00', 'hex');
+      (function() { Tree.parseHeadIndexValue(b); }).should.throw('i must be at least one byte');
+    });
+
+    it('should err if i length is zero', function() {
+      var b = new Buffer('0000', 'hex');
+      (function() { Tree.parseHeadIndexValue(b); }).should.throw('i must be at least one byte');
+    });
+
+    it('should err if i is bigger than specified length', function() {
+      var b = new Buffer('0002000000', 'hex');
+      (function() { Tree.parseHeadIndexValue(b); }).should.throw('unexpected length of value');
+    });
+
+    it('should err if i is smaller than specified length', function() {
+      var b = new Buffer('000200', 'hex');
+      (function() { Tree.parseHeadIndexValue(b); }).should.throw('index out of range');
+    });
+
+    describe('i 1,', function() {
+      it('conflict 0', function() {
+        var b = new Buffer('000102', 'hex');
+        var obj = Tree.parseHeadIndexValue(b);
+        should.deepEqual(obj, {
+          i: 2
+        });
+      });
+
+      it('conflict 1', function() {
+        var b = new Buffer('010102', 'hex');
+        var obj = Tree.parseHeadIndexValue(b);
+        should.deepEqual(obj, {
+          i: 2,
+          c: true
+        });
+      });
+    });
+
+    describe('i 3,', function() {
+      it('conflict 0', function() {
+        var b = new Buffer('0003235761', 'hex');
+        var obj = Tree.parseHeadIndexValue(b);
+        should.deepEqual(obj, {
+          i: 0x235761
+        });
+      });
+
+      it('conflict 1', function() {
+        var b = new Buffer('0103235761', 'hex');
+        var obj = Tree.parseHeadIndexValue(b);
+        should.deepEqual(obj, {
+          i: 0x235761,
+          c: true
+        });
+      });
+    });
+  });
+
   describe('getIKeyRange', function() {
     it('should work with a zero byte name and default iSize = 6', function() {
       var t = new Tree(db, '');
