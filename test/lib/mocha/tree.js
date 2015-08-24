@@ -787,36 +787,35 @@ describe('Tree', function() {
     });
   });
 
-  describe('parseHeadIndexValue', function() {
+  describe('parseHeadVal', function() {
     it('should err if value is not a buffer', function() {
-      var b = new Buffer('00000200', 'hex');
-      (function() { Tree.parseHeadIndexValue(''); }).should.throw('value must be a buffer');
+      (function() { Tree.parseHeadVal(''); }).should.throw('value must be a buffer');
     });
 
     it('should err if value does not contain i', function() {
       var b = new Buffer('00', 'hex');
-      (function() { Tree.parseHeadIndexValue(b); }).should.throw('i must be at least one byte');
+      (function() { Tree.parseHeadVal(b); }).should.throw('i must be at least one byte');
     });
 
     it('should err if i length is zero', function() {
       var b = new Buffer('0000', 'hex');
-      (function() { Tree.parseHeadIndexValue(b); }).should.throw('i must be at least one byte');
+      (function() { Tree.parseHeadVal(b); }).should.throw('i must be at least one byte');
     });
 
     it('should err if i is bigger than specified length', function() {
       var b = new Buffer('0002000000', 'hex');
-      (function() { Tree.parseHeadIndexValue(b); }).should.throw('unexpected length of value');
+      (function() { Tree.parseHeadVal(b); }).should.throw('unexpected length of value');
     });
 
     it('should err if i is smaller than specified length', function() {
       var b = new Buffer('000200', 'hex');
-      (function() { Tree.parseHeadIndexValue(b); }).should.throw('index out of range');
+      (function() { Tree.parseHeadVal(b); }).should.throw('index out of range');
     });
 
     describe('i 1,', function() {
       it('conflict 0', function() {
         var b = new Buffer('000102', 'hex');
-        var obj = Tree.parseHeadIndexValue(b);
+        var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
           i: 2
         });
@@ -824,7 +823,7 @@ describe('Tree', function() {
 
       it('conflict 1', function() {
         var b = new Buffer('010102', 'hex');
-        var obj = Tree.parseHeadIndexValue(b);
+        var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
           i: 2,
           c: true
@@ -835,7 +834,7 @@ describe('Tree', function() {
     describe('i 3,', function() {
       it('conflict 0', function() {
         var b = new Buffer('0003235761', 'hex');
-        var obj = Tree.parseHeadIndexValue(b);
+        var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
           i: 0x235761
         });
@@ -843,7 +842,7 @@ describe('Tree', function() {
 
       it('conflict 1', function() {
         var b = new Buffer('0103235761', 'hex');
-        var obj = Tree.parseHeadIndexValue(b);
+        var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
           i: 0x235761,
           c: true
