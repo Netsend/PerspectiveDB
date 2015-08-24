@@ -1016,9 +1016,10 @@ describe('Tree', function() {
     it('should iterate over item1, the only head', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.getHeads(function(item) {
+      t.getHeads(function(item, next) {
         i++;
         if (i > 0) { should.deepEqual(BSON.deserialize(item), item1); }
+        next();
       }, function() {
         should.strictEqual(i, 1);
         done();
@@ -1033,9 +1034,10 @@ describe('Tree', function() {
     it('should iterate over item2, the only head', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.getHeads(function(item) {
+      t.getHeads(function(item, next) {
         i++;
         if (i > 0) { should.deepEqual(BSON.deserialize(item), item2); }
+        next();
       }, function() {
         should.strictEqual(i, 1);
         done();
@@ -1050,10 +1052,11 @@ describe('Tree', function() {
     it('should iterate over item2 and item3, the only heads', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.getHeads(function(item) {
+      t.getHeads(function(item, next) {
         i++;
         if (i === 1) { should.deepEqual(BSON.deserialize(item), item2); }
         if (i > 1) { should.deepEqual(BSON.deserialize(item), item3); }
+        next();
       }, function() {
         should.strictEqual(i, 2);
         done();
@@ -1068,16 +1071,30 @@ describe('Tree', function() {
     it('should iterate over item3 and item4, the only heads', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.getHeads(function(item) {
+      t.getHeads(function(item, next) {
         i++;
         if (i === 1) { should.deepEqual(BSON.deserialize(item), item3); }
         if (i > 1) { should.deepEqual(BSON.deserialize(item), item4); }
+        next();
       }, function() {
         should.strictEqual(i, 2);
         done();
       });
     });
 
+    it('should stop iterating if next is called with false or an error', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item, next) {
+        i++;
+        if (i === 1) { should.deepEqual(BSON.deserialize(item), item3); }
+        if (i > 1) { should.deepEqual(BSON.deserialize(item), item4); }
+        next(false);
+      }, function() {
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
   });
 
   describe('getDsKeyByVersion', function() {
