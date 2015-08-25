@@ -23,7 +23,7 @@ require('should');
 var invalidItem = require('../../../lib/invalid_item');
 
 describe('invalidItem', function() {
-  var header = { id: '', pe: 'some', v: 'A', pa: [] };
+  var header = { id: '', v: 'A', pa: [] };
 
   it('should require item to be an object', function() {
     invalidItem([]).should.equal('item must be an object');
