@@ -296,71 +296,6 @@ describe('Tree', function() {
     });
   });
 
-  describe('invalidItem', function() {
-    it('should require item to be an object', function() {
-      Tree.invalidItem([]).should.equal('item must be an object');
-    });
-
-    it('should require item._h to be an object', function() {
-      Tree.invalidItem({ _h: [] }).should.equal('item._h must be an object');
-    });
-
-    it('should require item._b to be an object', function() {
-      Tree.invalidItem({ _h: {}, _b: [] }).should.equal('item._b must be an object');
-    });
-
-    it('should require item._h.id to be defined', function() {
-      Tree.invalidItem({ _h: { }, _b: {} }).should.equal('item._h.id must be a buffer, a string or implement "toString"');
-    });
-
-    it('should require item._h.id not to be undefined', function() {
-      Tree.invalidItem({ _h: { id: undefined }, _b: {} }).should.equal('item._h.id must be a buffer, a string or implement "toString"');
-    });
-
-    it('should require item._h.id not to be null', function() {
-      Tree.invalidItem({ _h: { id: null }, _b: {} }).should.equal('item._h.id must be a buffer, a string or implement "toString"');
-    });
-
-    it('should require item._h.v to be a string', function() {
-      Tree.invalidItem({ _h: { id: 'foo', v: [] }, _b: {} }).should.equal('item._h.v must be a string');
-    });
-
-    it('should require item._h.pa to be an array', function() {
-      Tree.invalidItem({
-        _h: { id: 'foo', v: 'A', pa: {} },
-        _b: {}
-      }).should.equal('item._h.pa must be an array');
-    });
-
-    it('should require that only item._h and item._b exist', function() {
-      Tree.invalidItem({
-        _h: {},
-        _b: {},
-        _c: {}
-      }).should.equal('item should only contain _h and _b keys');
-    });
-
-    it('should be a valid item', function() {
-      Tree.invalidItem({ _h: { id: 'foo', v: 'A', pa: [] }, _b: {} }).should.equal('');
-    });
-
-    it('should accept array type for id', function() {
-      Tree.invalidItem({ _h: { id: [], v: 'A', pa: [] }, _b: {} }).should.equal('');
-    });
-
-    it('should accept empty string for id', function() {
-      Tree.invalidItem({ _h: { id: '', v: 'A', pa: [] }, _b: {} }).should.equal('');
-    });
-
-    it('should accept positive number type for id', function() {
-      Tree.invalidItem({ _h: { id: 10 , v: 'A', pa: [] }, _b: {} }).should.equal('');
-    });
-
-    it('should accept 0 for id', function() {
-      Tree.invalidItem({ _h: { id: 0 , v: 'A', pa: [] }, _b: {} }).should.equal('');
-    });
-  });
-
   describe('parseKey', function() {
     it('should require key to be a buffer', function() {
       (function() { Tree.parseKey({}); }).should.throw('key must be a buffer');
@@ -1050,10 +985,10 @@ describe('Tree', function() {
     // simple test, test further after write tests are done
     var name = 'getHeadVersions';
 
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
-    var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
-    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, _b: { some: 'more2' } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item4 = { h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'] }, b: { some: 'more2' } };
 
     it('should require id to be a buffer', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1078,7 +1013,7 @@ describe('Tree', function() {
     it('should return item1 version, the only head', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getHeadVersions(new Buffer('XI'), function(err, versions) {
-        should.deepEqual([item1._h.v], versions);
+        should.deepEqual([item1.h.v], versions);
         done();
       });
     });
@@ -1091,7 +1026,7 @@ describe('Tree', function() {
     it('should return item2 version, the only head', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getHeadVersions(new Buffer('XI'), function(err, versions) {
-        should.deepEqual([item2._h.v], versions);
+        should.deepEqual([item2.h.v], versions);
         done();
       });
     });
@@ -1104,7 +1039,7 @@ describe('Tree', function() {
     it('should return item2 and item3 versions, the only heads', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getHeadVersions(new Buffer('XI'), function(err, versions) {
-        should.deepEqual([item2._h.v, item3._h.v], versions);
+        should.deepEqual([item2.h.v, item3.h.v], versions);
         done();
       });
     });
@@ -1117,7 +1052,7 @@ describe('Tree', function() {
     it('should iterate over item3 and item4, the only heads', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getHeadVersions(new Buffer('XI'), function(err, versions) {
-        should.deepEqual([item3._h.v, item4._h.v], versions);
+        should.deepEqual([item3.h.v, item4.h.v], versions);
         done();
       });
     });
@@ -1127,10 +1062,10 @@ describe('Tree', function() {
     // simple test, test further after write tests are done
     var name = 'getHeads';
 
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
-    var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
-    var item4 = { _h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'], c: true }, _b: { some: 'more2' } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item4 = { h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'], c: true }, b: { some: 'more2' } };
 
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1267,7 +1202,7 @@ describe('Tree', function() {
   describe('getDsKeyByVersion', function() {
     var name = 'getDsKeyByVersion';
 
-    var item = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
 
     it('should require version to be a number or a base64 string', function() {
       var t = new Tree(db, name, { log: silence });
@@ -1286,8 +1221,8 @@ describe('Tree', function() {
     it('needs an entry in vkey index', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
-      var vKey = t._composeVKey(item._h.v);
-      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+      var vKey = t._composeVKey(item.h.v);
+      var dsKey = t._composeDsKey(item.h.id, item.h.i);
 
       t._db.put(vKey, dsKey, done);
     });
@@ -1296,7 +1231,7 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getDsKeyByVersion('Aaaa', function(err, dsKey) {
         if (err) { throw err; }
-        should.strictEqual(dsKey.toString('hex'), t._composeDsKey(item._h.id, item._h.i).toString('hex'));
+        should.strictEqual(dsKey.toString('hex'), t._composeDsKey(item.h.id, item.h.i).toString('hex'));
         done();
       });
     });
@@ -1314,7 +1249,7 @@ describe('Tree', function() {
   describe('getByVersion', function() {
     var name = 'getByVersion';
 
-    var item = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
 
     it('should require version to be a number or a base64 string', function() {
       var t = new Tree(db, name, { log: silence });
@@ -1333,8 +1268,8 @@ describe('Tree', function() {
     it('needs an entry in vkey index', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
-      var vKey = t._composeVKey(item._h.v);
-      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+      var vKey = t._composeVKey(item.h.v);
+      var dsKey = t._composeDsKey(item.h.id, item.h.i);
 
       t._db.put(vKey, dsKey, done);
     });
@@ -1351,7 +1286,7 @@ describe('Tree', function() {
     it('needs an entry in dskey index', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
-      var dsKey = t._composeDsKey(item._h.id, item._h.i);
+      var dsKey = t._composeDsKey(item.h.id, item.h.i);
 
       t._db.put(dsKey, BSON.serialize(item), done);
     });
@@ -1378,9 +1313,9 @@ describe('Tree', function() {
   describe('iterateInsertionOrder', function() {
     var name = 'iterateInsertionOrder';
 
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } };
-    var item3 = { _h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, _b: { some: 'other' } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
 
     it('should require iterator to be a function', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1441,7 +1376,7 @@ describe('Tree', function() {
       var i = 0;
       t.iterateInsertionOrder(function(obj, next) {
         i++;
-        should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
+        should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
         next();
       }, function(err) {
         if (err) { throw err; }
@@ -1457,7 +1392,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder(function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
         }
         t.write(item2, next);
       }, function(err) {
@@ -1474,11 +1409,11 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ i: 1 }, function(obj, next) {
         i++;
         if (i === 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
         }
 
         if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1495,7 +1430,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ i: 2 }, function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1512,7 +1447,7 @@ describe('Tree', function() {
       t.iterateInsertionOrder({ v: 'Bbbb' }, function(obj, next) {
         i++;
         if (i > 0) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
         }
         next();
       }, function(err) {
@@ -1529,11 +1464,11 @@ describe('Tree', function() {
       t.iterateInsertionOrder(function(obj, next) {
         i++;
         if (i === 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, _b: { some: 'data' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
           t.write(item3, next);
         }
         if (i > 1) {
-          should.deepEqual({ _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, _b: { some: 'more' } }, obj);
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
         }
       }, function(err) {
         if (err) { throw err; }
@@ -1688,20 +1623,20 @@ describe('Tree', function() {
       (function() { t._composeHeadVal(null); }).should.throw('item must be an object');
     });
 
-    it('should require item._h.i to exist', function() {
+    it('should require item.h.i to exist', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { iSize: 2, log: silence });
-      (function() { t._composeHeadVal({ foo: 'bar' }); }).should.throw('item._h.i must be a number');
+      (function() { t._composeHeadVal({ foo: 'bar' }); }).should.throw('item.h.i must be a number');
     });
 
     it('should set option byte to 0 and i to 4', function() {
       var t = new Tree(db, name, { iSize: 3, log: silence });
-      t._composeHeadVal({ _h: { i: 4 } }).toString('hex').should.equal('0003000004');
+      t._composeHeadVal({ h: { i: 4 } }).toString('hex').should.equal('0003000004');
     });
 
     it('should set conflict option byte and i to 4', function() {
       var t = new Tree(db, name, { iSize: 3, log: silence });
-      t._composeHeadVal({ _h: { i: 4, c: true } }).toString('hex').should.equal('0103000004');
+      t._composeHeadVal({ h: { i: 4, c: true } }).toString('hex').should.equal('0103000004');
     });
   });
 
@@ -1761,10 +1696,10 @@ describe('Tree', function() {
       store an object in the I index:
       {                    _  n  e  x  t  I                          2
         key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 02>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
+        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
       }
       */
-      t._db.put(t._composeIKey(2), BSON.serialize({ _b: 'A' }), done);
+      t._db.put(t._composeIKey(2), BSON.serialize({ b: 'A' }), done);
     });
 
     it('should give an increased i', function(done) {
@@ -1782,10 +1717,10 @@ describe('Tree', function() {
       store an object in the I index:
       {                    _  n  e  x  t  I                         20
         key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 14>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { _b: 'A' }
+        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
       }
       */
-      t._db.put(t._composeIKey(20), BSON.serialize({ _b: 'A' }), done);
+      t._db.put(t._composeIKey(20), BSON.serialize({ b: 'A' }), done);
     });
 
     it('should return the highest increment in the snapshot collection', function(done) {
@@ -1815,12 +1750,12 @@ describe('Tree', function() {
     var name = '_isNewChild';
 
     // use 24-bit version numbers (base 64)
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
-    var item3 = { _h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'] } };
-    var item4 = { _h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'] } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'] } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'] } };
 
-    var itemA = { _h: { id: 'XI', v: 'Xxxx', i: 1, pa: [] } };
+    var itemA = { h: { id: 'XI', v: 'Xxxx', i: 1, pa: [] } };
 
     it('should accept roots in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1842,11 +1777,11 @@ describe('Tree', function() {
 
     it('needs item1 in dskey, ikey, headkey and vkey', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var dsKey = t._composeDsKey(item1._h.id, item1._h.i);
-      var headKey = t._composeHeadKey(item1._h.id, item1._h.v);
+      var dsKey = t._composeDsKey(item1.h.id, item1.h.i);
+      var headKey = t._composeHeadKey(item1.h.id, item1.h.v);
       var headVal = t._composeHeadVal(item1);
-      var iKey = t._composeIKey(item1._h.i);
-      var vKey = t._composeVKey(item1._h.v);
+      var iKey = t._composeIKey(item1.h.i);
+      var vKey = t._composeVKey(item1.h.v);
 
       t._db.put(dsKey, BSON.serialize(item1), function(err) {
         if (err) { throw err; }
@@ -1907,10 +1842,10 @@ describe('Tree', function() {
 
     it('needs item2 in dskey, ikey, headkey and vkey', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var dsKey = t._composeDsKey(item2._h.id, item2._h.i);
-      var headKey = t._composeHeadKey(item2._h.id, item2._h.v);
-      var iKey = t._composeIKey(item2._h.i);
-      var vKey = t._composeVKey(item2._h.v);
+      var dsKey = t._composeDsKey(item2.h.id, item2.h.i);
+      var headKey = t._composeHeadKey(item2.h.id, item2.h.v);
+      var iKey = t._composeIKey(item2.h.i);
+      var vKey = t._composeVKey(item2.h.v);
 
       t._db.put(dsKey, BSON.serialize(item2), function(err) {
         if (err) { throw err; }
@@ -1938,10 +1873,10 @@ describe('Tree', function() {
     var name = '_transform';
 
     // use 24-bit version numbers (base 64)
-    var item1 = { _h: { id: 'XI', v: 'Aaaa', pa: [] }, _b: { some: 'body' } };
-    var item2 = { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, _b: { more: 'body' } };
-    var item3 = { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, _b: { more2: 'body' } };
-    var item4 = { _h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, _b: { more3: 'b' } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
 
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1957,7 +1892,7 @@ describe('Tree', function() {
       var i = 0;
       t.on('data', function(obj) {
         i++;
-        should.strictEqual(BSON.deserialize(obj)._h.i, i);
+        should.strictEqual(BSON.deserialize(obj).h.i, i);
       });
       t.on('finish', function() {
         should.strictEqual(i, 2);
@@ -1983,13 +1918,13 @@ describe('Tree', function() {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 1);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } });
         }
         if (i === 2) {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 2);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, b: { more: 'body' } });
         }
       });
 
@@ -2122,7 +2057,7 @@ describe('Tree', function() {
     it('should accept new item (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('data', function(obj) {
-        should.strictEqual(BSON.deserialize(obj)._h.i, 3);
+        should.strictEqual(BSON.deserialize(obj).h.i, 3);
         done();
       });
       t.write(item3);
@@ -2131,7 +2066,7 @@ describe('Tree', function() {
     it('should accept new item (fast-forward)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('data', function(obj) {
-        should.strictEqual(BSON.deserialize(obj)._h.i, 4);
+        should.strictEqual(BSON.deserialize(obj).h.i, 4);
         done();
       });
       t.write(item4);
@@ -2152,25 +2087,25 @@ describe('Tree', function() {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 1);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } });
         }
         if (i === 2) {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 2);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, b: { more: 'body' } });
         }
         if (i === 3) {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 3);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3 }, _b: { more2: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3 }, b: { more2: 'body' } });
         }
         if (i === 4) {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 4);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4 }, _b: { more3: 'b' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4 }, b: { more3: 'b' } });
         }
       });
 
