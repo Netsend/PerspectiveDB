@@ -18,6 +18,8 @@
 
 'use strict';
 
+var tmpdir = require('os').tmpdir;
+
 var should = require('should');
 var rimraf = require('rimraf');
 var async = require('async');
@@ -28,7 +30,7 @@ var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
 
 var db, cons, silence;
-var dbPath = '/tmp/test_tree';
+var dbPath = tmpdir() + '/test_tree';
 
 // open database
 before(function(done) {
