@@ -43,6 +43,14 @@ describe('invalidHeader', function() {
     invalidHeader({ id: 'foo', v: 'A', pa: [] }).should.equal('');
   });
 
+  it('should require h.i to be a number', function() {
+    invalidHeader({ id: 'foo', v: 'A', pa: [], i: false }).should.equal('h.i must be a number');
+  });
+
+  it('should be a valid item with h.i', function() {
+    invalidHeader({ id: 'foo', v: 'A', pa: [], i: 0 }).should.equal('');
+  });
+
   it('should require h.d to be a boolean', function() {
     invalidHeader({ id: 'foo', v: 'A', pa: [], d: 0 }).should.equal('h.d must be a boolean');
   });
@@ -59,7 +67,7 @@ describe('invalidHeader', function() {
     invalidHeader({ id: 'foo', v: 'A', pa: [], c: true }).should.equal('');
   });
 
-  it('should not accept other optional keys than d or c', function() {
-    invalidHeader({ id: 'foo', v: 'A', pa: [], foo: 'bar' }).should.equal('h should only optionally contain "d" and "c" keys');
+  it('should not accept other optional keys than i, d or c', function() {
+    invalidHeader({ id: 'foo', v: 'A', pa: [], foo: 'bar', i: 3 }).should.equal('h should only optionally contain "i", "d" and "c" keys');
   });
 });
