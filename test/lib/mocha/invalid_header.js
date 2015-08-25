@@ -20,38 +20,38 @@
 
 require('should');
 
-var invalidRemoteHeader = require('../../../lib/invalid_remote_header');
+var invalidHeader = require('../../../lib/invalid_header');
 
-describe('invalidRemoteHeader', function() {
+describe('invalidHeader', function() {
   it('should require h to be an object', function() {
-    invalidRemoteHeader([]).should.equal('h must be an object');
+    invalidHeader([]).should.equal('h must be an object');
   });
 
   it('should require h.id to be a valid id', function() {
-    invalidRemoteHeader({ id: undefined }).should.equal('h.id must be a buffer, a string or implement "toString"');
+    invalidHeader({ id: undefined }).should.equal('h.id must be a buffer, a string or implement "toString"');
   });
 
   it('should require h.pe to be a string', function() {
-    invalidRemoteHeader({ id: 'foo', pe: [] }).should.equal('h.pe must be a string');
+    invalidHeader({ id: 'foo', pe: [] }).should.equal('h.pe must be a string');
   });
 
   it('should require h.v to be a string', function() {
-    invalidRemoteHeader({ id: 'foo', pe: 'some', v: [] }).should.equal('h.v must be a string');
+    invalidHeader({ id: 'foo', pe: 'some', v: [] }).should.equal('h.v must be a string');
   });
 
   it('should require h.pa to be an array', function() {
-    invalidRemoteHeader({ id: 'foo', pe: 'some', v: 'A', pa: {} }).should.equal('h.pa must be an array');
+    invalidHeader({ id: 'foo', pe: 'some', v: 'A', pa: {} }).should.equal('h.pa must be an array');
   });
 
   it('should be a valid item', function() {
-    invalidRemoteHeader({ id: 'foo', pe: 'some', v: 'A', pa: [] }).should.equal('');
+    invalidHeader({ id: 'foo', pe: 'some', v: 'A', pa: [] }).should.equal('');
   });
 
   it('should require h.d to be a boolean', function() {
-    invalidRemoteHeader({ id: 'foo', pe: 'some', v: 'A', pa: [], d: 0 }).should.equal('h.d must be a boolean');
+    invalidHeader({ id: 'foo', pe: 'some', v: 'A', pa: [], d: 0 }).should.equal('h.d must be a boolean');
   });
 
   it('should be a valid item with h.d', function() {
-    invalidRemoteHeader({ id: 'foo', pe: 'some', v: 'A', pa: [], d: false }).should.equal('');
+    invalidHeader({ id: 'foo', pe: 'some', v: 'A', pa: [], d: false }).should.equal('');
   });
 });
