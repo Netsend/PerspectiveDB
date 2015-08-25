@@ -250,8 +250,9 @@ describe('Tree', function() {
       (function() { tree = new Tree(db, 'foo', { iSize: 7 }); }).should.throw('opts.iSize must be between 0 and 6');
     });
 
-    it('should construct', function() {
-      (function() { tree = new Tree(db, 'foo'); }).should.not.throwError();
+    it('should construct and set name public', function() {
+      tree = new Tree(db, 'foo');
+      should.strictEqual(tree.name, 'foo');
     });
   });
 
