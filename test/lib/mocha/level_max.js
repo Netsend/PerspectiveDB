@@ -51,85 +51,152 @@ after(function(done) {
 
 describe('levelmax', function() {
   var seconds = 2;
+  var nritems = 50000;
 
-  it('insert 1 byte keys for ' + seconds + ' seconds (timeout)', function(done) {
-    this.timeout((seconds + 1) * 1000);
+  describe('single', function() {
+    it('insert 1 byte keys for ' + seconds + ' seconds (timeout)', function(done) {
+      this.timeout((seconds + 1) * 1000);
 
-    var run = true;
-    setTimeout(function() {
-      run = false;
-    }, seconds * 1000);
+      var run = true;
+      setTimeout(function() {
+        run = false;
+      }, seconds * 1000);
 
-    var i = 0;
-    function write() {
-      i++;
-      db.put(new Buffer(1), null, function(err) {
-        if (err) { throw err; }
-        if (run) {
-          write();
-        } else {
-          console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
-          // expect at least 10.000 items per seconds
-          i.should.greaterThan(seconds * 10000);
-          done();
-        }
-      });
-    }
+      var i = 0;
+      function write() {
+        i++;
+        db.put(new Buffer(1), null, function(err) {
+          if (err) { throw err; }
+          if (run) {
+            write();
+          } else {
+            console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
+            // expect at least 10.000 items per seconds
+            i.should.greaterThan(seconds * 10000);
+            done();
+          }
+        });
+      }
 
-    write();
+      write();
+    });
+
+    it('insert 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds', function(done) {
+      this.timeout((seconds + 1) * 1000);
+
+      var run = true;
+      setTimeout(function() {
+        run = false;
+      }, seconds * 1000);
+
+      var i = 0;
+      function write() {
+        i++;
+        db.put(new Buffer(30), new Buffer(1024), function(err) {
+          if (err) { throw err; }
+          if (run) {
+            write();
+          } else {
+            console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
+            // expect at least 10.000 items per seconds
+            i.should.greaterThan(seconds * 10000);
+            done();
+          }
+        });
+      }
+
+      write();
+    });
+
+    it('insert 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds (fsync)', function(done) {
+      this.timeout((seconds + 1) * 1000);
+
+      var run = true;
+      setTimeout(function() {
+        run = false;
+      }, seconds * 1000);
+
+      var i = 0;
+      function write() {
+        i++;
+        db.put(new Buffer(30), new Buffer(1024), { sync: true }, function(err) {
+          if (err) { throw err; }
+          if (run) {
+            write();
+          } else {
+            console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
+            // expect at least 5.000 items per seconds
+            i.should.greaterThan(seconds * 5000);
+            done();
+          }
+        });
+      }
+
+      write();
+    });
   });
 
-  it('insert 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds', function(done) {
-    this.timeout((seconds + 1) * 1000);
+  describe('bulk', function() {
+    var items = [];
 
-    var run = true;
-    setTimeout(function() {
-      run = false;
-    }, seconds * 1000);
+    it('create ' + nritems + ' items for bulk insert', function() {
+      for (var i = 0; i < nritems; i++) {
+        items.push({ type: 'put', key: new Buffer(30), value: new Buffer(1024) });
+      }
+    });
 
-    var i = 0;
-    function write() {
-      i++;
-      db.put(new Buffer(30), new Buffer(1024), function(err) {
-        if (err) { throw err; }
-        if (run) {
-          write();
-        } else {
-          console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
-          // expect at least 10.000 items per seconds
-          i.should.greaterThan(seconds * 10000);
-          done();
-        }
-      });
-    }
+    it('items of 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds', function(done) {
+      this.timeout((seconds + 1) * 1000);
 
-    write();
-  });
+      var run = true;
+      setTimeout(function() {
+        run = false;
+      }, seconds * 1000);
 
-  it('insert 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds (fsync)', function(done) {
-    this.timeout((seconds + 1) * 1000);
+      var i = 0;
+      function write() {
+        i++;
+        db.batch(items, function(err) {
+          if (err) { throw err; }
+          if (run) {
+            write();
+          } else {
+            console.log('%d keys inserted in %d seconds (%d items per second)', i * nritems, seconds, i * nritems / seconds);
+            // expect at least 5.000 items per seconds
+            (i * nritems).should.greaterThan(seconds * 5000);
+            done();
+          }
+        });
+      }
 
-    var run = true;
-    setTimeout(function() {
-      run = false;
-    }, seconds * 1000);
+      write();
+    });
 
-    var i = 0;
-    function write() {
-      i++;
-      db.put(new Buffer(30), new Buffer(1024), { sync: true }, function(err) {
-        if (err) { throw err; }
-        if (run) {
-          write();
-        } else {
-          console.log('%d keys inserted in %d seconds (%d items per second)', i, seconds, i / seconds);
-          // expect at least 5.000 items per seconds
-          i.should.greaterThan(seconds * 5000);
-          done();
-        }
-      });
-    }
+    it('insert items of 30 byte keys with 1 kilo-byte values for ' + seconds + ' seconds (fsync)', function(done) {
+      this.timeout((seconds + 1) * 1000);
 
-    write();
+      var run = true;
+      setTimeout(function() {
+        run = false;
+      }, seconds * 1000);
+
+      var i = 0;
+      function write() {
+        i++;
+        db.batch(items, { sync: true }, function(err) {
+          if (err) { throw err; }
+          if (run) {
+            write();
+          } else {
+            console.log('%d keys inserted in %d seconds (%d items per second)', i * nritems, seconds, i * nritems / seconds);
+            // expect at least 5.000 items per seconds
+            (i * nritems).should.greaterThan(seconds * 5000);
+            done();
+          }
+        });
+      }
+
+      write();
+    });
   });
 });
