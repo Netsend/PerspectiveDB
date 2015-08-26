@@ -1979,8 +1979,8 @@ describe('Tree', function() {
     });
   });
 
-  describe('_transform', function() {
-    var name = '_transform';
+  describe('_write', function() {
+    var name = '_write';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
@@ -2000,17 +2000,20 @@ describe('Tree', function() {
     it('should accept a new root and a new leaf in an empty database and increment i twice', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.on('data', function(obj) {
-        i++;
-        should.strictEqual(BSON.deserialize(obj).h.i, i);
-      });
-      t.on('finish', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
       t.write(item1);
       t.write(item2);
-      t.end();
+      t.end(function(err) {
+        if (err) { throw err; }
+        t.iterateInsertionOrder(function(obj, next) {
+          i++;
+          should.strictEqual(obj.h.i, i);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          done();
+        });
+      });
     });
 
     it('inspect keys: should have created two dskeys with incremented i values', function(done) {
@@ -2147,8 +2150,6 @@ describe('Tree', function() {
       t.end(item1);
       // expect that streams do not emit a finish after an error occurred
       t.on('finish', done);
-      // nor should a data event happen
-      t.on('data', done);
     });
 
     it('should not accept an existing non-root', function(done) {
@@ -2160,26 +2161,42 @@ describe('Tree', function() {
       t.end(item2);
       // expect that streams do not emit a finish after an error occurred
       t.on('finish', done);
-      // nor should a data event happen
-      t.on('data', done);
     });
 
     it('should accept new item (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.on('data', function(obj) {
-        should.strictEqual(BSON.deserialize(obj).h.i, 3);
-        done();
-      });
       t.write(item3);
+      var i = 0;
+      t.end(function(err) {
+        if (err) { throw err; }
+        t.iterateInsertionOrder(function(obj, next) {
+          i++;
+          should.strictEqual(obj.h.i, i);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 3);
+          done();
+        });
+      });
     });
 
     it('should accept new item (fast-forward)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.on('data', function(obj) {
-        should.strictEqual(BSON.deserialize(obj).h.i, 4);
-        done();
-      });
       t.write(item4);
+      var i = 0;
+      t.end(function(err) {
+        if (err) { throw err; }
+        t.iterateInsertionOrder(function(obj, next) {
+          i++;
+          should.strictEqual(obj.h.i, i);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 4);
+          done();
+        });
+      });
     });
 
     it('inspect keys: should have created four dskeys with incremented i values', function(done) {
