@@ -1856,8 +1856,8 @@ describe('Tree', function() {
     });
   });
 
-  describe('_isNewChild', function() {
-    var name = '_isNewChild';
+  describe('_isConnected', function() {
+    var name = '_isConnected';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
@@ -1869,18 +1869,20 @@ describe('Tree', function() {
 
     it('should accept roots in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item1, function(err, isNewChild) {
+      t._isConnected(item1, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, true);
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, false);
         done();
       });
     });
 
     it('should not accept non-roots in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item2, function(err, isNewChild) {
+      t._isConnected(item2, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, false);
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
         done();
       });
     });
@@ -1907,45 +1909,50 @@ describe('Tree', function() {
 
     it('should not accept a new root in a non-empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(itemA, function(err, isNewChild) {
+      t._isConnected(itemA, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, false);
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
         done();
       });
     });
 
-    it('should not accept an existing root in a non-empty database', function(done) {
+    it('should accept an existing root in a non-empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item1, function(err, isNewChild) {
+      t._isConnected(item1, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, false);
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, true);
         done();
       });
     });
 
     it('should accept new connecting non-roots in a non-empty database (fast-forward)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item2, function(err, isNewChild) {
+      t._isConnected(item2, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, true);
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, false);
         done();
       });
     });
 
     it('should accept new connecting non-roots in a non-empty database (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item4, function(err, isNewChild) {
+      t._isConnected(item4, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, true);
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, false);
         done();
       });
     });
 
     it('should not accept non-connecting non-roots in a non-empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item3, function(err, isNewChild) {
+      t._isConnected(item3, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, false);
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
         done();
       });
     });
@@ -1969,11 +1976,12 @@ describe('Tree', function() {
       });
     });
 
-    it('should not accept existing connecting non-roots in a non-empty database', function(done) {
+    it('should accept existing connecting non-roots in a non-empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._isNewChild(item2, function(err, isNewChild) {
+      t._isConnected(item2, function(err, isConnected, exists) {
         if (err) { throw err; }
-        should.strictEqual(isNewChild, false);
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, true);
         done();
       });
     });
@@ -1991,13 +1999,13 @@ describe('Tree', function() {
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
+        should.strictEqual(err.message, 'item is not a new child');
         done();
       });
       t.write(item2);
     });
 
-    it('should accept a new root and a new leaf in an empty database and increment i twice', function(done) {
+    it('should accept a new root and a new child in an empty database and increment i twice', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       t.write(item1);
@@ -2144,7 +2152,7 @@ describe('Tree', function() {
     it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
+        should.strictEqual(err.message, 'item is not a new child');
         done();
       });
       t.end(item1);
@@ -2155,7 +2163,7 @@ describe('Tree', function() {
     it('should not accept an existing non-root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
+        should.strictEqual(err.message, 'item is not a new child');
         done();
       });
       t.end(item2);
