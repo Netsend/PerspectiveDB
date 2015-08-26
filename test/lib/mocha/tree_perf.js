@@ -24,6 +24,7 @@ var cp = require('child_process');
 var should = require('should');
 var rimraf = require('rimraf');
 var level = require('level');
+var async = require('async');
 
 var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
@@ -67,39 +68,41 @@ after(function(done) {
   });
 });
 
-/**
- *
- */
-function writeItems(t, items, nitem, cb) {
+// return array with n items
+function genItems(n, gen) {
+  var m = [];
   var i = 0;
-  var j = 0;
 
-  function w() {
-    while(i < items && t.write(nitem())) {
-      i++;
-    }
-
-    // wait if write is paused
-    if (i < items) {
-      i++; // do skipped i++ from last write
-      //console.log('write returned false, wait for drain...');
-      t.once('drain', w);
-    } else {
-      t.end();
-    }
+  while (i++ < n) {
+    m.push(gen());
   }
 
-  t.on('data', function() {
-    j++;
-  });
+  return m;
+}
 
-  t.on('finish', function() {
-    should.strictEqual(i, items);
-    should.strictEqual(j, items);
-    cb();
-  });
+// write items using an array, wait for each item to finish
+function writeItemsSerial(t, items, cb) {
+  async.eachSeries(items, function(item, cb2) {
+    t.write(item, cb2);
+  }, cb);
+}
 
-  w();
+// write items using an array, write in bulk using drain
+function writeItemsDrain(t, items, cb) {
+  var i = 0;
+  function test() {
+    return i < items.length;
+  }
+  async.whilst(test, function(cb2) {
+    while (test() && t.write(items[i++])) {
+      //process.stdout.write('.');
+    }
+    if (test()) {
+      t.once('drain', cb2);
+    } else {
+      cb2();
+    }
+  }, cb);
 }
 
 describe('Tree', function() {
@@ -107,10 +110,10 @@ describe('Tree', function() {
     var name = 'siglehead';
     var heads = 0;
 
-    it('insert 300 items where #heads <= 256', function(done) {
-      var t = new Tree(db, name, { log: silence });
+    var items;
 
-      var ids = {};
+    it('create 300 items where #heads <= 256', function() {
+      var headIds = {};
 
       // return a random item, if id already exists, fast-forward head
       function nitem() {
@@ -119,21 +122,30 @@ describe('Tree', function() {
         var id = buf[0].toString(16);
         var v  = buf.toString('base64');
 
-        if (!ids[id]) {
+        if (!headIds[id]) {
           heads++;
         }
-        var pa  = ids[id] || [];
+        var pa  = headIds[id] || [];
 
-        ids[id] = [v];
+        headIds[id] = [v];
 
-        var item = { h: { id: id, v: v, pa: pa }, b: { some: buf[1].toString(11) } };
-        return item;
+        return { h: { id: id, v: v, pa: pa }, b: new Buffer(1) };
       }
 
-      writeItems(t, 300, nitem, done);
+      items = genItems(300, nitem);
     });
 
-    it('should have created least 10 heads for proper testing', function() {
+    it('insert these items', function(done) {
+      this.timeout(4000);
+      var t = new Tree(db, name, { log: silence });
+      writeItemsDrain(t, items, function(err) {
+        if (err) { throw err; }
+        t.on('finish', done);
+        t.end();
+      });
+    });
+
+    it('should have created at least 10 heads for proper testing', function() {
       heads.should.greaterThan(9);
     });
 
@@ -160,12 +172,9 @@ describe('Tree', function() {
     var name = 'multihead';
     var roots = {};
     var heads = {};
+    var items;
 
-    it('insert 10000 items where some ids have multple heads', function(done) {
-      this.timeout(20000);
-
-      var t = new Tree(db, name, { log: silence });
-
+    it('create 10000 items where some ids have multple heads', function() {
       // return a random item, if id already exists, fork head
       function nitem() {
         var buf = crypto.randomBytes(6);
@@ -186,10 +195,21 @@ describe('Tree', function() {
           heads[v] = true;
         }
 
-        return { h: { id: id, v: v, pa: pa }, b: { some: buf[1].toString(11) } };
+        return { h: { id: id, v: v, pa: pa }, b: new Buffer(1) };
       }
 
-      writeItems(t, 10000, nitem, done);
+      items = genItems(10000, nitem);
+    });
+
+    it('insert these items', function(done) {
+      this.timeout(10000);
+
+      var t = new Tree(db, name, { log: silence });
+      writeItemsDrain(t, items, function(err) {
+        if (err) { throw err; }
+        t.on('finish', done);
+        t.end();
+      });
     });
 
     it('should have created least 10 roots for proper testing', function() {
@@ -231,7 +251,6 @@ describe('Tree', function() {
           k++;
           j++;
           if (j > high) { high = j; }
-          //console.log('same id as previous', id, j + 1);
         } else {
           j = 0;
         }
@@ -240,7 +259,7 @@ describe('Tree', function() {
       }, function(err) {
         if (err) { throw err; }
         console.log('heads with common ids: %s, highest number of heads per id: %s', k, high);
-        k.should.greaterThan(10); // with only 256 random bits and 300 items this should yield a lot more than 10
+        k.should.greaterThan(10); // with only 256 random bits and 10000 items this should yield a lot more than 10
         done();
       });
     });
