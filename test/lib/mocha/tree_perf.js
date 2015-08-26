@@ -116,8 +116,8 @@ describe('Tree', function() {
       function nitem() {
         var buf = crypto.randomBytes(6);
 
-        var id  = buf[0].toString(16);
-        var v   = buf.toString('base64');
+        var id = buf[0].toString(16);
+        var v  = buf.toString('base64');
 
         if (!ids[id]) {
           heads++;
@@ -126,7 +126,8 @@ describe('Tree', function() {
 
         ids[id] = [v];
 
-        return { _h: { id: id, v: v, pa: pa }, _b: { some: buf[1].toString(11) } };
+        var item = { h: { id: id, v: v, pa: pa }, b: { some: buf[1].toString(11) } };
+        return item;
       }
 
       writeItems(t, 300, nitem, done);
@@ -140,17 +141,15 @@ describe('Tree', function() {
       var t = new Tree(db, name, { log: silence });
       var i = 0;
 
-      var prevId = 0;
-      var s = t.getHeads();
-      s.on('data', function(data) {
-        var key = Tree.parseKey(data.key, 'hex');
-        var id = Number('0x' + key.id);
+      var prevId = -1;
+      t.getHeads(function(item, next) {
+        var id = Number('0x' + item.h.id);
         id.should.greaterThan(prevId);
         prevId = id;
         i++;
-      });
-
-      s.on('close', function() {
+        next();
+      }, function(err) {
+        if (err) { throw err; }
         should.strictEqual(i, heads);
         done();
       });
@@ -187,7 +186,7 @@ describe('Tree', function() {
           heads[v] = true;
         }
 
-        return { _h: { id: id, v: v, pa: pa }, _b: { some: buf[1].toString(11) } };
+        return { h: { id: id, v: v, pa: pa }, b: { some: buf[1].toString(11) } };
       }
 
       writeItems(t, 10000, nitem, done);
@@ -206,16 +205,14 @@ describe('Tree', function() {
       var i = 0;
 
       var prevId = 0;
-      var s = t.getHeads();
-      s.on('data', function(data) {
-        var key = Tree.parseKey(data.key, 'hex');
-        var id = Number('0x' + key.id);
+      t.getHeads(function(item, next) {
+        var id = Number('0x' + item.h.id);
         id.should.greaterThan(prevId - 1);
         prevId = id;
         i++;
-      });
-
-      s.on('close', function() {
+        next();
+      }, function(err) {
+        if (err) { throw err; }
         should.strictEqual(i, Object.keys(heads).length);
         done();
       });
@@ -225,24 +222,23 @@ describe('Tree', function() {
       var t = new Tree(db, name, { log: silence });
 
       var prevId;
-      var s = t.getHeads();
       var j = 0;
       var k = 0;
       var high = 0;
-      s.on('data', function(data) {
-        var key = Tree.parseKey(data.key, 'hex');
-        if (key.id === prevId) {
+      t.getHeads(function(item, next) {
+        var id = Number('0x' + item.h.id);
+        if (id === prevId) {
           k++;
           j++;
           if (j > high) { high = j; }
-          //console.log('same id as previous', key.id, j + 1);
+          //console.log('same id as previous', id, j + 1);
         } else {
           j = 0;
         }
-        prevId = key.id;
-      });
-
-      s.on('close', function() {
+        prevId = id;
+        next();
+      }, function(err) {
+        if (err) { throw err; }
         console.log('heads with common ids: %s, highest number of heads per id: %s', k, high);
         k.should.greaterThan(10); // with only 256 random bits and 300 items this should yield a lot more than 10
         done();
