@@ -24,7 +24,8 @@ var should = require('should');
 var rimraf = require('rimraf');
 var async = require('async');
 var level = require('level');
-var BSON = require('bson').BSONPure.BSON;
+var bson = require('bson');
+var BSON = new bson.BSONPure.BSON();
 
 var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
