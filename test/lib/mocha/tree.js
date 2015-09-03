@@ -279,11 +279,11 @@ describe('Tree', function() {
     });
 
     it('should require type to be >= 0x01', function() {
-      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 0x01 to 0x04');
+      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
     });
 
-    it('should require type to be <= 0x04', function() {
-      (function() { p = Tree.getPrefix('', 0x05); }).should.throw('type must be in the subkey range of 0x01 to 0x04');
+    it('should require type to be <= 0x05', function() {
+      (function() { p = Tree.getPrefix('', 0x06); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
     });
 
     it('should return the right prefix with an empty name', function() {
@@ -307,8 +307,8 @@ describe('Tree', function() {
       (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
     });
 
-    it('should require subkey to be <= 0x04', function() {
-      var b = new Buffer('00000500', 'hex');
+    it('should require subkey to be <= 0x05', function() {
+      var b = new Buffer('00000600', 'hex');
       (function() { Tree.parseKey(b); }).should.throw('key is of an unknown type');
     });
 
@@ -438,7 +438,7 @@ describe('Tree', function() {
 
       it('should decode id to "hex" string', function() {
         var b = new Buffer('0000030144000100', 'hex');
-        var obj = Tree.parseKey(b, 'hex');
+        var obj = Tree.parseKey(b, { decodeId: 'hex' });
         should.deepEqual(obj, {
           name: new Buffer([]),
           type: 0x03,
@@ -449,7 +449,7 @@ describe('Tree', function() {
 
       it('should decode id to "base64" string', function() {
         var b = new Buffer('0000030144000100', 'hex');
-        var obj = Tree.parseKey(b, 'base64');
+        var obj = Tree.parseKey(b, { decodeId: 'base64' });
         should.deepEqual(obj, {
           name: new Buffer([]),
           type: 0x03,
@@ -705,9 +705,102 @@ describe('Tree', function() {
       });
     });
 
+    describe('pekey', function() {
+      it('should err if pe length is zero', function() {
+        var b = new Buffer('000005000000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('pe must be at least one byte');
+      });
+
+      it('should err if i is bigger than specified length', function() {
+        var b = new Buffer('000005010000010000', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after i');
+      });
+
+      it('should err if i is smaller than specified length (1)', function() {
+        var b = new Buffer('00000501000001', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      it('should err if i is smaller than specified length (2)', function() {
+        var b = new Buffer('0000050100000200', 'hex');
+        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+      });
+
+      describe('i 1,', function() {
+        it('name 0, pe 1', function() {
+          var b = new Buffer('0000050160000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x05,
+            pe: new Buffer([96]),
+            i: 0,
+          });
+        });
+
+        it('name 1, pe 1', function() {
+          var b = new Buffer('016000050159000100', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([96]),
+            type: 0x05,
+            pe: new Buffer([89]),
+            i: 0,
+          });
+        });
+
+      });
+
+      describe('i 3,', function() {
+        it('name 0, pe 3', function() {
+          var b = new Buffer('000005032357600003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer(0),
+            type: 0x05,
+            pe: new Buffer([35, 87, 96]),
+            i: 0x235761
+          });
+        });
+
+        it('name 3, pe 3', function() {
+          var b = new Buffer('032357600005032357590003235761', 'hex');
+          var obj = Tree.parseKey(b);
+          should.deepEqual(obj, {
+            name: new Buffer([35, 87, 96]),
+            type: 0x05,
+            pe: new Buffer([35, 87, 89]),
+            i: 0x235761
+          });
+        });
+      });
+
+      it('should decode pe to "hex" string', function() {
+        var b = new Buffer('0000050144000100', 'hex');
+        var obj = Tree.parseKey(b, { decodePe: 'hex' });
+        should.deepEqual(obj, {
+          name: new Buffer([]),
+          type: 0x05,
+          pe: '44',
+          i: 0
+        });
+      });
+
+      it('should decode pe to "base64" string', function() {
+        var b = new Buffer('0000050144000100', 'hex');
+        var obj = Tree.parseKey(b, { decodePe: 'base64' });
+        should.deepEqual(obj, {
+          name: new Buffer([]),
+          type: 0x05,
+          pe: 'RA==',
+          i: 0
+        });
+      });
+    });
+
     it('should decode v to "hex" string', function() {
       var b = new Buffer('00000403235761', 'hex');
-      var obj = Tree.parseKey(b, null, 'hex');
+      var obj = Tree.parseKey(b, { decodeV: 'hex' });
       should.deepEqual(obj, {
         name: new Buffer([]),
         type: 0x04,
@@ -717,7 +810,7 @@ describe('Tree', function() {
 
     it('should decode v to "base64" string', function() {
       var b = new Buffer('00000403235761', 'hex');
-      var obj = Tree.parseKey(b, null, 'base64');
+      var obj = Tree.parseKey(b, { decodeV: 'base64' });
       should.deepEqual(obj, {
         name: new Buffer([]),
         type: 0x04,
@@ -2033,7 +2126,7 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8' });
         var val = BSON.deserialize(obj.value);
 
         if (i === 1) {
@@ -2064,7 +2157,7 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
         var val = Tree.parseHeadVal(obj.value);
 
         should.strictEqual(key.type, 0x03);
@@ -2088,8 +2181,8 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8');
-        var val = Tree.parseKey(obj.value, 'utf8', 'base64');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8' });
+        var val = Tree.parseKey(obj.value, { decodeId: 'utf8', decodeV: 'base64' });
 
         if (i === 1) {
           should.strictEqual(key.type, 0x02);
@@ -2123,8 +2216,8 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
-        var val = Tree.parseKey(obj.value, 'utf8');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
+        var val = Tree.parseKey(obj.value, { decodeId: 'utf8' });
 
         if (i === 1) {
           should.strictEqual(key.type, 0x04);
@@ -2216,7 +2309,7 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8' });
         var val = BSON.deserialize(obj.value);
 
         if (i === 1) {
@@ -2259,7 +2352,7 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
         var val = Tree.parseHeadVal(obj.value, 'utf8');
 
         if (i === 1) {
@@ -2293,7 +2386,7 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
         var val = Tree.parseHeadVal(obj.value, 'utf8');
 
         if (i === 1) {
@@ -2326,8 +2419,8 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8');
-        var val = Tree.parseKey(obj.value, 'utf8', 'base64');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8' });
+        var val = Tree.parseKey(obj.value, { decodeId: 'utf8', decodeV: 'base64' });
 
         if (i === 1) {
           should.strictEqual(key.type, 0x02);
@@ -2377,8 +2470,8 @@ describe('Tree', function() {
       s.on('data', function(obj) {
         i++;
 
-        var key = Tree.parseKey(obj.key, 'utf8', 'base64');
-        var val = Tree.parseKey(obj.value, 'utf8');
+        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
+        var val = Tree.parseKey(obj.value, { decodeId: 'utf8' });
 
         if (i === 1) {
           should.strictEqual(key.type, 0x04);
