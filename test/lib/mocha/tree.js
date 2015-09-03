@@ -1844,6 +1844,55 @@ describe('Tree', function() {
     });
   });
 
+  describe('_composePeKey', function() {
+    var name = '_';
+
+    it('should require pe to be (convertiable to) a string', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      (function() { t._composePeKey(null, 1); }).should.throw('Cannot read property \'toString\' of null');
+    });
+
+    it('should require i to be a number', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      (function() { t._composePeKey('foo', {}); }).should.throw('i must be a number');
+    });
+
+    it('should transform a string type pe into a buffer and pad i to a lbeint', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      t._composePeKey('foo', 257).toString('hex').should.equal('015f000503666f6f00020101');
+    });
+
+    it('should transform a function type pe into a buffer and pad i to a lbeint', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      t._composePeKey(function() { return true; }, 257).toString('hex').should.equal('015f00051c66756e6374696f6e202829207b2072657475726e20747275653b207d00020101');
+    });
+
+    it('should transform a boolean type pe into a buffer and pad i to a lbeint', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      t._composePeKey(true, 257).toString('hex').should.equal('015f0005047472756500020101');
+    });
+
+    it('should accept buffer type pe', function() {
+      var t = new Tree(db, name, { iSize: 2, log: silence });
+      t._composePeKey(new Buffer('true'), 257).toString('hex').should.equal('015f0005047472756500020101');
+    });
+  });
+
+  describe('_composePeVal', function() {
+    var name = '_composePeVal';
+
+    it('should require that v matches the vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      (function() { t._composePeVal('YWJj'); }).should.throw('v is too short or too long');
+    });
+
+    it('should set version', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._composePeVal('YWJj').toString('hex').should.equal('03616263');
+    });
+  });
+
   describe('_composeDsKey', function() {
     var name = '_composeDsKey';
 
