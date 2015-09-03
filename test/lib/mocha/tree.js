@@ -1617,56 +1617,103 @@ describe('Tree', function() {
     });
   });
 
-  describe('minI', function() {
-    var name = 'minI';
+  describe('lastByPerspective', function() {
+    var name = 'lastByPerspective';
 
-    it('should return null by default', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      t.minI(function(err, i) {
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [], pe: 'lbp' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'], pe: 'lbp' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'], pe: 'lbp2' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'], pe: 'lbp' } };
+
+    it('should require pe to be a buffer or a string', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.lastByPerspective(function() {}); }).should.throw('pe must be a buffer or a string');
+    });
+
+    it('should return null with empty databases', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp', function(err, v) {
         if (err) { throw err; }
-        should.equal(i, null);
+        should.equal(v, null);
         done();
       });
     });
 
-    it('needs an item with a number in the index', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      /*
-      store an object in the I index:
-      {                    _  n  e  x  t  I                          2
-        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 02>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
-      }
-      */
-      t._db.put(t._composeIKey(2), BSON.serialize({ b: 'A' }), done);
+    it('needs item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item1, done);
     });
 
-    it('should give the new i', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      t.minI(function(err, i) {
+    it('should return version of item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp', function(err, v) {
         if (err) { throw err; }
-        should.equal(i, 2);
+        should.equal(v, 108186); // 108186 dec = Aaaa base64
         done();
       });
     });
 
-    it('needs a new higher i in the index', function(done) {
-      var t = new Tree(db, name, { log: silence });
-      /*
-      store an object in the I index:
-      {                    _  n  e  x  t  I                         20
-        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 14>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
-      }
-      */
-      t._db.put(t._composeIKey(20), BSON.serialize({ b: 'A' }), done);
+    it('should return version of item1 base64', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp', 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Aaaa');
+        done();
+      });
     });
 
-    it('should still return the first i', function(done) {
-      var vc = new Tree(db, name, { log: silence });
-      vc.minI(function(err, i) {
+    it('should not return version of item1 if other pe is searched for', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp2', function(err, v) {
         if (err) { throw err; }
-        should.equal(i, 2);
+        should.equal(v, null);
+        done();
+      });
+    });
+
+    it('needs item2 and item3 (lbp and lbp2)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item2);
+      t.end(item3, done);
+    });
+
+    it('should return version of item2 (lbp)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp', 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Bbbb');
+        done();
+      });
+    });
+
+    it('should return version of item3 (lbp2)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp2', 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Cccc');
+        done();
+      });
+    });
+
+    it('needs item4 (lbp)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item4, done);
+    });
+
+    it('should return version of item4 (lbp)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp', 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Dddd');
+        done();
+      });
+    });
+
+    it('should return version of item3 (lbp2) unchanged', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastByPerspective('lbp2', 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Cccc');
         done();
       });
     });
