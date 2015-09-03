@@ -2380,6 +2380,37 @@ describe('Tree', function() {
       });
     });
 
+    it('inspect keys: should have created two pekeys with the tree name as perspective and version as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getPeKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, { decodePe: 'utf8' });
+        var val = Tree.parsePeVal(obj.value, 'base64');
+
+        if (i === 1) {
+          should.strictEqual(key.type, 0x05);
+          should.strictEqual(key.pe, name);
+          should.strictEqual(key.i, 1);
+          should.deepEqual(val.v, 'Aaaa');
+        }
+        if (i === 2) {
+          should.strictEqual(key.type, 0x05);
+          should.strictEqual(key.pe, name);
+          should.strictEqual(key.i, 2);
+          should.deepEqual(val.v, 'Bbbb');
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
     it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
@@ -2477,40 +2508,6 @@ describe('Tree', function() {
 
       s.on('end', function() {
         should.strictEqual(i, 4);
-        done();
-      });
-    });
-
-    it('inspect keys: should have two headkey with the latest versions and corresponding value', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getHeadKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
-        var val = Tree.parseHeadVal(obj.value, 'utf8');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Bbbb');
-
-          should.strictEqual(val.i, 2);
-        }
-
-        if (i === 2) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Dddd');
-
-          should.strictEqual(val.i, 4);
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 2);
         done();
       });
     });
@@ -2641,6 +2638,44 @@ describe('Tree', function() {
           should.strictEqual(val.type, 0x01);
           should.strictEqual(val.id, 'XI');
           should.strictEqual(val.i, 4);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 4);
+        done();
+      });
+    });
+
+    it('inspect keys: should have four pekeys with the corresponding version as value', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var r = t.getPeKeyRange();
+      var s = db.createReadStream({ gt: r.s, lt: r.e });
+      s.on('data', function(obj) {
+        i++;
+
+        var key = Tree.parseKey(obj.key, { decodePe: 'utf8', decodeV: 'base64' });
+        var val = Tree.parsePeVal(obj.value, 'base64');
+
+        should.strictEqual(key.type, 0x05);
+        should.strictEqual(key.pe, name);
+
+        if (i === 1) {
+          should.strictEqual(key.i, 1);
+          should.strictEqual(val.v, 'Aaaa');
+        }
+        if (i === 2) {
+          should.strictEqual(key.i, 2);
+          should.strictEqual(val.v, 'Bbbb');
+        }
+        if (i === 3) {
+          should.strictEqual(key.i, 3);
+          should.strictEqual(val.v, 'Cccc');
+        }
+        if (i === 4) {
+          should.strictEqual(key.i, 4);
+          should.strictEqual(val.v, 'Dddd');
         }
       });
 
