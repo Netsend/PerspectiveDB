@@ -883,6 +883,43 @@ describe('Tree', function() {
     });
   });
 
+  describe('parsePeVal', function() {
+    it('should err if value is not a buffer', function() {
+      (function() { Tree.parsePeVal(''); }).should.throw('value must be a buffer');
+    });
+
+    it('should err if v length is zero', function() {
+      var b = new Buffer('00', 'hex');
+      (function() { Tree.parsePeVal(b); }).should.throw('v must be at least one byte');
+    });
+
+    it('should err if v is bigger than specified length', function() {
+      var b = new Buffer('02000000', 'hex');
+      (function() { Tree.parsePeVal(b); }).should.throw('unexpected length of value');
+    });
+
+    it('should err if v is smaller than specified length', function() {
+      var b = new Buffer('0200', 'hex');
+      (function() { Tree.parsePeVal(b); }).should.throw('index out of range');
+    });
+
+    it('v 1', function() {
+      var b = new Buffer('0102', 'hex');
+      var obj = Tree.parsePeVal(b);
+      should.deepEqual(obj, {
+        v: 2
+      });
+    });
+
+    it('v 3', function() {
+      var b = new Buffer('03235761', 'hex');
+      var obj = Tree.parsePeVal(b);
+      should.deepEqual(obj, {
+        v: 0x235761
+      });
+    });
+  });
+
   describe('getIKeyRange', function() {
     it('should work with a zero byte name and default iSize = 6', function() {
       var t = new Tree(db, '');
