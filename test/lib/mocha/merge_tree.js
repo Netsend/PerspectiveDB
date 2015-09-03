@@ -159,6 +159,7 @@ describe('MergeTree', function() {
     var item1 = { h: { id: 'XI', v: 'Aaaa' }, b: { some: 'body' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc' }, b: { more2: 'body' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
 
     it('should require item to be an object', function(done) {
       var t = new MergeTree(db, { vSize: 3, log: silence });
