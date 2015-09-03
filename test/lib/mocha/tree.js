@@ -1883,6 +1883,59 @@ describe('Tree', function() {
     });
   });
 
+  describe('getPeKeyRange', function() {
+    describe('no pe', function() {
+      it('should work with a zero byte name', function() {
+        var t = new Tree(db, '');
+        var p = t.getPeKeyRange();
+        should.strictEqual(p.s.toString('hex'), '000005');
+        should.strictEqual(p.e.toString('hex'), '000005ff');
+      });
+
+      it('should work with a single byte name', function() {
+        var t = new Tree(db, 'a');
+        var p = t.getPeKeyRange();
+        should.strictEqual(p.s.toString('hex'), '01610005');
+        should.strictEqual(p.e.toString('hex'), '01610005ff');
+      });
+
+      it('should work with a multi byte name', function() {
+        var t = new Tree(db, 'abc');
+        var p = t.getPeKeyRange();
+        should.strictEqual(p.s.toString('hex'), '036162630005');
+        should.strictEqual(p.e.toString('hex'), '036162630005ff');
+      });
+    });
+
+    describe('with pe', function() {
+      it('should require pe to be a buffer', function() {
+        var t = new Tree(db, '');
+        (function() { t.getPeKeyRange([]); }).should.throw('pe must be a buffer if provided');
+      });
+
+      it('should work with a zero byte name', function() {
+        var t = new Tree(db, '');
+        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '00000501cb');
+        should.strictEqual(p.e.toString('hex'), '00000501cbff');
+      });
+
+      it('should work with a single byte name', function() {
+        var t = new Tree(db, 'a');
+        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '0161000501cb');
+        should.strictEqual(p.e.toString('hex'), '0161000501cbff');
+      });
+
+      it('should work with a multi byte name', function() {
+        var t = new Tree(db, 'abc');
+        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
+        should.strictEqual(p.s.toString('hex'), '03616263000501cb');
+        should.strictEqual(p.e.toString('hex'), '03616263000501cbff');
+      });
+    });
+  });
+
   describe('_composeDsKey', function() {
     var name = '_composeDsKey';
 
