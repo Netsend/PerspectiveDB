@@ -918,6 +918,14 @@ describe('Tree', function() {
         v: 0x235761
       });
     });
+
+    it('v 3 decode hex', function() {
+      var b = new Buffer('03235761', 'hex');
+      var obj = Tree.parsePeVal(b, 'base64');
+      should.deepEqual(obj, {
+        v: 'I1dh'
+      });
+    });
   });
 
   describe('getIKeyRange', function() {
