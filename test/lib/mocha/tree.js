@@ -1608,6 +1608,7 @@ describe('Tree', function() {
         }
         if (i > 1) {
           should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+          next();
         }
       }, function(err) {
         if (err) { throw err; }
