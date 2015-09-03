@@ -1847,9 +1847,9 @@ describe('Tree', function() {
   describe('_composePeKey', function() {
     var name = '_';
 
-    it('should require pe to be (convertiable to) a string', function() {
+    it('should require pe to be a string', function() {
       var t = new Tree(db, name, { iSize: 2, log: silence });
-      (function() { t._composePeKey(null, 1); }).should.throw('Cannot read property \'toString\' of null');
+      (function() { t._composePeKey(null, 1); }).should.throw('pe must be a string');
     });
 
     it('should require i to be a number', function() {
@@ -1860,16 +1860,6 @@ describe('Tree', function() {
     it('should transform a string type pe into a buffer and pad i to a lbeint', function() {
       var t = new Tree(db, name, { iSize: 2, log: silence });
       t._composePeKey('foo', 257).toString('hex').should.equal('015f000503666f6f00020101');
-    });
-
-    it('should transform a function type pe into a buffer and pad i to a lbeint', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._composePeKey(function() { return true; }, 257).toString('hex').should.equal('015f00051c66756e6374696f6e202829207b2072657475726e20747275653b207d00020101');
-    });
-
-    it('should transform a boolean type pe into a buffer and pad i to a lbeint', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._composePeKey(true, 257).toString('hex').should.equal('015f0005047472756500020101');
     });
 
     it('should accept buffer type pe', function() {
