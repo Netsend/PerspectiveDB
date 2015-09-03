@@ -50,7 +50,7 @@ key: "\x01", value: BSON serialized javascript object
 key: "\x02", value: key of subtype "\x03"
 key: "\x03", value: opts ival
 key: "\x04", value: key of subtype "\x01"
-key: "\x04", value: null
+key: "\x05", value: version
 
 
 
