@@ -176,8 +176,6 @@ describe('MergeTree', function() {
       var streeIt = 0;
       stree.end(item2, function(err) {
         stree.iterateInsertionOrder(function(item, next) {
-          if (err) { throw err; }
-
           if (streeIt === 0) {
             should.deepEqual(item, item1);
           }
@@ -251,8 +249,6 @@ describe('MergeTree', function() {
       stree.write(item3);
       stree.end(item4, function(err) {
         stree.iterateInsertionOrder(function(item, next) {
-          if (err) { throw err; }
-
           if (streeIt === 0) {
             should.deepEqual(item, item1);
           }
@@ -316,8 +312,6 @@ describe('MergeTree', function() {
       MergeTree._copyTo(stree, dtree, opts, function(err) {
         if (err) { throw err; }
         stree.iterateInsertionOrder(function(item, next) {
-          if (err) { throw err; }
-
           if (streeIt === 0) {
             should.deepEqual(item, item1);
           }
@@ -335,8 +329,6 @@ describe('MergeTree', function() {
         }, function(err) {
           if (err) { throw err; }
           dtree.iterateInsertionOrder(function(item, next) {
-            if (err) { throw err; }
-
             if (dtreeIt === 0) {
               should.deepEqual(item, item1);
             }
