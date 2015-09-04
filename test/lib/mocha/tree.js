@@ -1541,6 +1541,69 @@ describe('Tree', function() {
       });
     });
 
+    it('should wait with close before all items are iterated', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder(function(obj, next) {
+        i++;
+        setTimeout(next, 10);
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('should stop iterating and propagate the error that next is called with', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var error = new Error('custom error');
+      t.iterateInsertionOrder(function(obj, next) {
+        i++;
+        setTimeout(function() {
+          next(error); 
+        }, 10);
+      }, function(err) {
+        should.strictEqual(err.message, 'custom error');
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should stop iterating if next is called with a falsy value as second parameter', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder(function(obj, next) {
+        i++;
+        setTimeout(function() {
+          next(null, false); 
+        }, 10);
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should keep iterating if next is called with a truthy value as second parameter', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder(function(obj, next) {
+        i++;
+        setTimeout(function() {
+          next(null, true); 
+        }, 10);
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
     it('should use opts.i and start emitting at offset 1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
