@@ -1625,6 +1625,23 @@ describe('Tree', function() {
       });
     });
 
+    it('should use opts.i and start emitting at offset 2 (exludeOffset)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder({ i: 1, excludeOffset: true }, function(obj, next) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
     it('should use opts.i and start emitting at offset 2', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
