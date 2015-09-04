@@ -25,6 +25,7 @@ var rimraf = require('rimraf');
 var level = require('level');
 
 var MergeTree = require('../../../lib/merge_tree');
+var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
 
 var db, cons, silence;
@@ -91,6 +92,270 @@ describe('MergeTree', function() {
 
     it('should construct', function() {
       (function() { mtree = new MergeTree(db); }).should.not.throwError();
+    });
+  });
+
+  describe('_copyTo', function() {
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
+
+    it('should require dtree to be an object', function() {
+      (function() { MergeTree._copyTo(); }).should.throw('stree must be an object');
+    });
+
+    it('should require dtree to be an object', function() {
+      (function() { MergeTree._copyTo({}); }).should.throw('dtree must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      (function() { MergeTree._copyTo({}, {}, {}); }).should.throw('cb must be a function');
+    });
+
+    it('should require opts to be an object', function() {
+      (function() { MergeTree._copyTo({}, {}, 1, function() {}); }).should.throw('opts must be an object');
+    });
+
+    it('should copy an empty database to an empty database', function(done) {
+      var stree = new Tree(db, 'foo', { log: silence });
+      var dtree = new Tree(db, 'bar', { log: silence });
+      MergeTree._copyTo(stree, dtree, function(err) {
+        if (err) { throw err; }
+        stree.iterateInsertionOrder(function() {
+          throw new Error('stree: no new item expected');
+        }, function(err) {
+          if (err) { throw err; }
+          dtree.iterateInsertionOrder(function() {
+            throw new Error('dtree: no new item expected');
+          }, done);
+        });
+      });
+    });
+
+    it('needs item1 in stree', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      stree.end(item1, done);
+    });
+
+    it('should copy stree to dtree with one item', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var dtree = new Tree(db, 'bar', { vSize: 3, log: silence });
+
+      var streeIt = 0;
+      var dtreeIt = 0;
+
+      MergeTree._copyTo(stree, dtree, function(err) {
+        if (err) { throw err; }
+        stree.iterateInsertionOrder(function(item, next) {
+          should.deepEqual(item, item1);
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          dtree.iterateInsertionOrder(function(item, next) {
+            should.deepEqual(item, item1);
+            dtreeIt++;
+            next();
+          }, function(err) {
+            if (err) { throw err; }
+            should.strictEqual(streeIt, 1);
+            should.strictEqual(dtreeIt, 1);
+            done();
+          });
+        });
+      });
+    });
+
+    it('needs item2 in stree', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var streeIt = 0;
+      stree.end(item2, function(err) {
+        stree.iterateInsertionOrder(function(item, next) {
+          if (err) { throw err; }
+
+          if (streeIt === 0) {
+            should.deepEqual(item, item1);
+          }
+          if (streeIt > 0) {
+            should.deepEqual(item, item2);
+          }
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(streeIt, 2);
+          done();
+        });
+      });
+    });
+
+    it('should err when trying to copy an existing item', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var dtree = new Tree(db, 'bar', { vSize: 3, log: silence });
+
+      MergeTree._copyTo(stree, dtree, function(err) {
+        should.strictEqual(err.message, 'item is not a new child');
+        done();
+      });
+    });
+
+    it('should copy stree to dtree starting at item1, exclusive', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var dtree = new Tree(db, 'bar', { vSize: 3, log: silence });
+
+      var streeIt = 0;
+      var dtreeIt = 0;
+
+      var opts = { first: item1.h.v, excludeFirst: true };
+
+      MergeTree._copyTo(stree, dtree, opts, function(err) {
+        if (err) { throw err; }
+        stree.iterateInsertionOrder(function(item, next) {
+          if (streeIt === 0) {
+            should.deepEqual(item, item1);
+          }
+          if (streeIt > 0) {
+            should.deepEqual(item, item2);
+          }
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          dtree.iterateInsertionOrder(function(item, next) {
+            if (dtreeIt === 0) {
+              should.deepEqual(item, item1);
+            }
+            if (dtreeIt > 0) {
+              should.deepEqual(item, item2);
+            }
+            dtreeIt++;
+            next();
+          }, function(err) {
+            if (err) { throw err; }
+            should.strictEqual(streeIt, 2);
+            should.strictEqual(dtreeIt, 2);
+            done();
+          });
+        });
+      });
+    });
+
+    it('needs item3 and item4', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var streeIt = 0;
+      stree.write(item3);
+      stree.end(item4, function(err) {
+        stree.iterateInsertionOrder(function(item, next) {
+          if (err) { throw err; }
+
+          if (streeIt === 0) {
+            should.deepEqual(item, item1);
+          }
+          if (streeIt === 1) {
+            should.deepEqual(item, item2);
+          }
+          if (streeIt === 2) {
+            should.deepEqual(item, item3);
+          }
+          if (streeIt > 2) {
+            should.deepEqual(item, item4);
+          }
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(streeIt, 4);
+          done();
+        });
+      });
+    });
+
+    it('should err when copying non-connecting, starting at item3, exclusive', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var dtree = new Tree(db, 'bar', { vSize: 3, log: silence });
+
+      var streeIt = 0;
+      var dtreeIt = 0;
+
+      var opts = { first: item3.h.v, excludeFirst: true };
+
+      MergeTree._copyTo(stree, dtree, opts, function(err) {
+        should.strictEqual(err.message, 'item is not a new child');
+        stree.iterateInsertionOrder(function(item, next) {
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          dtree.iterateInsertionOrder(function(item, next) {
+            dtreeIt++;
+            next();
+          }, function(err) {
+            if (err) { throw err; }
+            should.strictEqual(streeIt, 4);
+            should.strictEqual(dtreeIt, 2);
+            done();
+          });
+        });
+      });
+    });
+
+    it('should copy stree to dtree starting at item3, inclusive', function(done) {
+      var stree = new Tree(db, 'foo', { vSize: 3, log: silence });
+      var dtree = new Tree(db, 'bar', { vSize: 3, log: silence });
+
+      var streeIt = 0;
+      var dtreeIt = 0;
+
+      var opts = { first: item3.h.v, excludeFirst: false };
+
+      MergeTree._copyTo(stree, dtree, opts, function(err) {
+        if (err) { throw err; }
+        stree.iterateInsertionOrder(function(item, next) {
+          if (err) { throw err; }
+
+          if (streeIt === 0) {
+            should.deepEqual(item, item1);
+          }
+          if (streeIt === 1) {
+            should.deepEqual(item, item2);
+          }
+          if (streeIt === 2) {
+            should.deepEqual(item, item3);
+          }
+          if (streeIt > 2) {
+            should.deepEqual(item, item4);
+          }
+          streeIt++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          dtree.iterateInsertionOrder(function(item, next) {
+            if (err) { throw err; }
+
+            if (dtreeIt === 0) {
+              should.deepEqual(item, item1);
+            }
+            if (dtreeIt === 1) {
+              should.deepEqual(item, item2);
+            }
+            if (dtreeIt === 2) {
+              should.deepEqual(item, item3);
+            }
+            if (dtreeIt > 2) {
+              should.deepEqual(item, item4);
+            }
+            dtreeIt++;
+            next();
+          }, function(err) {
+            if (err) { throw err; }
+            should.strictEqual(streeIt, 4);
+            should.strictEqual(dtreeIt, 4);
+            done();
+          });
+        });
+      });
     });
   });
 
