@@ -27,7 +27,7 @@ subkey  ::=
           |  "\x02" ival            ikey, i index key
           |  "\x03" id version      headkey, head index key
           |  "\x04" version         vkey, version index key
-          |  "\x05" pe ival         pekey, perspective key
+          |  "\x05" string          ukey, user store key
 ival    ::=  lbeint                 i value, monotonically increasing number
 id      ::=  string                 used to identify data store values
 pe      ::=  string                 name of a perspective
@@ -50,7 +50,7 @@ key: "\x01", value: BSON serialized javascript object
 key: "\x02", value: key of subtype "\x03"
 key: "\x03", value: opts ival
 key: "\x04", value: key of subtype "\x01"
-key: "\x05", value: version
+key: "\x05", value: (byte*) one or more bytes (node Buffer)
 
 
 

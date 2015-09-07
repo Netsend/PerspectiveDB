@@ -705,10 +705,10 @@ describe('Tree', function() {
       });
     });
 
-    describe('pekey', function() {
-      it('should err if pe length is zero', function() {
+    describe('uskey', function() {
+      it('should err if us length is zero', function() {
         var b = new Buffer('000005000000', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('pe must be at least one byte');
+        (function() { Tree.parseKey(b); }).should.throw('us must be at least one byte');
       });
 
       it('should err if i is bigger than specified length', function() {
@@ -727,24 +727,24 @@ describe('Tree', function() {
       });
 
       describe('i 1,', function() {
-        it('name 0, pe 1', function() {
+        it('name 0, us 1', function() {
           var b = new Buffer('0000050160000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
             type: 0x05,
-            pe: new Buffer([96]),
+            us: new Buffer([96]),
             i: 0,
           });
         });
 
-        it('name 1, pe 1', function() {
+        it('name 1, us 1', function() {
           var b = new Buffer('016000050159000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([96]),
             type: 0x05,
-            pe: new Buffer([89]),
+            us: new Buffer([89]),
             i: 0,
           });
         });
@@ -752,24 +752,24 @@ describe('Tree', function() {
       });
 
       describe('i 3,', function() {
-        it('name 0, pe 3', function() {
+        it('name 0, us 3', function() {
           var b = new Buffer('000005032357600003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
             type: 0x05,
-            pe: new Buffer([35, 87, 96]),
+            us: new Buffer([35, 87, 96]),
             i: 0x235761
           });
         });
 
-        it('name 3, pe 3', function() {
+        it('name 3, us 3', function() {
           var b = new Buffer('032357600005032357590003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([35, 87, 96]),
             type: 0x05,
-            pe: new Buffer([35, 87, 89]),
+            us: new Buffer([35, 87, 89]),
             i: 0x235761
           });
         });
@@ -777,22 +777,22 @@ describe('Tree', function() {
 
       it('should decode pe to "hex" string', function() {
         var b = new Buffer('0000050144000100', 'hex');
-        var obj = Tree.parseKey(b, { decodePe: 'hex' });
+        var obj = Tree.parseKey(b, { decodeUs: 'hex' });
         should.deepEqual(obj, {
           name: new Buffer([]),
           type: 0x05,
-          pe: '44',
+          us: '44',
           i: 0
         });
       });
 
       it('should decode pe to "base64" string', function() {
         var b = new Buffer('0000050144000100', 'hex');
-        var obj = Tree.parseKey(b, { decodePe: 'base64' });
+        var obj = Tree.parseKey(b, { decodeUs: 'base64' });
         should.deepEqual(obj, {
           name: new Buffer([]),
           type: 0x05,
-          pe: 'RA==',
+          us: 'RA==',
           i: 0
         });
       });
@@ -879,51 +879,6 @@ describe('Tree', function() {
           i: 0x235761,
           c: true
         });
-      });
-    });
-  });
-
-  describe('parsePeVal', function() {
-    it('should err if value is not a buffer', function() {
-      (function() { Tree.parsePeVal(''); }).should.throw('value must be a buffer');
-    });
-
-    it('should err if v length is zero', function() {
-      var b = new Buffer('00', 'hex');
-      (function() { Tree.parsePeVal(b); }).should.throw('v must be at least one byte');
-    });
-
-    it('should err if v is bigger than specified length', function() {
-      var b = new Buffer('02000000', 'hex');
-      (function() { Tree.parsePeVal(b); }).should.throw('unexpected length of value');
-    });
-
-    it('should err if v is smaller than specified length', function() {
-      var b = new Buffer('0200', 'hex');
-      (function() { Tree.parsePeVal(b); }).should.throw('index out of range');
-    });
-
-    it('v 1', function() {
-      var b = new Buffer('0102', 'hex');
-      var obj = Tree.parsePeVal(b);
-      should.deepEqual(obj, {
-        v: 2
-      });
-    });
-
-    it('v 3', function() {
-      var b = new Buffer('03235761', 'hex');
-      var obj = Tree.parsePeVal(b);
-      should.deepEqual(obj, {
-        v: 0x235761
-      });
-    });
-
-    it('v 3 decode hex', function() {
-      var b = new Buffer('03235761', 'hex');
-      var obj = Tree.parsePeVal(b, 'base64');
-      should.deepEqual(obj, {
-        v: 'I1dh'
       });
     });
   });
@@ -1729,7 +1684,8 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.lastByPerspective('lbp', function(err, v) {
         if (err) { throw err; }
-        should.equal(v, 108186); // 108186 dec = Aaaa base64
+        var b = new Buffer('Aaaa', 'base64');
+        should.equal(v.toString('hex'), b.toString('hex'));
         done();
       });
     });
@@ -2017,95 +1973,22 @@ describe('Tree', function() {
     });
   });
 
-  describe('_composePeKey', function() {
+  describe('_composeUsKey', function() {
     var name = '_';
 
-    it('should require pe to be a string', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      (function() { t._composePeKey(null, 1); }).should.throw('pe must be a string');
-    });
-
-    it('should require i to be a number', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      (function() { t._composePeKey('foo', {}); }).should.throw('i must be a number');
-    });
-
-    it('should transform a string type pe into a buffer and pad i to a lbeint', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._composePeKey('foo', 257).toString('hex').should.equal('015f000503666f6f00020101');
-    });
-
-    it('should accept buffer type pe', function() {
-      var t = new Tree(db, name, { iSize: 2, log: silence });
-      t._composePeKey(new Buffer('true'), 257).toString('hex').should.equal('015f0005047472756500020101');
-    });
-  });
-
-  describe('_composePeVal', function() {
-    var name = '_composePeVal';
-
-    it('should require that v matches the vSize', function() {
-      // configure 2 bytes and call with 3 bytes (base64)
-      var t = new Tree(db, name, { vSize: 2, log: silence });
-      (function() { t._composePeVal('YWJj'); }).should.throw('v is too short or too long');
-    });
-
-    it('should set version', function() {
+    it('should require usKey to be a string', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._composePeVal('YWJj').toString('hex').should.equal('03616263');
-    });
-  });
-
-  describe('getPeKeyRange', function() {
-    describe('no pe', function() {
-      it('should work with a zero byte name', function() {
-        var t = new Tree(db, '');
-        var p = t.getPeKeyRange();
-        should.strictEqual(p.s.toString('hex'), '000005');
-        should.strictEqual(p.e.toString('hex'), '000005ff');
-      });
-
-      it('should work with a single byte name', function() {
-        var t = new Tree(db, 'a');
-        var p = t.getPeKeyRange();
-        should.strictEqual(p.s.toString('hex'), '01610005');
-        should.strictEqual(p.e.toString('hex'), '01610005ff');
-      });
-
-      it('should work with a multi byte name', function() {
-        var t = new Tree(db, 'abc');
-        var p = t.getPeKeyRange();
-        should.strictEqual(p.s.toString('hex'), '036162630005');
-        should.strictEqual(p.e.toString('hex'), '036162630005ff');
-      });
+      (function() { t._composeUsKey(null, 1); }).should.throw('Cannot read property \'toString\' of null');
     });
 
-    describe('with pe', function() {
-      it('should require pe to be a buffer', function() {
-        var t = new Tree(db, '');
-        (function() { t.getPeKeyRange([]); }).should.throw('pe must be a buffer if provided');
-      });
+    it('should transform a string type usKey into a buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._composeUsKey('foo', 257).toString('hex').should.equal('015f000503666f6f00');
+    });
 
-      it('should work with a zero byte name', function() {
-        var t = new Tree(db, '');
-        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '00000501cb');
-        should.strictEqual(p.e.toString('hex'), '00000501cbff');
-      });
-
-      it('should work with a single byte name', function() {
-        var t = new Tree(db, 'a');
-        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '0161000501cb');
-        should.strictEqual(p.e.toString('hex'), '0161000501cbff');
-      });
-
-      it('should work with a multi byte name', function() {
-        var t = new Tree(db, 'abc');
-        var p = t.getPeKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '03616263000501cb');
-        should.strictEqual(p.e.toString('hex'), '03616263000501cbff');
-      });
+    it('should accept buffer type usKey', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._composeUsKey(new Buffer('true'), 257).toString('hex').should.equal('015f0005047472756500');
     });
   });
 
@@ -2351,9 +2234,9 @@ describe('Tree', function() {
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
-    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
-    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], pe: 'other' }, b: { more3: 'b' } };
 
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -2383,6 +2266,14 @@ describe('Tree', function() {
       });
     });
 
+    it('inspect keys: should have created one usKey with the perspective and version of item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      db.get(t._composeUsKey(item2.h.pe), function(err, v) {
+        should.strictEqual(v.toString('base64'), 'Bbbb');
+        done();
+      });
+    });
+
     it('inspect keys: should have created two dskeys with incremented i values', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
@@ -2404,7 +2295,7 @@ describe('Tree', function() {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 2);
-          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, b: { more: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other', i: 2 }, b: { more: 'body' } });
         }
       });
 
@@ -2508,37 +2399,6 @@ describe('Tree', function() {
       });
     });
 
-    it('inspect keys: should have created two pekeys with the tree name as perspective and version as value', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getPeKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = Tree.parseKey(obj.key, { decodePe: 'utf8' });
-        var val = Tree.parsePeVal(obj.value, 'base64');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x05);
-          should.strictEqual(key.pe, name);
-          should.strictEqual(key.i, 1);
-          should.deepEqual(val.v, 'Aaaa');
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x05);
-          should.strictEqual(key.pe, name);
-          should.strictEqual(key.i, 2);
-          should.deepEqual(val.v, 'Bbbb');
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-
     it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
@@ -2579,6 +2439,14 @@ describe('Tree', function() {
       });
     });
 
+    it('inspect keys: should *not* have updated the usKey for the perspective "other" of item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      db.get(t._composeUsKey(item2.h.pe), function(err, v) {
+        should.strictEqual(v.toString('base64'), 'Bbbb');
+        done();
+      });
+    });
+
     it('should accept new item (fast-forward)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.write(item4);
@@ -2594,6 +2462,14 @@ describe('Tree', function() {
           should.strictEqual(i, 4);
           done();
         });
+      });
+    });
+
+    it('inspect keys: should have updated the usKey for the perspective "other" of item4', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      db.get(t._composeUsKey(item2.h.pe), function(err, v) {
+        should.strictEqual(v.toString('base64'), 'Dddd');
+        done();
       });
     });
 
@@ -2618,7 +2494,7 @@ describe('Tree', function() {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 2);
-          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, b: { more: 'body' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other', i: 2 }, b: { more: 'body' } });
         }
         if (i === 3) {
           should.strictEqual(key.type, 0x01);
@@ -2630,7 +2506,7 @@ describe('Tree', function() {
           should.strictEqual(key.type, 0x01);
           should.strictEqual(key.id, 'XI');
           should.strictEqual(key.i, 4);
-          should.deepEqual(val, { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4 }, b: { more3: 'b' } });
+          should.deepEqual(val, { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], pe: 'other', i: 4 }, b: { more3: 'b' } });
         }
       });
 
@@ -2766,44 +2642,6 @@ describe('Tree', function() {
           should.strictEqual(val.type, 0x01);
           should.strictEqual(val.id, 'XI');
           should.strictEqual(val.i, 4);
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 4);
-        done();
-      });
-    });
-
-    it('inspect keys: should have four pekeys with the corresponding version as value', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getPeKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = Tree.parseKey(obj.key, { decodePe: 'utf8', decodeV: 'base64' });
-        var val = Tree.parsePeVal(obj.value, 'base64');
-
-        should.strictEqual(key.type, 0x05);
-        should.strictEqual(key.pe, name);
-
-        if (i === 1) {
-          should.strictEqual(key.i, 1);
-          should.strictEqual(val.v, 'Aaaa');
-        }
-        if (i === 2) {
-          should.strictEqual(key.i, 2);
-          should.strictEqual(val.v, 'Bbbb');
-        }
-        if (i === 3) {
-          should.strictEqual(key.i, 3);
-          should.strictEqual(val.v, 'Cccc');
-        }
-        if (i === 4) {
-          should.strictEqual(key.i, 4);
-          should.strictEqual(val.v, 'Dddd');
         }
       });
 
