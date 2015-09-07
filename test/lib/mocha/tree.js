@@ -1166,9 +1166,9 @@ describe('Tree', function() {
       (function() { t.getHeads(0); }).should.throw('opts must be an object');
     });
 
-    it('should require opts.id to be a buffer', function() {
+    it('should require opts.id to be a buffer, string or implement "toString"', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.getHeads({ id: {} }); }).should.throw('opts.id must be a buffer');
+      (function() { t.getHeads({ id: null }); }).should.throw('Cannot read property \'toString\' of null');
     });
 
     it('should require opts.skipConflicts to be a boolean', function() {
