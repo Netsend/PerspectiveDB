@@ -478,6 +478,145 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('mergeWithLocal', function() {
+    var sname = 'mergeWithLocal_foo';
+    var dname = 'mergeWithLocal_bar';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+    it('should require stree to be an object', function() {
+      var mt = new MergeTree(db);
+      (function() { mt.mergeWithLocal(); }).should.throw('stree must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      var mt = new MergeTree(db);
+      (function() { mt.mergeWithLocal({}); }).should.throw('cb must be a function');
+    });
+
+    it('should merge an empty database', function(done) {
+      var mt = new MergeTree(db, { log: silence });
+      var stree = new Tree(db, sname, { log: silence });
+      var i = 0;
+      mt.mergeWithLocal(stree, function(err) {
+        if (err) { throw err; }
+        stree.iterateInsertionOrder(function(item, next) {
+          i++;
+          next();
+        }, function(err) {
+          should.strictEqual(i, 0);
+          done();
+        });
+      });
+    });
+
+    it('needs item1 in stree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      stree.end(item1, done);
+    });
+
+    it('should merge one item with the local database, by putting it in stage', function(done) {
+      var mt = new MergeTree(db, { log: silence });
+      var stree = new Tree(db, sname, { log: silence });
+      var stage = mt._stage;
+      var i = 0;
+      mt.mergeWithLocal(stree, function(err) {
+        if (err) { throw err; }
+        stage.iterateInsertionOrder(function(item, next) {
+          i++;
+          should.deepEqual(item, item1);
+          next();
+        }, function(err) {
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+    });
+
+    it('should iterate over item1 because it misses in dtree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+      var i = 0;
+      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+        i++;
+        should.deepEqual(item, item1);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('needs item1 in dtree', function(done) {
+      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+      dtree.end(item1, done);
+    });
+
+    it('should not iterate over item1 because it is already in dtree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+      var i = 0;
+      MergeTree._iterateMissing(stree, dtree, function() {
+        i++;
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 0);
+        done();
+      });
+    });
+
+    it('needs item2 in stree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      stree.end(item2, done);
+    });
+
+    it('should iterate over item2 in stree since item1 is already in dtree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+      var i = 0;
+      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+        should.deepEqual(item, item2);
+        i++;
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('needs item3 in stree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      stree.end(item3, done);
+    });
+
+    it('should iterate over item2 and item3 in stree since item1 is already in dtree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+      var i = 0;
+      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+        if (i === 0) {
+          should.deepEqual(item, item2);
+        }
+        if (i === 1) {
+          should.deepEqual(item, item3);
+        }
+        i++;
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+  });
+
   describe('createRemoteWriteStream', function() {
     var pe = 'other';
 
