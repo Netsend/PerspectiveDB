@@ -2410,17 +2410,6 @@ describe('Tree', function() {
       t.on('finish', done);
     });
 
-    it('should not accept an existing non-root', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
-        done();
-      });
-      t.end(item2);
-      // expect that streams do not emit a finish after an error occurred
-      t.on('finish', done);
-    });
-
     it('should accept new item (fork)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.write(item3);
@@ -2437,6 +2426,17 @@ describe('Tree', function() {
           done();
         });
       });
+    });
+
+    it('should not accept an existing non-root (of a local perspective)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.on('error', function(err) {
+        should.strictEqual(err.message, 'item is not a new child');
+        done();
+      });
+      t.end(item3);
+      // expect that streams do not emit a finish after an error occurred
+      t.on('finish', done);
     });
 
     it('inspect keys: should *not* have updated the usKey for the perspective "other" of item2', function(done) {
@@ -2469,6 +2469,24 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       db.get(t._composeUsKey(item2.h.pe), function(err, v) {
         should.strictEqual(v.toString('base64'), 'Dddd');
+        done();
+      });
+    });
+
+    it('should accept an existing non-root from a non-local perspective', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.on('error', function(err) {
+        throw err;
+      });
+      t.end(item2);
+      // expect that streams do not emit a finish after an error occurred
+      t.on('finish', done);
+    });
+
+    it('inspect keys: should have updated the usKey for the perspective "other" to previously written key, item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      db.get(t._composeUsKey(item2.h.pe), function(err, v) {
+        should.strictEqual(v.toString('base64'), 'Bbbb');
         done();
       });
     });
