@@ -50,7 +50,7 @@ after(function(done) {
 
 describe('findLCAs', function() {
   describe('one perspective', function() {
-    describe('two merges', function() {
+    describe('one merge', function() {
       // create the following structure:
       // A <-- B <-- C <-- D
       //        \     \             
@@ -242,31 +242,113 @@ describe('findLCAs', function() {
       });
     });
 
-/*
-    describe('two merges one side', function() {
-      var name = 'findLCAsTwoMergesOneSide';
-
-      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I' } };
-      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc'] } };
-      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc'] } };
-      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Dddddddd', 'Eeeeeeee'] } };
-
-      var DAG = [A, B, C, D, E, F];
-
+    describe('two merges', function() {
       // create the following structure:
       // A <-- C <-- E
       //  \     \     \
       //   B <-- D <-- F
-      it('should save DAG', function(done) {
-        vc._snapshotCollection.insert(DAG, {w: 1}, done);
+
+      var A = { v: 'Aaaaaaaa', pa: [] };
+      var B = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var C = { v: 'Cccccccc', pa: ['Aaaaaaaa'] };
+      var D = { v: 'Dddddddd', pa: ['Bbbbbbbb', 'Cccccccc'] };
+      var E = { v: 'Eeeeeeee', pa: ['Cccccccc'] };
+      var F = { v: 'Ffffffff', pa: ['Dddddddd', 'Eeeeeeee'] };
+
+      var DAG = [A, B, C, D, E, F];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
+      var dD = DAG.slice(0, 4).reverse();
+      var dE = DAG.slice(0, 5).reverse();
+      var dF = DAG.slice(0, 6).reverse();
+
+      it('B and D = C', function(done) {
+        var x = streamify(dB);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [B.v]);
+          done();
+        });
+      });
+
+      it('D and B = C', function(done) {
+        var x = streamify(dD);
+        var y = streamify(dB);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [B.v]);
+          done();
+        });
+      });
+
+      it('F and E = E', function(done) {
+        var x = streamify(dF);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [E.v]);
+          done();
+        });
+      });
+
+      it('E and F = E', function(done) {
+        var x = streamify(dE);
+        var y = streamify(dF);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [E.v]);
+          done();
+        });
+      });
+
+      it('F and D = D', function(done) {
+        var x = streamify(dF);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [D.v]);
+          done();
+        });
+      });
+
+      it('D and F = C', function(done) {
+        var x = streamify(dD);
+        var y = streamify(dF);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [D.v]);
+          done();
+        });
+      });
+
+      it('E and D = C', function(done) {
+        var x = streamify(dE);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, [C.v]);
+          done();
+        });
       });
 
       it('D and E = C', function(done) {
-        findLCAs(D, E, function(err, lca) {
+        var x = streamify(dD);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [C.h.v]);
+          should.deepEqual(lca, [C.v]);
           done();
         });
       });
@@ -819,6 +901,7 @@ describe('findLCAs', function() {
   });
 
   describe('two perspectives', function() {
+  /*
     describe('second import', function() {
       var name = '_findLCAsTwoPerspectivesSecondImport';
 
