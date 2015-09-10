@@ -63,7 +63,7 @@ describe('findLCAs', function() {
       var E = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
       var F = { v: 'Ffffffff', pa: ['Eeeeeeee', 'Cccccccc'] };
       var G = { v: 'Gggggggg', pa: ['Ffffffff'] };
-      var H = { v: 'H', pa: [] };
+      var H = { v: 'Hhhhhhhh', pa: [] };
 
 
       var DAG = [A, B, C, D, E, F, G, H];
@@ -606,21 +606,6 @@ describe('findLCAs', function() {
     });
 
     describe('n-parents', function() {
-      var name = 'findLCAsNParents';
-
-      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I', pa: [] } };
-      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Cccccccc'] } };
-      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Eeeeeeee', 'Cccccccc'] } };
-      var G = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Ffffffff'] } };
-      var H = { h: { id: 'foo', v: 'H', pe: 'I', pa: ['Ffffffff'] } };
-      var J = { h: { id: 'foo', v: 'J', pe: 'I', pa: ['H'] } };
-      var K = { h: { id: 'foo', v: 'K', pe: 'I', pa: ['J'] } };
-      var I = { h: { id: 'foo', v: 'I', pe: 'I', pa: ['H', 'Gggggggg', 'Dddddddd'] } };
-      var L = { h: { id: 'foo', v: 'L', pe: 'I', pa: ['I'] } };
-
       // create the following structure:
       // A <-- B <-- C <----- D
       //        \     \        \
@@ -629,28 +614,63 @@ describe('findLCAs', function() {
       //                 H <------- I <-- L
       //                  \
       //                   J <-- K
-      it('should save DAG', function(done) {
-        vc._snapshotCollection.insert([A, B, C, D, E, F, G, H, J, K, I, L], {w: 1}, done);
-      });
+
+      var A = { v: 'Aaaaaaaa', pa: [] };
+      var B = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var C = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var D = { v: 'Dddddddd', pa: ['Cccccccc'] };
+      var E = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
+      var F = { v: 'Ffffffff', pa: ['Eeeeeeee', 'Cccccccc'] };
+      var G = { v: 'Gggggggg', pa: ['Ffffffff'] };
+      var H = { v: 'Hhhhhhhh', pa: ['Ffffffff'] };
+      var J = { v: 'Jjjjjjjj', pa: ['Hhhhhhhh'] };
+      var K = { v: 'Kkkkkkkk', pa: ['Jjjjjjjj'] };
+      var I = { v: 'Iiiiiiii', pa: ['Hhhhhhhh', 'Gggggggg', 'Dddddddd'] };
+      var L = { v: 'Llllllll', pa: ['Iiiiiiii'] };
+
+      var DAG = [A, B, C, D, E, F, G, H, J, K, I, L];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
+      var dD = DAG.slice(0, 4).reverse();
+      var dE = DAG.slice(0, 5).reverse();
+      var dF = DAG.slice(0, 6).reverse();
+      var dG = DAG.slice(0, 7).reverse();
+      var dH = DAG.slice(0, 8).reverse();
+      var dJ = DAG.slice(0, 9).reverse();
+      var dK = DAG.slice(0, 10).reverse();
+      var dI = DAG.slice(0, 11).reverse();
+      var dL = DAG.slice(0, 12).reverse();
 
       it('J and K = J', function(done) {
-        findLCAs(J, K, function(err, lca) {
+        var x = streamify(dJ);
+        var y = streamify(dK);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['J']);
+          should.deepEqual(lca, ['Jjjjjjjj']);
           done();
         });
       });
 
       it('I and K = H', function(done) {
-        findLCAs(I, K, function(err, lca) {
+        var x = streamify(dI);
+        var y = streamify(dK);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['H']);
+          should.deepEqual(lca, ['Hhhhhhhh']);
           done();
         });
       });
 
       it('I and G = G', function(done) {
-        findLCAs(I, G, function(err, lca) {
+        var x = streamify(dI);
+        var y = streamify(dG);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg']);
           done();
@@ -658,7 +678,10 @@ describe('findLCAs', function() {
       });
 
       it('I and D = D', function(done) {
-        findLCAs(I, D, function(err, lca) {
+        var x = streamify(dI);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd']);
           done();
@@ -666,15 +689,21 @@ describe('findLCAs', function() {
       });
 
       it('I and L = I', function(done) {
-        findLCAs(I, L, function(err, lca) {
+        var x = streamify(dI);
+        var y = streamify(dL);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['I']);
+          should.deepEqual(lca, ['Iiiiiiii']);
           done();
         });
       });
 
       it('L and C = C', function(done) {
-        findLCAs(L, C, function(err, lca) {
+        var x = streamify(dL);
+        var y = streamify(dC);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Cccccccc']);
           done();
@@ -682,9 +711,12 @@ describe('findLCAs', function() {
       });
 
       it('L and J = H', function(done) {
-        findLCAs(L, J, function(err, lca) {
+        var x = streamify(dL);
+        var y = streamify(dJ);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['H']);
+          should.deepEqual(lca, ['Hhhhhhhh']);
           done();
         });
       });
@@ -693,16 +725,16 @@ describe('findLCAs', function() {
     describe('three parents', function() {
       var name = '_findLCAsThreeParents';
 
-      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I', pa: [] } };
-      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var G = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Dddddddd', 'Ffffffff'] } };
-      var H = { h: { id: 'foo', v: 'H', pe: 'I', pa: ['Eeeeeeee'] } };
-      var I = { h: { id: 'foo', v: 'I', pe: 'I', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var J = { h: { id: 'foo', v: 'J', pe: 'I', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] } };
+      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
+      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
+      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
+      var G = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
+      var H = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
+      var I = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var J = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       // create the following structure:
       //         C <-- E <-- H
@@ -838,15 +870,15 @@ describe('findLCAs', function() {
     describe('virtual merge', function() {
       var name = '_findLCAsVirtualMerge';
 
-      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HI = { h: { id: 'foo', v: 'H', pe: 'I', pa: ['Eeeeeeee'] } };
-      var II = { h: { id: 'foo', v: 'I', pe: 'I', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JI = { h: { id: 'foo', v: 'J', pe: 'I', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
+      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
+      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
+      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
+      var HI = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
+      var II = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var JI = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       // create the following structure:
       //         C <-- E <-- H
@@ -859,8 +891,8 @@ describe('findLCAs', function() {
       });
 
       it('vm1 B and vm2 B = B', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'I', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Bbbbbbbb'] } };
+        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
@@ -869,8 +901,8 @@ describe('findLCAs', function() {
       });
 
       it('vm1 B and vm2 A = error because AI is not in the database', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'I', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Aaaaaaaa'] } };
+        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
         findLCAs(vm1, vm2, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: I');
           done();
@@ -878,8 +910,8 @@ describe('findLCAs', function() {
       });
 
       it('vm1 C, D and vm2 G = C and D', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'I', pa: ['Cccccccc', 'Dddddddd'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Gggggggg'] } };
+        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Gggggggg'] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd', 'Cccccccc']);
@@ -888,8 +920,8 @@ describe('findLCAs', function() {
       });
 
       it('two vm\'s without parents = []', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'I', pa: [] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: [] } };
+        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: [] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: [] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, []);
@@ -908,7 +940,7 @@ describe('findLCAs', function() {
 
 
       it('vm C, D and GI = C and D', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['Cccccccc', 'Dddddddd'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd'] } };
         findLCAs(vm, GI, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd', 'Cccccccc']);
@@ -917,7 +949,7 @@ describe('findLCAs', function() {
       });
 
       it('vm J and II = E, G', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['J'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Jjjjjjjj'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
@@ -926,7 +958,7 @@ describe('findLCAs', function() {
       });
 
       it('vm E, F, G and II = E, F, G', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['Eeeeeeee', 'Ffffffff', 'Gggggggg'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Eeeeeeee', 'Ffffffff', 'Gggggggg'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee', 'Ffffffff', 'Gggggggg']);
@@ -935,16 +967,16 @@ describe('findLCAs', function() {
       });
 
       it('vm H, I, J and JI = I', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['H', 'I', 'J'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Hhhhhhhh', 'Iiiiiiii', 'Jjjjjjjj'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['I']);
+          should.deepEqual(lca, ['Iiiiiiii']);
           done();
         });
       });
 
       it('vm G, H and II = G and E', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['Gggggggg', 'H'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Hhhhhhhh'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
@@ -953,7 +985,7 @@ describe('findLCAs', function() {
       });
 
       it('vm I, J and FI = F', function(done) {
-        var vm = { h: { id: 'foo', pe: 'I', pa: ['I', 'J'] } };
+        var vm = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Iiiiiiii', 'Jjjjjjjj'] } };
         findLCAs(vm, FI, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
@@ -968,33 +1000,33 @@ describe('findLCAs', function() {
     describe('second import', function() {
       var name = '_findLCAsTwoPerspectivesSecondImport';
 
-      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I',  pa: [] } };
-      var BI  = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I',  pa: ['Aaaaaaaa'] } };
-      var CI  = { h: { id: 'foo', v: 'Cccccccc', pe: 'I',  pa: ['Bbbbbbbb'] } };
-      var EI  = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I',  pa: ['Bbbbbbbb'] } };
-      var FI  = { h: { id: 'foo', v: 'Ffffffff', pe: 'I',  pa: ['Eeeeeeee', 'Cccccccc'] } };
-      var GI  = { h: { id: 'foo', v: 'Gggggggg', pe: 'I',  pa: ['Ffffffff'] } };
+      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii',  pa: [] } };
+      var BI  = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii',  pa: ['Aaaaaaaa'] } };
+      var CI  = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii',  pa: ['Bbbbbbbb'] } };
+      var EI  = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii',  pa: ['Bbbbbbbb'] } };
+      var FI  = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii',  pa: ['Eeeeeeee', 'Cccccccc'] } };
+      var GI  = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii',  pa: ['Ffffffff'] } };
       var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
       var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
       var CII = { h: { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Bbbbbbbb'] } };
       var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Bbbbbbbb'] } };
       var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Eeeeeeee', 'Cccccccc'] } };
       var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Ffffffff'] } };
-      var HI  = { h: { id: 'foo', v: 'H', pe: 'I',  pa: ['Gggggggg'] } };
-      var KI  = { h: { id: 'foo', v: 'K', pe: 'I',  pa: ['H'] } };
-      var SI  = { h: { id: 'foo', v: 'S', pe: 'I',  pa: ['H'] } };
-      var RI  = { h: { id: 'foo', v: 'R', pe: 'I',  pa: ['K'] } };
-      var JI  = { h: { id: 'foo', v: 'J', pe: 'I',  pa: ['S'] } };
-      var LI  = { h: { id: 'foo', v: 'L', pe: 'I',  pa: ['R', 'J'] } };
-      var MI  = { h: { id: 'foo', v: 'M', pe: 'I',  pa: ['L'] } };
-      var HII = { h: { id: 'foo', v: 'H', pe: 'II', pa: ['Gggggggg'] } };
-      var KII = { h: { id: 'foo', v: 'K', pe: 'II', pa: ['H'] } };
-      var SII = { h: { id: 'foo', v: 'S', pe: 'II', pa: ['H'] } };
-      var RII = { h: { id: 'foo', v: 'R', pe: 'II', pa: ['K'] } };
-      var JII = { h: { id: 'foo', v: 'J', pe: 'II', pa: ['S'] } };
-      var LII = { h: { id: 'foo', v: 'L', pe: 'II', pa: ['R', 'J'] } };
-      var NII = { h: { id: 'foo', v: 'N', pe: 'II', pa: ['J'] } };
-      var OII = { h: { id: 'foo', v: 'O', pe: 'II', pa: ['L', 'N'] } };
+      var HI  = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii',  pa: ['Gggggggg'] } };
+      var KI  = { h: { id: 'foo', v: 'Kkkkkkkk', pe: 'Iiiiiiii',  pa: ['Hhhhhhhh'] } };
+      var SI  = { h: { id: 'foo', v: 'S', pe: 'Iiiiiiii',  pa: ['Hhhhhhhh'] } };
+      var RI  = { h: { id: 'foo', v: 'R', pe: 'Iiiiiiii',  pa: ['Kkkkkkkk'] } };
+      var JI  = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii',  pa: ['S'] } };
+      var LI  = { h: { id: 'foo', v: 'Llllllll', pe: 'Iiiiiiii',  pa: ['R', 'Jjjjjjjj'] } };
+      var MI  = { h: { id: 'foo', v: 'M', pe: 'Iiiiiiii',  pa: ['Llllllll'] } };
+      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Gggggggg'] } };
+      var KII = { h: { id: 'foo', v: 'Kkkkkkkk', pe: 'II', pa: ['Hhhhhhhh'] } };
+      var SII = { h: { id: 'foo', v: 'S', pe: 'II', pa: ['Hhhhhhhh'] } };
+      var RII = { h: { id: 'foo', v: 'R', pe: 'II', pa: ['Kkkkkkkk'] } };
+      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['S'] } };
+      var LII = { h: { id: 'foo', v: 'Llllllll', pe: 'II', pa: ['R', 'Jjjjjjjj'] } };
+      var NII = { h: { id: 'foo', v: 'N', pe: 'II', pa: ['Jjjjjjjj'] } };
+      var OII = { h: { id: 'foo', v: 'O', pe: 'II', pa: ['Llllllll', 'N'] } };
       var PII = { h: { id: 'foo', v: 'P', pe: 'II', pa: ['N'] } };
       var QII = { h: { id: 'foo', v: 'Q', pe: 'II', pa: ['O'] } };
 
@@ -1017,7 +1049,7 @@ describe('findLCAs', function() {
       });
 
       it('should not find nodes that are not in the DAG', function(done) {
-        var item1 = { h: { id: 'foo', v: 'r1', pe: 'I', pa: [] } };
+        var item1 = { h: { id: 'foo', v: 'r1', pe: 'Iiiiiiii', pa: [] } };
         var item2 = { h: { id: 'foo', v: 'r2', pe: 'II', pa: [] } };
         findLCAs(item1, item2, function(err, lca) {
           if (err) { throw err; }
@@ -1053,7 +1085,7 @@ describe('findLCAs', function() {
       it('LII and MI = L', function(done) {
         findLCAs(LII, MI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['L']);
+          should.deepEqual(lca, ['Llllllll']);
           done();
         });
       });
@@ -1061,7 +1093,7 @@ describe('findLCAs', function() {
       it('KII and MI = K', function(done) {
         findLCAs(KII, MI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['K']);
+          should.deepEqual(lca, ['Kkkkkkkk']);
           done();
         });
       });
@@ -1069,7 +1101,7 @@ describe('findLCAs', function() {
       it('KII and HI = H', function(done) {
         findLCAs(KII, HI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['H']);
+          should.deepEqual(lca, ['Hhhhhhhh']);
           done();
         });
       });
@@ -1077,7 +1109,7 @@ describe('findLCAs', function() {
       it('HII and HI = H', function(done) {
         findLCAs(HII, HI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['H']);
+          should.deepEqual(lca, ['Hhhhhhhh']);
           done();
         });
       });
@@ -1093,7 +1125,7 @@ describe('findLCAs', function() {
       it('PII and MI = J', function(done) {
         findLCAs(PII, MI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['J']);
+          should.deepEqual(lca, ['Jjjjjjjj']);
           done();
         });
       });
@@ -1101,7 +1133,7 @@ describe('findLCAs', function() {
       it('QII and MI = L', function(done) {
         findLCAs(QII, MI, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['L']);
+          should.deepEqual(lca, ['Llllllll']);
           done();
         });
       });
@@ -1195,12 +1227,12 @@ describe('findLCAs', function() {
       // create DAG with imported criss-cross merge
 
       var AI = {
-        _id : { id: 'foo', v: 'Aaaaaaaa', pe: 'I', pa: [] },
+        _id : { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] },
         _m3: { _merged: true },
       };
 
       var BI = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] },
+        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] },
         _m3: { _merged: true },
       };
 
@@ -1218,19 +1250,19 @@ describe('findLCAs', function() {
         _id : { id: 'foo', v: 'Dddddddd', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc'] },
       };
 
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc'] } };
+      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc'] } };
 
       var EII = {
         _id : { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Bbbbbbbb'] },
       };
 
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc', 'Bbbbbbbb'] } };
+      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Bbbbbbbb'] } };
 
       var FII = {
         _id : { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Dddddddd', 'Eeeeeeee'] },
       };
 
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Dddddddd', 'Eeeeeeee'] } };
+      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Eeeeeeee'] } };
 
       // create the following structure:
       //              CII - EII,EI
@@ -1360,7 +1392,7 @@ describe('findLCAs', function() {
       // create DAG with imported criss-cross merge with three parents
 
       var BI = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] },
+        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1368,7 +1400,7 @@ describe('findLCAs', function() {
       };
 
       var CI = {
-        _id : { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] },
+        _id : { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1377,7 +1409,7 @@ describe('findLCAs', function() {
       };
 
       var DI = {
-        _id : { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb'] },
+        _id : { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1386,7 +1418,7 @@ describe('findLCAs', function() {
       };
 
       var EI = {
-        _id : { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Bbbbbbbb'] },
+        _id : { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1395,7 +1427,7 @@ describe('findLCAs', function() {
       };
 
       var FI = { // change e
-        _id : { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
+        _id : { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1407,7 +1439,7 @@ describe('findLCAs', function() {
       };
 
       var GI = { // delete d
-        _id : { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
+        _id : { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
         _m3: { _merged: false },
         a: true,
         b: true,
@@ -1503,16 +1535,16 @@ describe('findLCAs', function() {
     describe('three parents', function() {
       var name = '_findLCAsTwoPerspectivesThreeParents';
 
-      var AI = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I', pa: [] } };
-      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HI = { h: { id: 'foo', v: 'H', pe: 'I', pa: ['Eeeeeeee'] } };
-      var II = { h: { id: 'foo', v: 'I', pe: 'I', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JI = { h: { id: 'foo', v: 'J', pe: 'I', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var AI = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] } };
+      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
+      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
+      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
+      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
+      var HI = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
+      var II = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var JI = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
       var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
@@ -1521,9 +1553,9 @@ describe('findLCAs', function() {
       var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
       var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
       var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HII = { h: { id: 'foo', v: 'H', pe: 'II', pa: ['Eeeeeeee'] } };
-      var III = { h: { id: 'foo', v: 'I', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JII = { h: { id: 'foo', v: 'J', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Eeeeeeee'] } };
+      var III = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       // create the following structure:
       //         C <-- E <-- H
@@ -1671,15 +1703,15 @@ describe('findLCAs', function() {
     describe('virtual merge', function() {
       var name = '_findLCAsTwoPerspectivesVirtualMerge';
 
-      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HI = { h: { id: 'foo', v: 'H', pe: 'I', pa: ['Eeeeeeee'] } };
-      var II = { h: { id: 'foo', v: 'I', pe: 'I', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JI = { h: { id: 'foo', v: 'J', pe: 'I', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
+      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
+      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
+      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
+      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
+      var HI = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
+      var II = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var JI = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
       var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
@@ -1688,9 +1720,9 @@ describe('findLCAs', function() {
       var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
       var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
       var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HII = { h: { id: 'foo', v: 'H', pe: 'II', pa: ['Eeeeeeee'] } };
-      var III = { h: { id: 'foo', v: 'I', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JII = { h: { id: 'foo', v: 'J', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
+      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Eeeeeeee'] } };
+      var III = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
+      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
 
       // create the following structure:
       //         C <-- E <-- H
@@ -1704,7 +1736,7 @@ describe('findLCAs', function() {
 
       it('vm1 B and vm2 B = B', function(done) {
         var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Bbbbbbbb'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
@@ -1714,7 +1746,7 @@ describe('findLCAs', function() {
 
       it('vm1 B and vm2 A = error because AI is not in the database', function(done) {
         var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Aaaaaaaa'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
         findLCAs(vm1, vm2, function(err) {
           should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
           done();
@@ -1723,7 +1755,7 @@ describe('findLCAs', function() {
 
       it('vm1 C, D and vm2 G = C and D', function(done) {
         var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Cccccccc', 'Dddddddd'] } };
-        var vm2 = { h: { id: 'foo', pe: 'I', pa: ['Gggggggg'] } };
+        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Gggggggg'] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd', 'Cccccccc']);
@@ -1732,7 +1764,7 @@ describe('findLCAs', function() {
       });
 
       it('two vm\'s without parents = []', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'I', pa: [] } };
+        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: [] } };
         var vm2 = { h: { id: 'foo', pe: 'II', pa: [] } };
         findLCAs(vm1, vm2, function(err, lca) {
           if (err) { throw err; }
@@ -1769,7 +1801,7 @@ describe('findLCAs', function() {
       });
 
       it('vm J and II = E, G', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['J'] } };
+        var vm = { h: { id: 'foo', pe: 'II', pa: ['Jjjjjjjj'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
@@ -1787,16 +1819,16 @@ describe('findLCAs', function() {
       });
 
       it('vm H, I, J and JI = I', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['H', 'I', 'J'] } };
+        var vm = { h: { id: 'foo', pe: 'II', pa: ['Hhhhhhhh', 'Iiiiiiii', 'Jjjjjjjj'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['I']);
+          should.deepEqual(lca, ['Iiiiiiii']);
           done();
         });
       });
 
       it('vm G, H and II = G and E', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Gggggggg', 'H'] } };
+        var vm = { h: { id: 'foo', pe: 'II', pa: ['Gggggggg', 'Hhhhhhhh'] } };
         findLCAs(vm, II, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
@@ -1805,7 +1837,7 @@ describe('findLCAs', function() {
       });
 
       it('vm I, J and FI = F', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['I', 'J'] } };
+        var vm = { h: { id: 'foo', pe: 'II', pa: ['Iiiiiiii', 'Jjjjjjjj'] } };
         findLCAs(vm, FI, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
@@ -1852,7 +1884,7 @@ describe('findLCAs', function() {
     describe('with virtual collection', function() {
       var name = '_findLCAsRegressionNonSymmetricMultipleLca';
 
-      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I',  pa: [], _i: 1}, _m3: { _ack: true } };
+      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii',  pa: [], _i: 1}, _m3: { _ack: true } };
       var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] },       _m3: { _ack: false } };
 
       var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] }, _m3: {} };
