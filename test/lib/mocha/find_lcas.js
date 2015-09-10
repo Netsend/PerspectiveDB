@@ -354,71 +354,92 @@ describe('findLCAs', function() {
       });
     });
 
-    describe('three merges', function() {
-      var name = 'findLCAsThreeMerges';
-
-      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'I' } };
-      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'I', pa: ['Aaaaaaaa'] } };
-      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'I', pa: ['Bbbbbbbb', 'Eeeeeeee'] } };
-      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'I', pa: ['Cccccccc'] } };
-      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'I', pa: ['Bbbbbbbb'] } };
-      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'I', pa: ['Eeeeeeee', 'Cccccccc'] } };
-      var G = { h: { id: 'foo', v: 'Gggggggg', pe: 'I', pa: ['Ffffffff'] } };
-
-      var DAG = [A, B, E, C, D, F, G];
-
+    describe('two merges (closer and different sort)', function() {
       // create the following structure:
       // A <-- B <-- C <-- D
       //        \  /  \             
       //         E <-- F <-- G
-      it('should save DAG', function(done) {
-        vc._snapshotCollection.insert(DAG, {w: 1}, done);
-      });
+      var A = { v: 'Aaaaaaaa', pa: [] };
+      var B = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var C = { v: 'Cccccccc', pa: ['Bbbbbbbb', 'Eeeeeeee'] };
+      var D = { v: 'Dddddddd', pa: ['Cccccccc'] };
+      var E = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
+      var F = { v: 'Ffffffff', pa: ['Eeeeeeee', 'Cccccccc'] };
+      var G = { v: 'Gggggggg', pa: ['Ffffffff'] };
+
+      var DAG = [A, B, E, C, D, F, G];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dE = DAG.slice(0, 3).reverse();
+      var dC = DAG.slice(0, 4).reverse();
+      var dD = DAG.slice(0, 5).reverse();
+      var dF = DAG.slice(0, 6).reverse();
+      var dG = DAG.slice(0, 6).reverse();
 
       it('C and E = E', function(done) {
-        findLCAs(C, E, function(err, lca) {
+        var x = streamify(dC);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [E.h.v]);
+          should.deepEqual(lca, [E.v]);
           done();
         });
       });
 
       it('D and F = C', function(done) {
-        findLCAs(D, F, function(err, lca) {
+        var x = streamify(dD);
+        var y = streamify(dF);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [C.h.v]);
+          should.deepEqual(lca, [C.v]);
           done();
         });
       });
 
       it('F and C = C', function(done) {
-        findLCAs(F, C, function(err, lca) {
+        var x = streamify(dF);
+        var y = streamify(dC);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [C.h.v]);
+          should.deepEqual(lca, [C.v]);
           done();
         });
       });
 
       it('D and E = E', function(done) {
-        findLCAs(D, E, function(err, lca) {
+        var x = streamify(dD);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [E.h.v]);
+          should.deepEqual(lca, [E.v]);
           done();
         });
       });
 
       it('E and D = E', function(done) {
-        findLCAs(E, D, function(err, lca) {
+        var x = streamify(dE);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [E.h.v]);
+          should.deepEqual(lca, [E.v]);
           done();
         });
       });
 
       it('G and B = B', function(done) {
-        findLCAs(G, B, function(err, lca) {
+        var x = streamify(dG);
+        var y = streamify(dB);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, [B.h.v]);
+          should.deepEqual(lca, [B.v]);
           done();
         });
       });
