@@ -20,11 +20,7 @@
 
 /*jshint -W068 */
 
-var tmpdir = require('os').tmpdir;
-
 var should = require('should');
-var rimraf = require('rimraf');
-var level = require('level');
 var streamify = require('stream-array');
 
 var findLCAs = require('../../../lib/find_lcas');
@@ -55,8 +51,6 @@ after(function(done) {
 describe('findLCAs', function() {
   describe('one perspective', function() {
     describe('two merges', function() {
-      var name = 'findLCAsTwoMerges';
-
       // create the following structure:
       // A <-- B <-- C <-- D
       //        \     \             
@@ -240,16 +234,7 @@ describe('findLCAs', function() {
         var x = streamify(dA);
         var y = streamify(dH);
 
-        findLCAs(x, y, { log: cons }, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, []);
-          done();
-        });
-      });
-
-      it('should not find disconnected by perspective', function(done) {
-        // add not connected nodes
-        findLCAs(GII, C, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, []);
           done();
