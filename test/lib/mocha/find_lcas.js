@@ -722,48 +722,65 @@ describe('findLCAs', function() {
       });
     });
 
-    describe('three parents', function() {
-      var name = '_findLCAsThreeParents';
-
-      var A = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] } };
-      var B = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
-      var C = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var D = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var E = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var F = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var G = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
-      var H = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
-      var I = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var J = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
-
+    describe('three parents (missing root A)', function() {
       // create the following structure:
       //         C <-- E <-- H
       //        / \ / / \
       //       B <-- F <-- I
       //        \ /   \ / \         
       //         D <-- G <-- J
-      it('should save DAG mixed branches', function(done) {
-        vc._snapshotCollection.insert([B, C, D, F, E, H, G, I, J], {w: 1}, done);
-      });
+
+      var A = { v: 'Aaaaaaaa', pa: [] };
+      var B = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var C = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var D = { v: 'Dddddddd', pa: ['Bbbbbbbb'] };
+      var E = { v: 'Eeeeeeee', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] };
+      var F = { v: 'Ffffffff', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] };
+      var G = { v: 'Gggggggg', pa: ['Dddddddd', 'Ffffffff'] };
+      var H = { v: 'Hhhhhhhh', pa: ['Eeeeeeee'] };
+      var I = { v: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] };
+      var J = { v: 'Jjjjjjjj', pa: ['Gggggggg', 'Eeeeeeee'] };
+
+      var DAG = [B, C, D, F, E, H, G, I, J];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dB = DAG.slice(0, 1).reverse();
+      var dC = DAG.slice(0, 2).reverse();
+      var dD = DAG.slice(0, 3).reverse();
+      var dF = DAG.slice(0, 4).reverse();
+      var dE = DAG.slice(0, 5).reverse();
+      var dH = DAG.slice(0, 6).reverse();
+      var dG = DAG.slice(0, 7).reverse();
+      var dI = DAG.slice(0, 8).reverse();
+      var dJ = DAG.slice(0, 9).reverse();
 
       it('J and H = E', function(done) {
-        findLCAs(J, H, function(err, lca) {
+        var x = streamify(dJ);
+        var y = streamify(dH);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
-      it('G and E = F', function(done) {
-        findLCAs(G, E, function(err, lca) {
+      it('G and E = F and D', function(done) {
+        var x = streamify(dG);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['Ffffffff']);
+          should.deepEqual(lca, ['Ffffffff', 'Dddddddd']);
           done();
         });
       });
 
       it('F and E = F', function(done) {
-        findLCAs(F, E, function(err, lca) {
+        var x = streamify(dF);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
           done();
@@ -771,7 +788,10 @@ describe('findLCAs', function() {
       });
 
       it('E and F = F', function(done) {
-        findLCAs(E, F, function(err, lca) {
+        var x = streamify(dE);
+        var y = streamify(dF);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
           done();
@@ -779,7 +799,10 @@ describe('findLCAs', function() {
       });
 
       it('J and I = G and E', function(done) {
-        findLCAs(J, I, function(err, lca) {
+        var x = streamify(dJ);
+        var y = streamify(dI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
           done();
@@ -787,31 +810,21 @@ describe('findLCAs', function() {
       });
 
       it('I and J = G and E', function(done) {
-        findLCAs(I, J, function(err, lca) {
+        var x = streamify(dI);
+        var y = streamify(dJ);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
           done();
         });
       });
 
-      it('A and B = no error because A is not in the database, but direct ancestor of B', function(done) {
-        findLCAs(A, B, function(err, lcas) {
-          if (err) { throw err; }
-          should.deepEqual(lcas, ['Aaaaaaaa']);
-          done();
-        });
-      });
-
-      it('B and A = no error because A is not in the database, but direct ancestor of B', function(done) {
-        findLCAs(B, A, function(err, lcas) {
-          if (err) { throw err; }
-          should.deepEqual(lcas, ['Aaaaaaaa']);
-          done();
-        });
-      });
-
       it('B and B = B', function(done) {
-        findLCAs(B, B, function(err, lca) {
+        var x = streamify(dB);
+        var y = streamify(dB);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [B.v]);
           done();
@@ -819,7 +832,10 @@ describe('findLCAs', function() {
       });
 
       it('H and B = B', function(done) {
-        findLCAs(H, B, function(err, lca) {
+        var x = streamify(dH);
+        var y = streamify(dB);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [B.v]);
           done();
@@ -827,7 +843,10 @@ describe('findLCAs', function() {
       });
 
       it('B and H = B', function(done) {
-        findLCAs(B, H, function(err, lca) {
+        var x = streamify(dB);
+        var y = streamify(dH);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [B.v]);
           done();
@@ -835,7 +854,10 @@ describe('findLCAs', function() {
       });
 
       it('H and E = E', function(done) {
-        findLCAs(H, E, function(err, lca) {
+        var x = streamify(dH);
+        var y = streamify(dE);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [E.v]);
           done();
@@ -843,7 +865,10 @@ describe('findLCAs', function() {
       });
 
       it('E and H = B', function(done) {
-        findLCAs(E, H, function(err, lca) {
+        var x = streamify(dE);
+        var y = streamify(dH);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [E.v]);
           done();
@@ -851,7 +876,10 @@ describe('findLCAs', function() {
       });
 
       it('J and D = D', function(done) {
-        findLCAs(J, D, function(err, lca) {
+        var x = streamify(dJ);
+        var y = streamify(dD);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [D.v]);
           done();
@@ -859,7 +887,10 @@ describe('findLCAs', function() {
       });
 
       it('D and J = D', function(done) {
-        findLCAs(D, J, function(err, lca) {
+        var x = streamify(dD);
+        var y = streamify(dJ);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, [D.v]);
           done();
