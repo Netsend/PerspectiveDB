@@ -1093,40 +1093,7 @@ describe('findLCAs', function() {
   });
 
   describe('two perspectives', function() {
-  /*
     describe('second import', function() {
-      var name = '_findLCAsTwoPerspectivesSecondImport';
-
-      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii',  pa: [] } };
-      var BI  = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii',  pa: ['Aaaaaaaa'] } };
-      var CI  = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii',  pa: ['Bbbbbbbb'] } };
-      var EI  = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii',  pa: ['Bbbbbbbb'] } };
-      var FI  = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii',  pa: ['Eeeeeeee', 'Cccccccc'] } };
-      var GI  = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii',  pa: ['Ffffffff'] } };
-      var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
-      var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
-      var CII = { h: { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Eeeeeeee', 'Cccccccc'] } };
-      var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Ffffffff'] } };
-      var HI  = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii',  pa: ['Gggggggg'] } };
-      var KI  = { h: { id: 'foo', v: 'Kkkkkkkk', pe: 'Iiiiiiii',  pa: ['Hhhhhhhh'] } };
-      var SI  = { h: { id: 'foo', v: 'S', pe: 'Iiiiiiii',  pa: ['Hhhhhhhh'] } };
-      var RI  = { h: { id: 'foo', v: 'R', pe: 'Iiiiiiii',  pa: ['Kkkkkkkk'] } };
-      var JI  = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii',  pa: ['S'] } };
-      var LI  = { h: { id: 'foo', v: 'Llllllll', pe: 'Iiiiiiii',  pa: ['R', 'Jjjjjjjj'] } };
-      var MI  = { h: { id: 'foo', v: 'M', pe: 'Iiiiiiii',  pa: ['Llllllll'] } };
-      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Gggggggg'] } };
-      var KII = { h: { id: 'foo', v: 'Kkkkkkkk', pe: 'II', pa: ['Hhhhhhhh'] } };
-      var SII = { h: { id: 'foo', v: 'S', pe: 'II', pa: ['Hhhhhhhh'] } };
-      var RII = { h: { id: 'foo', v: 'R', pe: 'II', pa: ['Kkkkkkkk'] } };
-      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['S'] } };
-      var LII = { h: { id: 'foo', v: 'Llllllll', pe: 'II', pa: ['R', 'Jjjjjjjj'] } };
-      var NII = { h: { id: 'foo', v: 'N', pe: 'II', pa: ['Jjjjjjjj'] } };
-      var OII = { h: { id: 'foo', v: 'O', pe: 'II', pa: ['Llllllll', 'N'] } };
-      var PII = { h: { id: 'foo', v: 'P', pe: 'II', pa: ['N'] } };
-      var QII = { h: { id: 'foo', v: 'Q', pe: 'II', pa: ['O'] } };
-
       // create the following structure:
       //                                       EII <-- FII <-- GII <--------------------- HII <-- SII <-- JII <-- NII <-- PII
       //                                       /       /                                    \               \       \
@@ -1135,20 +1102,80 @@ describe('findLCAs', function() {
       //          \     \                                         /             /
       //          EI <-- FI <-- GI <---------------------------- HI <-- SI <-- JI 
       //
-      it('should save DAG', function(done) {
-        var DAG = [
-          AI, BI, CI, EI, FI, GI,
-          AII, BII, CII, EII, FII, GII,
-          HI, KI, SI, RI, JI, LI, MI,
-          HII, KII, SII, RII, JII, LII, NII, OII, PII, QII
-        ];
-        vc._snapshotCollection.insert(DAG, {w: 1}, done);
-      });
+
+      var AI  = { v: 'Aaaaaaaa',  pa: [] };
+      var BI  = { v: 'Bbbbbbbb',  pa: ['Aaaaaaaa'] };
+      var CI  = { v: 'Cccccccc',  pa: ['Bbbbbbbb'] };
+      var EI  = { v: 'Eeeeeeee',  pa: ['Bbbbbbbb'] };
+      var FI  = { v: 'Ffffffff',  pa: ['Eeeeeeee', 'Cccccccc'] };
+      var GI  = { v: 'Gggggggg',  pa: ['Ffffffff'] };
+      var AII = { v: 'Aaaaaaaa', pa: [] };
+      var BII = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CII = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var EII = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
+      var FII = { v: 'Ffffffff', pa: ['Eeeeeeee', 'Cccccccc'] };
+      var GII = { v: 'Gggggggg', pa: ['Ffffffff'] };
+      var HI  = { v: 'Hhhhhhhh',  pa: ['Gggggggg'] };
+      var KI  = { v: 'Kkkkkkkk',  pa: ['Hhhhhhhh'] };
+      var SI  = { v: 'Ssssssss',  pa: ['Hhhhhhhh'] };
+      var RI  = { v: 'Rrrrrrrr',  pa: ['Kkkkkkkk'] };
+      var JI  = { v: 'Jjjjjjjj',  pa: ['Ssssssss'] };
+      var LI  = { v: 'Llllllll',  pa: ['Rrrrrrrr', 'Jjjjjjjj'] };
+      var MI  = { v: 'Mmmmmmmm',  pa: ['Llllllll'] };
+      var HII = { v: 'Hhhhhhhh', pa: ['Gggggggg'] };
+      var KII = { v: 'Kkkkkkkk', pa: ['Hhhhhhhh'] };
+      var SII = { v: 'Ssssssss', pa: ['Hhhhhhhh'] };
+      var RII = { v: 'Rrrrrrrr', pa: ['Kkkkkkkk'] };
+      var JII = { v: 'Jjjjjjjj', pa: ['Ssssssss'] };
+      var LII = { v: 'Llllllll', pa: ['Rrrrrrrr', 'Jjjjjjjj'] };
+      var NII = { v: 'Nnnnnnnn', pa: ['Jjjjjjjj'] };
+      var OII = { v: 'Oooooooo', pa: ['Llllllll', 'Nnnnnnnn'] };
+      var PII = { v: 'Pppppppp', pa: ['Nnnnnnnn'] };
+      var QII = { v: 'Qqqqqqqq', pa: ['Oooooooo'] };
+
+      var DAGI =  [ AI,  BI,  CI,  EI,  FI,  GI,  HI,  KI,  SI,  RI,  JI,  LI,  MI ];
+      var DAGII = [ AII, BII, CII, EII, FII, GII, HII, KII, SII, RII, JII, LII, NII, OII, PII, QII ];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      //var dEI = DAGI.slice(0, 4).reverse();
+      var dFI = DAGI.slice(0, 5).reverse();
+      //var dGI = DAGI.slice(0, 6).reverse();
+      var dHI = DAGI.slice(0, 7).reverse();
+      //var dKI = DAGI.slice(0, 8).reverse();
+      //var dSI = DAGI.slice(0, 9).reverse();
+      var dRI = DAGI.slice(0, 10).reverse();
+      //var dJI = DAGI.slice(0, 11).reverse();
+      //var dLI = DAGI.slice(0, 12).reverse();
+      var dMI = DAGI.slice(0, 13).reverse();
+
+      var dAII = DAGII.slice(0, 1).reverse();
+      var dBII = DAGII.slice(0, 2).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
+      //var dEII = DAGII.slice(0, 4).reverse();
+      //var dFII = DAGII.slice(0, 5).reverse();
+      var dGII = DAGII.slice(0, 6).reverse();
+      var dHII = DAGII.slice(0, 7).reverse();
+      var dKII = DAGII.slice(0, 8).reverse();
+      //var dSII = DAGII.slice(0, 9).reverse();
+      var dRII = DAGII.slice(0, 10).reverse();
+      //var dJII = DAGII.slice(0, 11).reverse();
+      var dLII = DAGII.slice(0, 12).reverse();
+      //var dNII = DAGII.slice(0, 13).reverse();
+      //var dOII = DAGII.slice(0, 14).reverse();
+      var dPII = DAGII.slice(0, 15).reverse();
+      var dQII = DAGII.slice(0, 16).reverse();
 
       it('should not find nodes that are not in the DAG', function(done) {
-        var item1 = { h: { id: 'foo', v: 'r1', pe: 'Iiiiiiii', pa: [] } };
-        var item2 = { h: { id: 'foo', v: 'r2', pe: 'II', pa: [] } };
-        findLCAs(item1, item2, function(err, lca) {
+        var item1 = { v: 'r1', pa: [] };
+        var item2 = { v: 'r2', pa: [] };
+
+        var x = streamify([item1]);
+        var y = streamify([item2]);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, []);
           done();
@@ -1156,7 +1183,10 @@ describe('findLCAs', function() {
       });
 
       it('GII and RI = G', function(done) {
-        findLCAs(GII, RI, function(err, lca) {
+        var x = streamify(dGII);
+        var y = streamify(dRI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg']);
           done();
@@ -1164,23 +1194,32 @@ describe('findLCAs', function() {
       });
 
       it('LII and RI = R', function(done) {
-        findLCAs(LII, RI, function(err, lca) {
+        var x = streamify(dLII);
+        var y = streamify(dRI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['R']);
+          should.deepEqual(lca, ['Rrrrrrrr']);
           done();
         });
       });
 
       it('RII and MI = R', function(done) {
-        findLCAs(RII, MI, function(err, lca) {
+        var x = streamify(dRII);
+        var y = streamify(dMI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['R']);
+          should.deepEqual(lca, ['Rrrrrrrr']);
           done();
         });
       });
 
       it('LII and MI = L', function(done) {
-        findLCAs(LII, MI, function(err, lca) {
+        var x = streamify(dLII);
+        var y = streamify(dMI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Llllllll']);
           done();
@@ -1188,7 +1227,10 @@ describe('findLCAs', function() {
       });
 
       it('KII and MI = K', function(done) {
-        findLCAs(KII, MI, function(err, lca) {
+        var x = streamify(dKII);
+        var y = streamify(dMI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Kkkkkkkk']);
           done();
@@ -1196,7 +1238,10 @@ describe('findLCAs', function() {
       });
 
       it('KII and HI = H', function(done) {
-        findLCAs(KII, HI, function(err, lca) {
+        var x = streamify(dKII);
+        var y = streamify(dHI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Hhhhhhhh']);
           done();
@@ -1204,7 +1249,10 @@ describe('findLCAs', function() {
       });
 
       it('HII and HI = H', function(done) {
-        findLCAs(HII, HI, function(err, lca) {
+        var x = streamify(dHII);
+        var y = streamify(dHI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Hhhhhhhh']);
           done();
@@ -1212,15 +1260,21 @@ describe('findLCAs', function() {
       });
 
       it('PII and QII = N', function(done) {
-        findLCAs(PII, QII, function(err, lca) {
+        var x = streamify(dPII);
+        var y = streamify(dQII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['N']);
+          should.deepEqual(lca, ['Nnnnnnnn']);
           done();
         });
       });
 
       it('PII and MI = J', function(done) {
-        findLCAs(PII, MI, function(err, lca) {
+        var x = streamify(dPII);
+        var y = streamify(dMI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Jjjjjjjj']);
           done();
@@ -1228,7 +1282,10 @@ describe('findLCAs', function() {
       });
 
       it('QII and MI = L', function(done) {
-        findLCAs(QII, MI, function(err, lca) {
+        var x = streamify(dQII);
+        var y = streamify(dMI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Llllllll']);
           done();
@@ -1236,7 +1293,10 @@ describe('findLCAs', function() {
       });
 
       it('AI and AII = A', function(done) {
-        findLCAs(AI, AII, function(err, lca) {
+        var x = streamify(dAI);
+        var y = streamify(dAII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Aaaaaaaa']);
           done();
@@ -1244,7 +1304,10 @@ describe('findLCAs', function() {
       });
 
       it('AII and AI = A', function(done) {
-        findLCAs(AII, AI, function(err, lca) {
+        var x = streamify(dAII);
+        var y = streamify(dAI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Aaaaaaaa']);
           done();
@@ -1252,39 +1315,21 @@ describe('findLCAs', function() {
       });
 
       it('BI and BII = B', function(done) {
-        findLCAs(BI, BII, function(err, lca) {
+        var x = streamify(dBI);
+        var y = streamify(dBII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
         });
       });
 
-      it('AI and AII = A', function(done) {
-        findLCAs(AI, AII, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Aaaaaaaa']);
-          done();
-        });
-      });
+      it('BII and BI = A', function(done) {
+        var x = streamify(dBII);
+        var y = streamify(dBI);
 
-      it('AII and AI = A', function(done) {
-        findLCAs(AII, AI, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Aaaaaaaa']);
-          done();
-        });
-      });
-
-      it('BI and BII = B', function(done) {
-        findLCAs(BI, BII, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Bbbbbbbb']);
-          done();
-        });
-      });
-
-      it('BII and BI = B', function(done) {
-        findLCAs(BII, BI, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
@@ -1292,7 +1337,10 @@ describe('findLCAs', function() {
       });
 
       it('FI and BII = B', function(done) {
-        findLCAs(FI, BII, function(err, lca) {
+        var x = streamify(dFI);
+        var y = streamify(dBII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
@@ -1301,22 +1349,25 @@ describe('findLCAs', function() {
 
       /////////// BREAK THE GRAPH ON PURPOSE
 
-      it('should remove GII', function(done) {
-        vc._snapshotCollection.remove(GII, {w: 1}, function(err, deleted) {
-          if (err) { throw err; }
-          should.equal(deleted, 1);
-          done();
-        });
+      it('remove GII and break DAGII on purpose', function() {
+        DAGII.splice(5, 1);
       });
 
       it('FI and HII = [] because link GII is missing', function(done) {
-        findLCAs(FI, HII, function(err, lca) {
+        // reset dHII because of DAGII breakage
+        dHII = DAGII.slice(0, 6).reverse();
+
+        var x = streamify(dFI);
+        var y = streamify(dHII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, []);
           done();
         });
       });
     });
+  /*
 
     describe('criss-cross merge import', function() {
       var name = '_findLCAsTwoPerspectivesCrissCrossMergeImport';
