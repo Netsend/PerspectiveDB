@@ -1619,60 +1619,88 @@ describe('findLCAs', function() {
       });
     });
 
-  /*
     describe('three parents', function() {
-      var name = '_findLCAsTwoPerspectivesThreeParents';
-
-      var AI = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] } };
-      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
-      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HI = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
-      var II = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JI = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
-
-      var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
-      var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
-      var CII = { h: { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var DII = { h: { id: 'foo', v: 'Dddddddd', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Eeeeeeee'] } };
-      var III = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
-
       // create the following structure:
       //         C <-- E <-- H
       //        / \ / / \
       //       B <-- F <-- I
       //        \ /   \ / \         
       //         D <-- G <-- J
-      it('should save DAG mixed branches and mixed perspectives', function(done) {
-        vc._snapshotCollection.insert([AII, BII, CII, DII, BI, CI, FII, EII, DI, FI, HII, EI, HI, GI, GII, III, JII, II, JI], {w: 1}, done);
-      });
+
+      var AI = { v: 'Aaaaaaaa', pa: [] };
+      var BI = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CI = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var DI = { v: 'Dddddddd', pa: ['Bbbbbbbb'] };
+      var EI = { v: 'Eeeeeeee', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] };
+      var FI = { v: 'Ffffffff', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] };
+      var GI = { v: 'Gggggggg', pa: ['Dddddddd', 'Ffffffff'] };
+      var HI = { v: 'Hhhhhhhh', pa: ['Eeeeeeee'] };
+      var II = { v: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] };
+      var JI = { v: 'Jjjjjjjj', pa: ['Gggggggg', 'Eeeeeeee'] };
+
+      var AII = { v: 'Aaaaaaaa', pa: [] };
+      var BII = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CII = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var DII = { v: 'Dddddddd', pa: ['Bbbbbbbb'] };
+      var EII = { v: 'Eeeeeeee', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] };
+      var FII = { v: 'Ffffffff', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] };
+      var GII = { v: 'Gggggggg', pa: ['Dddddddd', 'Ffffffff'] };
+      var HII = { v: 'Hhhhhhhh', pa: ['Eeeeeeee'] };
+      var III = { v: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] };
+      var JII = { v: 'Jjjjjjjj', pa: ['Gggggggg', 'Eeeeeeee'] };
+
+      var DAGI  = [AI,  BI,  CI,  DI,  FI,  EI,  HI,  GI,  II,  JI];
+      var DAGII = [AII, BII, CII, DII, FII, EII, HII, GII, III, JII];
+
+      var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dCI = DAGI.slice(0, 3).reverse();
+      var dDI = DAGI.slice(0, 4).reverse();
+      var dFI = DAGI.slice(0, 5).reverse();
+      var dEI = DAGI.slice(0, 6).reverse();
+      var dHI = DAGI.slice(0, 7).reverse();
+      var dGI = DAGI.slice(0, 8).reverse();
+      var dII = DAGI.slice(0, 9).reverse();
+      var dJI = DAGI.slice(0, 10).reverse();
+
+      var dAII = DAGII.slice(0, 1).reverse();
+      var dBII = DAGII.slice(0, 2).reverse();
+      var dCII = DAGII.slice(0, 3).reverse();
+      var dDII = DAGII.slice(0, 4).reverse();
+      var dFII = DAGII.slice(0, 5).reverse();
+      var dEII = DAGII.slice(0, 6).reverse();
+      var dHII = DAGII.slice(0, 7).reverse();
+      var dGII = DAGII.slice(0, 8).reverse();
+      var dIII = DAGII.slice(0, 9).reverse();
+      var dJII = DAGII.slice(0, 10).reverse();
 
       it('JI and HII = E', function(done) {
-        findLCAs(JI, HII, function(err, lca) {
+        var x = streamify(dJI);
+        var y = streamify(dHII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
-      it('GI and EII = F', function(done) {
-        findLCAs(GI, EII, function(err, lca) {
+      it('GI and EII = F and D', function(done) {
+        var x = streamify(dGI);
+        var y = streamify(dEII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lca, ['Ffffffff']);
+          should.deepEqual(lca, ['Ffffffff', 'Dddddddd']);
           done();
         });
       });
 
       it('FI and EII = F', function(done) {
-        findLCAs(FI, EII, function(err, lca) {
+        var x = streamify(dFI);
+        var y = streamify(dEII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
           done();
@@ -1680,7 +1708,10 @@ describe('findLCAs', function() {
       });
 
       it('EI and FII = F', function(done) {
-        findLCAs(EI, FII, function(err, lca) {
+        var x = streamify(dEI);
+        var y = streamify(dFII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
           done();
@@ -1688,7 +1719,10 @@ describe('findLCAs', function() {
       });
 
       it('JI and III = G and E', function(done) {
-        findLCAs(JI, III, function(err, lca) {
+        var x = streamify(dJI);
+        var y = streamify(dIII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
           done();
@@ -1696,43 +1730,65 @@ describe('findLCAs', function() {
       });
 
       it('II and JII = G and E', function(done) {
-        findLCAs(II, JII, function(err, lca) {
+        var x = streamify(dII);
+        var y = streamify(dJII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
           done();
         });
       });
 
-      it('AI and BII = error because AI is not in the database', function(done) {
-        findLCAs(AI, BII, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: I, II');
+      it('AI and BII = A', function(done) {
+        var x = streamify(dAI);
+        var y = streamify(dBII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
-      it('BII and AI = error because AI is not in the database', function(done) {
-        findLCAs(BII, AI, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
+      it('BII and AI = A', function(done) {
+        var x = streamify(dBII);
+        var y = streamify(dAI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
-      it('AII and BI = error because AI is not in the database', function(done) {
-        findLCAs(AII, BI, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
+      it('AII and BI = A', function(done) {
+        var x = streamify(dAII);
+        var y = streamify(dBI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
-      it('BI and AII = error because AII is not in the database', function(done) {
-        findLCAs(BI, AII, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: I, II');
+      it('BI and AII = A', function(done) {
+        var x = streamify(dBI);
+        var y = streamify(dAII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
       it('BI and BII = B', function(done) {
-        findLCAs(BI, BII, function(err, lca) {
+        var x = streamify(dBI);
+        var y = streamify(dBII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
@@ -1740,7 +1796,10 @@ describe('findLCAs', function() {
       });
 
       it('HI and BII = B', function(done) {
-        findLCAs(HI, BII, function(err, lca) {
+        var x = streamify(dHI);
+        var y = streamify(dBII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
@@ -1748,7 +1807,10 @@ describe('findLCAs', function() {
       });
 
       it('BI and HII = B', function(done) {
-        findLCAs(BI, HII, function(err, lca) {
+        var x = streamify(dBI);
+        var y = streamify(dHII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
           done();
@@ -1756,15 +1818,21 @@ describe('findLCAs', function() {
       });
 
       it('HI and EII = E', function(done) {
-        findLCAs(HI, EII, function(err, lca) {
+        var x = streamify(dHI);
+        var y = streamify(dEII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
-      it('EI and HII = B', function(done) {
-        findLCAs(EI, HII, function(err, lca) {
+      it('EI and HII = E', function(done) {
+        var x = streamify(dEI);
+        var y = streamify(dHII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee']);
           done();
@@ -1772,7 +1840,10 @@ describe('findLCAs', function() {
       });
 
       it('JI and DII = D', function(done) {
-        findLCAs(JI, DII, function(err, lca) {
+        var x = streamify(dJI);
+        var y = streamify(dDII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd']);
           done();
@@ -1780,7 +1851,10 @@ describe('findLCAs', function() {
       });
 
       it('DI and JII = D', function(done) {
-        findLCAs(DI, JII, function(err, lca) {
+        var x = streamify(dDI);
+        var y = streamify(dJII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd']);
           done();
@@ -1788,6 +1862,7 @@ describe('findLCAs', function() {
       });
     });
 
+  /*
     describe('virtual merge', function() {
       var name = '_findLCAsTwoPerspectivesVirtualMerge';
 
