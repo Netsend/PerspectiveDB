@@ -1367,51 +1367,8 @@ describe('findLCAs', function() {
         });
       });
     });
-  /*
 
     describe('criss-cross merge import', function() {
-      var name = '_findLCAsTwoPerspectivesCrissCrossMergeImport';
-
-      // create DAG with imported criss-cross merge
-
-      var AI = {
-        _id : { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii', pa: [] },
-        _m3: { _merged: true },
-      };
-
-      var BI = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] },
-        _m3: { _merged: true },
-      };
-
-      var AII = {
-        _id : { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] },
-      };
-
-      var BII = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] },
-      };
-
-      var CII = { h: { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Aaaaaaaa'] } };
-
-      var DII = {
-        _id : { id: 'foo', v: 'Dddddddd', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc'] },
-      };
-
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc'] } };
-
-      var EII = {
-        _id : { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Bbbbbbbb'] },
-      };
-
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Bbbbbbbb'] } };
-
-      var FII = {
-        _id : { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Dddddddd', 'Eeeeeeee'] },
-      };
-
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Eeeeeeee'] } };
-
       // create the following structure:
       //              CII - EII,EI
       //             /  \ /   \
@@ -1421,119 +1378,190 @@ describe('findLCAs', function() {
       //
       // AI <-- BI
 
-      it('should save DAG', function(done) {
-        vc._snapshotCollection.insert([AI, BI, AII, BII, CII, DII, DI, EII, EI, FII, FI], {w: 1}, done);
-      });
+      var AI  = { v: 'Aaaaaaaa', pa: [] };
+      var BI  = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var AII = { v: 'Aaaaaaaa', pa: [] };
+      var BII = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CII = { v: 'Cccccccc', pa: ['Aaaaaaaa'] };
+      var DII = { v: 'Dddddddd', pa: ['Bbbbbbbb', 'Cccccccc'] };
+      var DI  = { v: 'Dddddddd', pa: ['Bbbbbbbb', 'Cccccccc'] };
+      var EII = { v: 'Eeeeeeee', pa: ['Cccccccc', 'Bbbbbbbb'] };
+      var EI  = { v: 'Eeeeeeee', pa: ['Cccccccc', 'Bbbbbbbb'] };
+      var FII = { v: 'Ffffffff', pa: ['Dddddddd', 'Eeeeeeee'] };
+      var FI  = { v: 'Ffffffff', pa: ['Dddddddd', 'Eeeeeeee'] };
 
-      it('EI and DII = error because CI is not in the database', function(done) {
-        findLCAs(EI, DII, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: I, II');
+      var DAGI  = [AI,  BI,       DI,  EI,  FI];
+      var DAGII = [AII, BII, CII, DII, EII, FII];
+
+      var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dDI = DAGI.slice(0, 3).reverse();
+      var dEI = DAGI.slice(0, 4).reverse();
+      var dFI = DAGI.slice(0, 5).reverse();
+
+      var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      var dCII = DAGII.slice(0, 3).reverse();
+      var dDII = DAGII.slice(0, 4).reverse();
+      var dEII = DAGII.slice(0, 5).reverse();
+      var dFII = DAGII.slice(0, 6).reverse();
+
+      it('EI and DII = only B because CI is missing', function(done) {
+        var x = streamify(dEI);
+        var y = streamify(dDII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Bbbbbbbb']);
           done();
         });
       });
 
-      it('EII and DI = error (becaue CI is not in the database', function(done) {
-        findLCAs(EII, DI, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: II, I');
+      it('EII and DI = only B because CI is missing', function(done) {
+        var x = streamify(dEII);
+        var y = streamify(dDI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Bbbbbbbb']);
           done();
         });
       });
 
-      it('DII and EI = error becaue CI is not in the database', function(done) {
-        findLCAs(DII, EI, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: II, I');
+      it('DII and EI = only B because CI is missing', function(done) {
+        var x = streamify(dDII);
+        var y = streamify(dEI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Bbbbbbbb']);
           done();
         });
       });
 
-      it('DI and EII = error becaue CI is not in the database', function(done) {
-        findLCAs(DI, EII, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca C. perspectives: I, II');
+      it('DI and EII = only B because CI is missing', function(done) {
+        var x = streamify(dDI);
+        var y = streamify(dEII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Bbbbbbbb']);
           done();
         });
       });
 
       it('AI and AII = A', function(done) {
-        findLCAs(AI, AII, function(err, merged) {
+        var x = streamify(dAI);
+        var y = streamify(dAII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Aaaaaaaa']);
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
       it('BI and CII = A', function(done) {
-        findLCAs(BI, CII, function(err, merged) {
+        var x = streamify(dBI);
+        var y = streamify(dCII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Aaaaaaaa']);
+          should.deepEqual(lca, ['Aaaaaaaa']);
           done();
         });
       });
 
       it('FI and DII = D', function(done) {
-        findLCAs(FI, DII, function(err, merged) {
+        var x = streamify(dFI);
+        var y = streamify(dDII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Dddddddd']);
+          should.deepEqual(lca, ['Dddddddd']);
           done();
         });
       });
 
       it('FII and DI = D', function(done) {
-        findLCAs(FII, DI, function(err, merged) {
+        var x = streamify(dFII);
+        var y = streamify(dDI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Dddddddd']);
+          should.deepEqual(lca, ['Dddddddd']);
           done();
         });
       });
 
       it('DII and FI = D', function(done) {
-        findLCAs(DII, FI, function(err, merged) {
+        var x = streamify(dDII);
+        var y = streamify(dFI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Dddddddd']);
+          should.deepEqual(lca, ['Dddddddd']);
           done();
         });
       });
 
       it('DI and FII = D', function(done) {
-        findLCAs(DI, FII, function(err, merged) {
+        var x = streamify(dDI);
+        var y = streamify(dFII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Dddddddd']);
+          should.deepEqual(lca, ['Dddddddd']);
           done();
         });
       });
 
       it('FI and EII = E', function(done) {
-        findLCAs(FI, EII, function(err, merged) {
+        var x = streamify(dFI);
+        var y = streamify(dEII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Eeeeeeee']);
+          should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
       it('FII and EI = E', function(done) {
-        findLCAs(FII, EI, function(err, merged) {
+        var x = streamify(dFII);
+        var y = streamify(dEI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Eeeeeeee']);
+          should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
       it('EII and FI = E', function(done) {
-        findLCAs(EII, FI, function(err, merged) {
+        var x = streamify(dEII);
+        var y = streamify(dFI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Eeeeeeee']);
+          should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
 
       it('EI and FII = E', function(done) {
-        findLCAs(EI, FII, function(err, merged) {
+        var x = streamify(dEI);
+        var y = streamify(dFII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(merged, ['Eeeeeeee']);
+          should.deepEqual(lca, ['Eeeeeeee']);
           done();
         });
       });
     });
 
+  /*
     describe('criss-cross n-parents', function() {
       var name = '_findLCAsTwoPerspectivesCrissCrossNParents';
 
