@@ -1654,7 +1654,7 @@ describe('findLCAs', function() {
 
       var dAI = DAGI.slice(0, 1).reverse();
       var dBI = DAGI.slice(0, 2).reverse();
-      var dCI = DAGI.slice(0, 3).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
       var dDI = DAGI.slice(0, 4).reverse();
       var dFI = DAGI.slice(0, 5).reverse();
       var dEI = DAGI.slice(0, 6).reverse();
@@ -1665,7 +1665,7 @@ describe('findLCAs', function() {
 
       var dAII = DAGII.slice(0, 1).reverse();
       var dBII = DAGII.slice(0, 2).reverse();
-      var dCII = DAGII.slice(0, 3).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
       var dDII = DAGII.slice(0, 4).reverse();
       var dFII = DAGII.slice(0, 5).reverse();
       var dEII = DAGII.slice(0, 6).reverse();
@@ -1860,139 +1860,25 @@ describe('findLCAs', function() {
           done();
         });
       });
-    });
 
-  /*
-    describe('virtual merge', function() {
-      var name = '_findLCAsTwoPerspectivesVirtualMerge';
+      it('vm C, D and GII = C and D', function(done) {
+        var vm = { v: 'x', pa: ['Cccccccc', 'Dddddddd'] };
+        var x = streamify([vm].concat(dEI));
+        var y = streamify(dGII);
 
-      var BI = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
-      var CI = { h: { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var DI = { h: { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-      var EI = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FI = { h: { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GI = { h: { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HI = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'Iiiiiiii', pa: ['Eeeeeeee'] } };
-      var II = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'Iiiiiiii', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JI = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'Iiiiiiii', pa: ['Gggggggg', 'Eeeeeeee'] } };
-
-      var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] } };
-      var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] } };
-      var CII = { h: { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var DII = { h: { id: 'foo', v: 'Dddddddd', pe: 'II', pa: ['Bbbbbbbb'] } };
-      var EII = { h: { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Cccccccc', 'Ffffffff', 'Dddddddd'] } };
-      var FII = { h: { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Bbbbbbbb', 'Cccccccc', 'Dddddddd'] } };
-      var GII = { h: { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Dddddddd', 'Ffffffff'] } };
-      var HII = { h: { id: 'foo', v: 'Hhhhhhhh', pe: 'II', pa: ['Eeeeeeee'] } };
-      var III = { h: { id: 'foo', v: 'Iiiiiiii', pe: 'II', pa: ['Ffffffff', 'Eeeeeeee', 'Gggggggg'] } };
-      var JII = { h: { id: 'foo', v: 'Jjjjjjjj', pe: 'II', pa: ['Gggggggg', 'Eeeeeeee'] } };
-
-      // create the following structure:
-      //         C <-- E <-- H
-      //        / \ / / \
-      //       B <-- F <-- I
-      //        \ /   \ / \         
-      //         D <-- G <-- J
-      it('should save DAG mixed branches and mixed perspectives', function(done) {
-        vc._snapshotCollection.insert([AII, BII, CII, DII, BI, CI, FII, EII, DI, FI, HII, EI, HI, GI, GII, III, JII, II, JI], {w: 1}, done);
-      });
-
-      it('vm1 B and vm2 B = B', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] } };
-        findLCAs(vm1, vm2, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Bbbbbbbb']);
-          done();
-        });
-      });
-
-      it('vm1 B and vm2 A = error because AI is not in the database', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Bbbbbbbb'] } };
-        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] } };
-        findLCAs(vm1, vm2, function(err) {
-          should.equal(err.message, 'missing at least one perspective when fetching lca A. perspectives: II, I');
-          done();
-        });
-      });
-
-      it('vm1 C, D and vm2 G = C and D', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'II', pa: ['Cccccccc', 'Dddddddd'] } };
-        var vm2 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: ['Gggggggg'] } };
-        findLCAs(vm1, vm2, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Dddddddd', 'Cccccccc']);
-          done();
-        });
-      });
-
-      it('two vm\'s without parents = []', function(done) {
-        var vm1 = { h: { id: 'foo', pe: 'Iiiiiiii', pa: [] } };
-        var vm2 = { h: { id: 'foo', pe: 'II', pa: [] } };
-        findLCAs(vm1, vm2, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, []);
-          done();
-        });
-      });
-
-      it('vm without parents and GI = []', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: [] } };
-        findLCAs(vm, GI, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, []);
-          done();
-        });
-      });
-
-      it('vm C, D pe III and GI = []', function(done) {
-        var vm = { h: { id: 'foo', pe: 'III', pa: ['Cccccccc', 'Dddddddd'] } };
-        findLCAs(vm, GI, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, []);
-          done();
-        });
-      });
-
-      it('vm C, D and GI = C and D', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Cccccccc', 'Dddddddd'] } };
-        findLCAs(vm, GI, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Dddddddd', 'Cccccccc']);
-          done();
-        });
-      });
-
-      it('vm J and II = E, G', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Jjjjjjjj'] } };
-        findLCAs(vm, II, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
-          done();
-        });
-      });
-
-      it('vm E, F, G and II = E, F, G', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Eeeeeeee', 'Ffffffff', 'Gggggggg'] } };
-        findLCAs(vm, II, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Eeeeeeee', 'Ffffffff', 'Gggggggg']);
-          done();
-        });
-      });
-
-      it('vm H, I, J and JI = I', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Hhhhhhhh', 'Iiiiiiii', 'Jjjjjjjj'] } };
-        findLCAs(vm, II, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Iiiiiiii']);
           done();
         });
       });
 
       it('vm G, H and II = G and E', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Gggggggg', 'Hhhhhhhh'] } };
-        findLCAs(vm, II, function(err, lca) {
+        var vm = { v: 'x', pa: ['Gggggggg', 'Hhhhhhhh'] };
+        var x = streamify([vm].concat(dJI));
+        var y = streamify(dII);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
           done();
@@ -2000,120 +1886,16 @@ describe('findLCAs', function() {
       });
 
       it('vm I, J and FI = F', function(done) {
-        var vm = { h: { id: 'foo', pe: 'II', pa: ['Iiiiiiii', 'Jjjjjjjj'] } };
-        findLCAs(vm, FI, function(err, lca) {
+        var vm = { v: 'x', pa: ['Iiiiiiii', 'Jjjjjjjj'] };
+        var x = streamify([vm].concat(dJI));
+        var y = streamify(dFI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Ffffffff']);
           done();
         });
       });
     });
-
-    describe('regression', function() {
-      var name = '_findLCAsTwoPerspectivesRegressions';
-
-      var itemIA =  {'_id':{'_co':'foo','_id':'Aaaaaaaa','_v':'Hr+ojSYQ','_pa':[],'_pe':'_local','_i':3947}};
-      var itemIIA = {'_id':{'_co':'foo','_id':'Aaaaaaaa','_v':'Hr+ojSYQ','_pa':[],'_pe':'test2'}};
-      var itemIB =  {'_id':{'_co':'foo','_id':'Aaaaaaaa','_v':'p3oGRFGC','_pa':['Hr+ojSYQ'],'_pe':'_local','_i':3948}};
-      var itemIIB = {'_id':{'_co':'foo','_id':'Aaaaaaaa','_v':'p3oGRFGC','_pa':['Hr+ojSYQ'],'_pe':'test2'}};
-
-      it('needs the following items', function(done) {
-        var DAG = [itemIA, itemIB];
-        vc._snapshotCollection.insert(DAG, { w: 1 }, done);
-      });
-
-      it('should find the version itself to be the lca of two roots from different perspectives with the same version', function(done) {
-        var ac = new ArrayCollection([itemIIA, itemIIB]);
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
-
-        var newThis = {
-          _log: silence,
-          databaseName: vc.databaseName,
-          localPerspective: vc.localPerspective,
-          versionKey: vc.versionKey,
-          name: vc.name,
-          _snapshotCollection: vc._virtualCollection,
-          _findLCAs: findLCAs,
-          _merge: vc._merge
-        };
-        newThis._findLCAs(itemIIA, itemIA, function(err, lca) {
-          if (err) { throw err; }
-          should.deepEqual(lca, ['Hr+ojSYQ']);
-          done();
-        });
-      });
-    });
-
-    describe('with virtual collection', function() {
-      var name = '_findLCAsRegressionNonSymmetricMultipleLca';
-
-      var AI  = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'Iiiiiiii',  pa: [], _i: 1}, _m3: { _ack: true } };
-      var AII = { h: { id: 'foo', v: 'Aaaaaaaa', pe: 'II', pa: [] },       _m3: { _ack: false } };
-
-      var BII = { h: { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] }, _m3: {} };
-
-      // create the following structure, for _pe I and II:
-      // _pe I
-      //  A
-      //
-      // _pe II
-      //  A
-      //
-      it('should save DAGs', function(done) {
-        vc._snapshotCollection.insert([AI, AII], done);
-      });
-
-      it('BII and AI = A', function(done) {
-        var ac = new ArrayCollection([BII]);
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
-
-        // create a new context with _snapshotCollection set to _virtualCollection
-        var newThis = {
-          _log: silence,
-          databaseName: vc.databaseName,
-          localPerspective: vc.localPerspective,
-          versionKey: vc.versionKey,
-          name: vc.name,
-          _snapshotCollection: vc._virtualCollection,
-          _findLCAs: findLCAs
-        };
-
-        newThis._findLCAs(BII, AI, function(err, lcas) {
-          if (err) { throw err; }
-          should.equal(lcas.length, 1);
-          should.deepEqual(lcas, ['Aaaaaaaa']);
-          done();
-        });
-      });
-
-      it('BII and AI = A, should not append to found lcas after callback is called', function(done) {
-        var ac = new ArrayCollection([BII]);
-        vc._virtualCollection = new ConcatMongoCollection([vc._snapshotCollection, ac]);
-
-        // create a new context with _snapshotCollection set to _virtualCollection
-        var newThis = {
-          _log: silence,
-          databaseName: vc.databaseName,
-          localPerspective: vc.localPerspective,
-          versionKey: vc.versionKey,
-          name: vc.name,
-          _snapshotCollection: vc._virtualCollection,
-          _findLCAs: findLCAs
-        };
-
-        newThis._findLCAs(BII, AI, function(err, lcas) {
-          if (err) { throw err; }
-          should.equal(lcas.length, 1);
-          should.deepEqual(lcas, ['Aaaaaaaa']);
-
-          setTimeout(function() {
-            should.equal(lcas.length, 1);
-            should.deepEqual(lcas, ['Aaaaaaaa']);
-            done();
-          }, 10);
-        });
-      });
-    });
-    */
   });
 });
