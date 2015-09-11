@@ -1561,122 +1561,8 @@ describe('findLCAs', function() {
       });
     });
 
-  /*
     describe('criss-cross n-parents', function() {
-      var name = '_findLCAsTwoPerspectivesCrissCrossNParents';
-
       // create DAG with imported criss-cross merge with three parents
-
-      var BI = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'Iiiiiiii', pa: ['Aaaaaaaa'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        some: 'secret'
-      };
-
-      var CI = {
-        _id : { id: 'foo', v: 'Cccccccc', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-        some: 'secret'
-      };
-
-      var DI = {
-        _id : { id: 'foo', v: 'Dddddddd', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        d: true,
-        some: 'secret'
-      };
-
-      var EI = {
-        _id : { id: 'foo', v: 'Eeeeeeee', pe: 'Iiiiiiii', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        e: true,
-        some: 'secret'
-      };
-
-      var FI = { // change e
-        _id : { id: 'foo', v: 'Ffffffff', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-        d: true,
-        e: 'foo',
-        f: true,
-        some: 'secret'
-      };
-
-      var GI = { // delete d
-        _id : { id: 'foo', v: 'Gggggggg', pe: 'Iiiiiiii', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-        e: true,
-        g: true,
-        some: 'secret'
-      };
-
-      var BII = {
-        _id : { id: 'foo', v: 'Bbbbbbbb', pe: 'II', pa: ['Aaaaaaaa'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-      };
-
-      var CII = {
-        _id : { id: 'foo', v: 'Cccccccc', pe: 'II', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-      };
-
-      var DII = {
-        _id : { id: 'foo', v: 'Dddddddd', pe: 'II', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        d: true,
-      };
-
-      var EII = {
-        _id : { id: 'foo', v: 'Eeeeeeee', pe: 'II', pa: ['Bbbbbbbb'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        e: true,
-      };
-
-      var FII = { // change e
-        _id : { id: 'foo', v: 'Ffffffff', pe: 'II', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-        d: true,
-        e: 'foo',
-        f: true,
-      };
-
-      var GII = { // delete d
-        _id : { id: 'foo', v: 'Gggggggg', pe: 'II', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] },
-        _m3: { _merged: false },
-        a: true,
-        b: true,
-        c: true,
-        e: true,
-        g: true,
-      };
-
       // following with both I and II
       //          C <------- F
       //         /  \  /    /
@@ -1690,24 +1576,50 @@ describe('findLCAs', function() {
       //         \  /  \    \
       //          E <------- G
       //
-      it('save the DAG topologically sorted but perspectives mixed', function(done) {
-        var DAG = [BI, BII, CII, DII, CI, DI, EI, FI, GI, EII, FII, GII ];
-        vc._snapshotCollection.insert(DAG, {w: 1}, function(err, inserts) {
-          if (err) { throw err; }
-          should.equal(DAG.length, inserts.length);
-          done();
-        });
-      });
+
+      var BI  = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CI  = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var DI  = { v: 'Dddddddd', pa: ['Bbbbbbbb'] };
+      var EI  = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
+      var FI  = { v: 'Ffffffff', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] };
+      var GI  = { v: 'Gggggggg', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] };
+      var BII = { v: 'Bbbbbbbb', pa: ['Aaaaaaaa'] };
+      var CII = { v: 'Cccccccc', pa: ['Bbbbbbbb'] };
+      var DII = { v: 'Dddddddd', pa: ['Bbbbbbbb'] };
+      var EII = { v: 'Eeeeeeee', pa: ['Bbbbbbbb'] };
+      var FII = { v: 'Ffffffff', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] };
+      var GII = { v: 'Gggggggg', pa: ['Cccccccc', 'Dddddddd', 'Eeeeeeee'] };
+
+      var DAGI  = [BI,  CI,  DI,  EI,  FI,  GI];
+      var DAGII = [BII, CII, DII, EII, FII, GII];
+
+      //var dBI = DAGI.slice(0, 1).reverse();
+      //var dCI = DAGI.slice(0, 2).reverse();
+      //var dDI = DAGI.slice(0, 3).reverse();
+      //var dEI = DAGI.slice(0, 4).reverse();
+      var dFI = DAGI.slice(0, 5).reverse();
+      //var dGI = DAGI.slice(0, 6).reverse();
+
+      //var dBII = DAGII.slice(0, 1).reverse();
+      //var dCII = DAGII.slice(0, 2).reverse();
+      //var dDII = DAGII.slice(0, 3).reverse();
+      //var dEII = DAGII.slice(0, 4).reverse();
+      //var dFII = DAGII.slice(0, 5).reverse();
+      var dGII = DAGII.slice(0, 6).reverse();
 
       it('GII and FI = C, D, E', function(done) {
-        findLCAs(GII, FI, function(err, lcas) {
+        var x = streamify(dGII);
+        var y = streamify(dFI);
+
+        findLCAs(x, y, { log: silence }, function(err, lca) {
           if (err) { throw err; }
-          should.deepEqual(lcas, ['Eeeeeeee', 'Cccccccc', 'Dddddddd']);
+          should.deepEqual(lca, ['Eeeeeeee', 'Dddddddd', 'Cccccccc']);
           done();
         });
       });
     });
 
+  /*
     describe('three parents', function() {
       var name = '_findLCAsTwoPerspectivesThreeParents';
 
