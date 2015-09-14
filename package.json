@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "through2": "^2.0.0",
+    "stream-array": "^1.1.1",
     "chroot": "^1.0.2",
     "bson-stream": "^0.0.6",
     "mocha": "^2.3.0",
