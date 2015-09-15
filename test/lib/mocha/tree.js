@@ -888,54 +888,54 @@ describe('Tree', function() {
       var t = new Tree(db, '');
       var p = t.getIKeyRange();
       should.strictEqual(p.s.toString('hex'), '000002');
-      should.strictEqual(p.e.toString('hex'), '00000207ffffffffffffff');
+      should.strictEqual(p.e.toString('hex'), '000002ff');
     });
 
     it('should use iSize + 1 for 0xff end sequence', function() {
       var t = new Tree(db, '', { iSize: 1 });
       var p = t.getIKeyRange();
       should.strictEqual(p.s.toString('hex'), '000002');
-      should.strictEqual(p.e.toString('hex'), '00000202ffff');
+      should.strictEqual(p.e.toString('hex'), '000002ff');
     });
 
     it('should work with a single byte name', function() {
       var t = new Tree(db, 'a', { iSize: 1 });
       var p = t.getIKeyRange();
       should.strictEqual(p.s.toString('hex'), '01610002');
-      should.strictEqual(p.e.toString('hex'), '0161000202ffff');
+      should.strictEqual(p.e.toString('hex'), '01610002ff');
     });
 
     it('should work with a multi byte name', function() {
       var t = new Tree(db, 'abc', { iSize: 1 });
       var p = t.getIKeyRange();
       should.strictEqual(p.s.toString('hex'), '036162630002');
-      should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
+      should.strictEqual(p.e.toString('hex'), '036162630002ff');
     });
 
     it('should require opts to be an object', function() {
       var t = new Tree(db, 'abc', { iSize: 1 });
-      (function() { t.getIKeyRange(null); }).should.throw('opts must be an object');
+      (function() { t.getIKeyRange([]); }).should.throw('opts must be an object');
     });
 
     it('should work with minI 3', function() {
       var t = new Tree(db, 'abc', { iSize: 1 });
       var p = t.getIKeyRange({ minI: 3 });
       should.strictEqual(p.s.toString('hex'), '0361626300020103');
-      should.strictEqual(p.e.toString('hex'), '03616263000202ffff');
+      should.strictEqual(p.e.toString('hex'), '036162630002ff');
     });
 
     it('should work with maxI 4', function() {
       var t = new Tree(db, 'abc', { iSize: 1 });
       var p = t.getIKeyRange({ maxI: 4 });
       should.strictEqual(p.s.toString('hex'), '036162630002');
-      should.strictEqual(p.e.toString('hex'), '0361626300020204ff');
+      should.strictEqual(p.e.toString('hex'), '0361626300020104');
     });
 
     it('should work with minI 5 and maxI 2', function() {
       var t = new Tree(db, 'abc', { iSize: 1 });
       var p = t.getIKeyRange({ minI: 5, maxI: 2 });
       should.strictEqual(p.s.toString('hex'), '0361626300020105');
-      should.strictEqual(p.e.toString('hex'), '0361626300020202ff');
+      should.strictEqual(p.e.toString('hex'), '0361626300020102');
     });
   });
 
@@ -1047,11 +1047,6 @@ describe('Tree', function() {
     });
 
     describe('with id', function() {
-      it('should require id to be a buffer or (convertiable to) a string', function() {
-        var t = new Tree(db, '');
-        (function() { t.getDsKeyRange({ id: null }); }).should.throw('Cannot read property \'toString\' of null');
-      });
-
       it('should work with a zero byte name', function() {
         var t = new Tree(db, '');
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
@@ -1205,11 +1200,6 @@ describe('Tree', function() {
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       (function() { t.getHeads(0); }).should.throw('opts must be an object');
-    });
-
-    it('should require opts.id to be a buffer, string or implement "toString"', function() {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.getHeads({ id: null }); }).should.throw('Cannot read property \'toString\' of null');
     });
 
     it('should require opts.skipConflicts to be a boolean', function() {
@@ -1460,12 +1450,6 @@ describe('Tree', function() {
     it('should require cb to be a function', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       (function() { t.iterateInsertionOrder(function() {}); }).should.throw('cb must be a function');
-    });
-
-    it('should require opts.id to be convertiable to a string', function() {
-      // configure 2 bytes and call with 3 bytes (base64)
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.iterateInsertionOrder({ id: null }, function() { }, function() { }); }).should.throw('Cannot read property \'toString\' of null');
     });
 
     it('should require opts.v to match vSize', function() {
