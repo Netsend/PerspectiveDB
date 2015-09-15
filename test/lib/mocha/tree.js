@@ -1441,6 +1441,7 @@ describe('Tree', function() {
     var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
     var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item4 = { h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } };
 
     it('should require iterator to be a function', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1452,10 +1453,16 @@ describe('Tree', function() {
       (function() { t.iterateInsertionOrder(function() {}); }).should.throw('cb must be a function');
     });
 
-    it('should require opts.v to match vSize', function() {
+    it('should require opts.first to match vSize', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.iterateInsertionOrder({ v: 'a' }, function() { }, function() { }); }).should.throw('opts.v must be the same size as the configured vSize');
+      (function() { t.iterateInsertionOrder({ first: 'a' }, function() { }, function() { }); }).should.throw('opts.first must be the same size as the configured vSize');
+    });
+
+    it('should require opts.last to match vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.iterateInsertionOrder({ last: 'a' }, function() { }, function() { }); }).should.throw('opts.last must be the same size as the configured vSize');
     });
 
     it('should require raw to be a buffer', function() {
@@ -1584,11 +1591,11 @@ describe('Tree', function() {
       });
     });
 
-    it('should use opts.v and start emitting at offset 1', function(done) {
+    it('should use opts.first and start emitting at offset 1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
-      t.iterateInsertionOrder({ v: 'Aaaa' }, function(obj, next) {
+      t.iterateInsertionOrder({ first: 'Aaaa' }, function(obj, next) {
         i++;
         if (i === 1) {
           should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
@@ -1605,14 +1612,49 @@ describe('Tree', function() {
       });
     });
 
-    it('should use opts.v and start emitting at offset 2 (excludeOffset)', function(done) {
+    it('should use opts.first and start emitting at offset 2 (excludeFirst)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
-      t.iterateInsertionOrder({ v: 'Aaaa', excludeOffset: true }, function(obj, next) {
+      t.iterateInsertionOrder({ first: 'Aaaa', excludeFirst: true }, function(obj, next) {
         i++;
         if (i > 0) {
           should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should use opts.last and start emitting at offset 1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder({ last: 'Aaaa' }, function(obj, next) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should use opts.last and start emitting at offset 1 (excludeLast)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder({ last: 'Bbbb', excludeLast: true }, function(obj, next) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
         }
         next();
       }, function(err) {
@@ -1639,6 +1681,44 @@ describe('Tree', function() {
       }, function(err) {
         if (err) { throw err; }
         should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('should use opts.first, opts.last, excludeFirst, excludeLast and emit offset 2 only', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder({ first: 'Aaaa', excludeFirst: true, last: 'Dddd', excludeLast: true }, function(obj, next) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('item4, different DAG', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item4, done);
+    });
+
+    it('should iterate over DAG foo only (item4)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.iterateInsertionOrder({ id: 'foo' }, function(obj, next) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } }, obj);
+        }
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
         done();
       });
     });
