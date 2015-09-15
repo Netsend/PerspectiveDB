@@ -1047,30 +1047,71 @@ describe('Tree', function() {
     });
 
     describe('with id', function() {
-      it('should require id to be a buffer', function() {
+      it('should require id to be a buffer or (convertiable to) a string', function() {
         var t = new Tree(db, '');
-        (function() { t.getDsKeyRange([]); }).should.throw('id must be a buffer if provided');
+        (function() { t.getDsKeyRange({ id: null }); }).should.throw('Cannot read property \'toString\' of null');
       });
 
       it('should work with a zero byte name', function() {
         var t = new Tree(db, '');
-        var p = t.getDsKeyRange(new Buffer('cb', 'hex'));
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
         should.strictEqual(p.s.toString('hex'), '00000101cb');
         should.strictEqual(p.e.toString('hex'), '00000101cbff');
       });
 
       it('should work with a single byte name', function() {
         var t = new Tree(db, 'a');
-        var p = t.getDsKeyRange(new Buffer('cb', 'hex'));
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
         should.strictEqual(p.s.toString('hex'), '0161000101cb');
         should.strictEqual(p.e.toString('hex'), '0161000101cbff');
       });
 
       it('should work with a multi byte name', function() {
         var t = new Tree(db, 'abc');
-        var p = t.getDsKeyRange(new Buffer('cb', 'hex'));
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
         should.strictEqual(p.s.toString('hex'), '03616263000101cb');
         should.strictEqual(p.e.toString('hex'), '03616263000101cbff');
+      });
+
+      it('should work with a zero byte name and minI', function() {
+        var t = new Tree(db, '', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 8 });
+        should.strictEqual(p.s.toString('hex'), '00000101cb00020008');
+        should.strictEqual(p.e.toString('hex'), '00000101cbff');
+      });
+
+      it('should work with a zero byte name and maxI', function() {
+        var t = new Tree(db, '', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), maxI: 8 });
+        should.strictEqual(p.s.toString('hex'), '00000101cb');
+        should.strictEqual(p.e.toString('hex'), '00000101cb00020008ff');
+      });
+
+      it('should work with a zero byte name, minI and maxI', function() {
+        var t = new Tree(db, '', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 7, maxI: 8 });
+        should.strictEqual(p.s.toString('hex'), '00000101cb00020007');
+        should.strictEqual(p.e.toString('hex'), '00000101cb00020008ff');
+      });
+      it('should work with a single byte name and minI', function() {
+        var t = new Tree(db, 'a', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 8 });
+        should.strictEqual(p.s.toString('hex'), '0161000101cb00020008');
+        should.strictEqual(p.e.toString('hex'), '0161000101cbff');
+      });
+
+      it('should work with a single byte name and maxI', function() {
+        var t = new Tree(db, 'a', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), maxI: 8 });
+        should.strictEqual(p.s.toString('hex'), '0161000101cb');
+        should.strictEqual(p.e.toString('hex'), '0161000101cb00020008ff');
+      });
+
+      it('should work with a single byte name, minI and maxI', function() {
+        var t = new Tree(db, 'a', { iSize: 2 });
+        var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 7, maxI: 8 });
+        should.strictEqual(p.s.toString('hex'), '0161000101cb00020007');
+        should.strictEqual(p.e.toString('hex'), '0161000101cb00020008ff');
       });
     });
   });
