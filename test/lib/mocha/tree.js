@@ -1213,9 +1213,8 @@ describe('Tree', function() {
 
     var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
-    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'], d: true }, b: { some: 'other' } };
     var item4 = { h: { id: 'XI', v: 'Ffff', i: 4, pa: ['Bbbb'], c: true }, b: { some: 'more2' } };
-    var item5 = { h: { id: 'XI', v: 'Gggg', i: 5, pa: ['Bbbb'], d: true }, b: { some: 'deleted' } };
 
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -1343,20 +1342,27 @@ describe('Tree', function() {
       });
     });
 
-    it('item5', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.write(item5, done);
-    });
-
-    it('should not emit deleted heads', function(done) {
+    it('should not emit deleted heads if skipDeletes is true', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
-      t.getHeads({ skipConflicts: true }, function(item, next) {
+      t.getHeads({ skipDeletes: true }, function(item, next) {
         i++;
-        if (i > 0) { should.deepEqual(item, item3); }
+        if (i > 0) { should.deepEqual(item, item4); }
         next();
       }, function() {
         should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should not emit any heads if skipConflicts and skipDeletes are true', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads({ skipConflicts: true, skipDeletes: true }, function(item, next) {
+        i++;
+        next();
+      }, function() {
+        should.strictEqual(i, 0);
         done();
       });
     });
@@ -2356,7 +2362,6 @@ describe('Tree', function() {
     var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
     var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], pe: 'other' }, b: { more3: 'b' } };
-    var item5 = { h: { id: 'XI', v: 'Eeee', pa: ['Bbbb'], d: true }, b: { some: 'deleted' } };
 
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -2785,34 +2790,6 @@ describe('Tree', function() {
 
       s.on('end', function() {
         should.strictEqual(i, 4);
-        done();
-      });
-    });
-
-    it('write item5 (delete head)', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.write(item5, done);
-    });
-
-    it('inspect keys: should have one headKey left', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getHeadKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = Tree.parseKey(obj.key, { decodeId: 'utf8', decodeV: 'base64' });
-        var val = Tree.parseHeadVal(obj.value, 'utf8');
-
-        should.strictEqual(key.type, 0x03);
-        should.strictEqual(key.id, 'XI');
-        should.strictEqual(key.v, 'Dddd');
-
-        should.strictEqual(val.i, 4);
-      });
-      s.on('close', function() {
-        should.strictEqual(i, 1);
         done();
       });
     });
