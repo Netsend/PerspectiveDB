@@ -845,7 +845,7 @@ describe('Tree', function() {
     });
 
     describe('i 1,', function() {
-      it('conflict 0', function() {
+      it('opts 0', function() {
         var b = new Buffer('000102', 'hex');
         var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
@@ -861,10 +861,29 @@ describe('Tree', function() {
           c: true
         });
       });
+
+      it('delete 1', function() {
+        var b = new Buffer('020102', 'hex');
+        var obj = Tree.parseHeadVal(b);
+        should.deepEqual(obj, {
+          i: 2,
+          d: true
+        });
+      });
+
+      it('conflict 1, delete 1', function() {
+        var b = new Buffer('030102', 'hex');
+        var obj = Tree.parseHeadVal(b);
+        should.deepEqual(obj, {
+          i: 2,
+          c: true,
+          d: true
+        });
+      });
     });
 
     describe('i 3,', function() {
-      it('conflict 0', function() {
+      it('opts 0', function() {
         var b = new Buffer('0003235761', 'hex');
         var obj = Tree.parseHeadVal(b);
         should.deepEqual(obj, {
@@ -2060,6 +2079,16 @@ describe('Tree', function() {
     it('should set conflict option byte and i to 4', function() {
       var t = new Tree(db, name, { iSize: 3, log: silence });
       t._composeHeadVal({ h: { i: 4, c: true } }).toString('hex').should.equal('0103000004');
+    });
+
+    it('should set delete option byte and i to 4', function() {
+      var t = new Tree(db, name, { iSize: 3, log: silence });
+      t._composeHeadVal({ h: { i: 4, d: true } }).toString('hex').should.equal('0203000004');
+    });
+
+    it('should set conflict and delete option byte and i to 4', function() {
+      var t = new Tree(db, name, { iSize: 3, log: silence });
+      t._composeHeadVal({ h: { i: 4, c: true, d: true } }).toString('hex').should.equal('0303000004');
     });
   });
 
