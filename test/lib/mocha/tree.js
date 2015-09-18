@@ -1871,12 +1871,12 @@ describe('Tree', function() {
     });
   });
 
-  describe('maxI', function() {
-    var name = 'maxI';
+  describe('_maxI', function() {
+    var name = '_maxI';
 
     it('should return null by default', function(done) {
       var t = new Tree(db, name, { log: silence });
-      t.maxI(function(err, i) {
+      t._maxI(function(err, i) {
         if (err) { throw err; }
         should.equal(i, null);
         done();
@@ -1885,19 +1885,12 @@ describe('Tree', function() {
 
     it('needs an item with a number in the index', function(done) {
       var t = new Tree(db, name, { log: silence });
-      /*
-      store an object in the I index:
-      {                    _  n  e  x  t  I                          2
-        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 02>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
-      }
-      */
       t._db.put(t._composeIKey(2), BSON.serialize({ b: 'A' }), done);
     });
 
     it('should give the new i', function(done) {
       var t = new Tree(db, name, { log: silence });
-      t.maxI(function(err, i) {
+      t._maxI(function(err, i) {
         if (err) { throw err; }
         should.equal(i, 2);
         done();
@@ -1906,19 +1899,12 @@ describe('Tree', function() {
 
     it('needs a new higher i in the index', function(done) {
       var t = new Tree(db, name, { log: silence });
-      /*
-      store an object in the I index:
-      {                    _  n  e  x  t  I                         20
-        key:   <Buffer 06 5f 6e 65 78 74 49 00 02 06 00 00 00 00 00 14>,
-        value: <Buffer 0f 00 00 00 02 5f 62 00 02 00 00 00 41 00 00> // BSON { b: 'A' }
-      }
-      */
       t._db.put(t._composeIKey(20), BSON.serialize({ b: 'A' }), done);
     });
 
     it('should return the new i which is 20', function(done) {
       var vc = new Tree(db, name, { log: silence });
-      vc.maxI(function(err, i) {
+      vc._maxI(function(err, i) {
         if (err) { throw err; }
         should.equal(i, 20);
         done();
