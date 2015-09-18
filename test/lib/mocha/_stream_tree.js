@@ -120,7 +120,12 @@ describe('StreamTree', function() {
 
     var i = 0;
     var s = new StreamTree(t);
-    t.write(item2);
+    var writeDone, ended;
+    t.write(item2, function(err) {
+      if (err) { throw err; }
+      writeDone = true;
+      if (ended) { done(); }
+    });
     s.on('data', function(obj) {
       i++;
       if (i > 0) {
@@ -130,7 +135,8 @@ describe('StreamTree', function() {
 
     s.on('end', function() {
       should.strictEqual(i, 1);
-      done();
+      ended = true;
+      if (writeDone) { done(); }
     });
   });
 
@@ -198,7 +204,12 @@ describe('StreamTree', function() {
 
     var i = 0;
     var s = new StreamTree(t);
-    t.write(item3);
+    var writeDone, ended;
+    t.write(item3, function(err) {
+      if (err) { throw err; }
+      writeDone = true;
+      if (ended) { done(); }
+    });
     s.on('data', function(obj) {
       i++;
       if (i === 1) {
@@ -211,7 +222,8 @@ describe('StreamTree', function() {
 
     s.on('end', function() {
       should.strictEqual(i, 2);
-      done();
+      ended = true;
+      if (writeDone) { done(); }
     });
   });
 
