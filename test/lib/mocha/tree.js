@@ -1737,6 +1737,269 @@ describe('Tree', function() {
     });
   });
 
+  describe('createReadStream', function() {
+    var name = 'createReadStream';
+
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item4 = { h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } };
+
+    it('should require opts to be an object', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createReadStream(function() {}); }).should.throw('opts must be an object');
+    });
+
+    it('should require opts.first to match vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createReadStream({ first: 'a' }, function() { }, function() { }); }).should.throw('opts.first must be the same size as the configured vSize');
+    });
+
+    it('should require opts.last to match vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createReadStream({ last: 'a' }, function() { }, function() { }); }).should.throw('opts.last must be the same size as the configured vSize');
+    });
+
+    it('should require opts.raw to be a buffer', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createReadStream({ raw: 'a' }, function() { }, function() { }); }).should.throw('opts.raw must be a boolean');
+    });
+
+    it('should call end directly with an empty database (if data event is handled)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createReadStream();
+      s.on('end', done);
+      s.on('data', done);
+    });
+
+    it('needs item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item1, done);
+    });
+
+    it('should emit raw buffers', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ raw: true });
+
+      s.on('data', function(obj) {
+        i++;
+        should.strictEqual(Buffer.isBuffer(obj), true);
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should iterate over item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream();
+
+      s.on('data', function(obj) {
+        i++;
+        should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item2, done);
+    });
+
+    it('should wait with close before all items are iterated', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream();
+
+      s.on('data', function() {
+        i++;
+        s.pause();
+        setTimeout(function() {
+          s.resume();
+        }, 10);
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('should use opts.first and start emitting at offset 1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ first: 'Aaaa' });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i === 1) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+
+        if (i > 1) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('should use opts.first and start emitting at offset 2 (excludeFirst)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ first: 'Aaaa', excludeFirst: true });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should use opts.last and start emitting at offset 1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ last: 'Aaaa' });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should use opts.last and start emitting at offset 1 (excludeLast)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ last: 'Bbbb', excludeLast: true });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should not emit items that are added after the stream is openend and data handler is registered', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream();
+
+      s.on('data', function(obj) {
+        i++;
+        if (i === 1) {
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+        if (i > 1) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+      });
+
+      s.pause();
+      t.write(item3, function(err) {
+        if (err) { throw err; }
+        s.resume();
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
+    it('should use opts.first, opts.last, excludeFirst, excludeLast and emit offset 2 only', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      var s = t.createReadStream({ first: 'Aaaa', excludeFirst: true, last: 'Dddd', excludeLast: true });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('item4, different DAG', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item4, done);
+    });
+
+    it('should iterate over DAG foo only (item4)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var s = t.createReadStream({ id: 'foo' });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i > 0) {
+          should.deepEqual({ h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } }, obj);
+        }
+      });
+
+      s.on('end', function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+  });
+
   describe('lastByPerspective', function() {
     var name = 'lastByPerspective';
 
