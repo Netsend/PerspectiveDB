@@ -1322,7 +1322,7 @@ describe('Tree', function() {
         i++;
         if (i === 1) { should.deepEqual(item, item3); }
         if (i > 1) { should.deepEqual(item, item4); }
-        next(false);
+        next(null, false);
       }, function() {
         should.strictEqual(i, 1);
         done();
