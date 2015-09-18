@@ -1368,53 +1368,6 @@ describe('Tree', function() {
     });
   });
 
-  describe('getDsKeyByVersion', function() {
-    var name = 'getDsKeyByVersion';
-
-    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
-
-    it('should require version to be a number or a base64 string', function() {
-      var t = new Tree(db, name, { log: silence });
-      (function() { t.getDsKeyByVersion({}); }).should.throw('version must be a number or a base64 string');
-    });
-
-    it('should return with null if the index is empty', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.getDsKeyByVersion('Aaaa', function(err, dsKey) {
-        if (err) { throw err; }
-        should.strictEqual(dsKey, null);
-        done();
-      });
-    });
-
-    it('needs an entry in vkey index', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-
-      var vKey = t._composeVKey(item.h.v);
-      var dsKey = t._composeDsKey(item.h.id, item.h.i);
-
-      t._db.put(vKey, dsKey, done);
-    });
-
-    it('should find the version', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.getDsKeyByVersion('Aaaa', function(err, dsKey) {
-        if (err) { throw err; }
-        should.strictEqual(dsKey.toString('hex'), t._composeDsKey(item.h.id, item.h.i).toString('hex'));
-        done();
-      });
-    });
-
-    it('should return null if version is not found', function(done) {
-      var t = new Tree(db, name, { vSize: 2, log: silence });
-      t.getDsKeyByVersion(8, function(err, dsKey) {
-        if (err) { throw err; }
-        should.strictEqual(dsKey, null);
-        done();
-      });
-    });
-  });
-
   describe('getByVersion', function() {
     var name = 'getByVersion';
 
@@ -1866,6 +1819,96 @@ describe('Tree', function() {
       t.lastByPerspective('lbp2', 'base64', function(err, v) {
         if (err) { throw err; }
         should.equal(v, 'Cccc');
+        done();
+      });
+    });
+  });
+
+  describe('_getDsKeyByVersion', function() {
+    var name = '_getDsKeyByVersion';
+
+    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+
+    it('should require version to be a number or a base64 string', function() {
+      var t = new Tree(db, name, { log: silence });
+      (function() { t._getDsKeyByVersion({}); }).should.throw('version must be a number or a base64 string');
+    });
+
+    it('should return with null if the index is empty', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._getDsKeyByVersion('Aaaa', function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey, null);
+        done();
+      });
+    });
+
+    it('needs an entry in vkey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var vKey = t._composeVKey(item.h.v);
+      var dsKey = t._composeDsKey(item.h.id, item.h.i);
+
+      t._db.put(vKey, dsKey, done);
+    });
+
+    it('should find the version', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._getDsKeyByVersion('Aaaa', function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey.toString('hex'), t._composeDsKey(item.h.id, item.h.i).toString('hex'));
+        done();
+      });
+    });
+
+    it('should return null if version is not found', function(done) {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      t._getDsKeyByVersion(8, function(err, dsKey) {
+        if (err) { throw err; }
+        should.strictEqual(dsKey, null);
+        done();
+      });
+    });
+  });
+
+  describe('_resolveVtoI', function() {
+    var name = '_resolveVtoI';
+
+    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+
+    it('should require version to be a number or a base64 string', function() {
+      var t = new Tree(db, name, { log: silence });
+      (function() { t._resolveVtoI({}); }).should.throw('version must be a number or a base64 string');
+    });
+
+    it('should return with null if the index is empty', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._resolveVtoI('Aaaa', function(err, i) {
+        if (err) { throw err; }
+        should.strictEqual(i, null);
+        done();
+      });
+    });
+
+    it('needs an entry in vkey index', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item, done);
+    });
+
+    it('should find the version', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._resolveVtoI('Aaaa', function(err, i) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should return null if version is not found', function(done) {
+      var t = new Tree(db, name, { vSize: 2, log: silence });
+      t._resolveVtoI(8, function(err, i) {
+        if (err) { throw err; }
+        should.strictEqual(i, null);
         done();
       });
     });
