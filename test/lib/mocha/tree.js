@@ -1315,7 +1315,7 @@ describe('Tree', function() {
       });
     });
 
-    it('should stop iterating if next is called with false or an error', function(done) {
+    it('should stop iterating if next is called with false', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var i = 0;
       t.getHeads(function(item, next) {
@@ -1323,7 +1323,23 @@ describe('Tree', function() {
         if (i === 1) { should.deepEqual(item, item3); }
         if (i > 1) { should.deepEqual(item, item4); }
         next(null, false);
-      }, function() {
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should stop iterating if next is called with an error and propagate this error', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      t.getHeads(function(item, next) {
+        i++;
+        if (i === 1) { should.deepEqual(item, item3); }
+        if (i > 1) { should.deepEqual(item, item4); }
+        next(new Error('stop it'));
+      }, function(err) {
+        should.strictEqual(err.message, 'stop it');
         should.strictEqual(i, 1);
         done();
       });
