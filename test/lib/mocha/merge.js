@@ -65,7 +65,7 @@ after(function(done) {
 describe('merge', function() {
   var id = 'foo';
 
-  describe('one perspective', function() {
+  describe('one perspective (tree)', function() {
     var name = 'onePerspective';
     var tree;
 
@@ -167,7 +167,7 @@ describe('merge', function() {
       (function() { merge({}, {}, {}, {}, [], function() {}); }).should.throw('opts must be an object');
     });
 
-    it('A and A = ff to A', function(done) {
+    it('A and A = original A', function(done) {
       merge(A, A, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
         should.deepEqual(mergeX, {
@@ -191,124 +191,166 @@ describe('merge', function() {
     });
 
     it('B and C = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(B, C, function(err, merged) {
+      merge(B, C, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
-        }]);
-        should.strictEqual(merged[0]._id === B._id, false);
-        should.strictEqual(merged[0]._m3 === B._m3, false);
-        should.strictEqual(merged[0]._id === C._id, false);
-        should.strictEqual(merged[0]._m3 === C._m3, false);
+        should.deepEqual(mergeX, {
+          h: { id: id, pa: ['Bbbb', 'Cccc'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, pa: ['Bbbb', 'Cccc'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
         done();
       });
     });
 
     it('E and B = ff to E', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(E, B, function(err, merged) {
+      merge(E, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Cccc', 'Bbbb'] },
-          _m3: { _ack: true },
-          foo: 'bar',
-          bar: 'foobar',
-          qux: 'qux'
-        }]);
-        should.strictEqual(merged[0]._id === B._id, false);
-        should.strictEqual(merged[0]._m3 === B._m3, false);
-        should.strictEqual(merged[0]._id === E._id, true);
-        should.strictEqual(merged[0]._m3 === E._m3, true);
+        should.deepEqual(mergeX, {
+          h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'], i: 5 },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'qux'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'qux'
+          }
+        });
         done();
       });
     });
 
     it('D and E = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(D, E, function(err, merged) {
+      merge(D, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['Dddd', 'Eeee'], _lo: true },
-          foo: 'bar',
-          bar: 'foobar',
-          qux: 'quz'
-        }]);
+        should.deepEqual(mergeX, {
+          h: { id: id, pa: ['Dddd', 'Eeee'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, pa: ['Dddd', 'Eeee'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
         done();
       });
     });
 
     it('E and D = merge', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(E, D, function(err, merged) {
+      merge(E, D, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
-          foo: 'bar',
-          bar: 'foobar',
-          qux: 'quz'
-        }]);
-        should.strictEqual(merged[0]._id === D._id, false);
-        should.strictEqual(merged[0]._m3 === D._m3, false);
-        should.strictEqual(merged[0]._id === E._id, false);
-        should.strictEqual(merged[0]._m3 === E._m3, false);
+        should.deepEqual(mergeX, {
+          h: { id: id, pa: ['Eeee', 'Dddd'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, pa: ['Eeee', 'Dddd'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
         done();
       });
     });
 
     it('E and F = ff to F', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(E, F, function(err, merged) {
+      merge(E, F, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
-          _m3: { _ack: true },
-          foo: 'bar',
-          bar: 'foobar',
-          qux: 'quz'
-        }]);
-        should.strictEqual(merged[0]._id === F._id, true);
-        should.strictEqual(merged[0]._m3 === F._m3, true);
-        should.strictEqual(merged[0]._id === E._id, false);
-        should.strictEqual(merged[0]._m3 === E._m3, false);
+        should.deepEqual(mergeX, {
+          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
         done();
       });
     });
 
     it('F and E = ff to F', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(F, E, function(err, merged) {
+      merge(F, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
-          _m3: { _ack: true },
-          foo: 'bar',
-          bar: 'foobar',
-          qux: 'quz'
-        }]);
+        should.deepEqual(mergeX, {
+          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
+          b: {
+            foo: 'bar',
+            bar: 'foobar',
+            qux: 'quz'
+          }
+        });
         done();
       });
     });
 
-    it('virtual merge vm1 and vm2 = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      var vm1 = { // add c: 'foo'
-        h: { id: idFoo, pe: 'I', pa: ['Aaaa'] },
-        foo: 'bar',
-        v: true
-      };
-      var vm2 = { // add c: 'bar'
-        h: { id: idFoo, pe: 'I', pa: ['Aaaa'] },
-        foo: 'bar',
-        v: false
-      };
+    it('should require version on itemX', function(done) {
+      var vm = { h: { id: id, pa: ['Aaaa'] } };
 
-      vc._merge(vm1, vm2, function(err, merged) {
-        should.equal(err.message, 'merge conflict');
-        should.deepEqual(merged, ['v']);
+      merge(vm, B, tree, tree, { log: silence }, function(err) {
+        should.equal(err.message, 'itemX has no version');
+        done();
+      });
+    });
+
+    it('should require version on itemY', function(done) {
+      var vm = { h: { id: id, pa: ['Aaaa'] } };
+
+      merge(A, vm, tree, tree, { log: silence }, function(err) {
+        should.equal(err.message, 'itemY has no version');
+        done();
+      });
+    });
+
+    it('should err if version can not be found', function(done) {
+      var vm = { h: { id: id, v: 'Xxxx', pa: ['Aaaa'] } };
+
+      merge(vm, B, tree, tree, { log: silence }, function(err) {
+        should.equal(err.message, 'version not found');
         done();
       });
     });
