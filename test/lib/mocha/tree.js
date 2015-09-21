@@ -1021,22 +1021,22 @@ describe('Tree', function() {
       it('should work with a zero byte name', function() {
         var t = new Tree(db, '');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '00000301cb');
-        should.strictEqual(p.e.toString('hex'), '00000301cbff');
+        should.strictEqual(p.s.toString('hex'), '00000301cb00');
+        should.strictEqual(p.e.toString('hex'), '00000301cb00ff');
       });
 
       it('should work with a single byte name', function() {
         var t = new Tree(db, 'a');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '0161000301cb');
-        should.strictEqual(p.e.toString('hex'), '0161000301cbff');
+        should.strictEqual(p.s.toString('hex'), '0161000301cb00');
+        should.strictEqual(p.e.toString('hex'), '0161000301cb00ff');
       });
 
       it('should work with a multi byte name', function() {
         var t = new Tree(db, 'abc');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '03616263000301cb');
-        should.strictEqual(p.e.toString('hex'), '03616263000301cbff');
+        should.strictEqual(p.s.toString('hex'), '03616263000301cb00');
+        should.strictEqual(p.e.toString('hex'), '03616263000301cb00ff');
       });
     });
   });
