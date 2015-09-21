@@ -27,7 +27,7 @@ subkey  ::=
           |  "\x02" ival            ikey, i index key
           |  "\x03" id version      headkey, head index key
           |  "\x04" version         vkey, version index key
-          |  "\x05" string          ukey, user store key
+          |  "\x05" string          uskey, user store key
 ival    ::=  lbeint                 i value, monotonically increasing number
 id      ::=  string                 used to identify data store values
 pe      ::=  string                 name of a perspective
@@ -38,8 +38,8 @@ lbeint  ::=  byte (byte*)           Large int - The byte is the number of bytes
                                     unsigned integer in big endian format.
 string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
                                     (byte*) + 1 (for the trailing '\x00'). The
-                                    (byte*) is zero or more UTF-8 encoded
-                                    characters. Can be at most 254 bytes.
+                                    (byte*) is zero or more ASCII encoded
+                                    characters and must not contain '\x00' byte.
 opts    ::=  byte                   option bits, single byte:
                                       0x01 = conflict, when a merge with this
                                       item failed
