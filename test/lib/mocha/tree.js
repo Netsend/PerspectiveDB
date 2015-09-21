@@ -2169,11 +2169,10 @@ describe('Tree', function() {
       (function() { t._resolveVtoI({}); }).should.throw('version must be a number or a base64 string');
     });
 
-    it('should return with null if the index is empty', function(done) {
+    it('should error if the index is empty', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._resolveVtoI('Aaaa', function(err, i) {
-        if (err) { throw err; }
-        should.strictEqual(i, null);
+      t._resolveVtoI('Aaaa', function(err) {
+        should.strictEqual(err.message, 'version not found');
         done();
       });
     });
@@ -2192,11 +2191,10 @@ describe('Tree', function() {
       });
     });
 
-    it('should return null if version is not found', function(done) {
+    it('should error if version is not found', function(done) {
       var t = new Tree(db, name, { vSize: 2, log: silence });
-      t._resolveVtoI(8, function(err, i) {
-        if (err) { throw err; }
-        should.strictEqual(i, null);
+      t._resolveVtoI(8, function(err) {
+        should.strictEqual(err.message, 'version not found');
         done();
       });
     });
