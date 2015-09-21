@@ -1433,6 +1433,15 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.getByVersion('Aaaa', function(err, found) {
         if (err) { throw err; }
+        should.deepEqual(found, item);
+        done();
+      });
+    });
+
+    it('should return the raw version', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.getByVersion('Aaaa', { raw: true }, function(err, found) {
+        if (err) { throw err; }
         should.deepEqual(BSON.deserialize(found), item);
         done();
       });
