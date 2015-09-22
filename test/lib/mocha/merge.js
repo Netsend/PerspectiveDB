@@ -358,7 +358,7 @@ describe('merge', function() {
     });
 
     describe('delete one', function() {
-      var name = 'deleteOne';
+      var name = 'onePerspectiveDeleteOne';
       var tree;
 
       // create the following structure:
@@ -456,7 +456,7 @@ describe('merge', function() {
     });
 
     describe('delete two', function() {
-      var name = 'deleteTwo';
+      var name = 'onePerspectiveDeleteTwo';
       var tree;
 
       // create the following structure:
@@ -554,156 +554,201 @@ describe('merge', function() {
     });
   });
 
-  /*
   describe('two perspectives delete one', function() {
-    var collectionName = '_mergeTwoPerspectiveDeleteOne';
+    describe('delete one', function() {
+      var nameI  = 'twoPerspectiveDeleteOneI';
+      var nameII = 'twoPerspectiveDeleteOneII';
+      var treeI;
+      var treeII;
 
-    var AI = {
-      h: { id: id, v: 'Aaaa', pa: [] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'quux',
-      some: true
-    };
+      // create the following structure:
+      //    Cd
+      //   /
+      //  A
+      //   \
+      //    B
+      // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
-    var BI = {
-      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'qux',
-      some: true
-    };
-
-    var CId = {
-      h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true },
-      foo: 'bar',
-      bar: 'raboof',
-      qux: 'quux',
-      some: true
-    };
-
-    var AII = {
-      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'quux'
-    };
-
-    var BII = {
-      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'qux'
-    };
-
-    var CIId = {
-      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'], d: true },
-      foo: 'bar',
-      bar: 'raboof',
-      qux: 'quux'
-    };
-
-    // create the following structure:
-    //    Cd
-    //   /
-    //  A
-    //   \
-    //    B
-    // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
-
-    it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._snapshotCollection.insert([AI, BI, AII, BII, CId, CIId], {w: 1}, done);
-    });
-
-    it('BI and CII = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(BI, CIId, function(err, merged) {
-        if (err) { throw err; }
-        should.strictEqual(merged.length, 2);
-        should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pa: ['Bbbb', 'Cccc'], _lo: true },
+      var AI = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
           foo: 'bar',
-          bar: 'raboof',
+          bar: 'baz',
+          qux: 'quux',
+          some: true
+        }
+      };
+
+      var BI = {
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
           qux: 'qux',
           some: true
-        });
-        should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+        }
+      };
+
+      var CId = {
+        h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true },
+        b: {
           foo: 'bar',
           bar: 'raboof',
+          qux: 'quux',
+          some: true
+        }
+      };
+
+      var AII = {
+        h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'quux'
+        }
+      };
+
+      var BII = {
+        h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
           qux: 'qux'
+        }
+      };
+
+      var CIId = {
+        h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'], d: true },
+        b: {
+          foo: 'bar',
+          bar: 'raboof',
+          qux: 'quux'
+        }
+      };
+
+      it('save DAG', function(done) {
+        var DAGI = [AI, BI, CId];
+        var DAGII = [AII, BII, CIId];
+
+        treeI = new Tree(db, nameI, { vSize: 3, log: silence });
+
+        async.eachSeries(DAGI, function(item, cb) {
+          treeI.write(item, cb);
+        }, function(err) {
+          if (err) { throw err; }
+          treeI.end(null, function(err) {
+            if (err) { throw err; }
+
+            treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+
+            async.eachSeries(DAGII, function(item, cb) {
+              treeII.write(item, cb);
+            }, function(err) {
+              if (err) { throw err; }
+              treeII.end(null, done);
+            });
+          });
         });
-        done();
       });
-    });
 
-    it('BII and CI = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(BII, CId, function(err, merged) {
-        if (err) { throw err; }
-        should.strictEqual(merged.length, 2);
-        should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
+      it('BI and CII = merge, no delete', function(done) {
+        merge(BI, CIId, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux',
+              some: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          done();
         });
-        should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pa: ['Bbbb', 'Cccc'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux',
-          some: true
-        });
-        done();
       });
-    });
 
-    it('CI and BII = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(CId, BII, function(err, merged) {
-        if (err) { throw err; }
-        should.strictEqual(merged.length, 2);
-        should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pa: ['Cccc', 'Bbbb'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux',
-          some: true
+      it('BII and CI = merge, no delete', function(done) {
+        merge(BII, CId, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux',
+              some: true
+            }
+          });
+          done();
         });
-        should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
-        });
-        done();
       });
-    });
 
-    it('CII and BI = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(CIId, BI, function(err, merged) {
-        if (err) { throw err; }
-        should.strictEqual(merged.length, 2);
-        should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
+      it('CI and BII = merge, no delete', function(done) {
+        merge(CId, BII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Cccc', 'Bbbb'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux',
+              some: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Cccc', 'Bbbb'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          done();
         });
-        should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pa: ['Cccc', 'Bbbb'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux',
-          some: true
+      });
+
+      it('CII and BI = merge, no delete', function(done) {
+        merge(CIId, BI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Cccc', 'Bbbb'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Cccc', 'Bbbb'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux',
+              some: true
+            }
+          });
+          done();
         });
-        done();
       });
     });
   });
+  /*
 
   describe('two perspectives delete two', function() {
     var collectionName = '_mergeTwoPerspectiveDeleteTwo';
