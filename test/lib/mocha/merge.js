@@ -358,30 +358,9 @@ describe('merge', function() {
     });
   });
 
-  /*
   describe('one perspective delete one', function() {
-    var collectionName = '_mergeOnePerspectiveDeleteOne';
-
-    var A = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'quux'
-    };
-
-    var B = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
-      foo: 'bar',
-      bar: 'baz',
-      qux: 'qux'
-    };
-
-    var Cd = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'], _d: true },
-      foo: 'bar',
-      bar: 'raboof',
-      qux: 'quux'
-    };
+    var name = 'onePerspectiveDeleteOne';
+    var tree;
 
     // create the following structure:
     //    Cd
@@ -391,35 +370,87 @@ describe('merge', function() {
     //    B
     // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
-    it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._snapshotCollection.insert([A, B, Cd], {w: 1}, done);
+    var A = {
+      h: { id: id, v: 'Aaaa', pa: [] },
+      b: {
+        foo: 'bar',
+        bar: 'baz',
+        qux: 'quux'
+      }
+    };
+
+    var B = {
+      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+      b: {
+        foo: 'bar',
+        bar: 'baz',
+        qux: 'qux'
+      }
+    };
+
+    var Cd = {
+      h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true },
+      b: {
+        foo: 'bar',
+        bar: 'raboof',
+        qux: 'quux'
+      }
+    };
+
+    var DAG = [A, B, Cd];
+
+    it('save DAG', function(done) {
+      tree = new Tree(db, name, { vSize: 3, log: silence });
+      async.eachSeries(DAG, function(item, cb) {
+        tree.write(item, cb);
+      }, function(err) {
+        if (err) { throw err; }
+        tree.end(null, done);
+      });
     });
 
     it('B and C = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(B, Cd, function(err, merged) {
+      merge(B, Cd, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
-        }]);
+        should.deepEqual(mergeX, {
+          h: { id: id, pa: ['Bbbb', 'Cccc'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, pa: ['Bbbb', 'Cccc'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
         done();
       });
     });
 
     it('C and B = merge, no delete', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(Cd, B, function(err, merged) {
+      merge(Cd, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
         if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Cccc', 'Bbbb'], _lo: true },
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'qux'
-        }]);
+        should.deepEqual(mergeX, {
+          h: { id: id, pa: ['Cccc', 'Bbbb'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
+        should.deepEqual(mergeY, {
+          h: { id: id, pa: ['Cccc', 'Bbbb'] },
+          b: {
+            foo: 'bar',
+            bar: 'raboof',
+            qux: 'qux'
+          }
+        });
         done();
       });
     });
@@ -430,21 +461,21 @@ describe('merge', function() {
     var collectionName = '_mergeOnePerspectiveDeleteTwo';
 
     var A = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux'
     };
 
     var Bd = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux'
     };
 
     var Cd = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux'
@@ -468,7 +499,7 @@ describe('merge', function() {
       vc._merge(Bd, Cd, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeOnePerspectiveDeleteTwo', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, _d: true },
+          _id : { _co: '_mergeOnePerspectiveDeleteTwo', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -480,7 +511,7 @@ describe('merge', function() {
 
   describe('maintain meta', function() {
     var A = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       m: { _ack: true },
       b: {
         foo: 'bar',
@@ -490,14 +521,14 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: true },
       foo: 'bar',
       qux: 'quux'
     };
 
     var B = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -505,7 +536,7 @@ describe('merge', function() {
     };
 
     var C = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'], d: true },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'raboof',
@@ -513,7 +544,7 @@ describe('merge', function() {
     };
 
     var D = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Aaaa'], d: true },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -521,7 +552,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Aaaa'], d: true },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz'
@@ -541,7 +572,7 @@ describe('merge', function() {
 
     it('should err on id mismatch', function(done) {
       var opts = { log: silence };
-      var item1 = { h: { id: idFoo, v: 'X', pe: 'I', pa: [] }, _m3: { _ack: true } };
+      var item1 = { h: { id: id, v: 'X', pe: 'I', pa: [] }, _m3: { _ack: true } };
       var item2 = { h: { id: 'bar', v: 'Y', pe: 'I', pa: [] }, _m3: { _ack: true } };
 
       var vc = new VersionedCollection(db, collectionName, opts);
@@ -557,7 +588,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
@@ -575,7 +606,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
@@ -595,7 +626,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          _id: { _id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'], _d: true },
+          _id: { _id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'], d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -615,7 +646,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'], _d: true },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'], d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -635,7 +666,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Aaaa'], _d: true },
+          h: { id: id, v: 'Dddd', pe: 'I', pa: ['Aaaa'], d: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
@@ -655,7 +686,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          _id : { _co: 'maintainM3', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Dddd'], _lo: true },
+          _id : { _co: 'maintainM3', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Dddd'], _lo: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux'
@@ -683,7 +714,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 1);
         should.deepEqual(merged[0], {
-          _id : { _co: 'maintainM3', _id: idFoo, v: null, pe: 'I', pa: ['Cccc', 'Dddd'], _lo: true, _d: true },
+          _id : { _co: 'maintainM3', _id: id, v: null, pe: 'I', pa: ['Cccc', 'Dddd'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -701,7 +732,7 @@ describe('merge', function() {
     var collectionName = '_mergeTwoPerspectiveDeleteOne';
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux',
@@ -709,7 +740,7 @@ describe('merge', function() {
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux',
@@ -717,7 +748,7 @@ describe('merge', function() {
     };
 
     var CId = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux',
@@ -725,21 +756,21 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux'
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux'
     };
 
     var CIId = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux'
@@ -764,14 +795,14 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
           some: true
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -786,13 +817,13 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
@@ -808,14 +839,14 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Cccc', 'Bbbb'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'I', pa: ['Cccc', 'Bbbb'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
           some: true
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -830,13 +861,13 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'II', pa: ['Cccc', 'Bbbb'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: idFoo, v: null, pe: 'I', pa: ['Cccc', 'Bbbb'], _lo: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteOne', _id: id, v: null, pe: 'I', pa: ['Cccc', 'Bbbb'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
@@ -851,7 +882,7 @@ describe('merge', function() {
     var collectionName = '_mergeTwoPerspectiveDeleteTwo';
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux',
@@ -859,7 +890,7 @@ describe('merge', function() {
     };
 
     var BId = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux',
@@ -867,7 +898,7 @@ describe('merge', function() {
     };
 
     var CId = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux',
@@ -875,21 +906,21 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       foo: 'bar',
       bar: 'baz',
       qux: 'quux'
     };
 
     var BIId = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'baz',
       qux: 'qux'
     };
 
     var CIId = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'], _d: true },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'], d: true },
       foo: 'bar',
       bar: 'raboof',
       qux: 'quux'
@@ -914,14 +945,14 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, _d: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
           some: true
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true, _d: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -936,13 +967,13 @@ describe('merge', function() {
         if (err) { throw err; }
         should.strictEqual(merged.length, 2);
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true, _d: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, _d: true },
+          _id : { _co: '_mergeTwoPerspectiveDeleteTwo', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true, d: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
@@ -959,7 +990,7 @@ describe('merge', function() {
     // create DAG where all exported items are imported again
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: true },
       baz : 'qux',
       bar: 'raboof',
@@ -967,34 +998,34 @@ describe('merge', function() {
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       bar: 'raboof',
       some: 'secret'
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: true },
       bar: 'foo',
       some: 'secret'
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof'
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       bar: 'raboof'
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof',
@@ -1002,7 +1033,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
       _m3: { _ack: false },
       bar: 'raboof',
       foo: 'bar'
@@ -1033,13 +1064,13 @@ describe('merge', function() {
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           baz : 'qux',
           bar: 'raboof',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           baz : 'qux',
           bar: 'raboof'
@@ -1061,12 +1092,12 @@ describe('merge', function() {
       vc._merge(AII, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           baz : 'qux',
           bar: 'raboof'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           baz : 'qux',
           bar: 'raboof',
@@ -1089,12 +1120,12 @@ describe('merge', function() {
       vc._merge(BI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar'
         }, {
-          h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar'
@@ -1116,12 +1147,12 @@ describe('merge', function() {
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           some: 'secret',
           foo: 'bar'
         }, {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           foo: 'bar'
         }]);
@@ -1142,7 +1173,7 @@ describe('merge', function() {
       vc._merge(EI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
           _m3: { _ack: true },
           bar: 'foo',
           some: 'secret'
@@ -1160,13 +1191,13 @@ describe('merge', function() {
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged[0], {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar'
         });
         should.deepEqual(merged[1], {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
           bar: 'raboof',
           foo: 'bar'
         });
@@ -1185,11 +1216,11 @@ describe('merge', function() {
     it('virtual merge vm1 and vm2 = conflict', function(done) {
       var vc = new VersionedCollection(db, collectionName, { log: silence });
       var vm1 = { // add c: 'foo'
-        h: { id: idFoo, pe: 'I', pa: ['Aaaa'] },
+        h: { id: id, pe: 'I', pa: ['Aaaa'] },
         foo: 'bar'
       };
       var vm2 = { // add c: 'bar'
-        h: { id: idFoo, pe: 'II', pa: ['Aaaa'] },
+        h: { id: id, pe: 'II', pa: ['Aaaa'] },
         foo: 'baz'
       };
 
@@ -1216,7 +1247,7 @@ describe('merge', function() {
 
     it('should not have had any side effects on merged objects', function() {
       should.deepEqual(AI, {
-        h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+        h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
         _m3: { _ack: true },
         baz : 'qux',
         bar: 'raboof',
@@ -1224,34 +1255,34 @@ describe('merge', function() {
       });
 
       should.deepEqual(BI, {
-        h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+        h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
         _m3: { _ack: true },
         bar: 'raboof',
         some: 'secret'
       });
 
       should.deepEqual(EI, {
-        h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+        h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
         _m3: { _ack: true },
         bar: 'foo',
         some: 'secret'
       });
 
       should.deepEqual(AII, {
-        h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+        h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
         _m3: { _ack: false },
         baz : 'qux',
         bar: 'raboof'
       });
 
       should.deepEqual(BII, {
-        h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+        h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
         _m3: { _ack: false },
         bar: 'raboof'
       });
 
       should.deepEqual(CII, {
-        h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+        h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
         _m3: { _ack: false },
         baz : 'qux',
         bar: 'raboof',
@@ -1259,7 +1290,7 @@ describe('merge', function() {
       });
 
       should.deepEqual(DII, {
-        h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+        h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
         _m3: { _ack: false },
         bar: 'raboof',
         foo: 'bar'
@@ -1273,7 +1304,7 @@ describe('merge', function() {
     // create DAG with recreated merge CI
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -1282,14 +1313,14 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       bar: 'baz',
       qux: 'quux'
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -1298,21 +1329,21 @@ describe('merge', function() {
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       bar: 'baz',
       qux: 'qux'
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       bar: 'raboof',
       qux: 'quux'
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1335,7 +1366,7 @@ describe('merge', function() {
       vc._merge(AI, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -1351,7 +1382,7 @@ describe('merge', function() {
       vc._merge(AI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -1367,7 +1398,7 @@ describe('merge', function() {
       vc._merge(BI, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -1383,7 +1414,7 @@ describe('merge', function() {
       vc._merge(AII, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
@@ -1397,7 +1428,7 @@ describe('merge', function() {
       vc._merge(AII, BII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
           _m3: { _ack: false },
           bar: 'baz',
           qux: 'qux'
@@ -1411,7 +1442,7 @@ describe('merge', function() {
       vc._merge(BII, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
           _m3: { _ack: false },
           bar: 'baz',
           qux: 'qux'
@@ -1425,14 +1456,14 @@ describe('merge', function() {
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
@@ -1446,12 +1477,12 @@ describe('merge', function() {
       vc._merge(AII, AI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           bar: 'baz',
           qux: 'quux'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -1467,11 +1498,11 @@ describe('merge', function() {
       vc._merge(AII, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
           bar: 'baz',
           qux: 'qux'
         }, {
-          h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -1487,14 +1518,14 @@ describe('merge', function() {
       vc._merge(BI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'qux',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+          h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
           bar: 'baz',
           qux: 'qux'
         }]);
@@ -1507,13 +1538,13 @@ describe('merge', function() {
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
@@ -1527,12 +1558,12 @@ describe('merge', function() {
       vc._merge(CII, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
         }, {
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
           foo: 'bar',
           bar: 'raboof',
           qux: 'quux',
@@ -1547,7 +1578,7 @@ describe('merge', function() {
       vc._merge(BII, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
@@ -1561,7 +1592,7 @@ describe('merge', function() {
       vc._merge(CII, BII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           qux: 'quux'
@@ -1575,7 +1606,7 @@ describe('merge', function() {
       vc._merge(BI, CI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
@@ -1591,7 +1622,7 @@ describe('merge', function() {
       vc._merge(CI, BI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
@@ -1609,7 +1640,7 @@ describe('merge', function() {
     // create DAG with imported criss-cross merge
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -1618,7 +1649,7 @@ describe('merge', function() {
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -1627,7 +1658,7 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'baz',
@@ -1635,7 +1666,7 @@ describe('merge', function() {
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'baz',
@@ -1643,7 +1674,7 @@ describe('merge', function() {
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1652,7 +1683,7 @@ describe('merge', function() {
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1660,7 +1691,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Bbbb', 'Cccc'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Bbbb', 'Cccc'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1668,7 +1699,7 @@ describe('merge', function() {
     };
 
     var DI = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Bbbb', 'Cccc'] },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Bbbb', 'Cccc'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1677,7 +1708,7 @@ describe('merge', function() {
     };
 
     var EII = {
-      h: { id: idFoo, v: 'Eeee', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'II', pa: ['Cccc', 'Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'foobar',
@@ -1685,7 +1716,7 @@ describe('merge', function() {
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Cccc', 'Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Cccc', 'Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'foobar',
@@ -1694,7 +1725,7 @@ describe('merge', function() {
     };
 
     var FII = {
-      h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'foobar',
@@ -1702,7 +1733,7 @@ describe('merge', function() {
     };
 
     var FI = {
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'foobar',
@@ -1729,14 +1760,14 @@ describe('merge', function() {
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'baz',
@@ -1751,13 +1782,13 @@ describe('merge', function() {
       vc._merge(BI, CII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'I', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux',
           some: 'secret'
         }, {
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
           foo: 'bar',
           bar: 'raboof',
           qux: 'qux'
@@ -1771,13 +1802,13 @@ describe('merge', function() {
       vc._merge(DI, EII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'I', pa: ['Dddd', 'Eeee'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'I', pa: ['Dddd', 'Eeee'], _lo: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
           some: 'secret'
         }, {
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'II', pa: ['Dddd', 'Eeee'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'II', pa: ['Dddd', 'Eeee'], _lo: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
@@ -1791,12 +1822,12 @@ describe('merge', function() {
       vc._merge(EII, DI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
         }, {
-          _id : { _co: '_mergeDifferentPerspectives3', _id: idFoo, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives3', _id: id, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
@@ -1811,13 +1842,13 @@ describe('merge', function() {
       vc._merge(EI, FII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'foobar',
@@ -1832,13 +1863,13 @@ describe('merge', function() {
       vc._merge(FII, EI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'II', pa: ['Dddd', 'Eeee'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz'
         }, {
-          h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'I', pa: ['Dddd', 'Eeee'] },
           foo: 'bar',
           bar: 'foobar',
           qux: 'quz',
@@ -1882,7 +1913,7 @@ describe('merge', function() {
     // create DAG with a merge with n-parents
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: true },
       foo: 'bar',
       bar: 'baz',
@@ -1890,7 +1921,7 @@ describe('merge', function() {
     };
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'baz',
@@ -1899,7 +1930,7 @@ describe('merge', function() {
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'baz',
@@ -1907,7 +1938,7 @@ describe('merge', function() {
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1916,7 +1947,7 @@ describe('merge', function() {
     };
 
     var DI = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1925,7 +1956,7 @@ describe('merge', function() {
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1934,7 +1965,7 @@ describe('merge', function() {
     };
 
     var FI = {
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       foo: 'bar',
       bar: 'raboof',
@@ -1962,14 +1993,14 @@ describe('merge', function() {
       vc._merge(AII, FI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
           foo: 'bar',
           bar: 'raboof',
           c: true,
           d: true,
           e: true
         }, {
-          h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+          h: { id: id, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
@@ -1987,12 +2018,12 @@ describe('merge', function() {
       vc._merge(AII, CI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
           foo: 'bar',
           bar: 'raboof',
           c: true
         }, {
-          h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+          h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'raboof',
@@ -2008,14 +2039,14 @@ describe('merge', function() {
       vc._merge(AI, AII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
           _m3: { _ack: false },
           foo: 'bar',
           bar: 'baz',
           qux: 'quux',
           some: 'secret'
         }, {
-          h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
           _m3: { _ack: true },
           foo: 'bar',
           bar: 'baz',
@@ -2032,14 +2063,14 @@ describe('merge', function() {
     // create DAG with imported criss-cross merge with three parents
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: false },
       a: true,
       some: 'secret'
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2047,7 +2078,7 @@ describe('merge', function() {
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2056,7 +2087,7 @@ describe('merge', function() {
     };
 
     var DI = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2065,7 +2096,7 @@ describe('merge', function() {
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2074,7 +2105,7 @@ describe('merge', function() {
     };
 
     var FI = { // change e
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2086,7 +2117,7 @@ describe('merge', function() {
     };
 
     var GI = { // delete d
-      h: { id: idFoo, v: 'G', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2097,7 +2128,7 @@ describe('merge', function() {
     };
 
     var FIc = { // delete e, change d, conflict with Gc
-      h: { id: idFoo, v: 'Fc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Fc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2108,7 +2139,7 @@ describe('merge', function() {
     };
 
     var GIc = { // delete d, change e, conflict with Fc
-      h: { id: idFoo, v: 'Gc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Gc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2119,7 +2150,7 @@ describe('merge', function() {
     };
 
     var HI = {
-      h: { id: idFoo, v: 'H', pe: 'I', pa: ['Ffff', 'G' ] },
+      h: { id: id, v: 'H', pe: 'I', pa: ['Ffff', 'G' ] },
       _m3: { _ack: false },
       b: {
         a: true,
@@ -2135,20 +2166,20 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: true },
       a: true,
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       a: true,
       b: true,
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2156,7 +2187,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2164,7 +2195,7 @@ describe('merge', function() {
     };
 
     var EII = {
-      h: { id: idFoo, v: 'Eeee', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2172,7 +2203,7 @@ describe('merge', function() {
     };
 
     var FII = { // change e
-      h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2183,7 +2214,7 @@ describe('merge', function() {
     };
 
     var GII = { // delete d
-      h: { id: idFoo, v: 'G', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2228,7 +2259,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.equal(merged.length, 1);
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives5', _id: id, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
           a: true,
           b: true,
           c: true,
@@ -2247,7 +2278,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.equal(merged.length, 2);
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives5', _id: id, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
           a: true,
           b: true,
           c: true,
@@ -2255,7 +2286,7 @@ describe('merge', function() {
           f: true,
           g: true,
         }, {
-          _id : { _co: '_mergeDifferentPerspectives5', _id: idFoo, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
+          _id : { _co: '_mergeDifferentPerspectives5', _id: id, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
           a: true,
           b: true,
           c: true,
@@ -2273,7 +2304,7 @@ describe('merge', function() {
       vc._merge(AII, HI, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'H', pe: 'II', pa: ['Ffff', 'G'] },
+          h: { id: id, v: 'H', pe: 'II', pa: ['Ffff', 'G'] },
           a: true,
           b: true,
           c: true,
@@ -2283,7 +2314,7 @@ describe('merge', function() {
           g: true,
           h: true
         }, {
-          h: { id: idFoo, v: 'H', pe: 'I', pa: ['Ffff', 'G'] },
+          h: { id: id, v: 'H', pe: 'I', pa: ['Ffff', 'G'] },
           _m3: { _ack: false },
           a: true,
           b: true,
@@ -2333,7 +2364,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: id, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: true,
@@ -2341,7 +2372,7 @@ describe('merge', function() {
             f: true,
             g: true,
           }, {
-            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: id, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: true,
@@ -2360,7 +2391,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: true,
@@ -2369,7 +2400,7 @@ describe('merge', function() {
             g: true,
             some: 'secret'
           }, {
-            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: idFoo, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeDifferentPerspectives5RecursiveLcaOrder', _id: id, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: true,
@@ -2387,14 +2418,14 @@ describe('merge', function() {
     // create 2 DAGs with a double criss-cross merge with three parents
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: false },
       a: true,
       some: 'secret'
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2402,7 +2433,7 @@ describe('merge', function() {
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2411,7 +2442,7 @@ describe('merge', function() {
     };
 
     var DI = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2420,7 +2451,7 @@ describe('merge', function() {
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2429,7 +2460,7 @@ describe('merge', function() {
     };
 
     var FI = { // change c
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2441,7 +2472,7 @@ describe('merge', function() {
     };
 
     var GI = { // change d, delete b
-      h: { id: idFoo, v: 'G', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       c: true,
@@ -2452,7 +2483,7 @@ describe('merge', function() {
     };
 
     var HI = { // delete e, delete a
-      h: { id: idFoo, v: 'H', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'H', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       b: true,
       c: true,
@@ -2462,7 +2493,7 @@ describe('merge', function() {
     };
 
     var II = { // add e again, change d, change h
-      h: { id: idFoo, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'baz',
@@ -2475,7 +2506,7 @@ describe('merge', function() {
     };
 
     var JI = { // change f, change g
-      h: { id: idFoo, v: 'J', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'J', pe: 'I', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'bar',
@@ -2487,7 +2518,7 @@ describe('merge', function() {
     };
 
     var FIc = { // delete e, change d, conflict with GIc
-      h: { id: idFoo, v: 'Fc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Fc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2498,7 +2529,7 @@ describe('merge', function() {
     };
 
     var GIc = { // delete d, change e, conflict with FIc
-      h: { id: idFoo, v: 'Gc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Gc', pe: 'I', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2509,7 +2540,7 @@ describe('merge', function() {
     };
 
     var IIc = { // conflict with JIc: change f
-      h: { id: idFoo, v: 'Ic', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'Ic', pe: 'I', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'bar',
@@ -2522,7 +2553,7 @@ describe('merge', function() {
     };
 
     var JIc = { // conflict with IIc: change f, change h
-      h: { id: idFoo, v: 'Jc', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'Jc', pe: 'I', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'bar',
@@ -2534,20 +2565,20 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       a: true,
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       a: true,
       b: true,
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2555,7 +2586,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2563,7 +2594,7 @@ describe('merge', function() {
     };
 
     var EII = {
-      h: { id: idFoo, v: 'Eeee', pe: 'II', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'II', pa: ['Bbbb'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2571,7 +2602,7 @@ describe('merge', function() {
     };
 
     var FII = { // change c
-      h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       b: true,
@@ -2582,7 +2613,7 @@ describe('merge', function() {
     };
 
     var GII = { // change d, delete b
-      h: { id: idFoo, v: 'G', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       a: true,
       c: true,
@@ -2592,7 +2623,7 @@ describe('merge', function() {
     };
 
     var HII = { // delete e, delete a
-      h: { id: idFoo, v: 'H', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'H', pe: 'II', pa: ['Cccc', 'Dddd', 'Eeee'] },
       _m3: { _ack: false },
       b: true,
       c: true,
@@ -2601,7 +2632,7 @@ describe('merge', function() {
     };
 
     var III = { // add e again, change d, change h
-      h: { id: idFoo, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'baz',
@@ -2613,7 +2644,7 @@ describe('merge', function() {
     };
 
     var JII = { // change f, change g
-      h: { id: idFoo, v: 'J', pe: 'II', pa: ['Ffff', 'G', 'H'] },
+      h: { id: id, v: 'J', pe: 'II', pa: ['Ffff', 'G', 'H'] },
       _m3: { _ack: false },
       c: 'foo',
       d: 'bar',
@@ -2666,7 +2697,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 1);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2685,7 +2716,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 1);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['I', 'J'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesOnePerspective', _id: id, v: null, pe: 'I', pa: ['I', 'J'], _lo: true },
             c: 'foo',
             d: 'baz',
             e: 'II',
@@ -2725,7 +2756,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2733,7 +2764,7 @@ describe('merge', function() {
             f: true,
             g: true,
           }, {
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             c: 'foo',
             d: 'bar',
@@ -2752,7 +2783,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            h: { id: idFoo, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+            h: { id: id, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2762,7 +2793,7 @@ describe('merge', function() {
             i: true,
             some: 'secret'
           }, {
-            h: { id: idFoo, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
+            h: { id: id, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
             _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
@@ -2782,7 +2813,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            h: { id: idFoo, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
+            h: { id: id, v: 'I', pe: 'I', pa: ['Ffff', 'G', 'H'] },
             _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
@@ -2793,7 +2824,7 @@ describe('merge', function() {
             i: true,
             some: 'secret'
           }, {
-            h: { id: idFoo, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
+            h: { id: id, v: 'I', pe: 'II', pa: ['Ffff', 'G', 'H'] },
             _m3: { _ack: false },
             c: 'foo',
             d: 'baz',
@@ -2823,7 +2854,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['J', 'I'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['J', 'I'], _lo: true },
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2834,7 +2865,7 @@ describe('merge', function() {
             i: true,
             some: 'secret'
           }, {
-            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['J', 'I'], _lo: true },
+            _id : { _co: '_mergeDoubleCrissCrossThreeMergesTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['J', 'I'], _lo: true },
             c: 'foo',
             d: 'baz',
             e: 'III',
@@ -2856,7 +2887,7 @@ describe('merge', function() {
     // create DAG where all exported items are imported again
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: true },
       baz : 'qux',
       bar: 'raboof',
@@ -2864,34 +2895,34 @@ describe('merge', function() {
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       bar: 'raboof',
       some: 'secret'
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: true },
       bar: 'foo',
       some: 'secret'
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof'
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       bar: 'raboof'
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof',
@@ -2899,7 +2930,7 @@ describe('merge', function() {
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
       _m3: { _ack: false },
       bar: 'raboof',
       foo: 'bar',
@@ -2922,13 +2953,13 @@ describe('merge', function() {
       vc._merge(BI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar',
           d: true
         }, {
-          h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar',
@@ -2943,13 +2974,13 @@ describe('merge', function() {
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeMergeWithPatches', _id: idFoo, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithPatches', _id: id, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
           d: true
         }, {
-          _id : { _co: '_mergeMergeWithPatches', _id: idFoo, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithPatches', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           foo: 'bar',
           d: true
@@ -2965,7 +2996,7 @@ describe('merge', function() {
     // create DAG where all exported items are imported again
 
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       _m3: { _ack: true },
       baz : 'qux',
       bar: 'raboof',
@@ -2973,7 +3004,7 @@ describe('merge', function() {
     };
 
     var BI = { // add c: 'foo'
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       _m3: { _ack: true },
       bar: 'raboof',
       c: 'foo',
@@ -2981,7 +3012,7 @@ describe('merge', function() {
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Bbbb'] },
       _m3: { _ack: true },
       bar: 'foo',
       c: 'foo',
@@ -2990,7 +3021,7 @@ describe('merge', function() {
     };
 
     var FI = {
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Eeee'] },
       _m3: { _ack: true },
       bar: 'foo',
       c: 'baz',
@@ -3000,7 +3031,7 @@ describe('merge', function() {
     };
 
     var GI = { // conflict with DII
-      h: { id: idFoo, v: 'G', pe: 'I', pa: ['Ffff'] },
+      h: { id: id, v: 'G', pe: 'I', pa: ['Ffff'] },
       _m3: { _ack: true },
       bar: 'foo',
       c: 'raboof',
@@ -3011,21 +3042,21 @@ describe('merge', function() {
     };
 
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof'
     };
 
     var BII = { // add c: 'foo'
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       bar: 'raboof',
       c: 'foo'
     };
 
     var CII = { // add c: 'bar'
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
       _m3: { _ack: false },
       baz : 'qux',
       bar: 'raboof',
@@ -3034,7 +3065,7 @@ describe('merge', function() {
     };
 
     var DII = { // resolve conflict: c: 'baz'
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
       _m3: { _ack: false },
       bar: 'raboof',
       foo: 'bar',
@@ -3069,7 +3100,7 @@ describe('merge', function() {
         if (err) { throw err; }
         should.equal(merged.length, 2);
         should.deepEqual(merged[0], {
-          h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'I', pa: ['Cccc', 'Bbbb'] },
           bar: 'raboof',
           some: 'secret',
           foo: 'bar',
@@ -3077,7 +3108,7 @@ describe('merge', function() {
           d: true
         });
         should.deepEqual(merged[1], {
-          h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+          h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
           _m3: { _ack: false },
           bar: 'raboof',
           foo: 'bar',
@@ -3093,7 +3124,7 @@ describe('merge', function() {
       vc._merge(EI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithResolvedConflict', _id: id, v: null, pe: 'I', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
@@ -3101,7 +3132,7 @@ describe('merge', function() {
           e: true,
           d: true
         }, {
-          _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithResolvedConflict', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
           bar: 'foo',
           foo: 'bar',
           c: 'baz',
@@ -3117,7 +3148,7 @@ describe('merge', function() {
       vc._merge(FI, DII, function(err, merged) {
         if (err) { throw err; }
         should.deepEqual(merged, [{
-          _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithResolvedConflict', _id: id, v: null, pe: 'I', pa: ['Ffff', 'Dddd'], _lo: true },
           bar: 'foo',
           some: 'secret',
           foo: 'bar',
@@ -3126,7 +3157,7 @@ describe('merge', function() {
           d: true,
           f: true
         }, {
-          _id : { _co: '_mergeMergeWithResolvedConflict', _id: idFoo, v: null, pe: 'II', pa: ['Ffff', 'Dddd'], _lo: true },
+          _id : { _co: '_mergeMergeWithResolvedConflict', _id: id, v: null, pe: 'II', pa: ['Ffff', 'Dddd'], _lo: true },
           bar: 'foo',
           foo: 'bar',
           c: 'baz',
@@ -3151,34 +3182,34 @@ describe('merge', function() {
   describe('criss-cross four parents', function() {
     ////// _pe I
     var AI = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'I', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'I', pa: [] },
       a: true,
       some: 'secret'
     };
 
     var BI = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'I', pa: ['Aaaa'] },
       a: true,
       b: true,
       some: 'secret'
     };
 
     var CI = {
-      h: { id: idFoo, v: 'Cccc', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'I', pa: ['Aaaa'] },
       a: true,
       c: true,
       some: 'secret'
     };
 
     var DI = {
-      h: { id: idFoo, v: 'Dddd', pe: 'I', pa: ['Aaaa'] },
+      h: { id: id, v: 'Dddd', pe: 'I', pa: ['Aaaa'] },
       a: true,
       d: true,
       some: 'secret'
     };
 
     var EI = {
-      h: { id: idFoo, v: 'Eeee', pe: 'I', pa: ['Aaaa', 'Cccc'] },
+      h: { id: id, v: 'Eeee', pe: 'I', pa: ['Aaaa', 'Cccc'] },
       a: true,
       c: 'foo',
       e: true,
@@ -3186,7 +3217,7 @@ describe('merge', function() {
     };
 
     var FI = {
-      h: { id: idFoo, v: 'Ffff', pe: 'I', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'I', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
       a: true,
       b: true,
       c: 'foo',
@@ -3197,7 +3228,7 @@ describe('merge', function() {
     };
 
     var GI = {
-      h: { id: idFoo, v: 'G', pe: 'I', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'I', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
       a: true,
       b: true,
       c: 'foo',
@@ -3209,37 +3240,37 @@ describe('merge', function() {
 
     ////// _pe II
     var AII = {
-      h: { id: idFoo, v: 'Aaaa', pe: 'II', pa: [] },
+      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
       a: true
     };
 
     var BII = {
-      h: { id: idFoo, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
       a: true,
       b: true
     };
 
     var CII = {
-      h: { id: idFoo, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
       a: true,
       c: true
     };
 
     var DII = {
-      h: { id: idFoo, v: 'Dddd', pe: 'II', pa: ['Aaaa'] },
+      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Aaaa'] },
       a: true,
       d: true
     };
 
     var EII = {
-      h: { id: idFoo, v: 'Eeee', pe: 'II', pa: ['Aaaa', 'Cccc'] },
+      h: { id: id, v: 'Eeee', pe: 'II', pa: ['Aaaa', 'Cccc'] },
       a: true,
       c: 'foo',
       e: true
     };
 
     var FII = {
-      h: { id: idFoo, v: 'Ffff', pe: 'II', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'Ffff', pe: 'II', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
       a: true,
       b: true,
       c: 'foo',
@@ -3249,7 +3280,7 @@ describe('merge', function() {
     };
 
     var GII = {
-      h: { id: idFoo, v: 'G', pe: 'II', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
+      h: { id: id, v: 'G', pe: 'II', pa: ['Bbbb', 'Cccc', 'Dddd', 'Eeee'] },
       a: true,
       b: true,
       c: 'foo',
@@ -3282,7 +3313,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 1);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeCrissCrossFourParentsOnePerspective', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsOnePerspective', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3311,7 +3342,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3321,7 +3352,7 @@ describe('merge', function() {
             g: true,
             some: 'secret'
           }, {
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3340,7 +3371,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3349,7 +3380,7 @@ describe('merge', function() {
             f: true,
             g: true,
           }, {
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['Ffff', 'G'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3369,7 +3400,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3379,7 +3410,7 @@ describe('merge', function() {
             g: true,
             some: 'secret'
           }, {
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3398,7 +3429,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.equal(merged.length, 2);
           should.deepEqual(merged, [{
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'II', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
@@ -3407,7 +3438,7 @@ describe('merge', function() {
             f: true,
             g: true
           }, {
-            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: idFoo, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
+            _id : { _co: '_mergeCrissCrossFourParentsTwoPerspectives', _id: id, v: null, pe: 'I', pa: ['G', 'Ffff'], _lo: true },
             a: true,
             b: true,
             c: 'foo',
