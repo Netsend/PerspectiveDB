@@ -1896,6 +1896,24 @@ describe('findLCAs', function() {
           done();
         });
       });
+
+      it('should ignore everything until rootX and rootY are encounctered', function(done) {
+        var vm1 = { v: 'x', pa: ['Cccccccc'] };
+        var vm2 = { v: 'y', pa: ['Dddddddd'] };
+        var x = streamify(dII);
+        var y = streamify(dJII);
+
+        var opts = {
+          rootX: vm1,
+          rootY: vm2,
+          log: cons
+        };
+        findLCAs(x, y, opts, function(err, lca) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['Bbbbbbbb']);
+          done();
+        });
+      });
     });
   });
 });
