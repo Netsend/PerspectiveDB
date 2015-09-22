@@ -65,6 +65,32 @@ after(function(done) {
 describe('merge', function() {
   var id = 'foo';
 
+  describe('constructor', function() {
+    it('should require itemX to be an object', function() {
+      (function() { merge(null); }).should.throw('itemX must be an object');
+    });
+
+    it('should require itemY to be an object', function() {
+      (function() { merge({}, null); }).should.throw('itemY must be an object');
+    });
+
+    it('should require treeX to be an object', function() {
+      (function() { merge({}, {}, null); }).should.throw('treeX must be an object');
+    });
+
+    it('should require treeY to be an object', function() {
+      (function() { merge({}, {}, {}, null); }).should.throw('treeY must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      (function() { merge({}, {}, {}, {}); }).should.throw('cb must be a function');
+    });
+
+    it('should require opts to be an object', function() {
+      (function() { merge({}, {}, {}, {}, [], function() {}); }).should.throw('opts must be an object');
+    });
+  });
+
   describe('one perspective (tree)', function() {
     var name = 'onePerspective';
     var tree;
@@ -141,30 +167,6 @@ describe('merge', function() {
         if (err) { throw err; }
         tree.end(null, done);
       });
-    });
-
-    it('should require itemX to be an object', function() {
-      (function() { merge(null); }).should.throw('itemX must be an object');
-    });
-
-    it('should require itemY to be an object', function() {
-      (function() { merge({}, null); }).should.throw('itemY must be an object');
-    });
-
-    it('should require treeX to be an object', function() {
-      (function() { merge({}, {}, null); }).should.throw('treeX must be an object');
-    });
-
-    it('should require treeY to be an object', function() {
-      (function() { merge({}, {}, {}, null); }).should.throw('treeY must be an object');
-    });
-
-    it('should require cb to be a function', function() {
-      (function() { merge({}, {}, {}, {}); }).should.throw('cb must be a function');
-    });
-
-    it('should require opts to be an object', function() {
-      (function() { merge({}, {}, {}, {}, [], function() {}); }).should.throw('opts must be an object');
     });
 
     it('A and A = original A', function(done) {
@@ -423,6 +425,7 @@ describe('merge', function() {
     });
   });
 
+  /*
   describe('one perspective delete two', function() {
     var collectionName = '_mergeOnePerspectiveDeleteTwo';
 
