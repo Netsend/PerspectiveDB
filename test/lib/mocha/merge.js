@@ -61,6 +61,21 @@ after(function(done) {
   });
 });
 
+function saveDAG(DAG, tree, cb) {
+  async.eachSeries(DAG, function(item, cb2) {
+    tree.write(item, cb2);
+  }, function(err) {
+    if (err) { throw err; }
+    tree.end(null, cb);
+  });
+}
+
+function saveDAGs(DAGI, DAGII, treeI, treeII, cb) {
+  saveDAG(DAGI, treeI, function(err) {
+    if (err) { throw err; }
+    saveDAG(DAGII, treeII, cb);
+  });
+}
 
 describe('merge', function() {
   var id = 'foo';
@@ -92,268 +107,264 @@ describe('merge', function() {
   });
 
   describe('one perspective (tree)', function() {
-    var name = 'onePerspective';
-    var tree;
+    describe('basic', function() {
+      var name = 'onePerspective';
+      var tree;
 
-    // create the following structure:
-    //    C <- E
-    //   / \ /  \
-    //  A   X    F
-    //   \ / \  /          
-    //    B <- D
-    // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
+      // create the following structure:
+      //    C <- E
+      //   / \ /  \
+      //  A   X    F
+      //   \ / \  /
+      //    B <- D
+      // see http://www.gelato.unsw.edu.au/archives/git/0504/2279.html
 
-    var A = {
-      h: { id: id, v: 'Aaaa', pa: [] },
-      b: {
-        foo: 'bar',
-        bar: 'baz',
-        qux: 'quux'
-      }
-    };
+      var A = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'quux'
+        }
+      };
 
-    var B = {
-      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-      b: {
-        foo: 'bar',
-        bar: 'baz',
-        qux: 'qux'
-      }
-    };
+      var B = {
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'qux'
+        }
+      };
 
-    var C = {
-      h: { id: id, v: 'Cccc', pa: ['Aaaa'] },
-      b: {
-        foo: 'bar',
-        bar: 'raboof',
-        qux: 'quux'
-      }
-    };
+      var C = {
+        h: { id: id, v: 'Cccc', pa: ['Aaaa'] },
+        b: {
+          foo: 'bar',
+          bar: 'raboof',
+          qux: 'quux'
+        }
+      };
 
-    var D = {
-      h: { id: id, v: 'Dddd', pa: ['Bbbb', 'Cccc'] },
-      b: {
-        foo: 'bar',
-        bar: 'raboof',
-        qux: 'quz'
-      }
-    };
+      var D = {
+        h: { id: id, v: 'Dddd', pa: ['Bbbb', 'Cccc'] },
+        b: {
+          foo: 'bar',
+          bar: 'raboof',
+          qux: 'quz'
+        }
+      };
 
-    var E = {
-      h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
-      b: {
-        foo: 'bar',
-        bar: 'foobar',
-        qux: 'qux'
-      }
-    };
+      var E = {
+        h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
+        b: {
+          foo: 'bar',
+          bar: 'foobar',
+          qux: 'qux'
+        }
+      };
 
-    var F = {
-      h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
-      b: {
-        foo: 'bar',
-        bar: 'foobar',
-        qux: 'quz'
-      }
-    };
+      var F = {
+        h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
+        b: {
+          foo: 'bar',
+          bar: 'foobar',
+          qux: 'quz'
+        }
+      };
 
-    var DAG = [A, B, C, D, E, F];
-
-    it('save DAG', function(done) {
-      tree = new Tree(db, name, { vSize: 3, log: silence });
-      async.eachSeries(DAG, function(item, cb) {
-        tree.write(item, cb);
-      }, function(err) {
-        if (err) { throw err; }
-        tree.end(null, done);
+      it('save DAG', function(done) {
+        var DAG = [A, B, C, D, E, F];
+        tree = new Tree(db, name, { vSize: 3, log: silence });
+        saveDAG(DAG, tree, done);
       });
-    });
 
-    it('A and A = original A', function(done) {
-      merge(A, A, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, v: 'Aaaa', pa: [], i: 1 },
-          b: {
-            foo: 'bar',
-            bar: 'baz',
-            qux: 'quux'
-          }
+      it('A and A = original A', function(done) {
+        merge(A, A, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            b: {
+              foo: 'bar',
+              bar: 'baz',
+              qux: 'quux'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            b: {
+              foo: 'bar',
+              bar: 'baz',
+              qux: 'quux'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, v: 'Aaaa', pa: [], i: 1 },
-          b: {
-            foo: 'bar',
-            bar: 'baz',
-            qux: 'quux'
-          }
-        });
-        done();
       });
-    });
 
-    it('B and C = merge', function(done) {
-      merge(B, C, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, pa: ['Bbbb', 'Cccc'] },
-          b: {
-            foo: 'bar',
-            bar: 'raboof',
-            qux: 'qux'
-          }
+      it('B and C = merge', function(done) {
+        merge(B, C, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Bbbb', 'Cccc'] },
+            b: {
+              foo: 'bar',
+              bar: 'raboof',
+              qux: 'qux'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, pa: ['Bbbb', 'Cccc'] },
-          b: {
-            foo: 'bar',
-            bar: 'raboof',
-            qux: 'qux'
-          }
-        });
-        done();
       });
-    });
 
-    it('E and B = ff to E', function(done) {
-      merge(E, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'], i: 5 },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'qux'
-          }
+      it('E and B = ff to E', function(done) {
+        merge(E, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'], i: 5 },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'qux'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'qux'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'qux'
-          }
-        });
-        done();
       });
-    });
 
-    it('D and E = merge', function(done) {
-      merge(D, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, pa: ['Dddd', 'Eeee'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      it('D and E = merge', function(done) {
+        merge(D, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Dddd', 'Eeee'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Dddd', 'Eeee'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, pa: ['Dddd', 'Eeee'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
-        });
-        done();
       });
-    });
 
-    it('E and D = merge', function(done) {
-      merge(E, D, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, pa: ['Eeee', 'Dddd'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      it('E and D = merge', function(done) {
+        merge(E, D, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Eeee', 'Dddd'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Eeee', 'Dddd'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, pa: ['Eeee', 'Dddd'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
-        });
-        done();
       });
-    });
 
-    it('E and F = ff to F', function(done) {
-      merge(E, F, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      it('E and F = ff to F', function(done) {
+        merge(E, F, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      });
+
+      it('F and E = ff to F', function(done) {
+        merge(F, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
+            b: {
+              foo: 'bar',
+              bar: 'foobar',
+              qux: 'quz'
+            }
+          });
+          done();
         });
-        done();
       });
-    });
 
-    it('F and E = ff to F', function(done) {
-      merge(F, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      it('should require version on itemX', function(done) {
+        var vm = { h: { id: id, pa: ['Aaaa'] } };
+
+        merge(vm, B, tree, tree, { log: silence }, function(err) {
+          should.equal(err.message, 'itemX has no version');
+          done();
         });
-        should.deepEqual(mergeY, {
-          h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
-          b: {
-            foo: 'bar',
-            bar: 'foobar',
-            qux: 'quz'
-          }
+      });
+
+      it('should require version on itemY', function(done) {
+        var vm = { h: { id: id, pa: ['Aaaa'] } };
+
+        merge(A, vm, tree, tree, { log: silence }, function(err) {
+          should.equal(err.message, 'itemY has no version');
+          done();
         });
-        done();
       });
-    });
 
-    it('should require version on itemX', function(done) {
-      var vm = { h: { id: id, pa: ['Aaaa'] } };
+      it('should err if version can not be found', function(done) {
+        var vm = { h: { id: id, v: 'Xxxx', pa: ['Aaaa'] } };
 
-      merge(vm, B, tree, tree, { log: silence }, function(err) {
-        should.equal(err.message, 'itemX has no version');
-        done();
-      });
-    });
-
-    it('should require version on itemY', function(done) {
-      var vm = { h: { id: id, pa: ['Aaaa'] } };
-
-      merge(A, vm, tree, tree, { log: silence }, function(err) {
-        should.equal(err.message, 'itemY has no version');
-        done();
-      });
-    });
-
-    it('should err if version can not be found', function(done) {
-      var vm = { h: { id: id, v: 'Xxxx', pa: ['Aaaa'] } };
-
-      merge(vm, B, tree, tree, { log: silence }, function(err) {
-        should.equal(err.message, 'version not found');
-        done();
+        merge(vm, B, tree, tree, { log: silence }, function(err) {
+          should.equal(err.message, 'version not found');
+          done();
+        });
       });
     });
 
@@ -396,16 +407,11 @@ describe('merge', function() {
         }
       };
 
-      var DAG = [A, B, Cd];
 
       it('save DAG', function(done) {
+        var DAG = [A, B, Cd];
         tree = new Tree(db, name, { vSize: 3, log: silence });
-        async.eachSeries(DAG, function(item, cb) {
-          tree.write(item, cb);
-        }, function(err) {
-          if (err) { throw err; }
-          tree.end(null, done);
-        });
+        saveDAG(DAG, tree, done);
       });
 
       it('B and C = merge, no delete', function(done) {
@@ -494,16 +500,11 @@ describe('merge', function() {
         }
       };
 
-      var DAG = [A, Bd, Cd];
 
       it('save DAG', function(done) {
+        var DAG = [A, Bd, Cd];
         tree = new Tree(db, name, { vSize: 3, log: silence });
-        async.eachSeries(DAG, function(item, cb) {
-          tree.write(item, cb);
-        }, function(err) {
-          if (err) { throw err; }
-          tree.end(null, done);
-        });
+        saveDAG(DAG, tree, done);
       });
 
       it('B and C = merge, delete', function(done) {
@@ -554,7 +555,332 @@ describe('merge', function() {
     });
   });
 
-  describe('two perspectives delete one', function() {
+  describe('two perspectives', function() {
+    describe('basic', function() {
+      var nameI  = 'twoPerspectiveI';
+      var nameII = 'twoPerspectiveII';
+      var treeI;
+      var treeII;
+
+      // create DAG in system I after some interaction between system I and II:
+      // I creates AI, syncs to II
+      // II creates CII
+      // I creates BI, syncs to II
+      // I creates EI
+      // II merged BI, with CII, creating DII
+
+      // DAG:
+      //                   AII <-- BII
+      //                     \       \
+      //                     CII <-- DII
+      // AI <-- BI <-- EI
+
+      var AI = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          baz : 'qux',
+          bar: 'raboof',
+          some: 'secret'
+        }
+      };
+
+      var BI = {
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+        b: {
+          bar: 'raboof',
+          some: 'secret'
+        }
+      };
+
+      var EI = {
+        h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
+        b: {
+          bar: 'foo',
+          some: 'secret'
+        }
+      };
+
+      var AII = {
+        h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
+        b: {
+          baz : 'qux',
+          bar: 'raboof'
+        }
+      };
+
+      var BII = {
+        h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+        b: {
+          bar: 'raboof'
+        }
+      };
+
+      var CII = {
+        h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+        b: {
+          baz : 'qux',
+          bar: 'raboof',
+          foo: 'bar'
+        }
+      };
+
+      var DII = {
+        h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+        b: {
+          bar: 'raboof',
+          foo: 'bar'
+        }
+      };
+
+      it('save DAG', function(done) {
+        var DAGI  = [AI, BI, EI];
+        var DAGII = [AII, CII, BII, DII];
+
+        treeI  = new Tree(db, nameI, { vSize: 3, log: silence });
+        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+
+        saveDAGs(DAGI, DAGII, treeI, treeII, done);
+      });
+
+      it('AI and AII = ff to AI, ff to AII', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(AI, AII, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged, [{
+            h: { id: id, v: 'Aaaa', pa: [] },
+            _m3: { _ack: true },
+            baz : 'qux',
+            bar: 'raboof',
+            some: 'secret'
+          }, {
+            h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
+            _m3: { _ack: false },
+            baz : 'qux',
+            bar: 'raboof'
+          }]);
+          should.strictEqual(merged[0]._id === AI._id, true);
+          should.strictEqual(merged[0]._id === AII._id, false);
+          should.strictEqual(merged[0]._m3 === AI._m3, true);
+          should.strictEqual(merged[0]._m3 === AII._m3, false);
+          should.strictEqual(merged[1]._id === AI._id, false);
+          should.strictEqual(merged[1]._id === AII._id, true);
+          should.strictEqual(merged[1]._m3 === AI._m3, false);
+          should.strictEqual(merged[1]._m3 === AII._m3, true);
+          done();
+        });
+      });
+
+      it('AII and AI = ff to AII, ff to AI', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(AII, AI, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged, [{
+            h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
+            _m3: { _ack: false },
+            baz : 'qux',
+            bar: 'raboof'
+          }, {
+            h: { id: id, v: 'Aaaa', pa: [] },
+            _m3: { _ack: true },
+            baz : 'qux',
+            bar: 'raboof',
+            some: 'secret'
+          }]);
+          should.strictEqual(merged[0]._id === AI._id, false);
+          should.strictEqual(merged[0]._id === AII._id, true);
+          should.strictEqual(merged[0]._m3 === AI._m3, false);
+          should.strictEqual(merged[0]._m3 === AII._m3, true);
+          should.strictEqual(merged[1]._id === AI._id, true);
+          should.strictEqual(merged[1]._id === AII._id, false);
+          should.strictEqual(merged[1]._m3 === AI._m3, true);
+          should.strictEqual(merged[1]._m3 === AII._m3, false);
+          done();
+        });
+      });
+
+      it('BI and DII = merged ff to DI, ff to DII', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(BI, DII, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged, [{
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
+            bar: 'raboof',
+            some: 'secret',
+            foo: 'bar'
+          }, {
+            h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+            _m3: { _ack: false },
+            bar: 'raboof',
+            foo: 'bar'
+          }]);
+          should.strictEqual(merged[0]._id === BI._id, false);
+          should.strictEqual(merged[0]._id === DII._id, false);
+          should.strictEqual(merged[0]._m3 === BI._m3, false);
+          should.strictEqual(merged[0]._m3 === DII._m3, false);
+          should.strictEqual(merged[1]._id === BI._id, false);
+          should.strictEqual(merged[1]._id === DII._id, true);
+          should.strictEqual(merged[1]._m3 === BI._m3, false);
+          should.strictEqual(merged[1]._m3 === DII._m3, true);
+          done();
+        });
+      });
+
+      it('EI and DII = merges based on BI, BII', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(EI, DII, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged, [{
+            _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pa: ['Eeee', 'Dddd'], _lo: true },
+            bar: 'foo',
+            some: 'secret',
+            foo: 'bar'
+          }, {
+            _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
+            bar: 'foo',
+            foo: 'bar'
+          }]);
+          should.strictEqual(merged[0]._id === EI._id, false);
+          should.strictEqual(merged[0]._id === DII._id, false);
+          should.strictEqual(merged[0]._m3 === EI._m3, false);
+          should.strictEqual(merged[0]._m3 === DII._m3, false);
+          should.strictEqual(merged[1]._id === EI._id, false);
+          should.strictEqual(merged[1]._id === DII._id, false);
+          should.strictEqual(merged[1]._m3 === EI._m3, false);
+          should.strictEqual(merged[1]._m3 === DII._m3, false);
+          done();
+        });
+      });
+
+      it('EI and BI = ff to EI', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(EI, BI, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged, [{
+            h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
+            _m3: { _ack: true },
+            bar: 'foo',
+            some: 'secret'
+          }]);
+          should.strictEqual(merged[0]._id === EI._id, true);
+          should.strictEqual(merged[0]._id === BI._id, false);
+          should.strictEqual(merged[0]._m3 === EI._m3, true);
+          should.strictEqual(merged[0]._m3 === BI._m3, false);
+          done();
+        });
+      });
+
+      it('BI and CII = unversioned DI and DII', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._merge(BI, CII, function(err, merged) {
+          if (err) { throw err; }
+          should.deepEqual(merged[0], {
+            _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pa: ['Bbbb', 'Cccc'], _lo: true },
+            bar: 'raboof',
+            some: 'secret',
+            foo: 'bar'
+          });
+          should.deepEqual(merged[1], {
+            _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
+            bar: 'raboof',
+            foo: 'bar'
+          });
+          should.strictEqual(merged[0]._id === BI._id, false);
+          should.strictEqual(merged[0]._id === CII._id, false);
+          should.strictEqual(merged[0]._m3 === BI._m3, false);
+          should.strictEqual(merged[0]._m3 === CII._m3, false);
+          should.strictEqual(merged[1]._id === BI._id, false);
+          should.strictEqual(merged[1]._id === CII._id, false);
+          should.strictEqual(merged[1]._m3 === BI._m3, false);
+          should.strictEqual(merged[1]._m3 === CII._m3, false);
+          done();
+        });
+      });
+
+      it('virtual merge vm1 and vm2 = conflict', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        var vm1 = { // add c: 'foo'
+          h: { id: id, pa: ['Aaaa'] },
+          foo: 'bar'
+        };
+        var vm2 = { // add c: 'bar'
+          h: { id: id, pe: 'II', pa: ['Aaaa'] },
+          foo: 'baz'
+        };
+
+        vc._merge(vm1, vm2, function(err, merged) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(merged, [['foo'], ['foo']]);
+          done();
+        });
+      });
+
+      //////////////////// DELETE AI ON PURPOSE
+
+      it('should error on missing lca', function(done) {
+        var vc = new VersionedCollection(db, collectionName, { log: silence });
+        vc._snapshotCollection.remove({ '_id._v': 'Aaaa', '_id._pe': 'I' }, {w: 1}, function(err, deleted) {
+          if (err) { throw err; }
+          should.equal(deleted, 1);
+          vc._merge(BI, CII, function(err) {
+            should.equal(err.message, 'no lca found');
+            done();
+          });
+        });
+      });
+
+      it('should not have had any side effects on merged objects', function() {
+        should.deepEqual(AI, {
+          h: { id: id, v: 'Aaaa', pa: [] },
+          _m3: { _ack: true },
+          baz : 'qux',
+          bar: 'raboof',
+          some: 'secret'
+        });
+
+        should.deepEqual(BI, {
+          h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+          _m3: { _ack: true },
+          bar: 'raboof',
+          some: 'secret'
+        });
+
+        should.deepEqual(EI, {
+          h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
+          _m3: { _ack: true },
+          bar: 'foo',
+          some: 'secret'
+        });
+
+        should.deepEqual(AII, {
+          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
+          _m3: { _ack: false },
+          baz : 'qux',
+          bar: 'raboof'
+        });
+
+        should.deepEqual(BII, {
+          h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
+          _m3: { _ack: false },
+          bar: 'raboof'
+        });
+
+        should.deepEqual(CII, {
+          h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
+          _m3: { _ack: false },
+          baz : 'qux',
+          bar: 'raboof',
+          foo: 'bar'
+        });
+
+        should.deepEqual(DII, {
+          h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
+          _m3: { _ack: false },
+          bar: 'raboof',
+          foo: 'bar'
+        });
+      });
+    });
+
     describe('delete one', function() {
       var nameI  = 'twoPerspectiveDeleteOneI';
       var nameII = 'twoPerspectiveDeleteOneII';
@@ -630,25 +956,10 @@ describe('merge', function() {
         var DAGI = [AI, BI, CId];
         var DAGII = [AII, BII, CIId];
 
-        treeI = new Tree(db, nameI, { vSize: 3, log: silence });
+        treeI  = new Tree(db, nameI, { vSize: 3, log: silence });
+        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
 
-        async.eachSeries(DAGI, function(item, cb) {
-          treeI.write(item, cb);
-        }, function(err) {
-          if (err) { throw err; }
-          treeI.end(null, function(err) {
-            if (err) { throw err; }
-
-            treeII = new Tree(db, nameII, { vSize: 3, log: silence });
-
-            async.eachSeries(DAGII, function(item, cb) {
-              treeII.write(item, cb);
-            }, function(err) {
-              if (err) { throw err; }
-              treeII.end(null, done);
-            });
-          });
-        });
+        saveDAGs(DAGI, DAGII, treeI, treeII, done);
       });
 
       it('BI and CII = merge, no delete', function(done) {
@@ -823,25 +1134,10 @@ describe('merge', function() {
         var DAGI = [AI, BId, CId];
         var DAGII = [AII, BIId, CIId];
 
-        treeI = new Tree(db, nameI, { vSize: 3, log: silence });
+        treeI  = new Tree(db, nameI, { vSize: 3, log: silence });
+        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
 
-        async.eachSeries(DAGI, function(item, cb) {
-          treeI.write(item, cb);
-        }, function(err) {
-          if (err) { throw err; }
-          treeI.end(null, function(err) {
-            if (err) { throw err; }
-
-            treeII = new Tree(db, nameII, { vSize: 3, log: silence });
-
-            async.eachSeries(DAGII, function(item, cb) {
-              treeII.write(item, cb);
-            }, function(err) {
-              if (err) { throw err; }
-              treeII.end(null, done);
-            });
-          });
-        });
+        saveDAGs(DAGI, DAGII, treeI, treeII, done);
       });
 
       it('BI and CII = merge, delete', function(done) {
@@ -893,321 +1189,8 @@ describe('merge', function() {
       });
     });
   });
+
   /*
-
-  describe('different perspectives 1', function() {
-    var collectionName = '_mergeDifferentPerspectives1';
-
-    // create DAG where all exported items are imported again
-
-    var AI = {
-      h: { id: id, v: 'Aaaa', pa: [] },
-      _m3: { _ack: true },
-      baz : 'qux',
-      bar: 'raboof',
-      some: 'secret'
-    };
-
-    var BI = {
-      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-      _m3: { _ack: true },
-      bar: 'raboof',
-      some: 'secret'
-    };
-
-    var EI = {
-      h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
-      _m3: { _ack: true },
-      bar: 'foo',
-      some: 'secret'
-    };
-
-    var AII = {
-      h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
-      _m3: { _ack: false },
-      baz : 'qux',
-      bar: 'raboof'
-    };
-
-    var BII = {
-      h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
-      _m3: { _ack: false },
-      bar: 'raboof'
-    };
-
-    var CII = {
-      h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
-      _m3: { _ack: false },
-      baz : 'qux',
-      bar: 'raboof',
-      foo: 'bar'
-    };
-
-    var DII = {
-      h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
-      _m3: { _ack: false },
-      bar: 'raboof',
-      foo: 'bar'
-    };
-
-    // create DAG in system I after some interaction between system I and II:
-    // I creates AI, syncs to II
-    // II creates AI, then CII
-    // I creates BI, syncs to II
-    // I creates EI
-    // II merged BI, with CII, creating DII
-    // I syncs from II creating AII, CII, BII and DII
-    // note: normally after this I should recreate DII as DI and create a merge between DI and EI
-
-    // resulting DAG in system I:
-    //                   AII <-- BII
-    //                     \       \
-    //                     CII <-- DII
-    // AI <-- BI <-- EI
-
-    it('should save DAG', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._snapshotCollection.insert([AI, BI, EI, AII, CII, BII, DII], {w: 1}, done);
-    });
-
-    it('AI and AII = ff to AI, ff to AII', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(AI, AII, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: id, v: 'Aaaa', pa: [] },
-          _m3: { _ack: true },
-          baz : 'qux',
-          bar: 'raboof',
-          some: 'secret'
-        }, {
-          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
-          _m3: { _ack: false },
-          baz : 'qux',
-          bar: 'raboof'
-        }]);
-        should.strictEqual(merged[0]._id === AI._id, true);
-        should.strictEqual(merged[0]._id === AII._id, false);
-        should.strictEqual(merged[0]._m3 === AI._m3, true);
-        should.strictEqual(merged[0]._m3 === AII._m3, false);
-        should.strictEqual(merged[1]._id === AI._id, false);
-        should.strictEqual(merged[1]._id === AII._id, true);
-        should.strictEqual(merged[1]._m3 === AI._m3, false);
-        should.strictEqual(merged[1]._m3 === AII._m3, true);
-        done();
-      });
-    });
-
-    it('AII and AI = ff to AII, ff to AI', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(AII, AI, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
-          _m3: { _ack: false },
-          baz : 'qux',
-          bar: 'raboof'
-        }, {
-          h: { id: id, v: 'Aaaa', pa: [] },
-          _m3: { _ack: true },
-          baz : 'qux',
-          bar: 'raboof',
-          some: 'secret'
-        }]);
-        should.strictEqual(merged[0]._id === AI._id, false);
-        should.strictEqual(merged[0]._id === AII._id, true);
-        should.strictEqual(merged[0]._m3 === AI._m3, false);
-        should.strictEqual(merged[0]._m3 === AII._m3, true);
-        should.strictEqual(merged[1]._id === AI._id, true);
-        should.strictEqual(merged[1]._id === AII._id, false);
-        should.strictEqual(merged[1]._m3 === AI._m3, true);
-        should.strictEqual(merged[1]._m3 === AII._m3, false);
-        done();
-      });
-    });
-
-    it('BI and DII = merged ff to DI, ff to DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(BI, DII, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
-          bar: 'raboof',
-          some: 'secret',
-          foo: 'bar'
-        }, {
-          h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
-          _m3: { _ack: false },
-          bar: 'raboof',
-          foo: 'bar'
-        }]);
-        should.strictEqual(merged[0]._id === BI._id, false);
-        should.strictEqual(merged[0]._id === DII._id, false);
-        should.strictEqual(merged[0]._m3 === BI._m3, false);
-        should.strictEqual(merged[0]._m3 === DII._m3, false);
-        should.strictEqual(merged[1]._id === BI._id, false);
-        should.strictEqual(merged[1]._id === DII._id, true);
-        should.strictEqual(merged[1]._m3 === BI._m3, false);
-        should.strictEqual(merged[1]._m3 === DII._m3, true);
-        done();
-      });
-    });
-
-    it('EI and DII = merges based on BI, BII', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(EI, DII, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged, [{
-          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pa: ['Eeee', 'Dddd'], _lo: true },
-          bar: 'foo',
-          some: 'secret',
-          foo: 'bar'
-        }, {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Eeee', 'Dddd'], _lo: true },
-          bar: 'foo',
-          foo: 'bar'
-        }]);
-        should.strictEqual(merged[0]._id === EI._id, false);
-        should.strictEqual(merged[0]._id === DII._id, false);
-        should.strictEqual(merged[0]._m3 === EI._m3, false);
-        should.strictEqual(merged[0]._m3 === DII._m3, false);
-        should.strictEqual(merged[1]._id === EI._id, false);
-        should.strictEqual(merged[1]._id === DII._id, false);
-        should.strictEqual(merged[1]._m3 === EI._m3, false);
-        should.strictEqual(merged[1]._m3 === DII._m3, false);
-        done();
-      });
-    });
-
-    it('EI and BI = ff to EI', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(EI, BI, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged, [{
-          h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
-          _m3: { _ack: true },
-          bar: 'foo',
-          some: 'secret'
-        }]);
-        should.strictEqual(merged[0]._id === EI._id, true);
-        should.strictEqual(merged[0]._id === BI._id, false);
-        should.strictEqual(merged[0]._m3 === EI._m3, true);
-        should.strictEqual(merged[0]._m3 === BI._m3, false);
-        done();
-      });
-    });
-
-    it('BI and CII = unversioned DI and DII', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._merge(BI, CII, function(err, merged) {
-        if (err) { throw err; }
-        should.deepEqual(merged[0], {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pa: ['Bbbb', 'Cccc'], _lo: true },
-          bar: 'raboof',
-          some: 'secret',
-          foo: 'bar'
-        });
-        should.deepEqual(merged[1], {
-          _id : { _co: '_mergeDifferentPerspectives1', _id: id, v: null, pe: 'II', pa: ['Bbbb', 'Cccc'], _lo: true },
-          bar: 'raboof',
-          foo: 'bar'
-        });
-        should.strictEqual(merged[0]._id === BI._id, false);
-        should.strictEqual(merged[0]._id === CII._id, false);
-        should.strictEqual(merged[0]._m3 === BI._m3, false);
-        should.strictEqual(merged[0]._m3 === CII._m3, false);
-        should.strictEqual(merged[1]._id === BI._id, false);
-        should.strictEqual(merged[1]._id === CII._id, false);
-        should.strictEqual(merged[1]._m3 === BI._m3, false);
-        should.strictEqual(merged[1]._m3 === CII._m3, false);
-        done();
-      });
-    });
-
-    it('virtual merge vm1 and vm2 = conflict', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      var vm1 = { // add c: 'foo'
-        h: { id: id, pa: ['Aaaa'] },
-        foo: 'bar'
-      };
-      var vm2 = { // add c: 'bar'
-        h: { id: id, pe: 'II', pa: ['Aaaa'] },
-        foo: 'baz'
-      };
-
-      vc._merge(vm1, vm2, function(err, merged) {
-        should.equal(err.message, 'merge conflict');
-        should.deepEqual(merged, [['foo'], ['foo']]);
-        done();
-      });
-    });
-
-    //////////////////// DELETE AI ON PURPOSE
-
-    it('should error on missing lca', function(done) {
-      var vc = new VersionedCollection(db, collectionName, { log: silence });
-      vc._snapshotCollection.remove({ '_id._v': 'Aaaa', '_id._pe': 'I' }, {w: 1}, function(err, deleted) {
-        if (err) { throw err; }
-        should.equal(deleted, 1);
-        vc._merge(BI, CII, function(err) {
-          should.equal(err.message, 'no lca found');
-          done();
-        });
-      });
-    });
-
-    it('should not have had any side effects on merged objects', function() {
-      should.deepEqual(AI, {
-        h: { id: id, v: 'Aaaa', pa: [] },
-        _m3: { _ack: true },
-        baz : 'qux',
-        bar: 'raboof',
-        some: 'secret'
-      });
-
-      should.deepEqual(BI, {
-        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-        _m3: { _ack: true },
-        bar: 'raboof',
-        some: 'secret'
-      });
-
-      should.deepEqual(EI, {
-        h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
-        _m3: { _ack: true },
-        bar: 'foo',
-        some: 'secret'
-      });
-
-      should.deepEqual(AII, {
-        h: { id: id, v: 'Aaaa', pe: 'II', pa: [] },
-        _m3: { _ack: false },
-        baz : 'qux',
-        bar: 'raboof'
-      });
-
-      should.deepEqual(BII, {
-        h: { id: id, v: 'Bbbb', pe: 'II', pa: ['Aaaa'] },
-        _m3: { _ack: false },
-        bar: 'raboof'
-      });
-
-      should.deepEqual(CII, {
-        h: { id: id, v: 'Cccc', pe: 'II', pa: ['Aaaa'] },
-        _m3: { _ack: false },
-        baz : 'qux',
-        bar: 'raboof',
-        foo: 'bar'
-      });
-
-      should.deepEqual(DII, {
-        h: { id: id, v: 'Dddd', pe: 'II', pa: ['Cccc', 'Bbbb'] },
-        _m3: { _ack: false },
-        bar: 'raboof',
-        foo: 'bar'
-      });
-    });
-  });
 
   describe('different perspectives 2', function() {
     var collectionName = '_mergeRecreatedMerge';
