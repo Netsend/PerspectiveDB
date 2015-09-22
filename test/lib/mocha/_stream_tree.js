@@ -248,4 +248,30 @@ describe('StreamTree', function() {
       done();
     });
   });
+
+  it('should reopen a new stream', function(done) {
+    var t = new Tree(db, name, { vSize: 3, log: silence });
+
+    var i = 0;
+    var s = new StreamTree(t);
+
+    s.on('data', function() {
+      i++;
+    });
+
+    s.on('end', function() {
+      should.strictEqual(i, 4);
+
+      var u = s.reopen();
+
+      u.on('data', function() {
+        i++;
+      });
+
+      u.on('end', function() {
+        should.strictEqual(i, 8);
+        done();
+      });
+    });
+  });
 });
