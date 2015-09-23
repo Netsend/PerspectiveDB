@@ -2630,210 +2630,221 @@ describe('merge', function() {
         });
       });
     });
-  });
 
-/*
-  describe('merge with resolved conflict', function() {
-    var collectionName = '_mergeMergeWithResolvedConflict';
+    describe('more DAGs that fork', function() {
+      var nameI  = 'moreDagsThatForkI';
+      var nameII = 'moreDagsThatForkII';
+      var treeI;
+      var treeII;
 
-    // create DAG where all exported items are imported again
+      // resulting DAGs:
+      //                   AII <-- BII
+      //                     \       \
+      //                     CII <-- DII
+      //
+      // AI <-- BI <-- EI <-- FI <-- GI
 
-    var AI = {
-      h: { id: id, v: 'Aaaa', pa: [] },
-      b: {
-        baz : 'qux',
-        bar: 'raboof',
-        some: 'secret'
-      }
-    };
 
-    var BI = { // add c: 'foo'
-      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-      b: {
-        bar: 'raboof',
-        c: 'foo',
-        some: 'secret'
-      }
-    };
-
-    var EI = {
-      h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
-      b: {
-        bar: 'foo',
-        c: 'foo',
-        e: true,
-        some: 'secret'
-      }
-    };
-
-    var FI = {
-      h: { id: id, v: 'Ffff', pa: ['Eeee'] },
-      b: {
-        bar: 'foo',
-        c: 'baz',
-        e: true,
-        f: true,
-        some: 'secret'
-      }
-    };
-
-    var GI = { // conflict with DII
-      h: { id: id, v: 'Gggg', pa: ['Ffff'] },
-      b: {
-        bar: 'foo',
-        c: 'raboof',
-        e: true,
-        f: true,
-        g: true,
-        some: 'secret'
-      }
-    };
-
-    var AII = {
-      h: { id: id, v: 'Aaaa', pa: [] },
-      b: {
-        baz : 'qux',
-        bar: 'raboof'
-      }
-    };
-
-    var BII = { // add c: 'foo'
-      h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
-      b: {
-        bar: 'raboof',
-        c: 'foo'
-      }
-    };
-
-    var CII = { // add c: 'bar'
-      h: { id: id, v: 'Cccc', pa: ['Aaaa'] },
-      b: {
-        baz : 'qux',
-        bar: 'raboof',
-        foo: 'bar',
-        c: 'bar'
-      }
-    };
-
-    var DII = { // resolve conflict: c: 'baz'
-      h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
-      b: {
-        bar: 'raboof',
-        foo: 'bar',
-        c: 'baz',
-        d: true
-      }
-    };
-
-    // resulting DAG in system I:
-    //                   AII <-- BII
-    //                     \       \
-    //                     CII <-- DII
-    //
-    // AI <-- BI <-- EI <-- FI <-- GI
-
-    it('should save DAG', function(done) {
-      vc._snapshotCollection.insert([AI, AII, CII, BI, BII, EI, FI, DII, GI], {w: 1}, done);
-    });
-
-    it('BI and CII = conflict', function(done) {
-      merge(BI, CII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-        should.equal(err.message, 'merge conflict');
-        should.deepEqual(merged, [['c'], ['c']]);
-        done();
-      });
-    });
-
-    it('BI and DII = merged ff to DI, ff to DII', function(done) {
-      merge(BI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(merged[0], {
-          h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
+      var AI = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          baz : 'qux',
           bar: 'raboof',
-          some: 'secret',
+          some: 'secret'
+        }
+      };
+
+      var BI = { // add c: 'foo'
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+        b: {
+          bar: 'raboof',
+          c: 'foo',
+          some: 'secret'
+        }
+      };
+
+      var EI = {
+        h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
+        b: {
+          bar: 'foo',
+          c: 'foo',
+          e: true,
+          some: 'secret'
+        }
+      };
+
+      var FI = {
+        h: { id: id, v: 'Ffff', pa: ['Eeee'] },
+        b: {
+          bar: 'foo',
+          c: 'baz',
+          e: true,
+          f: true,
+          some: 'secret'
+        }
+      };
+
+      var GI = { // conflict with DII
+        h: { id: id, v: 'Gggg', pa: ['Ffff'] },
+        b: {
+          bar: 'foo',
+          c: 'raboof',
+          e: true,
+          f: true,
+          g: true,
+          some: 'secret'
+        }
+      };
+
+      var AII = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          baz : 'qux',
+          bar: 'raboof'
+        }
+      };
+
+      var BII = { // add c: 'foo'
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
+        b: {
+          bar: 'raboof',
+          c: 'foo'
+        }
+      };
+
+      var CII = { // add c: 'bar'
+        h: { id: id, v: 'Cccc', pa: ['Aaaa'] },
+        b: {
+          baz : 'qux',
+          bar: 'raboof',
+          foo: 'bar',
+          c: 'bar'
+        }
+      };
+
+      var DII = { // resolve conflict: c: 'baz'
+        h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
+        b: {
+          bar: 'raboof',
           foo: 'bar',
           c: 'baz',
           d: true
-        });
-        should.deepEqual(merged[1], {
-          h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
-          b: {
-            bar: 'raboof',
-            foo: 'bar',
-            c: 'baz',
-            d: true
-          }
-        });
-        done();
-      });
-    });
+        }
+      };
 
-    it('EI and DII = merges based on BI, BII', function(done) {
-      merge(EI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, pa: ['Eeee', 'Dddd'] },
-          b: {
-            bar: 'foo',
-            some: 'secret',
-            foo: 'bar',
-            c: 'baz',
-            e: true,
-            d: true
-          }
-        });
-        should.deepEqual(mergeY, {
-          h: { id: id, pa: ['Eeee', 'Dddd'] },
-          b: {
-            bar: 'foo',
-            foo: 'bar',
-            c: 'baz',
-            d: true,
-            e: true
-          }
-        });
-        done();
-      });
-    });
+      it('save DAG', function(done) {
+        var DAGI  = [AI, BI, EI, FI, GI];
+        var DAGII = [AII, CII, BII, DII];
 
-    it('FI and DII = merges based on BI, BII', function(done) {
-      merge(FI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-        if (err) { throw err; }
-        should.deepEqual(mergeX, {
-          h: { id: id, pa: ['Ffff', 'Dddd'] },
-          b: {
-            bar: 'foo',
-            some: 'secret',
-            foo: 'bar',
-            c: 'baz',
-            e: true,
-            d: true,
-            f: true
-          }
-        });
-        should.deepEqual(mergeY, {
-          h: { id: id, pa: ['Ffff', 'Dddd'] },
-          b: {
-            bar: 'foo',
-            foo: 'bar',
-            c: 'baz',
-            d: true,
-            e: true,
-            f: true
-          }
-        });
-        done();
-      });
-    });
+        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
+        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
 
-    it('GI and DII = conflict', function(done) {
-      merge(GI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-        should.equal(err.message, 'merge conflict');
-        should.deepEqual(merged, [['c'], ['c']]);
-        done();
+        saveDAGs(DAGI, DAGII, treeI, treeII, done);
+      });
+
+      it('BI and CII = conflict', function(done) {
+        merge(BI, CII, treeI, treeII, { log: silence }, function(err) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['c']);
+          done();
+        });
+      });
+
+      it('BI and DII = merged ff to DI, ff to DII', function(done) {
+        merge(BI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
+            b: {
+              bar: 'raboof',
+              some: 'secret',
+              foo: 'bar',
+              c: 'baz',
+              d: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'], i: 4 },
+            b: {
+              bar: 'raboof',
+              foo: 'bar',
+              c: 'baz',
+              d: true
+            }
+          });
+          done();
+        });
+      });
+
+      it('EI and DII = merges based on BI, BII', function(done) {
+        merge(EI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Eeee', 'Dddd'] },
+            b: {
+              bar: 'foo',
+              some: 'secret',
+              foo: 'bar',
+              c: 'baz',
+              e: true,
+              d: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Eeee', 'Dddd'] },
+            b: {
+              bar: 'foo',
+              foo: 'bar',
+              c: 'baz',
+              d: true,
+              e: true
+            }
+          });
+          done();
+        });
+      });
+
+      it('FI and DII = merges based on BI, BII', function(done) {
+        merge(FI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Ffff', 'Dddd'] },
+            b: {
+              bar: 'foo',
+              some: 'secret',
+              foo: 'bar',
+              c: 'baz',
+              e: true,
+              d: true,
+              f: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Ffff', 'Dddd'] },
+            b: {
+              bar: 'foo',
+              foo: 'bar',
+              c: 'baz',
+              d: true,
+              e: true,
+              f: true
+            }
+          });
+          done();
+        });
+      });
+
+      it('GI and DII = conflict', function(done) {
+        merge(GI, DII, treeI, treeII, { log: silence }, function(err) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['c']);
+          done();
+        });
       });
     });
   });
+
+/*
 
   describe('criss-cross four parents', function() {
     ////// _pe I
