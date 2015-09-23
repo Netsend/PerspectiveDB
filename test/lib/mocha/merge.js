@@ -124,7 +124,7 @@ describe('_doMerge', function() {
 
         var merge = _doMerge(itemX, itemY, lcaX, lcaY, { log: silence });
         should.deepEqual(merge[0], {
-          h: { id: 'foo', pa: ['Ffff','Hhhh','Gggg'] },
+          h: { id: 'foo', pa: ['Hhhh','Gggg','Ffff'] },
           b: {
             c: 'foo',
             some: 'secret',
@@ -135,7 +135,7 @@ describe('_doMerge', function() {
           }
         });
         should.deepEqual(merge[1], {
-          h: { id: 'foo', pa: ['Ffff','Hhhh','Gggg'] },
+          h: { id: 'foo', pa: ['Hhhh','Gggg','Ffff'] },
           b: {
             c: 'foo',
             some: 'secret',
