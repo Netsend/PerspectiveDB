@@ -111,7 +111,7 @@ describe('merge', function() {
 
       var tree = new Tree(db, 'some', { vSize: 3, log: silence });
 
-      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err) {
         should.equal(err.message, 'id mismatch');
         done();
       });
@@ -123,7 +123,7 @@ describe('merge', function() {
 
       var tree = new Tree(db, 'some', { vSize: 3, log: silence });
 
-      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err) {
         should.equal(err.message, 'itemX has no version');
         done();
       });
@@ -135,7 +135,7 @@ describe('merge', function() {
 
       var tree = new Tree(db, 'some', { vSize: 3, log: silence });
 
-      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err) {
         should.equal(err.message, 'itemY has no version');
         done();
       });
@@ -1806,17 +1806,15 @@ describe('merge', function() {
       var HI = {
         h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg' ] },
         b: {
-          b: {
-            a: true,
-            b: true,
-            c: true,
-            d: true,
-            e: true,
-            f: true,
-            g: true,
-            h: true,
-            some: 'secret'
-          }
+          a: true,
+          b: true,
+          c: true,
+          d: true,
+          e: true,
+          f: true,
+          g: true,
+          h: true,
+          some: 'secret'
         }
       };
 
@@ -1931,22 +1929,26 @@ describe('merge', function() {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
-            a: true,
-            b: true,
-            c: true,
-            e: 'foo',
-            f: true,
-            g: true,
+            b: {
+              a: true,
+              b: true,
+              c: true,
+              e: 'foo',
+              f: true,
+              g: true,
+            }
           });
           should.deepEqual(mergeY, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
-            a: true,
-            b: true,
-            c: true,
-            e: 'foo',
-            f: true,
-            g: true,
-            some: 'secret'
+            b: {
+              a: true,
+              b: true,
+              c: true,
+              e: 'foo',
+              f: true,
+              g: true,
+              some: 'secret'
+            }
           });
           done();
         });
@@ -1969,7 +1971,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
+            h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg'], i: 10 },
             b: {
               a: true,
               b: true,
@@ -1987,86 +1989,86 @@ describe('merge', function() {
       });
 
       it('GIc and FIc = conflict', function(done) {
-        merge(GIc, FIc, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        merge(GIc, FIc, treeI, treeII, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
-          should.deepEqual(merged, ['d', 'e']);
+          should.deepEqual(err.conflict, ['d', 'e']);
           done();
-        });
-      });
-
-      describe('recursive lca order', function() {
-        // following with both I and II
-        //          C <------- F
-        //         /  \  /    /
-        //        /    \/    /
-        //       /     /\   /
-        //      /     /  \ /
-        //   B <---- D    X
-        //      \     \  / \
-        //       \     \/   \
-        //        \    /\    \
-        //         \  /  \    \
-        //          E <------- G
-        //
-        it('save DAG mixing perspectives', function(done) {
-          vc._snapshotCollection.insert([BI, BII, CII, DII, CI, DI, EI, FI, GI, EII, FII, GII ], {w: 1}, done);
-        });
-
-        it('GII and FI = merge', function(done) {
-          merge(GII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
-            if (err) { throw err; }
-            should.deepEqual(mergeX, {
-              h: { id: id, pa: ['Gggg', 'Ffff'] },
-              a: true,
-              b: true,
-              c: true,
-              e: 'foo',
-              f: true,
-              g: true,
-            });
-            should.deepEqual(mergeY, {
-              h: { id: id, pa: ['Gggg', 'Ffff'] },
-              a: true,
-              b: true,
-              c: true,
-              e: 'foo',
-              f: true,
-              g: true,
-              some: 'secret'
-            });
-            done();
-          });
-        });
-
-        it('FII and GI = merge', function(done) {
-          merge(FI, GII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-            if (err) { throw err; }
-            should.deepEqual(mergeX, {
-              h: { id: id, pa: ['Ffff', 'Gggg'] },
-              a: true,
-              b: true,
-              c: true,
-              e: 'foo',
-              f: true,
-              g: true,
-              some: 'secret'
-            });
-            should.deepEqual(mergeY, {
-              h: { id: id, pa: ['Ffff', 'Gggg'] },
-              a: true,
-              b: true,
-              c: true,
-              e: 'foo',
-              f: true,
-              g: true
-            });
-            done();
-          });
         });
       });
     });
 
+    describe('recursive lca order', function() {
+      // following with both I and II
+      //          C <------- F
+      //         /  \  /    /
+      //        /    \/    /
+      //       /     /\   /
+      //      /     /  \ /
+      //   B <---- D    X
+      //      \     \  / \
+      //       \     \/   \
+      //        \    /\    \
+      //         \  /  \    \
+      //          E <------- G
+      //
+      it('save DAG mixing perspectives', function(done) {
+        vc._snapshotCollection.insert([BI, BII, CII, DII, CI, DI, EI, FI, GI, EII, FII, GII ], {w: 1}, done);
+      });
+
+      it('GII and FI = merge', function(done) {
+        merge(GII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Gggg', 'Ffff'] },
+            a: true,
+            b: true,
+            c: true,
+            e: 'foo',
+            f: true,
+            g: true,
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Gggg', 'Ffff'] },
+            a: true,
+            b: true,
+            c: true,
+            e: 'foo',
+            f: true,
+            g: true,
+            some: 'secret'
+          });
+          done();
+        });
+      });
+
+      it('FII and GI = merge', function(done) {
+        merge(FI, GII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['Ffff', 'Gggg'] },
+            a: true,
+            b: true,
+            c: true,
+            e: 'foo',
+            f: true,
+            g: true,
+            some: 'secret'
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['Ffff', 'Gggg'] },
+            a: true,
+            b: true,
+            c: true,
+            e: 'foo',
+            f: true,
+            g: true
+          });
+          done();
+        });
+      });
+    });
   });
+
   /*
 
   describe('double criss-cross three parents', function() {
