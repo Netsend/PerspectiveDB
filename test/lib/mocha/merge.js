@@ -62,12 +62,10 @@ after(function(done) {
 });
 
 function saveDAG(DAG, tree, cb) {
-  async.eachSeries(DAG, function(item, cb2) {
-    tree.write(item, cb2);
-  }, function(err) {
-    if (err) { throw err; }
-    tree.end(null, cb);
+  DAG.forEach(function(item) {
+    tree.write(item);
   });
+  tree.end(null, cb);
 }
 
 function saveDAGs(DAGI, DAGII, treeI, treeII, cb) {
