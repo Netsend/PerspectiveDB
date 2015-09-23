@@ -1906,7 +1906,7 @@ describe('findLCAs', function() {
         var opts = {
           rootX: vm1,
           rootY: vm2,
-          log: cons
+          log: silence
         };
         findLCAs(x, y, opts, function(err, lca) {
           if (err) { throw err; }
