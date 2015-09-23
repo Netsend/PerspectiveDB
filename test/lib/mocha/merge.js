@@ -2383,81 +2383,84 @@ describe('merge', function() {
         saveDAGs(DAGI, DAGII, treeI, treeII, done);
       });
 
-      it('FI and GI = merge', function(done) {
-        merge(FI, GI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
-          if (err) { throw err; }
-          should.deepEqual(mergeX, {
-            h: { id: id, pa: ['Ffff', 'Gggg'] },
-            b: {
-              a: true,
-              c: 'foo',
-              d: 'bar',
-              e: true,
-              f: true,
-              g: true,
-              some: 'secret'
-            }
+      describe('one perspective', function() {
+        it('FI and GI = merge', function(done) {
+          merge(FI, GI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+            if (err) { throw err; }
+            should.deepEqual(mergeX, {
+              h: { id: id, pa: ['Ffff', 'Gggg'] },
+              b: {
+                a: true,
+                c: 'foo',
+                d: 'bar',
+                e: true,
+                f: true,
+                g: true,
+                some: 'secret'
+              }
+            });
+            should.deepEqual(mergeX, mergeY);
+            done();
           });
-          done();
         });
-      });
 
-      it('II and JI = merge', function(done) {
-        merge(II, JI, treeI, treeI, { log: cons }, function(err, mergeX, mergeY) {
-          if (err) { throw err; }
-          should.deepEqual(mergeX, {
-            h: { id: id, pa: ['Iiii', 'Jjjj'] },
-            b: {
-              c: 'foo',
-              d: 'baz',
-              e: 'II',
-              f: 'JI',
-              g: 'JI',
-              h: 'II',
-              i: true,
-              j: true,
-              some: 'secret'
-            }
+        it('II and JI = merge', function(done) {
+          merge(II, JI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+            if (err) { throw err; }
+            should.deepEqual(mergeX, {
+              h: { id: id, pa: ['Iiii', 'Jjjj'] },
+              b: {
+                c: 'foo',
+                d: 'baz',
+                e: 'II',
+                f: 'JI',
+                g: 'JI',
+                h: 'II',
+                i: true,
+                j: true,
+                some: 'secret'
+              }
+            });
+            should.deepEqual(mergeX, mergeY);
+            done();
           });
-          done();
+        });
+
+        it('IIc and JIc = conflict', function(done) {
+          merge(IIc, JIc, treeI, treeI, { log: silence }, function(err) {
+            should.equal(err.message, 'merge conflict');
+            should.deepEqual(err.conflict, ['f']);
+            done();
+          });
         });
       });
 
-      it('IIc and JIc = conflict', function(done) {
-        merge(IIc, JIc, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
-          should.equal(err.message, 'merge conflict');
-          should.deepEqual(merged, ['f']);
-          done();
-        });
-      });
-
-    describe('two perspectives', function() {
-        var collectionName = '_mergeDoubleCrissCrossThreeMergesTwoPerspectives';
-
-        it('should save DAG topologically sorted per perspective only', function(done) {
-        });
-
+      describe('two perspectives', function() {
         it('FII and GI = merge', function(done) {
           merge(FII, GI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, pa: ['Ffff', 'Gggg'] },
-              a: true,
-              c: 'foo',
-              d: 'bar',
-              e: true,
-              f: true,
-              g: true,
+              b: {
+                a: true,
+                c: 'foo',
+                d: 'bar',
+                e: true,
+                f: true,
+                g: true,
+              }
             });
             should.deepEqual(mergeY, {
               h: { id: id, pa: ['Ffff', 'Gggg'] },
-              a: true,
-              c: 'foo',
-              d: 'bar',
-              e: true,
-              f: true,
-              g: true,
-              some: 'secret'
+              b: {
+                a: true,
+                c: 'foo',
+                d: 'bar',
+                e: true,
+                f: true,
+                g: true,
+                some: 'secret'
+              }
             });
             done();
           });
@@ -2480,7 +2483,7 @@ describe('merge', function() {
               }
             });
             should.deepEqual(mergeY, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: '9' },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2499,7 +2502,7 @@ describe('merge', function() {
           merge(II, III, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: 11 },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2512,7 +2515,7 @@ describe('merge', function() {
               }
             });
             should.deepEqual(mergeY, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: 9 },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2528,9 +2531,9 @@ describe('merge', function() {
         });
 
         it('JIc and III = conflict', function(done) {
-          merge(JIc, III, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          merge(JIc, III, treeI, treeII, { log: silence }, function(err) {
             should.equal(err.message, 'merge conflict');
-            should.deepEqual(merged, [['h'], ['h']]);
+            should.deepEqual(err.conflict, ['h']);
             done();
           });
         });
