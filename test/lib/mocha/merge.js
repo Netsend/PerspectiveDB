@@ -104,6 +104,42 @@ describe('merge', function() {
     it('should require opts to be an object', function() {
       (function() { merge({}, {}, {}, {}, [], function() {}); }).should.throw('opts must be an object');
     });
+
+    it('should require that ids of itemX and itemY match', function(done) {
+      var itemX = { h: { id: 'a' } };
+      var itemY = { h: { id: 'b' } };
+
+      var tree = new Tree(db, 'some', { vSize: 3, log: silence });
+
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        should.equal(err.message, 'id mismatch');
+        done();
+      });
+    });
+
+    it('must require a version on itemX', function(done) {
+      var itemX = { h: { id: 'a' } };
+      var itemY = { h: { id: 'a' } };
+
+      var tree = new Tree(db, 'some', { vSize: 3, log: silence });
+
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        should.equal(err.message, 'itemX has no version');
+        done();
+      });
+    });
+
+    it('must require a version on itemY', function(done) {
+      var itemX = { h: { id: 'a', v: 's' } };
+      var itemY = { h: { id: 'a' } };
+
+      var tree = new Tree(db, 'some', { vSize: 3, log: silence });
+
+      merge(itemX, itemY, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        should.equal(err.message, 'itemY has no version');
+        done();
+      });
+    });
   });
 
   describe('one perspective (tree)', function() {
@@ -340,29 +376,55 @@ describe('merge', function() {
         });
       });
 
-      it('should require version on itemX', function(done) {
-        var vm = { h: { id: id, pa: ['Aaaa'] } };
+      it('should merge virtual merges', function(done) {
+        var vm1 = {
+          h: { id: id, v: 'x', pa: ['Aaaa'] },
+          b: { a: true }
+        };
+        var vm2 = {
+          h: { id: id, v: 'y', pa: ['Aaaa'] },
+          b: { b: true }
+        };
 
-        merge(vm, B, tree, tree, { log: silence }, function(err) {
-          should.equal(err.message, 'itemX has no version');
+        merge(vm1, vm2, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, pa: ['x', 'y'] },
+            b: {
+              a: true,
+              b: true
+            }
+          });
+          should.deepEqual(mergeY, {
+            h: { id: id, pa: ['x', 'y'] },
+            b: {
+              a: true,
+              b: true
+            }
+          });
           done();
         });
       });
 
-      it('should require version on itemY', function(done) {
-        var vm = { h: { id: id, pa: ['Aaaa'] } };
+      it('should not merge conflicting virtual merges', function(done) {
+        var vm1 = {
+          h: { id: id, v: 'x', pa: ['Aaaa'] },
+          b: {
+            foo: 'bar',
+            v: true
+          }
+        };
+        var vm2 = {
+          h: { id: id, v: 'y', pa: ['Aaaa'] },
+          b: {
+            foo: 'bar',
+            v: false
+          }
+        };
 
-        merge(A, vm, tree, tree, { log: silence }, function(err) {
-          should.equal(err.message, 'itemY has no version');
-          done();
-        });
-      });
-
-      it('should err if version can not be found', function(done) {
-        var vm = { h: { id: id, v: 'Xxxx', pa: ['Aaaa'] } };
-
-        merge(vm, B, tree, tree, { log: silence }, function(err) {
-          should.equal(err.message, 'version not found');
+        merge(vm1, vm2, tree, tree, { log: silence }, function(err) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['v']);
           done();
         });
       });
@@ -831,22 +893,19 @@ describe('merge', function() {
         });
       });
 
-      xit('virtual merge vm1 and vm2 = conflict', function(done) {
+      it('should not merge conflicting virtual merges', function(done) {
         var vm1 = {
-          h: { id: id, pa: ['Aaaa'] },
-          b: {
-            foo: 'bar'
-          }
+          h: { id: id, v: 'x', pa: ['Aaaa'] },
+          b: { foo: 'bar' }
         };
         var vm2 = {
-          h: { id: id, pa: ['Aaaa'] },
-          b: {
-            foo: 'baz'
-          }
+          h: { id: id, v: 'y', pa: ['Aaaa'] },
+          b: { foo: 'baz' }
         };
 
-        merge(vm1, vm2, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        merge(vm1, vm2, treeI, treeII, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['foo']);
           done();
         });
       });
@@ -1538,7 +1597,6 @@ describe('merge', function() {
 
         saveDAGs(DAGI, DAGII, treeI, treeII, done);
       });
-
 
       it('AII and FI = merged ff to FII, ff to FI', function(done) {
         merge(AII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
