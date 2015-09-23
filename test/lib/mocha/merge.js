@@ -275,14 +275,7 @@ describe('merge', function() {
               qux: 'quux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
-            b: {
-              foo: 'bar',
-              bar: 'baz',
-              qux: 'quux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -298,14 +291,7 @@ describe('merge', function() {
               qux: 'qux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Bbbb', 'Cccc'] },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -344,14 +330,7 @@ describe('merge', function() {
               qux: 'quz'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Dddd', 'Eeee'] },
-            b: {
-              foo: 'bar',
-              bar: 'foobar',
-              qux: 'quz'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -367,14 +346,7 @@ describe('merge', function() {
               qux: 'quz'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Eeee', 'Dddd'] },
-            b: {
-              foo: 'bar',
-              bar: 'foobar',
-              qux: 'quz'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -444,13 +416,7 @@ describe('merge', function() {
               b: true
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['x', 'y'] },
-            b: {
-              a: true,
-              b: true
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -536,14 +502,7 @@ describe('merge', function() {
               qux: 'qux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Bbbb', 'Cccc'] },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -559,14 +518,7 @@ describe('merge', function() {
               qux: 'qux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Cccc', 'Bbbb'] },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -629,14 +581,7 @@ describe('merge', function() {
               qux: 'qux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Bbbb', 'Cccc'], d: true },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -652,14 +597,7 @@ describe('merge', function() {
               qux: 'qux'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Cccc', 'Bbbb'], d: true },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -1957,18 +1895,7 @@ describe('merge', function() {
               some: 'secret'
             }
           });
-          should.deepEqual(mergeY, {
-            h: { id: id, pa: ['Gggg', 'Ffff'] },
-            b: {
-              a: true,
-              b: true,
-              c: true,
-              e: 'foo',
-              f: true,
-              g: true,
-              some: 'secret'
-            }
-          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
