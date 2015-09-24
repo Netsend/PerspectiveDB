@@ -2544,10 +2544,17 @@ describe('Tree', function() {
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
-    var item3 = { h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'] } };
-    var item4 = { h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'] } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Bbbb'] } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'] } };
 
-    var itemA = { h: { id: 'XI', v: 'Xxxx', i: 1, pa: [] } };
+    var itemA = { h: { id: 'XI', v: 'Xxxx', pa: [] } };
+
+    var item5 = { h: { id: 'XI', v: 'Eeee', pa: ['Bbbb'], d: true } };
+
+    var item10 = { h: { id: 'XI', v: 'Ffff', i: 1, pa: [] } };
+    var item20 = { h: { id: 'XI', v: 'Gggg', i: 2, pa: ['Ffff'] } };
+    var item30 = { h: { id: 'XI', v: 'Hhhh', pa: ['Gggg'] } };
+    var item40 = { h: { id: 'XI', v: 'Iiii', pa: ['Ffff'] } };
 
     it('should accept roots in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -2569,24 +2576,9 @@ describe('Tree', function() {
       });
     });
 
-    it('needs item1 in dskey, ikey, headkey and vkey', function(done) {
+    it('item1', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var dsKey = t._composeDsKey(item1.h.id, item1.h.i);
-      var headKey = t._composeHeadKey(item1.h.id, item1.h.v);
-      var headVal = t._composeHeadVal(item1);
-      var iKey = t._composeIKey(item1.h.i);
-      var vKey = t._composeVKey(item1.h.v);
-
-      t._db.put(dsKey, BSON.serialize(item1), function(err) {
-        if (err) { throw err; }
-        t._db.put(iKey, headKey, function(err) {
-          if (err) { throw err; }
-          t._db.put(headKey, headVal, function(err) {
-            if (err) { throw err; }
-            t._db.put(vKey, dsKey, done);
-          });
-        });
-      });
+      t.write(item1, done);
     });
 
     it('should not accept a new root in a non-empty database', function(done) {
@@ -2639,23 +2631,9 @@ describe('Tree', function() {
       });
     });
 
-    it('needs item2 in dskey, ikey, headkey and vkey', function(done) {
+    it('item2', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      var dsKey = t._composeDsKey(item2.h.id, item2.h.i);
-      var headKey = t._composeHeadKey(item2.h.id, item2.h.v);
-      var iKey = t._composeIKey(item2.h.i);
-      var vKey = t._composeVKey(item2.h.v);
-
-      t._db.put(dsKey, BSON.serialize(item2), function(err) {
-        if (err) { throw err; }
-        t._db.put(iKey, headKey, function(err) {
-          if (err) { throw err; }
-          t._db.put(headKey, iKey, function(err) {
-            if (err) { throw err; }
-            t._db.put(vKey, dsKey, done);
-          });
-        });
-      });
+      t.write(item2, done);
     });
 
     it('should accept existing connecting non-roots in a non-empty database', function(done) {
@@ -2667,6 +2645,94 @@ describe('Tree', function() {
         done();
       });
     });
+
+    //////////// DELETE ONE AND ONLY HEAD
+
+    it('item5 (delete head)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item5, done);
+    });
+
+    it('should not accept non-roots in a database with deleted heads', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item20, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
+        done();
+      });
+    });
+
+    it('item10', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item10, done);
+    });
+
+    it('should not accept a new root in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(itemA, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
+        done();
+      });
+    });
+
+    it('should accept an existing root in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item10, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, true);
+        done();
+      });
+    });
+
+    it('should accept new connecting non-roots in a non-empty database (fast-forward)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item20, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, false);
+        done();
+      });
+    });
+
+    it('should accept new connecting non-roots in a non-empty database (fork)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item40, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, false);
+        done();
+      });
+    });
+
+    it('should not accept non-connecting non-roots in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item30, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, false);
+        should.strictEqual(exists, false);
+        done();
+      });
+    });
+
+    it('item20', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item20, done);
+    });
+
+    it('should accept existing connecting non-roots in a non-empty database', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t._isConnected(item20, function(err, isConnected, exists) {
+        if (err) { throw err; }
+        should.strictEqual(isConnected, true);
+        should.strictEqual(exists, true);
+        done();
+      });
+    });
+
   });
 
   describe('_write', function() {
