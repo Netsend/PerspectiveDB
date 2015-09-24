@@ -2761,7 +2761,7 @@ describe('Tree', function() {
     it('should not accept a non-root in an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
       t.write(item2);
@@ -2922,7 +2922,7 @@ describe('Tree', function() {
     it('should not accept an existing root', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
       t.end(item1);
@@ -2951,7 +2951,7 @@ describe('Tree', function() {
     it('should not accept an existing non-root (of a local perspective)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
       t.end(item3);
