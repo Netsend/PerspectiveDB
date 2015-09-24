@@ -94,10 +94,6 @@ describe('_doMerge', function() {
       (function() { _doMerge({}, {}, {}, null); }).should.throw('lcaY must be an object');
     });
 
-    it('should require opts to be an object', function() {
-      (function() { _doMerge({}, {}, {}, {}, []); }).should.throw('opts must be an object');
-    });
-
     it('should require that versions of itemX and itemY match', function() {
       var itemX = { h: { v: 'a' }, b: {} };
       var lcaX  = { h: { v: 'b' }, b: {} };
@@ -106,7 +102,7 @@ describe('_doMerge', function() {
       var lcaY  = { h: { v: 'b' }, b: {} };
 
       try {
-        _doMerge(itemX, itemY, lcaX, lcaY, { log: silence });
+        _doMerge(itemX, itemY, lcaX, lcaY);
       } catch(err) {
         should.equal(err.message, 'id mismatch');
       }
@@ -122,7 +118,7 @@ describe('_doMerge', function() {
 
         // expect:  { h: { id: 'foo',           pa: ['Ffff','Hhhh','Gggg'] }, b: {                   c: 'foo', some: 'secret', d: 'bar',          f: true, h: true, g: true } }
 
-        var merge = _doMerge(itemX, itemY, lcaX, lcaY, { log: silence });
+        var merge = _doMerge(itemX, itemY, lcaX, lcaY);
         should.deepEqual(merge[0], {
           h: { id: 'foo', pa: ['Hhhh','Gggg','Ffff'] },
           b: {
