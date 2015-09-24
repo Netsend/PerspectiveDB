@@ -3156,20 +3156,45 @@ describe('merge', function() {
         });
       });
     });
-
   });
-
-/*
 
   describe('regression', function() {
     describe('non-symmetric multiple lca: error when fetching perspective bound lca\'s 3', function() {
-      var collectionName = '_mergeRegressionNonSymmetricMultipleLca';
+      var nameI  = 'regressionNonSymmetricMultipleLcaI';
+      var nameII = 'regressionNonSymmetricMultipleLcaII';
+      var treeI;
+      var treeII;
+
+      // create the following structure, for pe I and II:
+      // pe I
+      //          E
+      //         / \
+      //        /   \
+      //       /     \
+      //      B       G
+      //     /       /
+      //    /       /
+      //   /       /
+      //  A---C----
+      //
+      // pe II
+      //          E--------
+      //         / \       \
+      //        /   \       \
+      //       /     \       \
+      //      B---D---F---H---G
+      //     /   /           /
+      //    /   /           /
+      //   /   /           /
+      //  A---C------------
 
       ////// pe I
       var AI = {
         h: { id: 'foo', v: 'Aaaa', pa: [] },
-        a: true,
-        some: 'secret'
+        b: {
+          a: true,
+          some: 'secret'
+        }
       };
 
       var BI = {
@@ -3216,7 +3241,9 @@ describe('merge', function() {
       ////// pe II
       var AII = {
         h: { id: 'foo', v: 'Aaaa', pa: [] },
-        a: true
+        b: {
+          a: true
+        }
       };
 
       var BII = {
@@ -3291,38 +3318,21 @@ describe('merge', function() {
         }
       };
 
-      // create the following structure, for pe I and II:
-      // pe I
-      //          E
-      //         / \
-      //        /   \
-      //       /     \
-      //      B       G
-      //     /       /
-      //    /       /
-      //   /       /
-      //  A---C----
-      //
-      // pe II
-      //          E--------
-      //         / \       \
-      //        /   \       \
-      //       /     \       \
-      //      B---D---F---H---G
-      //     /   /           /
-      //    /   /           /
-      //   /   /           /
-      //  A---C------------
-      //
-      it('should save DAGs', function(done) {
-        vc._snapshotCollection.insert([AI, BI, CI, AII, EI, BII, CII, GI, DII, EII, FII, GII, HII], done);
+      it('save DAG', function(done) {
+        var DAGI  = [AI, BI, CI, EI, GI];
+        var DAGII = [AII, BII, CII, DII, EII, FII, GII, HII];
+
+        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
+        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+
+        saveDAGs(DAGI, DAGII, treeI, treeII, done);
       });
 
       it('HII and GI = ff to HI', function(done) {
         merge(HII, GI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
-          should.deepEqual(merged[0], {
-            h: { id: 'foo', v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
+          should.deepEqual(mergeX, {
+            h: { id: 'foo', v: 'Hhhh', pa: ['Ffff', 'Gggg'], i: 8 },
             b: {
               a: 'foo',
               b: 'foo',
@@ -3334,7 +3344,7 @@ describe('merge', function() {
               h: true
             }
           });
-          should.deepEqual(merged[1], {
+          should.deepEqual(mergeY, {
             h: { id: 'foo', v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
             b: {
               a: 'foo',
@@ -3353,5 +3363,4 @@ describe('merge', function() {
       });
     });
   });
-  */
 });
