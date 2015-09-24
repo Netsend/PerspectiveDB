@@ -3175,4 +3175,21 @@ describe('Tree', function() {
       });
     });
   });
+
+  describe('_writev regression', function() {
+    var name = '_writev';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other' }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa', 'Bbbb'] }, b: { more2: 'body' } };
+
+    it('should look in written batch if not all parents are in the databse yet', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item1);
+      t.write(item2);
+      t.write(item3);
+      t.end(null, done);
+    });
+  });
 });
