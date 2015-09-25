@@ -1533,12 +1533,11 @@ describe('Tree', function() {
       });
     });
 
-    it('should only end after next is called in iteration', function(done) {
+    it('should wait with close before the item is iterated', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
       t.iterateInsertionOrder(function(obj, next) {
-        should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
         setTimeout(function() {
           i++;
           next();
@@ -1572,8 +1571,10 @@ describe('Tree', function() {
 
       var i = 0;
       t.iterateInsertionOrder(function(obj, next) {
-        i++;
-        setTimeout(next, 10);
+        setTimeout(function() {
+          i++;
+          next();
+        }, 10);
       }, function(err) {
         if (err) { throw err; }
         should.strictEqual(i, 2);
@@ -1854,9 +1855,9 @@ describe('Tree', function() {
       var s = t.createReadStream();
 
       s.on('data', function() {
-        i++;
         s.pause();
         setTimeout(function() {
+          i++;
           s.resume();
         }, 10);
       });
