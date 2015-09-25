@@ -1533,6 +1533,23 @@ describe('Tree', function() {
       });
     });
 
+    it('should only end after next is called in iteration', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var i = 0;
+      t.iterateInsertionOrder(function(obj, next) {
+        should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        setTimeout(function() {
+          i++;
+          next();
+        }, 10);
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 1);
+        done();
+      });
+    });
+
     it('should emit the existing item but no new items that are added while the iterator is running', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
