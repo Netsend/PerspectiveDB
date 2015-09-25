@@ -147,8 +147,8 @@ describe('StreamTree', function() {
     var s = new StreamTree(t);
     s.on('data', function() {
       s.pause();
-      i++;
       setTimeout(function() {
+        i++;
         s.resume();
       }, 10);
     });
