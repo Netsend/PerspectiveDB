@@ -140,7 +140,7 @@ describe('StreamTree', function() {
     });
   });
 
-  it('should wait with end before all items are emitted', function(done) {
+  it('should pause and wait with end before all items are emitted and resume is called', function(done) {
     var t = new Tree(db, name, { vSize: 3, log: silence });
 
     var i = 0;
