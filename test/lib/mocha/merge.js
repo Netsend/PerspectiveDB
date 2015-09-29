@@ -108,6 +108,30 @@ describe('_doMerge', function() {
       }
     });
 
+    it('should copy itemY.h.d on fast-forward of X to Y', function() {
+      var itemX = { h: { id: 'XI', v: 'a' }, b: {} };
+      var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+      var itemY = { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} };
+      var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+      var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+      should.deepEqual(merge[0], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+      should.deepEqual(merge[1], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+    });
+
+    it('should copy itemX.h.d on fast-forward of Y to X', function() {
+      var itemX = { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} };
+      var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+      var itemY = { h: { id: 'XI', v: 'a' }, b: {} };
+      var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+      var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+      should.deepEqual(merge[0], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+      should.deepEqual(merge[1], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+    });
+
     describe('regress', function() {
       it('should require that both items be merged', function() {
         var itemX = { h: { id: 'foo',           pa: ['Hhhh','Gggg'] },        b: {                   c: true,  some: 'secret', d: 'bar',                   h: true, g: true } };
