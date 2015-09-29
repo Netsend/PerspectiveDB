@@ -791,6 +791,57 @@ describe('MergeTree', function() {
         });
       });
     });
+
+    describe('merge with conflict', function() {
+      var sname = '_mergeTreesWithConflict_foo';
+      var dname = '_mergeTreesWithConflict_bar';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
+      var ditem2 = { h: { id: 'XI', v: 'Cccc', pe: dname, pa: ['Aaaa'] }, b: { more2: 'other' } };
+
+      it('write sitem1, sitem2', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.end(done);
+      });
+
+      it('write ditem1, ditem2', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem1);
+        dtree.write(ditem2);
+        dtree.end(done);
+      });
+
+      it('write sitem1 to dtree', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(sitem1);
+        dtree.end(done);
+      });
+
+      it('should merge sitem2 with ditem2, conflict on "more2"', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          should.deepEqual(smerge, ['more2']);
+          should.deepEqual(dmerge, null);
+          should.deepEqual(shead, sitem2);
+          should.deepEqual(dhead, ditem2);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+    });
   });
 
   describe('mergeWithLocal', function() {
