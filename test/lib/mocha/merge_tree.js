@@ -175,6 +175,7 @@ describe('MergeTree', function() {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
       var streeIt = 0;
       stree.end(item2, function(err) {
+        if (err) { throw err; }
         stree.iterateInsertionOrder(function(item, next) {
           if (streeIt === 0) {
             should.deepEqual(item, item1);
@@ -197,7 +198,7 @@ describe('MergeTree', function() {
       var dtree = new Tree(db, dname, { vSize: 3, log: silence });
 
       MergeTree._copyTo(stree, dtree, function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
     });
@@ -248,6 +249,7 @@ describe('MergeTree', function() {
       var streeIt = 0;
       stree.write(item3);
       stree.end(item4, function(err) {
+        if (err) { throw err; }
         stree.iterateInsertionOrder(function(item, next) {
           if (streeIt === 0) {
             should.deepEqual(item, item1);
@@ -281,7 +283,7 @@ describe('MergeTree', function() {
       var opts = { first: item3.h.v, excludeFirst: true };
 
       MergeTree._copyTo(stree, dtree, opts, function(err) {
-        should.strictEqual(err.message, 'item is not a new child');
+        should.strictEqual(err.message, 'not a valid new item');
         stree.iterateInsertionOrder(function(item, next) {
           streeIt++;
           next();
@@ -478,6 +480,319 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('_mergeTrees', function() {
+    describe('parameter checking', function() {
+      it('should require stree to be an object', function() {
+        (function() { MergeTree._mergeTrees(); }).should.throw('stree must be an object');
+      });
+
+      it('should require dtree to be an object', function() {
+        (function() { MergeTree._mergeTrees({}); }).should.throw('dtree must be an object');
+      });
+
+      it('should require iterator to be a function', function() {
+        (function() { MergeTree._mergeTrees({}, {}, {}); }).should.throw('iterator must be a function');
+      });
+
+      it('should require cb to be a function', function() {
+        (function() { MergeTree._mergeTrees({}, {}, function() {}); }).should.throw('cb must be a function');
+      });
+    });
+
+    describe('empty databases and root merge', function() {
+      var sname = '_mergeTreesEmptyDatabases_foo';
+      var dname = '_mergeTreesEmptyDatabases_bar';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
+      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      it('should call back without calling the iterator when the database is empty', function(done) {
+        var stree = new Tree(db, sname, { log: silence });
+        var dtree = new Tree(db, dname, { log: silence });
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function() {
+          i++;
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 0);
+          done();
+        });
+      });
+
+      it('write sitem1', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem1, done);
+      });
+
+      it('should iterate over sitem1 (fast-forward) because it misses in dtree', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          should.deepEqual(smerge, null);
+          should.deepEqual(dmerge, null);
+          should.deepEqual(shead, sitem1);
+          should.deepEqual(dhead, null);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+
+      it('write ditem1', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem1, done);
+      });
+
+      it('should merge sitem1 and ditem1 since this perspective is not written to dtree', function(done) {
+        // this happens when a new remote is added that is a subset of the existing items
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          should.deepEqual(smerge, null);
+          should.deepEqual(dmerge, null);
+          should.deepEqual(shead, sitem1);
+          should.deepEqual(dhead, ditem1);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+
+      it('write sitem2 and ditem2', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem2, function(err) {
+        if (err) { throw err; }
+          stree.write(sitem2, done);
+        });
+      });
+
+      it('write sitem2 to dtree (should update last by perspective)', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(sitem2, done);
+      });
+
+      it('should not iterate over sitem1 or sitem2 since sitem2 is written to dtree (perspective update)', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 0);
+          done();
+        });
+      });
+    });
+
+    describe('merge one and two heads in stree', function() {
+      var sname = '_mergeTreesOneTwoHeads_foo';
+      var dname = '_mergeTreesOneTwoHeads_bar';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more3: 'body' } };
+
+      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
+      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      it('write sitem1, sitem2', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.end(done);
+      });
+
+      it('write ditem1, ditem2', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem1);
+        dtree.write(ditem2);
+        dtree.end(done);
+      });
+
+      it('write sitem1 to dtree', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(sitem1);
+        dtree.end(done);
+      });
+
+      it('should merge sitem2 with ditem2 (fast-forward to existing items)', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          should.deepEqual(smerge, null);
+          should.deepEqual(dmerge, null);
+          should.deepEqual(shead, sitem2);
+          should.deepEqual(dhead, ditem2);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+
+      it('write sitem3', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem3);
+        stree.end(done);
+      });
+
+      it('should merge sitem2 (ff) and sitem3 (merge) with ditem2', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(smerge, null);
+            should.deepEqual(dmerge, null);
+            should.deepEqual(shead, sitem2);
+            should.deepEqual(dhead, ditem2);
+          }
+          if (i === 2) {
+            should.deepEqual(smerge, {
+              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              b: { more2: 'body', more3: 'body' }
+            });
+            should.deepEqual(dmerge, {
+              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              b: { more2: 'body', more3: 'body' }
+            });
+            should.deepEqual(shead, sitem3);
+            should.deepEqual(dhead, ditem2);
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          done();
+        });
+      });
+    });
+
+    describe('merge two heads one deleted in stree', function() {
+      var sname = '_mergeTreesTwoHeadsOneDeleted_foo';
+      var dname = '_mergeTreesTwoHeadsOneDeleted_bar';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },                b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] },          b: { more3: 'body' } };
+
+      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },                b: { some: 'body' } };
+      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('write sitem1, sitem2', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.end(done);
+      });
+
+      it('write ditem1', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem1);
+        dtree.end(done);
+      });
+
+      it('write sitem1 to dtree', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(sitem1);
+        dtree.end(done);
+      });
+
+      it('should merge sitem2 with ditem1 (merge ff in dtree)', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          should.deepEqual(smerge, null);
+          should.deepEqual(dmerge, {
+            h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true },
+            b: { more2: 'body' }
+          });
+          should.deepEqual(shead, sitem2);
+          should.deepEqual(dhead, ditem1);
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
+      });
+
+      it('write ditem2', function(done) {
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+        dtree.write(ditem2);
+        dtree.end(done);
+      });
+
+      it('write sitem3', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        stree.write(sitem3);
+        stree.end(done);
+      });
+
+      it('should merge sitem2 (ff) and sitem3 with ditem2 (merge, no deleted flag)', function(done) {
+        var stree = new Tree(db, sname, { vSize: 3, log: silence });
+        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+
+        var i = 0;
+        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+          i++;
+          if (i === 1) {
+            // sitem2 with ditem2
+            should.deepEqual(smerge, null);
+            should.deepEqual(dmerge, null);
+            should.deepEqual(shead, sitem2);
+            should.deepEqual(dhead, ditem2);
+          }
+
+          if (i === 2) {
+            // sitem3 with ditem2
+            should.deepEqual(smerge, {
+              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              b: { more2: 'body', more3: 'body' }
+            });
+            should.deepEqual(dmerge, {
+              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              b: { more2: 'body', more3: 'body' }
+            });
+            should.deepEqual(shead, sitem3);
+            should.deepEqual(dhead, ditem2);
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          done();
+        });
+      });
+    });
+  });
+
   describe('mergeWithLocal', function() {
     var sname = 'mergeWithLocal_foo';
     var dname = 'mergeWithLocal_bar';
@@ -507,6 +822,7 @@ describe('MergeTree', function() {
           i++;
           next();
         }, function(err) {
+          if (err) { throw err; }
           should.strictEqual(i, 0);
           done();
         });
@@ -530,6 +846,7 @@ describe('MergeTree', function() {
           should.deepEqual(item, item1);
           next();
         }, function(err) {
+          if (err) { throw err; }
           should.strictEqual(i, 1);
           done();
         });
@@ -540,7 +857,7 @@ describe('MergeTree', function() {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
       var dtree = new Tree(db, dname, { vSize: 3, log: silence });
       var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+      MergeTree._mergeTrees(stree, dtree, function(item, next) {
         i++;
         should.deepEqual(item, item1);
         next();
@@ -560,7 +877,7 @@ describe('MergeTree', function() {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
       var dtree = new Tree(db, dname, { vSize: 3, log: silence });
       var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function() {
+      MergeTree._mergeTrees(stree, dtree, function() {
         i++;
       }, function(err) {
         if (err) { throw err; }
@@ -579,7 +896,7 @@ describe('MergeTree', function() {
       var dtree = new Tree(db, dname, { vSize: 3, log: silence });
 
       var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+      MergeTree._mergeTrees(stree, dtree, function(item, next) {
         should.deepEqual(item, item2);
         i++;
         next();
@@ -600,7 +917,7 @@ describe('MergeTree', function() {
       var dtree = new Tree(db, dname, { vSize: 3, log: silence });
 
       var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
+      MergeTree._mergeTrees(stree, dtree, function(item, next) {
         if (i === 0) {
           should.deepEqual(item, item2);
         }
