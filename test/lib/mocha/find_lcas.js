@@ -113,6 +113,27 @@ describe('findLCAs', function() {
         });
       });
 
+      it('should return original objects when fnv is in use', function(done) {
+        var A = { h: { v: 'X', pa: [] }, b: 'some' };
+
+        var x = streamify([A]);
+        var y = streamify([A]);
+
+        var fnv = function(item) {
+          return { v: item.h.v, pa: item.h.pa };
+        };
+
+        findLCAs(x, y, { fnv: fnv, log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
+          if (err) { throw err; }
+          should.deepEqual(lca, ['X']);
+          should.deepEqual(lcaX, { 'X': { h: { v: 'X', pa: [] }, b: 'some' } });
+          should.deepEqual(lcaY, { 'X': { h: { v: 'X', pa: [] }, b: 'some' } });
+          should.deepEqual(rootX, { h: { v: 'X', pa: [] }, b: 'some' });
+          should.deepEqual(rootY, { h: { v: 'X', pa: [] }, b: 'some' });
+          done();
+        });
+      });
+
       it('A and B = A', function(done) {
         var x = streamify(dA);
         var y = streamify(dB);
