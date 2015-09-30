@@ -21,9 +21,18 @@
 var should = require('should');
 var rimraf = require('rimraf');
 var level = require('level');
+var streamify = require('stream-array');
+
+// wrapper around streamify that supports "reopen" recursively
+function streamifier(dag) {
+  var result = streamify(dag);
+  result.reopen = function() {
+    return streamifier(dag);
+  };
+  return result;
+}
 
 var merge = require('../../../lib/merge');
-var Tree = require('../../../lib/tree');
 var logger = require('../../../lib/logger');
 
 var db, cons, silence;
@@ -59,20 +68,6 @@ after(function(done) {
     });
   });
 });
-
-function saveDAG(DAG, tree, cb) {
-  DAG.forEach(function(item) {
-    tree.write(item);
-  });
-  tree.end(null, cb);
-}
-
-function saveDAGs(DAGI, DAGII, treeI, treeII, cb) {
-  saveDAG(DAGI, treeI, function(err) {
-    if (err) { throw err; }
-    saveDAG(DAGII, treeII, cb);
-  });
-}
 
 describe('_doMerge', function() {
   var _doMerge = merge._doMerge;
@@ -174,48 +169,25 @@ describe('merge', function() {
   var id = 'foo';
 
   describe('constructor', function() {
-    it('should require itemX to be an object', function() {
-      (function() { merge(null); }).should.throw('itemX must be an object');
+    it('should require sX to be a stream.Readable', function() {
+      (function() { merge(null); }).should.throw('sX must be a stream.Readable');
     });
 
-    it('should require itemY to be an object', function() {
-      (function() { merge({}, null); }).should.throw('itemY must be an object');
-    });
-
-    it('should require treeX to be an object', function() {
-      (function() { merge({}, {}, null); }).should.throw('treeX must be an object');
-    });
-
-    it('should require treeY to be an object', function() {
-      (function() { merge({}, {}, {}, null); }).should.throw('treeY must be an object');
+    it('should require sY to be a stream.Readable', function() {
+      (function() { merge({}, null); }).should.throw('sY must be a stream.Readable');
     });
 
     it('should require cb to be a function', function() {
-      (function() { merge({}, {}, {}, {}); }).should.throw('cb must be a function');
+      (function() { merge({}, {}); }).should.throw('cb must be a function');
     });
 
     it('should require opts to be an object', function() {
-      (function() { merge({}, {}, {}, {}, [], function() {}); }).should.throw('opts must be an object');
-    });
-
-    it('should require that ids of itemX and itemY match', function(done) {
-      var itemX = { h: { id: 'a' } };
-      var itemY = { h: { id: 'b' } };
-
-      var tree = new Tree(db, 'some', { vSize: 3, log: silence });
-
-      merge(itemX, itemY, tree, tree, { log: silence }, function(err) {
-        should.equal(err.message, 'id mismatch');
-        done();
-      });
+      (function() { merge({}, {}, [], function() {}); }).should.throw('opts must be an object');
     });
   });
 
   describe('one perspective (tree)', function() {
     describe('basic', function() {
-      var name = 'onePerspective';
-      var tree;
-
       // create the following structure:
       //    C <- E
       //   / \ /  \
@@ -278,17 +250,23 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAG = [A, B, C, D, E, F];
-        tree = new Tree(db, name, { vSize: 3, log: silence });
-        saveDAG(DAG, tree, done);
-      });
+      var DAG = [A, B, C, D, E, F];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
+      var dD = DAG.slice(0, 4).reverse();
+      var dE = DAG.slice(0, 5).reverse();
+      var dF = DAG.slice(0, 6).reverse();
 
       it('A and A = original A', function(done) {
-        merge(A, A, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dA);
+        var y = streamifier(dA);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               foo: 'bar',
               bar: 'baz',
@@ -300,8 +278,11 @@ describe('merge', function() {
         });
       });
 
+
       it('B and C = merge', function(done) {
-        merge(B, C, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dB);
+        var y = streamifier(dC);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -317,10 +298,12 @@ describe('merge', function() {
       });
 
       it('E and B = ff to E', function(done) {
-        merge(E, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dE);
+        var y = streamifier(dB);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'], i: 5 },
+            h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
             b: {
               foo: 'bar',
               bar: 'foobar',
@@ -340,7 +323,9 @@ describe('merge', function() {
       });
 
       it('D and E = merge', function(done) {
-        merge(D, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dD);
+        var y = streamifier(dE);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Dddd', 'Eeee'] },
@@ -356,7 +341,9 @@ describe('merge', function() {
       });
 
       it('E and D = merge', function(done) {
-        merge(E, D, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dE);
+        var y = streamifier(dD);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Eeee', 'Dddd'] },
@@ -372,7 +359,9 @@ describe('merge', function() {
       });
 
       it('E and F = ff to F', function(done) {
-        merge(E, F, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dE);
+        var y = streamifier(dF);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
@@ -383,7 +372,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
             b: {
               foo: 'bar',
               bar: 'foobar',
@@ -395,10 +384,12 @@ describe('merge', function() {
       });
 
       it('F and E = ff to F', function(done) {
-        merge(F, E, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dF);
+        var y = streamifier(dE);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
             b: {
               foo: 'bar',
               bar: 'foobar',
@@ -427,7 +418,10 @@ describe('merge', function() {
           b: { b: true }
         };
 
-        merge(vm1, vm2, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier([vm1].concat(dF));
+        var y = streamifier([vm2].concat(dF));
+
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['x', 'y'] },
@@ -457,7 +451,10 @@ describe('merge', function() {
           }
         };
 
-        merge(vm1, vm2, tree, tree, { log: silence }, function(err) {
+        var x = streamifier([vm1].concat(dF));
+        var y = streamifier([vm2].concat(dF));
+
+        merge(x, y, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
           should.deepEqual(err.conflict, ['v']);
           done();
@@ -466,9 +463,6 @@ describe('merge', function() {
     });
 
     describe('delete one', function() {
-      var name = 'onePerspectiveDeleteOne';
-      var tree;
-
       // create the following structure:
       //    Cd
       //   /
@@ -505,14 +499,17 @@ describe('merge', function() {
       };
 
 
-      it('save DAG', function(done) {
-        var DAG = [A, B, Cd];
-        tree = new Tree(db, name, { vSize: 3, log: silence });
-        saveDAG(DAG, tree, done);
-      });
+      var DAG = [A, B, Cd];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
 
       it('B and C = merge, no delete', function(done) {
-        merge(B, Cd, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dB);
+        var y = streamifier(dC);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -528,7 +525,9 @@ describe('merge', function() {
       });
 
       it('C and B = merge, no delete', function(done) {
-        merge(Cd, B, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dC);
+        var y = streamifier(dB);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Cccc', 'Bbbb'] },
@@ -545,9 +544,6 @@ describe('merge', function() {
     });
 
     describe('delete two', function() {
-      var name = 'onePerspectiveDeleteTwo';
-      var tree;
-
       // create the following structure:
       //    Cd
       //   /
@@ -584,14 +580,17 @@ describe('merge', function() {
       };
 
 
-      it('save DAG', function(done) {
-        var DAG = [A, Bd, Cd];
-        tree = new Tree(db, name, { vSize: 3, log: silence });
-        saveDAG(DAG, tree, done);
-      });
+      var DAG = [A, Bd, Cd];
+
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dA = DAG.slice(0, 1).reverse();
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
 
       it('B and C = merge, delete', function(done) {
-        merge(Bd, Cd, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dB);
+        var y = streamifier(dC);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'], d: true },
@@ -607,7 +606,9 @@ describe('merge', function() {
       });
 
       it('C and B = merge, delete', function(done) {
-        merge(Cd, Bd, tree, tree, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dC);
+        var y = streamifier(dB);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Cccc', 'Bbbb'], d: true },
@@ -626,11 +627,6 @@ describe('merge', function() {
 
   describe('two perspectives', function() {
     describe('basic', function() {
-      var nameI  = 'twoPerspectiveI';
-      var nameII = 'twoPerspectiveII';
-      var treeI;
-      var treeII;
-
       // create DAG in system I after some interaction between system I and II:
       // I creates AI, syncs to II
       // II creates CII
@@ -701,80 +697,26 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, EI];
-        var DAGII = [AII, CII, BII, DII];
+      var DAGI  = [AI, BI, EI];
+      var DAGII = [AII, CII, BII, DII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dEI = DAGI.slice(0, 3).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
-
-      it('should have added an increment to the saved objects', function() {
-        should.deepEqual(AI, {
-          h: { id: id, v: 'Aaaa', pa: [], i: 1 },
-          b: {
-            baz : 'qux',
-            bar: 'raboof',
-            some: 'secret'
-          }
-        });
-
-        should.deepEqual(BI, {
-          h: { id: id, v: 'Bbbb', pa: ['Aaaa'], i: 2 },
-          b: {
-            bar: 'raboof',
-            some: 'secret'
-          }
-        });
-
-        should.deepEqual(EI, {
-          h: { id: id, v: 'Eeee', pa: ['Bbbb'], i: 3 },
-          b: {
-            bar: 'foo',
-            some: 'secret'
-          }
-        });
-
-        should.deepEqual(AII, {
-          h: { id: id, v: 'Aaaa', pa: [], i: 1 },
-          b: {
-            baz : 'qux',
-            bar: 'raboof'
-          }
-        });
-
-        should.deepEqual(CII, {
-          h: { id: id, v: 'Cccc', pa: ['Aaaa'], i: 2 },
-          b: {
-            baz : 'qux',
-            bar: 'raboof',
-            foo: 'bar'
-          }
-        });
-
-        should.deepEqual(BII, {
-          h: { id: id, v: 'Bbbb', pa: ['Aaaa'], i: 3 },
-          b: {
-            bar: 'raboof'
-          }
-        });
-
-        should.deepEqual(DII, {
-          h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'], i: 4 },
-          b: {
-            bar: 'raboof',
-            foo: 'bar'
-          }
-        });
-      });
+      var dAII = DAGII.slice(0, 1).reverse();
+      var dCII = DAGII.slice(0, 2).reverse();
+      var dBII = DAGII.slice(0, 3).reverse();
+      var dDII = DAGII.slice(0, 4).reverse();
 
       it('AI and AII = ff to AI, ff to AII', function(done) {
-        merge(AI, AII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAI);
+        var y = streamifier(dAII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               baz : 'qux',
               bar: 'raboof',
@@ -782,7 +724,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               baz : 'qux',
               bar: 'raboof'
@@ -793,17 +735,19 @@ describe('merge', function() {
       });
 
       it('AII and AI = ff to AII, ff to AI', function(done) {
-        merge(AII, AI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAII);
+        var y = streamifier(dAI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               baz : 'qux',
               bar: 'raboof'
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               baz : 'qux',
               bar: 'raboof',
@@ -815,7 +759,9 @@ describe('merge', function() {
       });
 
       it('BI and DII = merged ff to DI, ff to DII', function(done) {
-        merge(BI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
@@ -826,7 +772,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'], i: 4 },
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
             b: {
               bar: 'raboof',
               foo: 'bar'
@@ -837,7 +783,9 @@ describe('merge', function() {
       });
 
       it('EI and DII = merges based on BI, BII', function(done) {
-        merge(EI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Eeee', 'Dddd'] },
@@ -859,10 +807,12 @@ describe('merge', function() {
       });
 
       it('EI and BII = EI and merge ff EII', function(done) {
-        merge(EI, BII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEI);
+        var y = streamifier(dBII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Eeee', pa: ['Bbbb'], i: 3 },
+            h: { id: id, v: 'Eeee', pa: ['Bbbb'] },
             b: {
               bar: 'foo',
               some: 'secret'
@@ -879,7 +829,9 @@ describe('merge', function() {
       });
 
       it('BI and CII = merge D-like', function(done) {
-        merge(BI, CII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dCII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -910,7 +862,9 @@ describe('merge', function() {
           b: { foo: 'baz' }
         };
 
-        merge(vm1, vm2, treeI, treeII, { log: silence }, function(err) {
+        var x = streamifier([vm1].concat(dEI));
+        var y = streamifier([vm2].concat(dDII));
+        merge(x, y, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
           should.deepEqual(err.conflict, ['foo']);
           done();
@@ -919,11 +873,6 @@ describe('merge', function() {
     });
 
     describe('delete one', function() {
-      var nameI  = 'twoPerspectiveDeleteOneI';
-      var nameII = 'twoPerspectiveDeleteOneII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //    Cd
       //   /
@@ -989,18 +938,22 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI = [AI, BI, CId];
-        var DAGII = [AII, BII, CIId];
+      var DAGI = [AI, BI, CId];
+      var DAGII = [AII, BII, CIId];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dCI = DAGI.slice(0, 3).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      var dBII = DAGII.slice(0, 2).reverse();
+      var dCII = DAGII.slice(0, 3).reverse();
 
       it('BI and CII = merge, no delete', function(done) {
-        merge(BI, CIId, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dCII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -1024,7 +977,9 @@ describe('merge', function() {
       });
 
       it('BII and CI = merge, no delete', function(done) {
-        merge(BII, CId, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBII);
+        var y = streamifier(dCI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -1048,7 +1003,9 @@ describe('merge', function() {
       });
 
       it('CI and BII = merge, no delete', function(done) {
-        merge(CId, BII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dCI);
+        var y = streamifier(dBII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Cccc', 'Bbbb'] },
@@ -1072,7 +1029,9 @@ describe('merge', function() {
       });
 
       it('CII and BI = merge, no delete', function(done) {
-        merge(CIId, BI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dCII);
+        var y = streamifier(dBI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Cccc', 'Bbbb'] },
@@ -1097,11 +1056,6 @@ describe('merge', function() {
     });
 
     describe('delete two', function() {
-      var nameI  = 'twoPerspectiveDeleteTwoI';
-      var nameII = 'twoPerspectiveDeleteTwoII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //    Cd
       //   /
@@ -1167,18 +1121,22 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI = [AI, BId, CId];
-        var DAGII = [AII, BIId, CIId];
+      var DAGI = [AI, BId, CId];
+      var DAGII = [AII, BIId, CIId];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dCI = DAGI.slice(0, 3).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      var dBII = DAGII.slice(0, 2).reverse();
+      var dCII = DAGII.slice(0, 3).reverse();
 
       it('BI and CII = merge, delete', function(done) {
-        merge(BId, CIId, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dCII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'], d: true },
@@ -1202,7 +1160,9 @@ describe('merge', function() {
       });
 
       it('BII and CI = merge, delete', function(done) {
-        merge(BIId, CId, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBII);
+        var y = streamifier(dCI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'], d: true },
@@ -1227,11 +1187,6 @@ describe('merge', function() {
     });
 
     describe('criss-cross merge', function() {
-      var nameI  = 'twoPerspectiveCrissCrossI';
-      var nameII = 'twoPerspectiveCrissCrossII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //    (plus CI) CII - EII (plus EI)
       //             /   \ /   \
@@ -1355,21 +1310,31 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, CI, DI, EI, FI];
-        var DAGII = [AII, BII, CII, DII, EII, FII];
+      var DAGI  = [AI, BI, CI, DI, EI, FI];
+      var DAGII = [AII, BII, CII, DII, EII, FII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      var dDI = DAGI.slice(0, 4).reverse();
+      var dEI = DAGI.slice(0, 5).reverse();
+      //var dFI = DAGI.slice(0, 6).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      var dCII = DAGII.slice(0, 3).reverse();
+      //var dDII = DAGII.slice(0, 4).reverse();
+      var dEII = DAGII.slice(0, 5).reverse();
+      var dFII = DAGII.slice(0, 6).reverse();
 
       it('AI and AII = ff to AI, ff to AII', function(done) {
-        merge(AI, AII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAI);
+        var y = streamifier(dAII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               foo: 'bar',
               bar: 'baz',
@@ -1378,7 +1343,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               foo: 'bar',
               bar: 'baz',
@@ -1390,7 +1355,9 @@ describe('merge', function() {
       });
 
       it('BI and CII = merge', function(done) {
-        merge(BI, CII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dCII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -1414,7 +1381,9 @@ describe('merge', function() {
       });
 
       it('DI and EII = merge based on BI and CII, merge based on BII and CII', function(done) {
-        merge(DI, EII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dDI);
+        var y = streamifier(dEII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Dddd', 'Eeee'] },
@@ -1438,7 +1407,9 @@ describe('merge', function() {
       });
 
       it('EII and DI = merge based on BII and CII, merge based on BI and CII', function(done) {
-        merge(EII, DI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEII);
+        var y = streamifier(dDI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Eeee', 'Dddd'] },
@@ -1462,7 +1433,9 @@ describe('merge', function() {
       });
 
       it('EI and FII = merge ff to FI, ff to FII', function(done) {
-        merge(EI, FII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEI);
+        var y = streamifier(dFII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
@@ -1474,7 +1447,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
             b: {
               foo: 'bar',
               bar: 'foobar',
@@ -1486,10 +1459,12 @@ describe('merge', function() {
       });
 
       it('FII and EI = ff to FII, merge ff to FI', function(done) {
-        merge(FII, EI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dFII);
+        var y = streamifier(dEI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'], i: 6 },
+            h: { id: id, v: 'Ffff', pa: ['Dddd', 'Eeee'] },
             b: {
               foo: 'bar',
               bar: 'foobar',
@@ -1511,11 +1486,6 @@ describe('merge', function() {
     });
 
     describe('n-parent merge', function() {
-      var nameI  = 'twoPerspectiveNparentI';
-      var nameII = 'twoPerspectiveNparentII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //              CI <----
       //             /        \
@@ -1595,18 +1565,23 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, CI, DI, EI, FI];
-        var DAGII = [AII];
+      var DAGI  = [AI, BI, CI, DI, EI, FI];
+      var DAGII = [AII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      var dAI = DAGI.slice(0, 1).reverse();
+      //var dBI = DAGI.slice(0, 2).reverse();
+      var dCI = DAGI.slice(0, 3).reverse();
+      //var dDI = DAGI.slice(0, 4).reverse();
+      //var dEI = DAGI.slice(0, 5).reverse();
+      var dFI = DAGI.slice(0, 6).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      var dAII = DAGII.slice(0, 1).reverse();
 
       it('AII and FI = merged ff to FII, ff to FI', function(done) {
-        merge(AII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAII);
+        var y = streamifier(dFI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Ffff', pa: ['Cccc', 'Dddd', 'Eeee'] },
@@ -1619,7 +1594,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Ffff', pa: ['Cccc', 'Dddd', 'Eeee'], i: 6 },
+            h: { id: id, v: 'Ffff', pa: ['Cccc', 'Dddd', 'Eeee'] },
             b: {
               foo: 'bar',
               bar: 'raboof',
@@ -1634,7 +1609,9 @@ describe('merge', function() {
       });
 
       it('AII and CI = merged ff to CII, ff to CI', function(done) {
-        merge(AII, CI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAII);
+        var y = streamifier(dCI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
@@ -1645,7 +1622,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Cccc', pa: ['Bbbb'], i: 3 },
+            h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
             b: {
               foo: 'bar',
               bar: 'raboof',
@@ -1658,10 +1635,12 @@ describe('merge', function() {
       });
 
       it('AI and AII = ff to AI, ff to AII', function(done) {
-        merge(AI, AII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAI);
+        var y = streamifier(dAII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               foo: 'bar',
               bar: 'baz',
@@ -1670,7 +1649,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Aaaa', pa: [], i: 1 },
+            h: { id: id, v: 'Aaaa', pa: [] },
             b: {
               foo: 'bar',
               bar: 'baz',
@@ -1683,11 +1662,6 @@ describe('merge', function() {
     });
 
     describe('criss-cross 3-parent merge', function() {
-      var nameI  = 'twoPerspectiveCrissCross3ParentI';
-      var nameII = 'twoPerspectiveCrissCross3ParentII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //                 CI <----- FI (and FIc)
       //                / \  /    /  \
@@ -1890,18 +1864,33 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI];
-        var DAGII = [AII, BII, CII, DII, EII, FII, GII ];
+      var DAGI  = [AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI];
+      var DAGII = [AII, BII, CII, DII, EII, FII, GII ];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      //var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      //var dDI = DAGI.slice(0, 4).reverse();
+      //var dEI = DAGI.slice(0, 5).reverse();
+      var dFI = DAGI.slice(0, 6).reverse();
+      var dGI = DAGI.slice(0, 7).reverse();
+      var dFIc = DAGI.slice(0, 8).reverse();
+      var dGIc = DAGI.slice(0, 9).reverse();
+      var dHI = DAGI.slice(0, 10).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
+      //var dDII = DAGII.slice(0, 4).reverse();
+      //var dEII = DAGII.slice(0, 5).reverse();
+      //var dFII = DAGII.slice(0, 6).reverse();
+      var dGII = DAGII.slice(0, 7).reverse();
 
       it('GI and FI = merge', function(done) {
-        merge(GI, FI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dGI);
+        var y = streamifier(dFI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
@@ -1921,7 +1910,9 @@ describe('merge', function() {
       });
 
       it('GII and FI = merge', function(done) {
-        merge(GII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dGII);
+        var y = streamifier(dFI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
@@ -1950,8 +1941,10 @@ describe('merge', function() {
         });
       });
 
-      it('FII and GI = merge', function(done) {
-        merge(FI, GII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+      it('FI and GII = merge', function(done) {
+        var x = streamifier(dFI);
+        var y = streamifier(dGII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -1981,7 +1974,9 @@ describe('merge', function() {
       });
 
       it('AII and HI = merged ff to HII, ff to HI', function(done) {
-        merge(AII, HI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dAII);
+        var y = streamifier(dHI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
@@ -1997,7 +1992,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg'], i: 10 },
+            h: { id: id, v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
             b: {
               a: true,
               b: true,
@@ -2015,7 +2010,9 @@ describe('merge', function() {
       });
 
       it('GIc and FIc = conflict', function(done) {
-        merge(GIc, FIc, treeI, treeII, { log: silence }, function(err) {
+        var x = streamifier(dGIc);
+        var y = streamifier(dFIc);
+        merge(x, y, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
           should.deepEqual(err.conflict, ['d', 'e']);
           done();
@@ -2024,11 +2021,6 @@ describe('merge', function() {
     });
 
     describe('double criss-cross 3-parent merge', function() {
-      var nameI  = 'twoPerspectiveDoubleCrissCross3ParentI';
-      var nameII = 'twoPerspectiveDoubleCrissCross3ParentII';
-      var treeI;
-      var treeII;
-
       // create the following structure:
       //                           (and FIc)
       //                 CI <----- FI <----- II (and IIc)
@@ -2320,19 +2312,41 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI, II, JI, IIc, JIc];
-        var DAGII = [AII, BII, CII, DII, EII, FII, GII, HII, III, JII];
+      var DAGI  = [AI, BI, CI, DI, EI, FI, GI, FIc, GIc, HI, II, JI, IIc, JIc];
+      var DAGII = [AII, BII, CII, DII, EII, FII, GII, HII, III, JII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      //var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      //var dDI = DAGI.slice(0, 4).reverse();
+      //var dEI = DAGI.slice(0, 5).reverse();
+      var dFI = DAGI.slice(0, 6).reverse();
+      var dGI = DAGI.slice(0, 7).reverse();
+      //var dFIc = DAGI.slice(0, 8).reverse();
+      //var dGIc = DAGI.slice(0, 9).reverse();
+      var dHI = DAGI.slice(0, 10).reverse();
+      var dII = DAGI.slice(0, 11).reverse();
+      var dJI = DAGI.slice(0, 12).reverse();
+      var dIIc = DAGI.slice(0, 13).reverse();
+      var dJIc = DAGI.slice(0, 14).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
+      //var dDII = DAGII.slice(0, 4).reverse();
+      //var dEII = DAGII.slice(0, 5).reverse();
+      var dFII = DAGII.slice(0, 6).reverse();
+      //var dGII = DAGII.slice(0, 7).reverse();
+      //var dHII = DAGII.slice(0, 8).reverse();
+      var dIII = DAGII.slice(0, 9).reverse();
+      //var dJII = DAGII.slice(0, 10).reverse();
 
       describe('one perspective', function() {
         it('FI and GI = merge', function(done) {
-          merge(FI, GI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dFI);
+          var y = streamifier(dGI);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -2352,7 +2366,9 @@ describe('merge', function() {
         });
 
         it('II and JI = merge', function(done) {
-          merge(II, JI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dII);
+          var y = streamifier(dJI);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, pa: ['Iiii', 'Jjjj'] },
@@ -2374,7 +2390,9 @@ describe('merge', function() {
         });
 
         it('IIc and JIc = conflict', function(done) {
-          merge(IIc, JIc, treeI, treeI, { log: silence }, function(err) {
+          var x = streamifier(dIIc);
+          var y = streamifier(dJIc);
+          merge(x, y, { log: silence }, function(err) {
             should.equal(err.message, 'merge conflict');
             should.deepEqual(err.conflict, ['f']);
             done();
@@ -2384,7 +2402,9 @@ describe('merge', function() {
 
       describe('two perspectives', function() {
         it('FII and GI = merge', function(done) {
-          merge(FII, GI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dFII);
+          var y = streamifier(dGI);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -2414,7 +2434,9 @@ describe('merge', function() {
         });
 
         it('HI and III = merged ff to II, ff to III', function(done) {
-          merge(HI, III, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dHI);
+          var y = streamifier(dIII);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
@@ -2430,7 +2452,7 @@ describe('merge', function() {
               }
             });
             should.deepEqual(mergeY, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: '9' },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2446,10 +2468,12 @@ describe('merge', function() {
         });
 
         it('II and III = ff to II, ff to III', function(done) {
-          merge(II, III, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dII);
+          var y = streamifier(dIII);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: 11 },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2462,7 +2486,7 @@ describe('merge', function() {
               }
             });
             should.deepEqual(mergeY, {
-              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'], i: 9 },
+              h: { id: id, v: 'Iiii', pa: ['Ffff', 'Gggg', 'Hhhh'] },
               b: {
                 c: 'foo',
                 d: 'baz',
@@ -2478,7 +2502,9 @@ describe('merge', function() {
         });
 
         it('JIc and III = conflict', function(done) {
-          merge(JIc, III, treeI, treeII, { log: silence }, function(err) {
+          var x = streamifier(dJIc);
+          var y = streamifier(dIII);
+          merge(x, y, { log: silence }, function(err) {
             should.equal(err.message, 'merge conflict');
             should.deepEqual(err.conflict, ['h']);
             done();
@@ -2486,7 +2512,9 @@ describe('merge', function() {
         });
 
         it('JI and III = merge', function(done) {
-          merge(JI, III, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+          var x = streamifier(dJI);
+          var y = streamifier(dIII);
+          merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
             if (err) { throw err; }
             should.deepEqual(mergeX, {
               h: { id: id, pa: ['Jjjj', 'Iiii'] },
@@ -2522,11 +2550,6 @@ describe('merge', function() {
     });
 
     describe('DAGs that fork', function() {
-      var nameI  = 'dagsThatForkI';
-      var nameII = 'dagsThatForkII';
-      var treeI;
-      var treeII;
-
       // resulting DAGs:
       //                   AII <-- BII
       //                     \       \
@@ -2592,18 +2615,23 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, EI];
-        var DAGII = [AII, CII, BII, DII];
+      var DAGI  = [AI, BI, EI];
+      var DAGII = [AII, CII, BII, DII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dEI = DAGI.slice(0, 3).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      //var dCII = DAGII.slice(0, 2).reverse();
+      //var dBII = DAGII.slice(0, 3).reverse();
+      var dDII = DAGII.slice(0, 4).reverse();
 
       it('BI and DII = merged ff to DI, ff to DII', function(done) {
-        merge(BI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
@@ -2615,7 +2643,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'], i: 4 },
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
             b: {
               bar: 'raboof',
               foo: 'bar',
@@ -2627,7 +2655,9 @@ describe('merge', function() {
       });
 
       it('EI and DII = merges based on BI, BII', function(done) {
-        merge(EI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Eeee', 'Dddd'] },
@@ -2652,11 +2682,6 @@ describe('merge', function() {
     });
 
     describe('more DAGs that fork', function() {
-      var nameI  = 'moreDagsThatForkI';
-      var nameII = 'moreDagsThatForkII';
-      var treeI;
-      var treeII;
-
       // resulting DAGs:
       //                   AII <-- BII
       //                     \       \
@@ -2752,18 +2777,25 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, EI, FI, GI];
-        var DAGII = [AII, CII, BII, DII];
+      var DAGI  = [AI, BI, EI, FI, GI];
+      var DAGII = [AII, CII, BII, DII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      var dBI = DAGI.slice(0, 2).reverse();
+      var dEI = DAGI.slice(0, 3).reverse();
+      var dFI = DAGI.slice(0, 4).reverse();
+      var dGI = DAGI.slice(0, 5).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      var dCII = DAGII.slice(0, 2).reverse();
+      //var dBII = DAGII.slice(0, 3).reverse();
+      var dDII = DAGII.slice(0, 4).reverse();
 
       it('BI and CII = conflict', function(done) {
-        merge(BI, CII, treeI, treeII, { log: silence }, function(err) {
+        var x = streamifier(dBI);
+        var y = streamifier(dCII);
+        merge(x, y, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
           should.deepEqual(err.conflict, ['c']);
           done();
@@ -2771,7 +2803,9 @@ describe('merge', function() {
       });
 
       it('BI and DII = merged ff to DI, ff to DII', function(done) {
-        merge(BI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dBI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
@@ -2784,7 +2818,7 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeY, {
-            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'], i: 4 },
+            h: { id: id, v: 'Dddd', pa: ['Cccc', 'Bbbb'] },
             b: {
               bar: 'raboof',
               foo: 'bar',
@@ -2797,7 +2831,9 @@ describe('merge', function() {
       });
 
       it('EI and DII = merges based on BI, BII', function(done) {
-        merge(EI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dEI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Eeee', 'Dddd'] },
@@ -2825,7 +2861,9 @@ describe('merge', function() {
       });
 
       it('FI and DII = merges based on BI, BII', function(done) {
-        merge(FI, DII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dFI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Ffff', 'Dddd'] },
@@ -2855,7 +2893,9 @@ describe('merge', function() {
       });
 
       it('GI and DII = conflict', function(done) {
-        merge(GI, DII, treeI, treeII, { log: silence }, function(err) {
+        var x = streamifier(dGI);
+        var y = streamifier(dDII);
+        merge(x, y, { log: silence }, function(err) {
           should.equal(err.message, 'merge conflict');
           should.deepEqual(err.conflict, ['c']);
           done();
@@ -2864,11 +2904,6 @@ describe('merge', function() {
     });
 
     describe('criss-cross four parents', function() {
-      var nameI  = 'crissCrossFourParentsI';
-      var nameII = 'crissCrossFourParentsII';
-      var treeI;
-      var treeII;
-
       // create the following structure, for pe I and II:
       //    -------B------F (pa: B, C, D, E)
       //   /        \/ / /
@@ -3017,18 +3052,30 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI,  BI,  CI,  DI,  EI,  FI,  GI];
-        var DAGII = [AII, BII, CII, DII, EII, FII, GII];
+      var DAGI  = [AI,  BI,  CI,  DI,  EI,  FI,  GI];
+      var DAGII = [AII, BII, CII, DII, EII, FII, GII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      //var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      //var dDI = DAGI.slice(0, 4).reverse();
+      //var dEI = DAGI.slice(0, 5).reverse();
+      var dFI = DAGI.slice(0, 6).reverse();
+      var dGI = DAGI.slice(0, 7).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
+      //var dDII = DAGII.slice(0, 4).reverse();
+      //var dEII = DAGII.slice(0, 5).reverse();
+      var dFII = DAGII.slice(0, 6).reverse();
+      var dGII = DAGII.slice(0, 7).reverse();
 
       it('FI and GI = merge', function(done) {
-        merge(FI, GI, treeI, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dFI);
+        var y = streamifier(dGI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -3049,7 +3096,9 @@ describe('merge', function() {
       });
 
       it('FI and GII = merge', function(done) {
-        merge(FI, GII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dFI);
+        var y = streamifier(dGII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -3081,7 +3130,9 @@ describe('merge', function() {
       });
 
       it('FII and GI = merge', function(done) {
-        merge(FII, GI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dFII);
+        var y = streamifier(dGI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Ffff', 'Gggg'] },
@@ -3113,7 +3164,9 @@ describe('merge', function() {
       });
 
       it('GI and FII = merge', function(done) {
-        merge(GI, FII, treeI, treeII, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dGI);
+        var y = streamifier(dFII);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
@@ -3145,7 +3198,9 @@ describe('merge', function() {
       });
 
       it('GII and FI = merge', function(done) {
-        merge(GII, FI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dGII);
+        var y = streamifier(dFI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Gggg', 'Ffff'] },
@@ -3180,11 +3235,6 @@ describe('merge', function() {
 
   describe('regression', function() {
     describe('non-symmetric multiple lca: error when fetching perspective bound lca\'s 3', function() {
-      var nameI  = 'regressionNonSymmetricMultipleLcaI';
-      var nameII = 'regressionNonSymmetricMultipleLcaII';
-      var treeI;
-      var treeII;
-
       // create the following structure, for pe I and II:
       // pe I
       //          E
@@ -3338,21 +3388,32 @@ describe('merge', function() {
         }
       };
 
-      it('save DAG', function(done) {
-        var DAGI  = [AI, BI, CI, EI, GI];
-        var DAGII = [AII, BII, CII, DII, EII, FII, GII, HII];
+      var DAGI  = [AI, BI, CI, EI, GI];
+      var DAGII = [AII, BII, CII, DII, EII, FII, GII, HII];
 
-        treeI  = new Tree(db, nameI,  { vSize: 3, log: silence });
-        treeII = new Tree(db, nameII, { vSize: 3, log: silence });
+      // create graphs that start at the leaf, might contain multiple roots
+      //var dAI = DAGI.slice(0, 1).reverse();
+      //var dBI = DAGI.slice(0, 2).reverse();
+      //var dCI = DAGI.slice(0, 3).reverse();
+      //var dEI = DAGI.slice(0, 4).reverse();
+      var dGI = DAGI.slice(0, 5).reverse();
 
-        saveDAGs(DAGI, DAGII, treeI, treeII, done);
-      });
+      //var dAII = DAGII.slice(0, 1).reverse();
+      //var dBII = DAGII.slice(0, 2).reverse();
+      //var dCII = DAGII.slice(0, 3).reverse();
+      //var dDII = DAGII.slice(0, 4).reverse();
+      //var dEII = DAGII.slice(0, 5).reverse();
+      //var dFII = DAGII.slice(0, 6).reverse();
+      //var dGII = DAGII.slice(0, 7).reverse();
+      var dHII = DAGII.slice(0, 8).reverse();
 
       it('HII and GI = ff to HI', function(done) {
-        merge(HII, GI, treeII, treeI, { log: silence }, function(err, mergeX, mergeY) {
+        var x = streamifier(dHII);
+        var y = streamifier(dGI);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
-            h: { id: 'foo', v: 'Hhhh', pa: ['Ffff', 'Gggg'], i: 8 },
+            h: { id: 'foo', v: 'Hhhh', pa: ['Ffff', 'Gggg'] },
             b: {
               a: 'foo',
               b: 'foo',
