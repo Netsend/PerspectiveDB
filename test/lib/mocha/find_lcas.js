@@ -102,9 +102,11 @@ describe('findLCAs', function() {
         var x = streamify(dA);
         var y = streamify(dA);
 
-        findLCAs(x, y, { log: silence }, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, [A.v]);
+          should.deepEqual(rootX, A);
+          should.deepEqual(rootY, A);
           done();
         });
       });
@@ -157,9 +159,11 @@ describe('findLCAs', function() {
         var x = streamify(dC);
         var y = streamify(dE);
 
-        findLCAs(x, y, { log: silence }, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, [B.v]);
+          should.deepEqual(rootX, C);
+          should.deepEqual(rootY, E);
           done();
         });
       });
@@ -1908,9 +1912,11 @@ describe('findLCAs', function() {
           rootY: vm2,
           log: silence
         };
-        findLCAs(x, y, opts, function(err, lca) {
+        findLCAs(x, y, opts, function(err, lca, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
+          should.deepEqual(rootX, vm1);
+          should.deepEqual(rootY, vm2);
           done();
         });
       });
