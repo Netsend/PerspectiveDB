@@ -102,9 +102,11 @@ describe('findLCAs', function() {
         var x = streamify(dA);
         var y = streamify(dA);
 
-        findLCAs(x, y, { log: silence }, function(err, lca, rootX, rootY) {
+        findLCAs(x, y, { log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, [A.v]);
+          should.deepEqual(lcaX, { 'Aaaaaaaa': A });
+          should.deepEqual(lcaY, { 'Aaaaaaaa': A });
           should.deepEqual(rootX, A);
           should.deepEqual(rootY, A);
           done();
@@ -159,9 +161,11 @@ describe('findLCAs', function() {
         var x = streamify(dC);
         var y = streamify(dE);
 
-        findLCAs(x, y, { log: silence }, function(err, lca, rootX, rootY) {
+        findLCAs(x, y, { log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, [B.v]);
+          should.deepEqual(lcaX, { 'Bbbbbbbb': B });
+          should.deepEqual(lcaY, { 'Bbbbbbbb': B });
           should.deepEqual(rootX, C);
           should.deepEqual(rootY, E);
           done();
@@ -1425,9 +1429,13 @@ describe('findLCAs', function() {
         var x = streamify(dEII);
         var y = streamify(dDI);
 
-        findLCAs(x, y, { log: silence }, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
+          should.deepEqual(lcaX, { 'Bbbbbbbb': BI });
+          should.deepEqual(lcaY, { 'Bbbbbbbb': BII });
+          should.deepEqual(rootX, EII);
+          should.deepEqual(rootY, DI);
           done();
         });
       });
@@ -1682,9 +1690,13 @@ describe('findLCAs', function() {
         var x = streamify(dJI);
         var y = streamify(dHII);
 
-        findLCAs(x, y, { log: silence }, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Eeeeeeee']);
+          should.deepEqual(lcaX, { 'Eeeeeeee': EI });
+          should.deepEqual(lcaY, { 'Eeeeeeee': EII });
+          should.deepEqual(rootX, JI);
+          should.deepEqual(rootY, HII);
           done();
         });
       });
@@ -1737,9 +1749,13 @@ describe('findLCAs', function() {
         var x = streamify(dII);
         var y = streamify(dJII);
 
-        findLCAs(x, y, { log: silence }, function(err, lca) {
+        findLCAs(x, y, { log: silence }, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Gggggggg', 'Eeeeeeee']);
+          should.deepEqual(lcaX, { 'Gggggggg': GI, 'Eeeeeeee': EI });
+          should.deepEqual(lcaY, { 'Gggggggg': GII, 'Eeeeeeee': EII });
+          should.deepEqual(rootX, II);
+          should.deepEqual(rootY, JII);
           done();
         });
       });
@@ -1912,9 +1928,11 @@ describe('findLCAs', function() {
           rootY: vm2,
           log: silence
         };
-        findLCAs(x, y, opts, function(err, lca, rootX, rootY) {
+        findLCAs(x, y, opts, function(err, lca, lcaX, lcaY, rootX, rootY) {
           if (err) { throw err; }
           should.deepEqual(lca, ['Bbbbbbbb']);
+          should.deepEqual(lcaX, { 'Bbbbbbbb': BI });
+          should.deepEqual(lcaY, { 'Bbbbbbbb': BII });
           should.deepEqual(rootX, vm1);
           should.deepEqual(rootY, vm2);
           done();
