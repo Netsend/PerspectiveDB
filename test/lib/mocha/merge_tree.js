@@ -604,11 +604,11 @@ describe('MergeTree', function() {
       var dname = '_mergeTreesOneTwoHeads_bar';
 
       // use 24-bit version numbers (base 64)
-      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { more1: 'body' } };
       var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
       var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more3: 'body' } };
 
-      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
+      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { more1: 'body' } };
       var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'] }, b: { more2: 'body' } };
 
       it('write sitem1, sitem2', function(done) {
@@ -652,11 +652,10 @@ describe('MergeTree', function() {
 
       it('write sitem3', function(done) {
         var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem3);
-        stree.end(done);
+        stree.write(sitem3, done);
       });
 
-      it('should merge sitem2 (ff) and sitem3 (merge) with ditem2', function(done) {
+      it('should merge sitem2 with ditem2 (ff) and sitem3 with ditem2 (merge)', function(done) {
         var stree = new Tree(db, sname, { vSize: 3, log: silence });
         var dtree = new Tree(db, dname, { vSize: 3, log: silence });
 
@@ -670,12 +669,13 @@ describe('MergeTree', function() {
             should.deepEqual(dhead, ditem2);
           }
           if (i === 2) {
+            // should add content based version number to merges
             should.deepEqual(smerge, {
-              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
               b: { more2: 'body', more3: 'body' }
             });
             should.deepEqual(dmerge, {
-              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
               b: { more2: 'body', more3: 'body' }
             });
             should.deepEqual(shead, sitem3);
@@ -773,11 +773,11 @@ describe('MergeTree', function() {
           if (i === 2) {
             // sitem3 with ditem2
             should.deepEqual(smerge, {
-              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
               b: { more2: 'body', more3: 'body' }
             });
             should.deepEqual(dmerge, {
-              h: { id: 'XI', pa: ['Cccc', 'Bbbb'] },
+              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
               b: { more2: 'body', more3: 'body' }
             });
             should.deepEqual(shead, sitem3);
