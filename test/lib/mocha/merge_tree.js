@@ -846,7 +846,6 @@ describe('MergeTree', function() {
 
   describe('mergeWithLocal', function() {
     var sname = 'mergeWithLocal_foo';
-    var dname = 'mergeWithLocal_bar';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
@@ -880,18 +879,29 @@ describe('MergeTree', function() {
       });
     });
 
-    it('needs item1 in stree', function(done) {
+    it('item1 in stree', function(done) {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item1, done);
+      stree.write(item1, done);
     });
 
     it('should merge one item with the local database, by putting it in stage', function(done) {
-      var mt = new MergeTree(db, { log: silence });
-      var stree = new Tree(db, sname, { log: silence });
+      var mergeHandler = function(newHead, prevHead, next) {
+        should.deepEqual(newHead, item1);
+        should.deepEqual(prevHead, null);
+        next();
+      };
+      var opts = {
+        vSize: 3,
+        log: silence,
+        mergeHandler: mergeHandler
+      };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, opts);
       var stage = mt._stage;
       var i = 0;
       mt.mergeWithLocal(stree, function(err) {
         if (err) { throw err; }
+        // inspect staging
         stage.iterateInsertionOrder(function(item, next) {
           i++;
           should.deepEqual(item, item1);
@@ -904,83 +914,103 @@ describe('MergeTree', function() {
       });
     });
 
-    it('should iterate over item1 because it misses in dtree', function(done) {
+    it('item2 in stree', function(done) {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      var i = 0;
-      MergeTree._mergeTrees(stree, dtree, function(item, next) {
-        i++;
-        should.deepEqual(item, item1);
+      stree.write(item2, done);
+    });
+
+    it('should merge ff with previous head in stage', function(done) {
+      var mergeHandler = function(newHead, prevHead, next) {
+        should.deepEqual(newHead, item2);
+        should.deepEqual(prevHead, item1);
         next();
-      }, function(err) {
+      };
+      var opts = {
+        vSize: 3,
+        log: silence,
+        mergeHandler: mergeHandler
+      };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, opts);
+      var stage = mt._stage;
+      var i = 0;
+      mt.mergeWithLocal(stree, function(err) {
         if (err) { throw err; }
-        should.strictEqual(i, 1);
-        done();
+        // inspect staging
+        stage.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, item1);
+          }
+          if (i === 2) {
+            should.deepEqual(item, item2);
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          done();
+        });
       });
     });
 
-    it('needs item1 in dtree', function(done) {
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      dtree.end(item1, done);
+    it('item3 in stree', function(done) {
+      var tree = new Tree(db, sname, { vSize: 3, log: silence });
+      tree.write(item3, done);
     });
 
-    it('should not iterate over item1 because it is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      var i = 0;
-      MergeTree._mergeTrees(stree, dtree, function() {
-        i++;
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 0);
-        done();
-      });
-    });
-
-    it('needs item2 in stree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item2, done);
-    });
-
-    it('should iterate over item2 in stree since item1 is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
-      var i = 0;
-      MergeTree._mergeTrees(stree, dtree, function(item, next) {
-        should.deepEqual(item, item2);
-        i++;
-        next();
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 1);
-        done();
-      });
-    });
-
-    it('needs item3 in stree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item3, done);
-    });
-
-    it('should iterate over item2 and item3 in stree since item1 is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
-      var i = 0;
-      MergeTree._mergeTrees(stree, dtree, function(item, next) {
-        if (i === 0) {
-          should.deepEqual(item, item2);
+    it('should merge with previous head in stage (merge ff (again) + merge = 3 new items)', function(done) {
+      var j = 0;
+      var mergeHandler = function(newHead, prevHead, next) {
+        j++;
+        // the previously created merge in stage is created again
+        if (j === 1) {
+          should.deepEqual(newHead, item2);
+          should.deepEqual(prevHead, item2);
         }
-        if (i === 1) {
-          should.deepEqual(item, item3);
+        if (j > 1) {
+          should.deepEqual(newHead, {
+            h: { id: 'XI', v: 'C8I/', pe: sname, pa: ['Cccc', 'Bbbb'], i: 4 },
+            b: { more: 'body', more2: 'body' }
+          });
+          should.deepEqual(prevHead, item2);
         }
-        i++;
         next();
-      }, function(err) {
+      };
+      var mt = new MergeTree(db, {
+        vSize: 3,
+        log: silence,
+        mergeHandler: mergeHandler
+      });
+      var stree = new Tree(db, sname, { vSize: 3, log: silence});
+      var stage = mt._stage;
+      mt.mergeWithLocal(stree, function(err) {
         if (err) { throw err; }
-        should.strictEqual(i, 2);
-        done();
+        // inspect staging
+        var i = 0;
+        stage.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, item1);
+          }
+          if (i === 2) {
+            should.deepEqual(item, item2);
+          }
+          if (i === 3) {
+            should.deepEqual(item, item3);
+          }
+          if (i > 3) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'C8I/', pe: sname, pa: ['Cccc', 'Bbbb'], i: 4 },
+              b: { more: 'body', more2: 'body' }
+            });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 4);
+          done();
+        });
       });
     });
   });
