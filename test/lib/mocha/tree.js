@@ -2130,6 +2130,51 @@ describe('Tree', function() {
     });
   });
 
+  describe('del', function() {
+    var name = 'del';
+
+    var item = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [], pe: 'lbp' } };
+
+    it('should require item to be an object', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.del(function() {}); }).should.throw('item must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.del({}); }).should.throw('cb must be a function');
+    });
+
+    it('needs item', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item, done);
+    });
+
+    it('should err if skipValidation not set', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.del(item, function(err) {
+        should.strictEqual(err.message, 'del is only available if skipValidation is set to true');
+        done();
+      });
+    });
+
+    it('should delete item', function(done) {
+      var t = new Tree(db, name, { skipValidation: true, vSize: 3, log: silence });
+      t.del(item, function(err) {
+        if (err) { throw err; }
+        done();
+      });
+    });
+
+    it('should err if item not found', function(done) {
+      var t = new Tree(db, name, { skipValidation: true, vSize: 3, log: silence });
+      t.del(item, function(err) {
+        should.strictEqual(err.message, 'version not found');
+        done();
+      });
+    });
+  });
+
   describe('_getDsKeyByVersion', function() {
     var name = '_getDsKeyByVersion';
 
