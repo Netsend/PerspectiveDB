@@ -962,7 +962,7 @@ describe('MergeTree', function() {
       tree.write(item3, done);
     });
 
-    it('should merge with previous head in stage (merge ff (again) + merge = 3 new items)', function(done) {
+    it('should merge with previous head in stage (merge ff (like previous test) + merge = 3 new items)', function(done) {
       var j = 0;
       var mergeHandler = function(newHead, prevHead, next) {
         j++;
@@ -973,7 +973,7 @@ describe('MergeTree', function() {
         }
         if (j > 1) {
           should.deepEqual(newHead, {
-            h: { id: 'XI', v: 'C8I/', pe: sname, pa: ['Cccc', 'Bbbb'], i: 4 },
+            h: { id: 'XI', v: 'HFFj', pa: ['Cccc', 'Bbbb'], i: 4 },
             b: { more: 'body', more2: 'body' }
           });
           should.deepEqual(prevHead, item2);
@@ -1004,7 +1004,7 @@ describe('MergeTree', function() {
           }
           if (i > 3) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'C8I/', pe: sname, pa: ['Cccc', 'Bbbb'], i: 4 },
+              h: { id: 'XI', v: 'HFFj', pa: ['Cccc', 'Bbbb'], i: 4 },
               b: { more: 'body', more2: 'body' }
             });
           }
