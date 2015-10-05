@@ -3206,6 +3206,11 @@ describe('Tree', function() {
         done();
       });
     });
+
+    it('should accept an existing non-root (of a local perspective) if skipValidation is true', function(done) {
+      var t = new Tree(db, name, { skipValidation: true, vSize: 3, log: silence });
+      t.write(item3, done);
+    });
   });
 
   describe('_writev regression', function() {
