@@ -728,7 +728,10 @@ describe('MergeTree', function() {
         var i = 0;
         MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
           i++;
-          should.deepEqual(smerge, null);
+          should.deepEqual(smerge, {
+            h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 2 },
+            b: { more2: 'body' }
+          });
           should.deepEqual(dmerge, {
             h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true },
             b: { more2: 'body' }
