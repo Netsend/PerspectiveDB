@@ -1083,449 +1083,189 @@ describe('MergeTree', function() {
     var item1 = { h: { id: 'XI', v: 'Aaaa' }, b: { some: 'body' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc' }, b: { more2: 'body' } };
-    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd' }, b: { more3: 'b' } };
 
     it('should require item to be an object', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write([], function(err) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      mt.createLocalWriteStream().write([], function(err) {
         should.strictEqual(err.message, 'item must be an object');
         done();
       });
     });
 
     it('should require item.h to be an object', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write({}, function(err) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      mt.createLocalWriteStream().write({}, function(err) {
         should.strictEqual(err.message, 'item.h must be an object');
         done();
       });
     });
 
-    it('should require item.h.id to be defined', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write({ h: { id: null } }, function(err) {
-        should.strictEqual(err.message, 'item.h.id must be defined');
+    it('should require item.h.id to be a buffer, a string or implement "toString"', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      mt.createLocalWriteStream().write({ h: { id: null } }, function(err) {
+        should.strictEqual(err.message, 'item.h.id must be a buffer, a string or implement "toString"');
         done();
       });
     });
 
-    it('should require item.h.pe to be a string', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write({ h: { id: 'some' } }, function(err) {
-        should.strictEqual(err.message, 'item.h.pe must be a string');
+    it('should require items to not have h.pa defined', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write({ h: { id: 'XI', pa: ['Aaaa'] } }, function(err) {
+        should.strictEqual(err.message, 'did not expect local item to have a parent defined');
         done();
       });
     });
 
-    it('should require item.h.pe to be a configured perspective', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write({ h: { id: 'some', pe: 'some' } }, function(err) {
-        should.strictEqual(err.message, 'perspective not found');
-        done();
-      });
-    });
+    it('should accept a new item, create parents and i', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write(item1);
 
-    it('should not accept non-connecting items', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createLocalWriteStream().write(item2, function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
-        done();
-      });
-    });
-
-    it('should accept a new root and a new leaf in an empty database and increment i twice', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
       var i = 0;
-      t.on('data', function(obj) {
-        i++;
-        should.strictEqual(obj._h.i, i);
+      lws.end(function() {
+        mt._local.iterateInsertionOrder(function(item, next) {
+          i++;
+          should.deepEqual(item, {
+            h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+            b: { some: 'body' }
+          });
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
       });
-      t.on('finish', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-      t.createLocalWriteStream().write(item1);
-      t.createLocalWriteStream().write(item2);
-      t.end();
     });
 
-    it('inspect keys: should have created two dskeys with incremented i values', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
+    it('should accept a new item and point parents to the previously created head', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write(item2);
+
       var i = 0;
-      var r = t.getDsKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8');
-        var val = obj.value;
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 1);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 2);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
-        }
+      lws.end(function() {
+        mt._local.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i > 1) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              b: { more: 'body' }
+            });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          done();
+        });
       });
+    });
 
-      s.on('end', function() {
-        should.strictEqual(i, 2);
+    it('should not accept an existing version', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write(item1, function(err) {
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
     });
 
-    it('inspect keys: should have one head key with the latest version and corresponding head value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
+    it('should accept item3 (fast-forward)', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write(item3);
+      lws.end(function() {
+        var i = 0;
+        mt._local.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+              b: { some: 'body' }
+            });
+          }
+          if (i === 2) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              b: { more: 'body' }
+            });
+          }
+          if (i > 2) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Cccc', pa: ['Bbbb'], i: 3 },
+              b: { more2: 'body' }
+            });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 3);
+          done();
+        });
+      });
+    });
+
+    it('preload item4 in stage with parent set to of Aaaa (fork)', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      mt._stage.write({
+        h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'] },
+        b: { more3: 'b' }
+      }, done);
+    });
+
+    it('write item4 (fork, use item from stage)', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+      lws.write(item4);
+      lws.end(function() {
+        var i = 0;
+        mt._local.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+              b: { some: 'body' }
+            });
+          }
+          if (i === 2) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              b: { more: 'body' }
+            });
+          }
+          if (i === 3) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Cccc', pa: ['Bbbb'], i: 3 },
+              b: { more2: 'body' }
+            });
+          }
+          if (i > 3) {
+            should.deepEqual(item, {
+              h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'], i: 4 },
+              b: { more3: 'b' }
+            });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 4);
+          done();
+        });
+      });
+    });
+
+    it('stage should be empty, since item4 is copied to local', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
       var i = 0;
-      var r = t.getHeadKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
+      mt._stage.iterateInsertionOrder(function(item, next) {
         i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8', 'base64');
-        var val = MergeTree.parseHeadVal(obj.value);
-
-        should.strictEqual(key.type, 0x03);
-        should.strictEqual(key.id, 'XI');
-        should.strictEqual(key.v, 'Bbbb');
-
-        should.strictEqual(val.i, 2);
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 1);
-        done();
-      });
-    });
-
-    it('inspect keys: should have two ikeys with the corresponding headkey as value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getIKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8');
-        var val = MergeTree.parseKey(obj.value, 'utf8', 'base64');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 1);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Aaaa');
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 2);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Bbbb');
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-
-    it('inspect keys: should have two vkeys with the corresponding dskey as value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getVKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8', 'base64');
-        var val = MergeTree.parseKey(obj.value, 'utf8');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Aaaa');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 1);
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Bbbb');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 2);
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-
-    it('should not accept an existing root', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
-        done();
-      });
-      t.end(item1);
-      // expect that streams do not emit a finish after an error occurred
-      t.on('finish', done);
-      // nor should a data event happen
-      t.on('data', done);
-    });
-
-    it('should not accept an existing non-root', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.on('error', function(err) {
-        should.strictEqual(err.message, 'item is not a new leaf');
-        done();
-      });
-      t.end(item2);
-      // expect that streams do not emit a finish after an error occurred
-      t.on('finish', done);
-      // nor should a data event happen
-      t.on('data', done);
-    });
-
-    it('should accept new item (fork)', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.on('data', function(obj) {
-        should.strictEqual(obj._h.i, 3);
-        done();
-      });
-      t.createLocalWriteStream().write(item3);
-    });
-
-    it('should accept new item (fast-forward)', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.on('data', function(obj) {
-        should.strictEqual(obj._h.i, 4);
-        done();
-      });
-      t.createLocalWriteStream().write(item4);
-    });
-
-    it('inspect keys: should have created four dskeys with incremented i values', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getDsKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8');
-        var val = obj.value;
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 1);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, _b: { some: 'body' } });
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 2);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, _b: { more: 'body' } });
-        }
-        if (i === 3) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 3);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3 }, _b: { more2: 'body' } });
-        }
-        if (i === 4) {
-          should.strictEqual(key.type, 0x01);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.i, 4);
-          should.deepEqual(val, { _h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4 }, _b: { more3: 'b' } });
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 4);
-        done();
-      });
-    });
-
-    it('inspect keys: should have two headkey with the latest versions and corresponding value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getHeadKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8', 'base64');
-        var val = MergeTree.parseHeadVal(obj.value, 'utf8');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Bbbb');
-
-          should.strictEqual(val.i, 2);
-        }
-
-        if (i === 2) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Dddd');
-
-          should.strictEqual(val.i, 4);
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-
-    it('inspect keys: should have two headKeys with the latest versions and corresponding value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getHeadKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8', 'base64');
-        var val = MergeTree.parseHeadVal(obj.value, 'utf8');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Bbbb');
-
-          should.strictEqual(val.i, 2);
-        }
-
-        if (i === 2) {
-          should.strictEqual(key.type, 0x03);
-          should.strictEqual(key.id, 'XI');
-          should.strictEqual(key.v, 'Dddd');
-
-          should.strictEqual(val.i, 4);
-        }
-      });
-      s.on('close', function() {
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-
-    it('inspect keys: should have four ikeys with the corresponding headkey as value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getIKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8');
-        var val = MergeTree.parseKey(obj.value, 'utf8', 'base64');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 1);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Aaaa');
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 2);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Bbbb');
-        }
-        if (i === 3) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 3);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Cccc');
-        }
-        if (i === 4) {
-          should.strictEqual(key.type, 0x02);
-          should.strictEqual(key.i, 4);
-
-          should.strictEqual(val.type, 0x03);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.v, 'Dddd');
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 4);
-        done();
-      });
-    });
-
-    it('inspect keys: should have four vkeys with the corresponding dskey as value', function(done) {
-      var t = new MergeTree(db, { vSize: 3, log: silence });
-      var i = 0;
-      var r = t.getVKeyRange();
-      var s = db.createReadStream({ gt: r.s, lt: r.e });
-      s.on('data', function(obj) {
-        i++;
-
-        var key = MergeTree.parseKey(obj.key, 'utf8', 'base64');
-        var val = MergeTree.parseKey(obj.value, 'utf8');
-
-        if (i === 1) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Aaaa');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 1);
-        }
-        if (i === 2) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Bbbb');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 2);
-        }
-        if (i === 3) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Cccc');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 3);
-        }
-        if (i === 4) {
-          should.strictEqual(key.type, 0x04);
-          should.strictEqual(key.v, 'Dddd');
-
-          should.strictEqual(val.type, 0x01);
-          should.strictEqual(val.id, 'XI');
-          should.strictEqual(val.i, 4);
-        }
-      });
-
-      s.on('end', function() {
-        should.strictEqual(i, 4);
+        next();
+      }, function(err) {
+        if (err) { throw err; }
+        should.strictEqual(i, 0);
         done();
       });
     });
