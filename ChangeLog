@@ -3,6 +3,6 @@
 * add new leveldb backend that can replace the mongodb dependency (not in use yet)
 
 
-2015.10.06, Version 0.0.3
+2015.07.09, Version 0.0.3
 
 * first tagged release
