@@ -1,31 +1,31 @@
 {
-  "name": "Mastersync",
-  "version": "0.0.3",
+  "name": "PersBD",
+  "version": "0.0.5",
   "author": {
     "name": "Tim Kuijsten",
     "email": "tim@netsend.nl",
     "url": "https://github.com/timkuijsten"
   },
   "license": "AGPL-3.0",
-  "description": "master-master replication with transformations",
+  "description": "multi-master replication with transformations",
   "keywords": [
+    "multi",
     "master",
     "replication",
     "transformation"
   ],
   "dependencies": {
+    "daemon": "^1.1.0",
+    "hjson": "^1.7.4",
     "is-equal": "^1.2.3",
     "level": "^1.3.0",
     "bson": "^0.4.11",
     "posix": "^2.0.0",
-    "mongo-key-escaper": "^0.0.3",
     "properties": "^1.2.1",
-    "mongodb": "~1.4.9",
     "async": "^0.9.0",
     "crc-32": "^0.2.2",
     "commander": "^2.3.0",
     "object-key-transform": "^0.0.1",
-    "mongo-bcrypt-user": "^2.0.2",
     "array-bcrypt-user": "^1.0.2",
     "ld-jsonstream": "^0.0.2",
     "read": "^1.0.5",
@@ -44,10 +44,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/Netsend/mastersync.git"
+    "url": "git://github.com/Netsend/persdb.git"
   },
-  "bugs": "https://github.com/Netsend/mastersync/issues",
-  "bin" : { "mastersync" : "./server.js" },
+  "bugs": "https://github.com/Netsend/persdb/issues",
+  "bin" : { "persdb" : "./bin/server.js" },
   "scripts": {
     "test": "mocha ./test"
   }
