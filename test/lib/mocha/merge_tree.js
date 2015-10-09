@@ -1293,4 +1293,37 @@ describe('MergeTree', function() {
       });
     });
   });
+
+  describe('_versionContent', function() {
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, b: { more: 'body' } };
+
+    it('should require item to be an object', function() {
+      (function() { MergeTree._versionContent(); }).should.throw('item must be an object');
+    });
+
+    it('should require vSize to be >0 bytes', function() {
+      (function() { MergeTree._versionContent(item1, 0); }).should.throw('version too small');
+    });
+
+    it('should try to read first parent if vSize is omitted', function() {
+      (function() { MergeTree._versionContent(item1); }).should.throw('cannot determine vSize');
+    });
+
+    it('should version item1', function() {
+      var v = MergeTree._versionContent(item1, 3);
+      should.deepEqual(v, 'lYSZ');
+    });
+
+    it('should version item2 with vSize provided', function() {
+      var v = MergeTree._versionContent(item2, 3);
+      should.deepEqual(v, 'nujg');
+    });
+
+    it('should version item2 and determine vSize automatically', function() {
+      var v = MergeTree._versionContent(item2);
+      should.deepEqual(v, 'nujg');
+    });
+  });
 });
