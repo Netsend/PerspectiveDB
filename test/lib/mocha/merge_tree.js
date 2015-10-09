@@ -847,6 +847,55 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('lastByPerspective', function() {
+    var name = 'lastByPerspective';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: name, pa: [] }, b: { some: 'body' } };
+
+    it('should require pe to be a buffer or a string', function() {
+      var mt = new MergeTree(db);
+      (function() { mt.lastByPerspective(); }).should.throw('pe must be a buffer or a string');
+    });
+
+    it('should require cb to be a function', function() {
+      var mt = new MergeTree(db);
+      (function() { mt.lastByPerspective(''); }).should.throw('cb must be a function');
+    });
+
+    it('should return with non-existing database', function(done) {
+      var mt = new MergeTree(db, { log: silence });
+      mt.lastByPerspective('some', function(err, v) {
+        if (err) { throw err; }
+        should.strictEqual(v, null);
+        done();
+      });
+    });
+
+    it('save item1 from pe "lastByPerspective"', function(done) {
+      var mt = new MergeTree(db, { log: silence, vSize: 3 });
+      mt._local.write(item1, done);
+    });
+
+    it('should return with last saved item as a buffer by default', function(done) {
+      var mt = new MergeTree(db, { log: silence });
+      mt.lastByPerspective(name, 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.strictEqual(v.toString('base64'), 'Aaaa');
+        done();
+      });
+    });
+
+    it('should return with last saved item, decoded in base64', function(done) {
+      var mt = new MergeTree(db, { log: silence });
+      mt.lastByPerspective(name, 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.strictEqual(v, 'Aaaa');
+        done();
+      });
+    });
+  });
+
   describe('mergeWithLocal', function() {
     var sname = 'mergeWithLocal_foo';
 
