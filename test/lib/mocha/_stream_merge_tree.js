@@ -46,6 +46,7 @@ before(function(done) {
       silence = l;
       // ensure empty dbPath
       rimraf(dbPath, function(err) {
+        if (err) { throw err; }
         fs.mkdir(dbPath, 0o755, done);
       });
     });
@@ -126,7 +127,7 @@ describe('StreamMergeTree', function() {
   });
 
   describe('stream', function() {
-    var mt, smt;
+    var mt;
 
     var perspective = 'I';
 
@@ -254,6 +255,33 @@ describe('StreamMergeTree', function() {
       });
     });
 
+    it('should reopen and return all elements again', function(done) {
+      // use tailable is false to stop emitting documents after the last found doc
+      var smt = new StreamMergeTree(mt, { local: perspective, log: silence });
+      var docs = [], docs2 = [];
+
+      smt.on('data', function(doc) {
+        docs.push(doc);
+      });
+
+      smt.on('end', function() {
+        should.equal(docs.length, 7);
+        should.deepEqual(docs, [rA, rB, rC, rD, rE, rF, rG]);
+
+        var smt2 = smt.reopen();
+        smt2.on('data', function(doc) {
+          docs2.push(doc);
+        });
+
+        smt2.on('end', function() {
+          should.equal(docs2.length, 7);
+          should.deepEqual(docs2, [rA, rB, rC, rD, rE, rF, rG]);
+
+          done();
+        });
+      });
+    });
+
     it('should return raw buffer instances', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = new StreamMergeTree(mt, {
@@ -299,7 +327,7 @@ describe('StreamMergeTree', function() {
       var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: E.h.v
+        first: E.h.v
       });
       var docs = [];
 
@@ -318,10 +346,10 @@ describe('StreamMergeTree', function() {
 
     it('should return everything since offset C (including E)', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: C.h.v
+        first: C.h.v
       });
       var docs = [];
 
@@ -342,10 +370,10 @@ describe('StreamMergeTree', function() {
 
     it('should return the complete DAG if filter is empty', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v
+        first: A.h.v
       });
       var docs = [];
 
@@ -368,10 +396,10 @@ describe('StreamMergeTree', function() {
 
     it('should not endup with two same parents A for G since F is a merge but not selected', function(done) {
       // should not find A twice for merge F
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         filter: { baz: 'qux' }
       });
       var docs = [];
@@ -382,19 +410,19 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 3);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Aaaa', pa: [] }, _m3: {}, baz : 'qux' });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Dddd', pa: ['Aaaa'] }, _m3: {}, baz : 'qux' });
-        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Gggg', pa: ['Aaaa'] }, _m3: {}, baz : 'qux' });
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Aaaa', pa: [] }, b: { baz : 'qux' } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Dddd', pa: ['Aaaa'] },  b: { baz : 'qux' } });
+        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Gggg', pa: ['Aaaa'] },  b: { baz : 'qux' } });
         done();
       });
     });
 
     it('should return only attrs with baz = mug and change root to C', function(done) {
       // should not find A twice for merge F
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         filter: { baz: 'mux' }
       });
       var docs = [];
@@ -405,17 +433,17 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 1);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Cccc', pa: [] }, _m3: {}, baz : 'mux', foo: 'bar' });
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Cccc', pa: [] }, b: { baz : 'mux', foo: 'bar' } });
         done();
       });
     });
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents', function(done) {
       // should not find A twice for merge F
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         filter: { foo: 'bar' }
       });
       var docs = [];
@@ -426,19 +454,19 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 3);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, _m3: {}, foo: 'bar' });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, _m3: {}, baz: 'mux', foo: 'bar' });
-        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, _m3: {}, foo: 'bar' });
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, b: { foo: 'bar' } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, b: { baz: 'mux', foo: 'bar' } });
+        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, b: { foo: 'bar' } });
         done();
       });
     });
 
     it('should return nothing if filters don\'t match any item', function(done) {
       // should not find A twice for merge F
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         filter: { some: 'none' }
       });
       var docs = [];
@@ -455,31 +483,31 @@ describe('StreamMergeTree', function() {
 
     it('should execute each hook', function(done) {
       // should not find A twice for merge F
-      function transform(db, object, opts, callback) {
-        delete object.baz;
-        object.checked = true;
+      function transform(db, obj, opts, cb) {
+        delete obj.b.baz;
+        obj.b.checked = true;
         if (i === 1) {
-          object.checked = false;
+          obj.b.checked = false;
         }
         i++;
-        callback(null, object);
+        cb(null, obj);
       }
-      function hook1(db, object, opts, callback) {
-        object.hook1 = true;
-        if (object.h.v === 'Gggg') { object.hook1g = 'foo'; }
-        callback(null, object);
+      function hook1(db, obj, opts, cb) {
+        obj.b.hook1 = true;
+        if (obj.h.v === 'Gggg') { obj.b.hook1g = 'foo'; }
+        cb(null, obj);
       }
-      function hook2(db, object, opts, callback) {
-        if (object.hook1) {
-          object.hook2 = true;
+      function hook2(db, obj, opts, cb) {
+        if (obj.b.hook1) {
+          obj.b.hook2 = true;
         }
-        callback(null, object);
+        cb(null, obj);
       }
 
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         filter: { baz: 'qux' },
         hooks: [transform, hook1, hook2]
       });
@@ -493,10 +521,9 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 3);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Aaaa', pa: [] }, _m3: {}, checked : true, hook1: true, hook2: true });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Dddd', pa: ['Aaaa'] }, _m3: {}, checked : false, hook1: true, hook2: true});
-        should.deepEqual(docs[2],
-          { h: { id: 'foo', v: 'Gggg', pa: ['Aaaa'] }, _m3: {}, checked : true, hook1g: 'foo', hook1: true, hook2: true});
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Aaaa', pa: [] }, b: { checked : true, hook1: true, hook2: true } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Dddd', pa: ['Aaaa'] }, b: { checked : false, hook1: true, hook2: true} });
+        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Gggg', pa: ['Aaaa'] }, b: { checked : true, hook1g: 'foo', hook1: true, hook2: true} });
         done();
       });
     });
@@ -504,27 +531,27 @@ describe('StreamMergeTree', function() {
     it('should cancel hook execution and skip item if one hook filters', function(done) {
       // should not find A twice for merge F
 
-      function transform(db, object, opts, callback) {
-        delete object.baz;
-        object.transformed = true;
-        callback(null, object);
+      function transform(db, obj, opts, callback) {
+        delete obj.b.baz;
+        obj.b.transformed = true;
+        callback(null, obj);
       }
       // filter F. G should get parents of F which are E and C
-      function hook1(db, object, opts, callback) {
-        if (object.h.v === 'Ffff') {
+      function hook1(db, obj, opts, callback) {
+        if (obj.h.v === 'Ffff') {
           return callback(null, null);
         }
-        callback(null, object);
+        callback(null, obj);
       }
-      function hook2(db, object, opts, callback) {
-        object.hook2 = true;
-        callback(null, object);
+      function hook2(db, obj, opts, callback) {
+        obj.b.hook2 = true;
+        callback(null, obj);
       }
 
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: E.h.v,
+        first: E.h.v,
         hooks: [transform, hook1, hook2]
       });
 
@@ -536,24 +563,24 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 2);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Eeee', pa: ['Bbbb'] }, _m3: {}, transformed : true, hook2: true });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Gggg', pa: ['Eeee', 'Cccc'] }, _m3: {}, transformed : true, hook2: true});
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Eeee', pa: ['Bbbb'] }, b: { transformed : true, hook2: true } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Gggg', pa: ['Eeee', 'Cccc'] }, b: { transformed : true, hook2: true} });
         done();
       });
     });
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents, filtered by hook', function(done) {
-      function hook(db, object, opts, callback) {
-        if (object.foo === 'bar') {
-          return callback(null, object);
+      function hook(db, obj, opts, callback) {
+        if (obj.b.foo === 'bar') {
+          return callback(null, obj);
         }
         callback(null, null);
       }
 
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: A.h.v,
+        first: A.h.v,
         hooks: [hook]
       });
       var docs = [];
@@ -564,25 +591,25 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 3);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, _m3: {}, foo: 'bar' });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, _m3: {}, baz: 'mux', foo: 'bar' });
-        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, _m3: {}, foo: 'bar' });
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, b: { foo: 'bar' } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, b: { baz: 'mux', foo: 'bar' } });
+        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, b: { foo: 'bar' } });
         done();
       });
     });
 
     it('should return only attrs with foo = bar and change root to B and alter subsequent parents, filtered by hook and offset = B', function(done) {
-      function hook(db, object, opts, callback) {
-        if (object.foo === 'bar') {
-          return callback(null, object);
+      function hook(db, obj, opts, callback) {
+        if (obj.b.foo === 'bar') {
+          return callback(null, obj);
         }
         callback(null, null);
       }
 
-      var smt = new StreamMergeTree(snapshotCollection, {
+      var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        offset: B.h.v,
+        first: B.h.v,
         hooks: [hook]
       });
 
@@ -594,31 +621,17 @@ describe('StreamMergeTree', function() {
 
       smt.on('end', function() {
         should.equal(docs.length, 3);
-        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, _m3: {}, foo: 'bar' });
-        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, _m3: {}, baz: 'mux', foo: 'bar' });
-        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, _m3: {}, foo: 'bar' });
+        should.deepEqual(docs[0], { h: { id: 'foo', v: 'Bbbb', pa: [] }, b: { foo: 'bar' } });
+        should.deepEqual(docs[1], { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, b: { baz: 'mux', foo: 'bar' } });
+        should.deepEqual(docs[2], { h: { id: 'foo', v: 'Ffff', pa: ['Bbbb', 'Cccc'] }, b: { foo: 'bar' } });
         done();
       });
     });
 
     it('should be a readable stream', function(done) {
-      var smt = new StreamMergeTree(snapshotCollection, { log: silence });
+      var smt = new StreamMergeTree(mt, { log: silence });
       should.strictEqual(smt instanceof Readable, true);
       done();
-    });
-  });
-
-  describe('close', function() {
-    var snapshotCollectionName = 'm3.close';
-    var snapshotCollection;
-
-    it('should close', function(done) {
-      // should not find A twice for merge F
-      var smt = new StreamMergeTree(snapshotCollection, { follow: true, log: silence });
-
-      smt.on('end', done);
-      smt.resume();
-      smt.close();
     });
   });
 });
