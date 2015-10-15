@@ -122,7 +122,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.dbPath must be a string/.test(buff.toString()));
+    assert(/msg.path must be a string/.test(buff.toString()));
     assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
@@ -149,7 +149,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.dbName must be a string/.test(buff.toString()));
+    assert(/msg.name must be a string/.test(buff.toString()));
     assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
@@ -162,7 +162,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        dbPath: 'test',
+        path: 'test',
         chrootUser: 'test',
         chrootNewRoot: '/var/empty'
       });
@@ -174,7 +174,7 @@ tasks.push(function(done) {
   });
 });
 
-// should fail if first message does not contain a logCfg
+// should fail if first message does not contain a log
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -185,7 +185,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.logCfg must be an object/.test(buff.toString()));
+    assert(/msg.log must be an object/.test(buff.toString()));
     assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
@@ -198,8 +198,8 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        dbPath: tmpdir(),
-        dbName: 'test',
+        path: tmpdir(),
+        name: 'test',
         chrootUser: 'test',
         chrootNewRoot: '/var/empty'
       });
@@ -223,7 +223,7 @@ tasks.push(function(done) {
   });
   child.on('exit', function(code, sig) {
     assert(/chroot must be called while running as root/.test(buff.toString()));
-    assert.strictEqual(code, 1);
+    assert.strictEqual(code, 4);
     assert.strictEqual(sig, null);
     done();
   });
@@ -235,9 +235,9 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true },
-        dbPath: tmpdir(),
-        dbName: 'test',
+        log: { console: true },
+        path: tmpdir(),
+        name: 'test',
         chrootUser: 'test',
         chrootNewRoot: '/var/empty'
       });
