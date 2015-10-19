@@ -163,8 +163,8 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         path: 'test',
-        chrootUser: 'test',
-        chrootNewRoot: '/var/empty'
+        user: 'test',
+        chroot: '/var/empty'
       });
       break;
     default:
@@ -200,8 +200,8 @@ tasks.push(function(done) {
       child.send({
         path: tmpdir(),
         name: 'test',
-        chrootUser: 'test',
-        chrootNewRoot: '/var/empty'
+        user: 'test',
+        chroot: '/var/empty'
       });
       break;
     default:
@@ -238,8 +238,8 @@ tasks.push(function(done) {
         log: { console: true },
         path: tmpdir(),
         name: 'test',
-        chrootUser: 'test',
-        chrootNewRoot: '/var/empty'
+        user: 'test',
+        chroot: '/var/empty'
       });
       break;
     default:
@@ -248,6 +248,8 @@ tasks.push(function(done) {
     }
   });
 });
+
+// SEE assert_root/db_exec_root.js FOR FURTHER TESTING
 
 async.series(tasks, function(err) {
   if (err) {
