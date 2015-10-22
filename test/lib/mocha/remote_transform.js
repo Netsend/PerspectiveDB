@@ -71,19 +71,19 @@ describe('RemoteTransform', function() {
     rt.end();
   });
 
-  it('should reset _id._pe from baz to foo', function(done) {
+  it('should reset h.pe from baz to foo', function(done) {
     var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(obj) {
-      should.deepEqual(obj, { _id: { _pe: 'foo' } });
+      should.deepEqual(obj, { h: { pe: 'foo' } });
       done();
     });
-    rt.end({ _id: { _pe: 'baz' } });
+    rt.end({ h: { pe: 'baz' } });
   });
 
-  it('should emit an error if _id._pe can not be set', function(done) {
+  it('should emit an error if h.pe can not be set', function(done) {
     var rt = new RemoteTransform('foo', { log: silence });
     rt.on('error', function(err) {
-      should.strictEqual(err.message, 'Cannot set property \'_pe\' of undefined');
+      should.strictEqual(err.message, 'Cannot set property \'pe\' of undefined');
       done();
     });
 
@@ -105,41 +105,21 @@ describe('RemoteTransform', function() {
   it('should emit data when error is not the only key', function(done) {
     var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
-      should.deepEqual(data, { error: 'some error', _id: { some: 'not only error', _pe: 'foo' } });
+      should.deepEqual(data, { error: 'some error', h: { some: 'not only error', pe: 'foo' } });
       done();
     });
 
-    rt.end({ error: 'some error', _id: { some: 'not only error' } });
+    rt.end({ error: 'some error', h: { some: 'not only error' } });
   });
 
-  it('should strip _id._lo', function(done) {
+  it('should strip h.i', function(done) {
     var rt = new RemoteTransform('foo', { log: silence });
     rt.on('data', function(data) {
-      should.deepEqual(data, { _id: { _pe: 'foo' } });
+      should.deepEqual(data, { h: { pe: 'foo' } });
       done();
     });
 
-    rt.end({ _id: { _lo: true } });
-  });
-
-  it('should strip _id._i', function(done) {
-    var rt = new RemoteTransform('foo', { log: silence });
-    rt.on('data', function(data) {
-      should.deepEqual(data, { _id: { _pe: 'foo' } });
-      done();
-    });
-
-    rt.end({ _id: { _i: 1 } });
-  });
-
-  it('should strip _m3', function(done) {
-    var rt = new RemoteTransform('foo', { log: silence });
-    rt.on('data', function(data) {
-      should.deepEqual(data, { _id: { bar: 'baz', _pe: 'foo' } });
-      done();
-    });
-
-    rt.end({ _m3: { foo: 'bar' }, _id: { bar: 'baz' } });
+    rt.end({ h: { i: 1 } });
   });
 
   it('should support simple hooks and hook options', function(done) {
@@ -173,16 +153,16 @@ describe('RemoteTransform', function() {
     var rt = new RemoteTransform('fu', opts);
 
     rt.once('data', function(data) {
-      should.deepEqual(data, { foo: 'bar', hook1: true, _id: { _id: 'foo', _pe: 'fu' } });
+      should.deepEqual(data, { foo: 'bar', hook1: true, h: { id: 'foo', pe: 'fu' } });
 
       rt.on('data', function(data) {
-        should.deepEqual(data, { foo: 'quz', _id: { _id: 'foo', _pe: 'fu' } });
+        should.deepEqual(data, { foo: 'quz', h: { id: 'foo', pe: 'fu' } });
         done();
       });
-      rt.write({ _id: { _id: 'foo' }, foo: 'baz' }); // this one should be filtered by hook2
-      rt.write({ _id: { _id: 'foo' }, foo: 'quz' }); // nothing should happen to this one and it should be emitted
+      rt.write({ h: { id: 'foo' }, foo: 'baz' }); // this one should be filtered by hook2
+      rt.write({ h: { id: 'foo' }, foo: 'quz' }); // nothing should happen to this one and it should be emitted
     });
 
-    rt.write({ _id: { _id: 'foo' }, foo: 'bar' });
+    rt.write({ h: { id: 'foo' }, foo: 'bar' });
   });
 });
