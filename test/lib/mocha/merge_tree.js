@@ -849,22 +849,26 @@ describe('MergeTree', function() {
 
   describe('lastByPerspective', function() {
     var name = 'lastByPerspective';
+    var stageName = '_stage_lastByPerspective';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: name, pa: [] }, b: { some: 'body' } };
 
     it('should require pe to be a buffer or a string', function() {
-      var mt = new MergeTree(db);
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       (function() { mt.lastByPerspective(); }).should.throw('pe must be a buffer or a string');
     });
 
     it('should require cb to be a function', function() {
-      var mt = new MergeTree(db);
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       (function() { mt.lastByPerspective(''); }).should.throw('cb must be a function');
     });
 
     it('should return with non-existing database', function(done) {
-      var mt = new MergeTree(db, { log: silence });
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       mt.lastByPerspective('some', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v, null);
@@ -873,12 +877,14 @@ describe('MergeTree', function() {
     });
 
     it('save item1 from pe "lastByPerspective"', function(done) {
-      var mt = new MergeTree(db, { log: silence, vSize: 3 });
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       mt._local.write(item1, done);
     });
 
     it('should return with last saved item as a buffer by default', function(done) {
-      var mt = new MergeTree(db, { log: silence });
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       mt.lastByPerspective(name, 'base64', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v.toString('base64'), 'Aaaa');
@@ -887,7 +893,8 @@ describe('MergeTree', function() {
     });
 
     it('should return with last saved item, decoded in base64', function(done) {
-      var mt = new MergeTree(db, { log: silence });
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       mt.lastByPerspective(name, 'base64', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v, 'Aaaa');
@@ -898,6 +905,7 @@ describe('MergeTree', function() {
 
   describe('mergeWithLocal', function() {
     var sname = 'mergeWithLocal_foo';
+    var stageName = '_stage_mergeWithLocal';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
@@ -905,17 +913,20 @@ describe('MergeTree', function() {
     var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
 
     it('should require stree to be an object', function() {
-      var mt = new MergeTree(db);
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       (function() { mt.mergeWithLocal(); }).should.throw('stree must be an object');
     });
 
     it('should require cb to be a function', function() {
-      var mt = new MergeTree(db);
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       (function() { mt.mergeWithLocal({}); }).should.throw('cb must be a function');
     });
 
     it('should merge an empty database', function(done) {
-      var mt = new MergeTree(db, { log: silence });
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
       var stree = new Tree(db, sname, { log: silence });
       var i = 0;
       mt.mergeWithLocal(stree, function(err) {
@@ -943,7 +954,7 @@ describe('MergeTree', function() {
         next();
       };
       var opts = {
-        stage: '_stage' + sname,
+        stage: stageName,
         vSize: 3,
         log: silence,
         mergeHandler: mergeHandler
@@ -979,7 +990,7 @@ describe('MergeTree', function() {
         next();
       };
       var opts = {
-        stage: '_stage' + sname,
+        stage: stageName,
         vSize: 3,
         log: silence,
         mergeHandler: mergeHandler
@@ -1041,7 +1052,7 @@ describe('MergeTree', function() {
         next();
       };
       var mt = new MergeTree(db, {
-        stage: '_stage' + sname,
+        stage: stageName,
         vSize: 3,
         log: silence,
         mergeHandler: mergeHandler
@@ -1149,7 +1160,7 @@ describe('MergeTree', function() {
   });
 
   describe('createLocalWriteStream', function() {
-    var name = 'createLocalWriteStream';
+    var stageName = '_stage_createLocalWriteStream';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa' }, b: { some: 'body' } };
@@ -1158,7 +1169,7 @@ describe('MergeTree', function() {
     var item4 = { h: { id: 'XI', v: 'Dddd' }, b: { more3: 'b' } };
 
     it('should require item to be an object', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       mt.createLocalWriteStream().write([], function(err) {
         should.strictEqual(err.message, 'item must be an object');
         done();
@@ -1166,7 +1177,7 @@ describe('MergeTree', function() {
     });
 
     it('should require item.h to be an object', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       mt.createLocalWriteStream().write({}, function(err) {
         should.strictEqual(err.message, 'item.h must be an object');
         done();
@@ -1174,7 +1185,7 @@ describe('MergeTree', function() {
     });
 
     it('should require item.h.id to be a buffer, a string or implement "toString"', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       mt.createLocalWriteStream().write({ h: { id: null } }, function(err) {
         should.strictEqual(err.message, 'item.h.id must be a buffer, a string or implement "toString"');
         done();
@@ -1182,7 +1193,7 @@ describe('MergeTree', function() {
     });
 
     it('should require items to not have h.pa defined', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write({ h: { id: 'XI', pa: ['Aaaa'] } }, function(err) {
         should.strictEqual(err.message, 'did not expect local item to have a parent defined');
@@ -1191,7 +1202,7 @@ describe('MergeTree', function() {
     });
 
     it('should accept a new item, create parents and i', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item1);
 
@@ -1213,7 +1224,7 @@ describe('MergeTree', function() {
     });
 
     it('should accept a new item and point parents to the previously created head', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item2);
 
@@ -1237,7 +1248,7 @@ describe('MergeTree', function() {
     });
 
     it('should not accept an existing version', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item1, function(err) {
         should.strictEqual(err.message, 'not a valid new item');
@@ -1246,7 +1257,7 @@ describe('MergeTree', function() {
     });
 
     it('should accept item3 (fast-forward)', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item3);
       lws.end(function() {
@@ -1281,7 +1292,7 @@ describe('MergeTree', function() {
     });
 
     it('preload item4 in stage with parent set to of Aaaa (fork)', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       mt._stage.write({
         h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'] },
         b: { more3: 'b' }
@@ -1289,7 +1300,7 @@ describe('MergeTree', function() {
     });
 
     it('write item4 (fork, use item from stage)', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item4);
       lws.end(function() {
@@ -1330,7 +1341,7 @@ describe('MergeTree', function() {
     });
 
     it('stage should be empty, since item4 is copied to local', function(done) {
-      var mt = new MergeTree(db, { stage: '_stage' + name, vSize: 3, log: silence });
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var i = 0;
       mt._stage.iterateInsertionOrder(function(item, next) {
         i++;
