@@ -850,25 +850,43 @@ describe('MergeTree', function() {
   describe('lastByPerspective', function() {
     var name = 'lastByPerspective';
     var stageName = '_stage_lastByPerspective';
+    var ldb;
+    var ldbPath = tmpdir() + '/test_merge_tree_lastByPerspective';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: name, pa: [] }, b: { some: 'body' } };
 
+    before('should open a new db for lastByPerspective tests only', function(done) {
+      // ensure a db at start
+      rimraf(ldbPath, function(err) {
+        if (err) { throw err; }
+        level(ldbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, adb) {
+          if (err) { throw err; }
+          ldb = adb;
+          done();
+        });
+      });
+    });
+
+    after('should destroy this db', function(done) {
+      rimraf(ldbPath, done);
+    });
+
     it('should require pe to be a buffer or a string', function() {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       (function() { mt.lastByPerspective(); }).should.throw('pe must be a buffer or a string');
     });
 
     it('should require cb to be a function', function() {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       (function() { mt.lastByPerspective(''); }).should.throw('cb must be a function');
     });
 
     it('should return with non-existing database', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       mt.lastByPerspective('some', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v, null);
@@ -878,13 +896,13 @@ describe('MergeTree', function() {
 
     it('save item1 from pe "lastByPerspective"', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       mt._local.write(item1, done);
     });
 
     it('should return with last saved item as a buffer by default', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       mt.lastByPerspective(name, 'base64', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v.toString('base64'), 'Aaaa');
@@ -894,7 +912,7 @@ describe('MergeTree', function() {
 
     it('should return with last saved item, decoded in base64', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
+      var mt = new MergeTree(ldb, opts);
       mt.lastByPerspective(name, 'base64', function(err, v) {
         if (err) { throw err; }
         should.strictEqual(v, 'Aaaa');
