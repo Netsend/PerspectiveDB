@@ -20,7 +20,6 @@
 
 var assert = require('assert');
 var childProcess = require('child_process');
-var tmpdir = require('os').tmpdir;
 
 var async = require('async');
 
@@ -111,70 +110,7 @@ tasks.push(function(done) {
   });
 });
 
-// should fail if third message does not contain a db path
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.path must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.once('message', function(msg) {
-    assert.strictEqual(msg, 'init');
-    child.send({});
-  });
-});
-
-// should fail if first message does not contain a db name
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  var buff = new Buffer(0);
-  child.stderr.on('data', function(data) {
-    buff = Buffer.concat([buff, data]);
-  });
-  child.on('exit', function(code, sig) {
-    assert(/msg.name must be a string/.test(buff.toString()));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  child.on('message', function(msg) {
-    switch (msg) {
-    case 'init':
-      child.send({
-        path: 'test',
-        user: 'test',
-        chroot: '/var/empty'
-      });
-      break;
-    default:
-      console.error(msg);
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should fail if first message does not contain a log
+// should fail if first message does not contain a log object
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -194,14 +130,74 @@ tasks.push(function(done) {
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
 
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.once('message', function(msg) {
+    assert.strictEqual(msg, 'init');
+    child.send({});
+  });
+});
+
+// should fail path is not a string
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  var buff = new Buffer(0);
+  child.stderr.on('data', function(data) {
+    buff = Buffer.concat([buff, data]);
+  });
+  child.on('exit', function(code, sig) {
+    assert(/msg.path must be a string/.test(buff.toString()));
+    assert.strictEqual(code, 1);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
   child.on('message', function(msg) {
     switch (msg) {
     case 'init':
       child.send({
-        path: tmpdir(),
-        name: 'test',
-        user: 'test',
-        chroot: '/var/empty'
+        log: {},
+        path: 1
+      });
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should fail if user does not exist
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  var buff = new Buffer(0);
+  child.stderr.on('data', function(data) {
+    buff = Buffer.concat([buff, data]);
+  });
+  child.on('exit', function(code, sig) {
+    assert(/user id does not exist test/.test(buff.toString()));
+    assert.strictEqual(code, 3);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        log: { console: true },
+        user: 'test'
       });
       break;
     default:
@@ -223,7 +219,7 @@ tasks.push(function(done) {
   });
   child.on('exit', function(code, sig) {
     assert(/chroot must be called while running as root/.test(buff.toString()));
-    assert.strictEqual(code, 4);
+    assert.strictEqual(code, 8);
     assert.strictEqual(sig, null);
     done();
   });
@@ -236,9 +232,8 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: tmpdir(),
-        name: 'test',
-        user: 'test',
+        path: '.',
+        user: 'nobody',
         chroot: '/var/empty'
       });
       break;
