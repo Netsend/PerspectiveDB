@@ -1126,33 +1126,24 @@ describe('MergeTree', function() {
     var item3 = { h: { id: 'XI', pe: pe, v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
     var item4 = { h: { id: 'XI', pe: pe, v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'b' } };
 
-    it('should require item.h.pe to be a string', function(done) {
+    it('should require remote to be a string', function() {
       var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createRemoteWriteStream().write({}, function(err) {
-        should.strictEqual(err.message, 'item.h.pe must be a string');
-        done();
-      });
+      (function() { t.createRemoteWriteStream(); }).should.throw('remote must be a string');
     });
 
-    it('should require item.h.pe to be a configured perspective', function(done) {
+    it('should require remote to be a configured perspective', function() {
       var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createRemoteWriteStream().write({ h: { pe: pe } }, function(err) {
-        should.strictEqual(err.message, 'perspective not found');
-        done();
-      });
+      (function() { t.createRemoteWriteStream('foo'); }).should.throw('perspective not found');
     });
 
-    it('should require item.h.pe to differ from local name', function(done) {
+    it('should require remote to differ from local name', function() {
       var t = new MergeTree(db, { vSize: 3, log: silence });
-      t.createRemoteWriteStream().write({ h: { pe: '_local' } }, function(err) {
-        should.strictEqual(err.message, 'perspective should differ from local name');
-        done();
-      });
+      (function() { t.createRemoteWriteStream('_local'); }).should.throw('perspective should differ from local name');
     });
 
     it('should not accept non-connecting items (item2 in empty database)', function(done) {
       var t = new MergeTree(db, { vSize: 3, log: silence, perspectives: [pe] });
-      t.createRemoteWriteStream().write(item2, function(err) {
+      t.createRemoteWriteStream(pe).write(item2, function(err) {
         should.strictEqual(err.message, 'not a valid new item');
         done();
       });
@@ -1160,7 +1151,7 @@ describe('MergeTree', function() {
 
     it('should accept new root (item1)', function(done) {
       var t = new MergeTree(db, { vSize: 3, log: silence, perspectives: [pe] });
-      t.createRemoteWriteStream().write(item1, function(err) {
+      t.createRemoteWriteStream(pe).write(item1, function(err) {
         if (err) { throw err; }
         done();
       });
@@ -1168,7 +1159,7 @@ describe('MergeTree', function() {
 
     it('should accept item2, item3 and item4', function(done) {
       var t = new MergeTree(db, { vSize: 3, log: silence, perspectives: [pe] });
-      var s = t.createRemoteWriteStream();
+      var s = t.createRemoteWriteStream(pe);
       s.on('error', function(err) { throw err; });
       s.write(item2);
       s.write(item3);
@@ -1446,7 +1437,7 @@ describe('MergeTree', function() {
       var opts = { stage: stageName, vSize: 3, log: silence, perspectives: [pe] };
       var mt = new MergeTree(ldb, opts);
       should.equal(mt._updatedPerspectives[pe], undefined);
-      mt.createRemoteWriteStream().write(item1, function(err) {
+      mt.createRemoteWriteStream(pe).write(item1, function(err) {
         if (err) { throw err; }
         should.equal(mt._updatedPerspectives[pe], true);
         done();
