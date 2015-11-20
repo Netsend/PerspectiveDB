@@ -1157,14 +1157,44 @@ describe('MergeTree', function() {
       });
     });
 
-    it('should accept item2, item3 and item4', function(done) {
+    it('should accept item2 and item3', function(done) {
       var t = new MergeTree(db, { vSize: 3, log: silence, perspectives: [pe] });
       var s = t.createRemoteWriteStream(pe);
       s.on('error', function(err) { throw err; });
       s.write(item2);
       s.write(item3);
-      s.write(item4);
       s.end(done);
+    });
+
+    it('should run hook on item4', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence, perspectives: [pe] });
+      var opts = {};
+      opts.hooks = [
+        function(db, item, o, cb) {
+          item.b.seen = true;
+          cb(null, item);
+        }
+      ];
+      var s = mt.createRemoteWriteStream(pe, opts);
+      s.on('error', function(err) { throw err; });
+      s.write(item4);
+      s.end(function() {
+        var item4Found;
+        var rs = mt._pe[pe].createReadStream();
+        rs.on('data', function(item) {
+          if (item.h.v === item4.h.v) {
+            should.deepEqual({
+              h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], pe: pe, i: 4 },
+              b: { more3: 'b', seen: true }
+            }, item);
+            item4Found = true;
+          }
+        });
+        rs.on('end', function() {
+          should.ok(item4Found);
+          done();
+        });
+      });
     });
   });
 
