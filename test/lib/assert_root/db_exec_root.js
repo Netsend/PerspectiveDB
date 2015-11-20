@@ -31,13 +31,16 @@ var childProcess = require('child_process');
 
 var async = require('async');
 var BSONStream = require('bson-stream');
+var level = require('level');
 var LDJSONStream = require('ld-jsonstream');
 var rimraf = require('rimraf');
 var bson = require('bson');
+
 var BSON = new bson.BSONPure.BSON();
 var Timestamp = {};
 
 var logger = require('../../../lib/logger');
+var MergeTree = require('../../../lib/merge_tree');
 
 var tasks = [];
 var tasks2 = [];
@@ -55,8 +58,8 @@ var user = 'nobody';
 var group = 'nobody';
 var dbPath = '/test_db_exec_root';
 
-// open database
-tasks.push(function(done) {
+// open loggers
+tasks2.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
     cons = l;
@@ -352,7 +355,7 @@ tasks.push(function(done) {
 });
 
 // should respond with an auth response that indicates no data is requested.
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // start an echo server that can receive auth responses
@@ -419,8 +422,8 @@ tasks2.push(function(done) {
   });
 });
 
-// should save valid incoming BSON data following a
-tasks.push(function(done) {
+// should accept incoming BSON data if a replication config is given
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -434,105 +437,84 @@ tasks.push(function(done) {
   var server = net.createServer(function(conn) {
     conn.on('data', function(data) {
       assert.deepEqual(JSON.parse(data), {
-        username: 'foo',
-        password: 'bar',
-        database: 'baz',
-        collection: 'qux'
+        start: true
       });
 
       // now send a root node
-      var obj = { _id: { _id: 'abc', _v: 'def', _pa: [] } };
-      conn.write(BSON.serialize(obj));
-
-      setTimeout(function() {
-        // open and search in database
-        db.collection('m3.test').find().toArray(function(err, items) {
-          if (err) { throw err; }
-
-          assert.strictEqual(items.length, 2);
-          assert.deepEqual(items[0], {
-            _id: {
-              _id: 'abc',
-              _v: 'def',
-              _pa: [],
-              _pe: 'baz',
-              _co: 'test'
-            },
-            _m3: {
-              _ack: false,
-              _op: new Timestamp(0, 0)
-            }
-          });
-          assert.deepEqual(items[1], {
-            _id: {
-              _id: 'abc',
-              _v: 'def',
-              _pa: [],
-              _pe: '_local',
-              _co: 'test',
-              _i: 1
-            },
-            _m3: {
-              _ack: false,
-              _op: new Timestamp(0, 0)
-            }
-          });
-
-          conn.end();
-          server.close(function() {
-            child.kill();
-          });
+      var obj = { h: { id: 'abc', v: 'Aaaa', pa: [] }, b: { some: true } };
+      conn.end(BSON.serialize(obj), function() {
+        server.close(function() {
+          child.kill();
         });
-      }, 200);
+      });
     });
   });
   server.listen(port, host);
 
-  var vcCfg = {
-    log: { console: true },
-    path: dbPath,
-    name: 'test_vce_root',
-    debug: false,
-    user: user,
-    chroot: chroot,
-    autoProcessInterval: 50,
-    size: 1,
-    remotes: ['baz'], // list PR sources
-  };
-
-  // pull request
-  var pr = {
-    username: 'foo',
-    password: 'bar',
-    database: 'baz',
-    collection: 'qux',
-    host: host,
-    port: port
-  };
-
-  //child.stdout.pipe(process.stdout);
+  child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
 
   var stderr = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
 
+  var pe = 'baz';
+  var perspectives = [{ name: pe, import: true }];
+  var vSize = 3;
+
   child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
+    // open and search in database if item is written
+    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      if (err) { throw err; }
+
+      var mt = new MergeTree(db, {
+        perspectives: [pe],
+        vSize: vSize
+      });
+      var rs = mt._pe[pe].createReadStream();
+      var i = 0;
+      rs.on('data', function(item) {
+        i++;
+        assert.deepEqual(item, {
+          h: { id: 'abc', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+          b: { some: true }
+        });
+      });
+
+      rs.on('end', function() {
+        assert.strictEqual(stderr.length, 0);
+        assert.strictEqual(code, 0);
+        assert.strictEqual(sig, null);
+        assert.strictEqual(i, 1);
+        done();
+      });
+    });
   });
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
     switch(msg) {
     case 'init':
-      child.send(vcCfg);
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_vce_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        perspectives: perspectives,
+        mergeTree: {
+          vSize: vSize
+        }
+      });
       break;
     case 'listen':
-      // send pr
-      child.send(pr);
+      // send stripped auth request
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          username: pe
+        }, s);
+      });
       break;
     default:
       throw new Error('unknown state');
@@ -1206,20 +1188,21 @@ tasks.push(function(done) {
   });
 });
 
-tasks.push(function(done) {
-  cons.close(function(err) {
-    if (err) { throw err; }
-    silence.close(function(err) {
-      if (err) { throw err; }
-      rimraf(chroot + dbPath, done);
-    });
-  });
-});
-
 async.series(tasks2, function(err) {
   if (err) {
     console.error(err);
   } else {
     console.log('ok');
   }
+
+  // cleanup after
+  cons.close(function(err) {
+    if (err) { throw err; }
+    silence.close(function(err) {
+      if (err) { throw err; }
+      rimraf(chroot + dbPath, function(err) {
+        if (err) { console.error(err); }
+      });
+    });
+  });
 });
