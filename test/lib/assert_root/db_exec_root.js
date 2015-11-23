@@ -451,7 +451,7 @@ tasks2.push(function(done) {
   });
   server.listen(port, host);
 
-  child.stdout.pipe(process.stdout);
+  //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
 
   var stderr = '';
@@ -469,7 +469,8 @@ tasks2.push(function(done) {
 
       var mt = new MergeTree(db, {
         perspectives: [pe],
-        vSize: vSize
+        vSize: vSize,
+        log: silence
       });
       var rs = mt._pe[pe].createReadStream();
       var i = 0;
@@ -486,6 +487,125 @@ tasks2.push(function(done) {
         assert.strictEqual(code, 0);
         assert.strictEqual(sig, null);
         assert.strictEqual(i, 1);
+        mt.mergeWithLocal(mt._pe[pe], function(err) {
+          if (err) { throw err; }
+          db.close(done);
+        });
+      });
+    });
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_vce_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        perspectives: perspectives,
+        mergeTree: {
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      // send stripped auth request
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          username: pe
+        }, s);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should send back previously saved item (depends on previous test)
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to inspect response
+  var server = net.createServer(function(conn) {
+    conn.once('data', function(data) {
+      assert.deepEqual(JSON.parse(data), {
+        start: 'Aaaa'
+      });
+
+      conn.on('data', function(data) {
+        assert.deepEqual(BSON.deserialize(data), {
+          h: { id: 'abc', v: 'Aaaa', pa: [] },
+          b: { some: true }
+        });
+
+        // now send a new child
+        var obj = { h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
+        conn.end(BSON.serialize(obj), function() {
+          server.close(function() {
+            child.kill();
+          });
+        });
+      });
+    });
+  });
+  server.listen(port, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var pe = 'baz';
+  var perspectives = [{ name: pe, import: true }];
+  var vSize = 3;
+
+  child.on('exit', function(code, sig) {
+    // open and search in database if item is written
+    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      if (err) { throw err; }
+
+      var mt = new MergeTree(db, {
+        perspectives: [pe],
+        vSize: vSize,
+        log: silence
+      });
+      var rs = mt._pe[pe].createReadStream();
+      var i = 0;
+      rs.on('data', function(item) {
+        i++;
+        if (i === 1) {
+          assert.deepEqual(item, {
+            h: { id: 'abc', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            b: { some: true }
+          });
+        }
+        if (i === 2) {
+          assert.deepEqual(item, {
+            h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 2 },
+            b: { some: 'other' }
+          });
+        }
+      });
+
+      rs.on('end', function() {
+        assert.strictEqual(stderr.length, 0);
+        assert.strictEqual(code, 0);
+        assert.strictEqual(sig, null);
+        assert.strictEqual(i, 2);
         done();
       });
     });
@@ -521,167 +641,8 @@ tasks2.push(function(done) {
     }
   });
 });
-/*
-*/
 
-// should send auth response following a stripped auth request
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  // start an echo server that can receive auth responses and BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-
-  var authResponseReceived;
-
-  // start server to check if data is sent by db_exec
-  var server = net.createServer(function(conn) {
-    // expect first message to be an auth response (line delimited json) 
-    conn.pipe(new LDJSONStream({ maxBytes: 64 })).on('data', function(item) {
-      assert.deepEqual(item, { start: true });
-      authResponseReceived = true;
-      conn.end();
-      server.close(function() {
-        child.kill();
-      });
-    });
-  });
-  server.listen(port, host);
-
-  child.on('exit', function(code, sig) {
-    assert(authResponseReceived);
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
-    switch(msg) {
-    case 'init':
-      child.send({
-        log: { console: true, mask: logger.DEBUG2 },
-        path: dbPath,
-        name: 'test_vce_root',
-        user: user,
-        chroot: chroot,
-        perspectives: [{
-          name: 'webclient',
-          import: true,
-          export: true
-        }]
-      });
-      break;
-    case 'listen':
-      // send stripped auth request
-      var s = net.createConnection(port, host, function() {
-        child.send({
-          username: 'webclient'
-        }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should send auth response and accept incoming bson data
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  // start an echo server that can receive auth responses and BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-
-  var bsonSent;
-
-  // start server to check if data is sent by db_exec
-  var server = net.createServer(function(conn) {
-    // expect first message to be an auth response (line delimited json), then send a valid BSON object
-    conn.pipe(new LDJSONStream({ maxBytes: 64 })).on('data', function(item) {
-      assert.deepEqual(item, { start: true });
-
-      // expect first message to be an auth response (line delimited json), then send a valid BSON object
-      conn.write(BSON.serialize({
-        h: { id: 'XI', v: 'Aaaa', pa: [] },
-        b: { some: 'attr' }
-      }), function(err) {
-        if (err) { throw err; }
-        bsonSent = true;
-        conn.end();
-        server.close(function() {
-          child.kill();
-        });
-      });
-    });
-  });
-  server.listen(port, host);
-
-  child.on('exit', function(code, sig) {
-    assert(bsonSent);
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
-    switch(msg) {
-    case 'init':
-      child.send({
-        log: { console: true, mask: logger.DEBUG2 },
-        path: dbPath,
-        name: 'test_vce_root',
-        user: user,
-        chroot: chroot,
-        perspectives: [{
-          name: 'webclient',
-          import: true,
-          export: true
-        }],
-        mergeTree: {
-          vSize: 3
-        }
-      });
-      break;
-    case 'listen':
-      // send stripped auth request followed by a BSON object
-      var s = net.createConnection(port, host, function() {
-        child.send({
-          username: 'webclient'
-        }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should send auth response and the previously saved BSON data following a stripped auth request
+// should send auth response with offset and the previously saved BSON data following a stripped auth request
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -700,7 +661,7 @@ tasks.push(function(done) {
     var ldj = new LDJSONStream({ maxBytes: 64 });
     var bs = new BSONStream();
     conn.pipe(ldj).on('data', function(item) {
-      assert.deepEqual(item, { start: true });
+      assert.deepEqual(item, { start: 'Aaaa' });
       conn.unpipe(ldj);
       conn.pipe(bs).on('data', function(item) {
         assert.deepEqual(item, {
@@ -759,87 +720,6 @@ tasks.push(function(done) {
         child.send({
           username: 'webclient'
         }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should send auth response and the BSON data following a stripped auth request
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  // start an echo server that can receive auth requests and sends some BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-
-  // start server to check if pull request is sent by vcexec
-  var server = net.createServer(function(conn) {
-    var bs = conn.pipe(new BSONStream());
-    bs.on('data', function(item) {
-      assert.deepEqual(item, {
-        _id: {
-          _id: 'abc',
-          _v: 'def',
-          _pa: [],
-          _co: 'test'
-        },
-        _m3: { }
-      });
-
-      conn.end();
-      server.close(function() {
-        child.kill();
-      });
-    });
-  });
-  server.listen(port, host);
-
-  var vcCfg = {
-    log: { console: true },
-    path: dbPath,
-    name: 'test_vce_root',
-    debug: false,
-    user: user,
-    chroot: chroot,
-    autoProcessInterval: 50,
-    size: 1
-  };
-
-  // push request
-  var pr = {
-  };
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
-    switch(msg) {
-    case 'init':
-      child.send(vcCfg);
-      break;
-    case 'listen':
-      // send pr
-      //var s = net.createConnection(port, host
-      var s = net.createConnection(port, host, function() {
-        child.send(pr, s);
       });
       break;
     default:
