@@ -32,7 +32,6 @@ var childProcess = require('child_process');
 var async = require('async');
 var BSONStream = require('bson-stream');
 var level = require('level');
-var LDJSONStream = require('ld-jsonstream');
 var rimraf = require('rimraf');
 var bson = require('bson');
 
@@ -207,7 +206,7 @@ tasks.push(function(done) {
 });
 
 // should not fail with valid configurations (include existing hook paths)
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -236,7 +235,50 @@ tasks.push(function(done) {
         hookPaths: ['/var/empty'],
         name: 'test_vce_root',
         user: user,
-        chroot: chroot
+        chroot: chroot,
+      });
+      break;
+    case 'listen':
+      child.kill();
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should fail if configured hook is not loaded
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  child.on('exit', function(code, sig) {
+    assert(/hook requested that is not loaded/.test(stderr));
+    assert.strictEqual(code, 1);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true },
+        path: dbPath,
+        name: 'test_vce_root',
+        debug: false,
+        size: 1,
+        perspectives: [{ name: 'foo', import: { hooks: ['a'] } }]
       });
       break;
     case 'listen':
@@ -634,154 +676,6 @@ tasks2.push(function(done) {
         child.send({
           username: pe
         }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should send auth response with offset and the previously saved BSON data following a stripped auth request
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  // start an echo server that can receive auth responses and BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-
-  var bsonReceived;
-
-  // start server to check if data is sent by db_exec
-  var server = net.createServer(function(conn) {
-    // expect first message to be an auth response (line delimited json) 
-    var ldj = new LDJSONStream({ maxBytes: 64 });
-    var bs = new BSONStream();
-    conn.pipe(ldj).on('data', function(item) {
-      assert.deepEqual(item, { start: 'Aaaa' });
-      conn.unpipe(ldj);
-      conn.pipe(bs).on('data', function(item) {
-        assert.deepEqual(item, {
-          h: { id: 'XI', v: 'Aaaa', pa: [] },
-          b: { some: 'attr' }
-        });
-        bsonReceived = true;
-
-        conn.end();
-        server.close(function() {
-          child.kill();
-        });
-      });
-    });
-  });
-  server.listen(port, host);
-
-  child.on('exit', function(code, sig) {
-    assert(bsonReceived);
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
-    switch(msg) {
-    case 'init':
-      child.send({
-        log: { console: true, mask: logger.DEBUG2 },
-        path: dbPath,
-        name: 'test_vce_root',
-        user: user,
-        chroot: chroot,
-        perspectives: [{
-          name: 'webclient',
-          import: true,
-          export: true
-        }],
-        mergeTree: {
-          vSize: 3
-        }
-      });
-      break;
-    case 'listen':
-      // send stripped auth request
-      var s = net.createConnection(port, host, function() {
-        child.send({
-          username: 'webclient'
-        }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
-});
-
-// should disconnect if requested hooks in push request can not be loaded
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a vce
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  // start an echo server that can receive auth requests and sends some BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-
-  // start server to check if pull request with unloaded hook is disconnected by vcexec
-  var server = net.createServer(function(conn) {
-    conn.on('error', done);
-    conn.on('close', function() {
-      server.close(function() {
-        child.kill();
-      });
-    });
-  });
-  server.listen(port, host);
-
-  var vcCfg = {
-    log: { console: true },
-    path: dbPath,
-    name: 'test_vce_root',
-    debug: false,
-    size: 1
-  };
-
-  child.on('exit', function(code, sig) {
-    assert(/Error: hook requested that is not loaded/.test(stderr));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
-    switch(msg) {
-    case 'init':
-      child.send(vcCfg);
-      break;
-    case 'listen':
-      // send pr
-      var s = net.createConnection(port, host, function() {
-        child.send({ hooks: ['a'] }, s);
       });
       break;
     default:
