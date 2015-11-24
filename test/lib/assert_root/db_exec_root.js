@@ -206,7 +206,7 @@ tasks.push(function(done) {
 });
 
 // should not fail with valid configurations (include existing hook paths)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -248,7 +248,7 @@ tasks2.push(function(done) {
 });
 
 // should fail if configured hook is not loaded
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -396,7 +396,7 @@ tasks.push(function(done) {
   });
 });
 
-// should respond with an auth response that indicates no data is requested.
+// should respond with an auth response that indicates no data is requested and disconnect
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -411,7 +411,7 @@ tasks.push(function(done) {
         start: false
       });
 
-      conn.end(function() {
+      conn.on('end', function() {
         server.close(function() {
           child.kill();
         });
@@ -484,7 +484,8 @@ tasks2.push(function(done) {
 
       // now send a root node
       var obj = { h: { id: 'abc', v: 'Aaaa', pa: [] }, b: { some: true } };
-      conn.end(BSON.serialize(obj), function() {
+      conn.end(BSON.serialize(obj));
+      conn.on('close', function() {
         server.close(function() {
           child.kill();
         });
@@ -612,7 +613,7 @@ tasks2.push(function(done) {
   child.stderr.on('data', function(data) { stderr += data; });
 
   var pe = 'baz';
-  var perspectives = [{ name: pe, import: true }];
+  var perspectives = [{ name: pe, import: true, export: true }];
   var vSize = 3;
 
   child.on('exit', function(code, sig) {
@@ -648,7 +649,10 @@ tasks2.push(function(done) {
         assert.strictEqual(code, 0);
         assert.strictEqual(sig, null);
         assert.strictEqual(i, 2);
-        done();
+        mt.mergeWithLocal(mt._pe[pe], function(err) {
+          if (err) { throw err; }
+          db.close(done);
+        });
       });
     });
   });
@@ -684,36 +688,107 @@ tasks2.push(function(done) {
   });
 });
 
-// should insert some dummies in the collection to version on the server side
-tasks.push(function(done) {
+// should run export hooks and send back previously saved items (depends on two previous tests)
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
-  var coll = dbHookPush.collection('m3.test');
-  var item1 = {
-    _id: { _co: 'someColl', _id: 'key1', _v: 'A', _pe: '_local', _pa: [], _lo: true },
-    _m3: { _op: new Timestamp(1, 2), _ack: true },
-    foo: 'bar',
-    someKey: 'someVal',
-    someOtherKey: 'B'
-  };
-  var item2 = {
-    _id: { _co: 'someColl', _id: 'key2', _v: 'A', _pe: '_local', _pa: [], _lo: true },
-    _m3: { _op: new Timestamp(2, 3), _ack: true },
-    foo: 'baz',
-    someKey: 'someVal'
-  };
-  var item3 = {
-    _id: { _co: 'someColl', _id: 'key3', _v: 'A', _pe: '_local', _pa: [], _lo: true },
-    _m3: { _op: new Timestamp(3, 4), _ack: true },
-    quz: 'zab',
-    someKey: 'someVal'
-  };
+  // then fork a vce
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
-  var items = [item1, item2, item3];
-  coll.insert(items, done);
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to inspect response
+  var server = net.createServer(function(conn) {
+    conn.once('data', function(data) {
+      assert.deepEqual(JSON.parse(data), {
+        start: false
+      });
+
+      var i = 0;
+      conn.pipe(new BSONStream()).on('data', function(item) {
+        i++;
+        if (i === 1) {
+          assert.deepEqual(item, {
+            h: { id: 'abc', v: 'Aaaa', pa: [] },
+            b: { some: true }
+          });
+        }
+        if (i === 2) {
+          assert.deepEqual(item, {
+            h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'] },
+            b: { } // should have been stripped by export hook
+          });
+        }
+      });
+
+      conn.on('end', function() {
+        assert.strictEqual(i, 2);
+        server.close(function() {
+          child.kill();
+        });
+      });
+    });
+  });
+  server.listen(port, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var pe = 'baz';
+  var perspectives = [{ name: pe, export: {
+    hooks: ['strip_field_if_holds'],
+    hooksOpts: {
+      field: 'some',
+      fieldFilter: { some: 'other' }
+    }
+  }}];
+  var vSize = 3;
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_vce_root',
+        hookPaths: [__dirname + '/../../../hooks'],
+        user: user,
+        group: group,
+        chroot: chroot,
+        perspectives: perspectives,
+        mergeTree: {
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      // send stripped auth request
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          username: pe
+        }, s);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
 });
 
-// should run export hooks of push request
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
