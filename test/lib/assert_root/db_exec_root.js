@@ -36,7 +36,6 @@ var rimraf = require('rimraf');
 var bson = require('bson');
 
 var BSON = new bson.BSONPure.BSON();
-var Timestamp = {};
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
@@ -77,7 +76,7 @@ tasks2.push(function(done) {
 });
 
 // should accept writable stream for log files (regression)
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var logFile = fs.createWriteStream(tmpdir() + 'vce-test.log', { flags: 'a' });
@@ -125,7 +124,7 @@ tasks.push(function(done) {
 });
 
 // should fail if hooks not found
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -164,7 +163,7 @@ tasks.push(function(done) {
 });
 
 // should fail with a valid configuration but non-existing hook paths
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -206,7 +205,7 @@ tasks.push(function(done) {
 });
 
 // should not fail with valid configurations (include existing hook paths)
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -248,7 +247,7 @@ tasks.push(function(done) {
 });
 
 // should fail if configured hook is not loaded
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -291,7 +290,7 @@ tasks.push(function(done) {
 });
 
 // should require a connection
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -336,7 +335,7 @@ tasks.push(function(done) {
 });
 
 // should require a valid remote identity
-tasks.push(function(done) {
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   // start an echo server that can receive auth responses
@@ -396,8 +395,8 @@ tasks.push(function(done) {
   });
 });
 
-// should respond with an auth response that indicates no data is requested and disconnect
-tasks.push(function(done) {
+// should respond with an auth response that indicates no data is requested
+tasks2.push(function(done) {
   console.log('test #%d', lnr());
 
   // start an echo server that can receive auth responses
@@ -411,7 +410,7 @@ tasks.push(function(done) {
         start: false
       });
 
-      conn.on('end', function() {
+      conn.end(function() {
         server.close(function() {
           child.kill();
         });
