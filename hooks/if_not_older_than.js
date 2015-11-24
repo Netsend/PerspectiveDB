@@ -3,11 +3,11 @@
 // filter objects that are older than a certain offset compared to the current time.
 // use opts.field to specify which field name to check and opts.maxAge in seconds to set the max offset time 
 module.exports = function(db, item, opts, cb) {
-  if (typeof item[opts.field] !== 'undefined') {
+  if (typeof item.b[opts.field] !== 'undefined') {
     var now = (new Date()).getTime();
     var maxAge = now - (opts.maxAge * 1000);
     maxAge = new Date(maxAge);
-    if (item[opts.field] >= maxAge) {
+    if (item.b[opts.field] >= maxAge) {
       process.nextTick(function() {
         cb(null, item);
       });
