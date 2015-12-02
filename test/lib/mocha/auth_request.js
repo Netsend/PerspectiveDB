@@ -46,21 +46,10 @@ describe('authRequest', function () {
       should.strictEqual(result, false);
     });
 
-    it('should return false collection field is missing', function() {
-      var result = authRequest.valid({
-        username: 'foo',
-        password: 'bar',
-        database: 'qux'
-      });
-      should.strictEqual(result, false);
-    });
-
     it('should pass without offset', function() {
       var result = authRequest.valid({
         username: 'foo',
-        password: 'bar',
-        database: 'qux',
-        collection: 'baz'
+        password: 'bar'
       });
       should.strictEqual(result, true);
     });
@@ -69,8 +58,6 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
-        database: 'qux',
-        collection: 'baz',
         offset: '10'
       });
       should.strictEqual(result, true);
@@ -80,8 +67,6 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
-        database: 'qux',
-        collection: 'baz',
         offset: undefined
       });
       should.strictEqual(result, true);
@@ -91,8 +76,6 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
-        database: 'qux',
-        collection: 'baz',
         offset: 10,
         foo: 'bar'
       });
@@ -103,9 +86,7 @@ describe('authRequest', function () {
       it('should return false when username is not a string', function() {
         var result = authRequest.valid({
           username: 1,
-          password: 'bar',
-          database: 'qux',
-          collection: 'baz'
+          password: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -113,39 +94,15 @@ describe('authRequest', function () {
       it('should return false when password is not a string', function() {
         var result = authRequest.valid({
           username: 'foo',
-          password: 1,
-          database: 'qux',
-          collection: 'baz'
+          password: 1
         });
         should.strictEqual(result, false);
       });
 
-      it('should return false when database is not a string', function() {
+      it('should return false when offset is not a string', function() {
         var result = authRequest.valid({
           username: 'foo',
           password: 'bar',
-          database: 1,
-          collection: 'baz'
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when collection is not a string', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: 'qux',
-          collection: 1
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when offset is not a number', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: 'qux',
-          collection: 'baz',
           offset: 10
         });
         should.strictEqual(result, false);
@@ -156,9 +113,7 @@ describe('authRequest', function () {
       it('should return false when username is too short', function() {
         var result = authRequest.valid({
           username: '',
-          password: 'bar',
-          database: 'qux',
-          collection: 'baz'
+          password: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -166,29 +121,7 @@ describe('authRequest', function () {
       it('should return false when password is too short', function() {
         var result = authRequest.valid({
           username: 'foo',
-          password: '',
-          database: 'qux',
-          collection: 'baz'
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when database is too short', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: '',
-          collection: 'baz'
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when collection is too short', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: 'qux',
-          collection: ''
+          password: ''
         });
         should.strictEqual(result, false);
       });
@@ -202,9 +135,7 @@ describe('authRequest', function () {
       it('should return false when username is too long', function() {
         var result = authRequest.valid({
           username: tooLong,
-          password: 'bar',
-          database: 'qux',
-          collection: 'baz'
+          password: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -212,29 +143,7 @@ describe('authRequest', function () {
       it('should return false when password is too long', function() {
         var result = authRequest.valid({
           username: 'foo',
-          password: tooLong,
-          database: 'qux',
-          collection: 'baz'
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when database is too long', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: tooLong,
-          collection: 'baz'
-        });
-        should.strictEqual(result, false);
-      });
-
-      it('should return false when collection is too long', function() {
-        var result = authRequest.valid({
-          username: 'foo',
-          password: 'bar',
-          database: 'qux',
-          collection: tooLong
+          password: tooLong
         });
         should.strictEqual(result, false);
       });
