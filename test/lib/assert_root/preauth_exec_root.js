@@ -24,150 +24,51 @@ if (process.getuid() !== 0) {
 }
 
 var assert = require('assert');
-var fs = require('fs');
 var net = require('net');
 var childProcess = require('child_process');
 
 var async = require('async');
 
-var logger = require('../../../lib/logger');
-
 var tasks = [];
 var tasks2 = [];
 
-// should require logCfg.to be an object
+// print line number
+function lnr() {
+  return new Error().stack.split('\n')[2].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1];
+}
+
+var logger = require('../../../lib/logger');
+
+var cons, silence;
+
+// open loggers
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.logCfg must be an object/.test(stderr));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
-    switch (msg) {
-    case 'init':
-      child.send({
-        logCfg: 'foo'
-      });
-      break;
-    case 'listen':
-      break;
-    }
-  });
-});
-
-// should require serverConfig.port to be a number
-tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.serverConfig.port must be a number/.test(stderr));
-    assert.strictEqual(code, 8);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
-    switch (msg) {
-    case 'init':
-      child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 'foo'
-        }
-      });
-      break;
-    case 'listen':
-      break;
-    }
-  });
-});
-
-// should not start if socket path is taken by a regular file
-tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  // ensure normal file
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlinkSync('/var/run/ms-1234.sock');
-  }
-  fs.open('/var/run/ms-1234.sock', 'wx', function(err) {
+  logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
-
-    var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-    //child.stderr.pipe(process.stderr);
-    //child.stdout.pipe(process.stdout);
-
-    var stderr = '';
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', function(data) { stderr += data; });
-    child.on('close', function(code, sig) {
-      assert(/path already exists and is not a socket/.test(stderr));
-      assert.strictEqual(code, 8);
-      assert.strictEqual(sig, null);
-      fs.unlink('/var/run/ms-1234.sock');
+    cons = l;
+    logger({ silence: true }, function(err, l) {
+      if (err) { throw err; }
+      silence = l;
       done();
     });
-
-    child.on('message', function(msg) {
-      switch (msg) {
-      case 'init':
-        child.send({
-          logCfg: { console: true, mask: logger.DEBUG },
-          serverConfig: {
-            port: 1234
-          }
-        });
-        break;
-      }
-    });
   });
 });
 
-// should open a socket and chroot
+// should require msg.log to be an object
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
+  console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  child.stderr.pipe(process.stderr);
+  //child.stderr.pipe(process.stderr);
   //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
 
   var stderr = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
+    assert(/msg.log must be an object/.test(stderr));
+    assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
   });
@@ -176,36 +77,30 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
+        log: 'foo'
       });
       break;
     case 'listen':
-      assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
-      child.kill();
       break;
     }
   });
 });
 
-// should remove any previously created sockets
+// should require msg.port to be a number
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+  console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
-  child.stderr.pipe(process.stderr);
+  //child.stderr.pipe(process.stderr);
   //child.stdout.pipe(process.stdout);
 
   var stderr = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
+    assert(/msg.port must be a number/.test(stderr));
+    assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
   });
@@ -214,27 +109,19 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
+        log: { console: true, mask: logger.DEBUG },
+        port: 'foo'
       });
       break;
     case 'listen':
-      child.kill();
       break;
     }
   });
 });
 
-// should disconnect after receiving more than 1KB of data without newlines
+// should disconnect after receiving more than 512 bytes of data without newlines
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
+  console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
@@ -248,7 +135,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth .*: ldjsonstream error UNIX domain socket Error: more than maxBytes received/.test(stderr));
+    assert(/Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -258,17 +145,14 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
+        log: { console: true, mask: logger.DEBUG },
+        port: 1234
       });
       break;
     case 'listen':
-      assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
 
-      var ms = net.createConnection('/var/run/ms-1234.sock');
+      var ms = net.createConnection(1234);
 
       var pattern = 'abcdefgh';
       var i = 0;
@@ -278,7 +162,7 @@ tasks.push(function(done) {
           ms.write(pattern, function(err) {
             if (err) {
               assert(/EPIPE|This socket is closed|This socket has been ended by the other party/.test(err.message));
-              assert(i >= 127 && i <= 132);
+              assert(i >= 65 && i <= 67);
               child.kill();
             } else {
               flood();
@@ -302,12 +186,7 @@ tasks.push(function(done) {
 
 // should not parse objects larger than max length
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
+  console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
@@ -321,7 +200,7 @@ tasks.push(function(done) {
   child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
   child.on('close', function(code, sig) {
-    assert(/preauth .*: ldjsonstream error UNIX domain socket Error: more than maxBytes received/.test(stderr));
+    assert(/Error: more than maxBytes received/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -331,17 +210,14 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
+        log: { console: true, mask: logger.DEBUG },
+        port: 1234
       });
       break;
     case 'listen':
-      assert(fs.existsSync('/var/run/ms-1234.sock'));
-      assert(/preauth .*: changed root to "\/var\/empty" and user to "nobody"/.test(stdout));
+      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
 
-      var ms = net.createConnection('/var/run/ms-1234.sock');
+      var ms = net.createConnection(1234);
 
       var pattern = 'abcdefgh';
       var obj = { username: '' };
@@ -354,55 +230,13 @@ tasks.push(function(done) {
       ms.on('close', function() {
         child.kill();
       });
+      /*
       ms.on('error', function(err) {
         assert(/EPIPE/.test(err.code));
         console.log(err, i);
         child.kill();
       });
-      break;
-    }
-  });
-});
-
-// should make socket world writable
-tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
-    switch (msg) {
-    case 'init':
-      child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
-      });
-      break;
-    case 'listen':
-      fs.stat('/var/run/ms-1234.sock', function(err, stat) {
-        assert(stat.mode & 2);
-        child.kill();
-      });
+      */
       break;
     }
   });
@@ -410,19 +244,13 @@ tasks.push(function(done) {
 
 // should pass auth request to parent
 tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
+  console.log('test #%d', lnr());
 
   var authReq = {
     username: 'foo',
     password: 'bar',
-    database: 'qux',
-    collection: 'baz'
+    offset: 'qux'
   };
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
 
@@ -443,82 +271,20 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          port: 1234
-        }
+        log: { console: true, mask: logger.DEBUG },
+        port: 1234
       });
       break;
     case 'listen':
       // write auth request
-      var ms = net.createConnection('/var/run/ms-1234.sock');
+      var ms = net.createConnection(1234);
       ms.end(JSON.stringify(authReq) + '\n');
       break;
     default:
       assert.deepEqual(msg, {
         username: 'foo',
         password: 'bar',
-        database: 'qux',
-        collection: 'baz'
-      });
-      child.kill();
-    }
-  });
-});
-
-// should open a port on the local network interface
-tasks.push(function(done) {
-  console.log('test l' + new Error().stack.split('\n')[1].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]); // print current line number
-
-  var authReq = {
-    username: 'foo',
-    password: 'bar',
-    database: 'qux',
-    collection: 'baz'
-  };
-
-  // remove any previously created socket
-  if (fs.existsSync('/var/run/ms-1234.sock')) {
-    fs.unlink('/var/run/ms-1234.sock');
-  }
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
-    switch (msg) {
-    case 'init':
-      child.send({
-        logCfg: { console: true, mask: logger.DEBUG },
-        serverConfig: {
-          host: '127.0.0.1',
-          port: 1234
-        }
-      });
-      break;
-    case 'listen':
-      // write auth request
-      var ms = net.createConnection(1234, '127.0.0.1');
-      ms.end(JSON.stringify(authReq) + '\n');
-      break;
-    default:
-      assert.deepEqual(msg, {
-        username: 'foo',
-        password: 'bar',
-        database: 'qux',
-        collection: 'baz'
+        offset: 'qux'
       });
       child.kill();
     }
@@ -531,4 +297,12 @@ async.series(tasks, function(err) {
   } else {
     console.log('ok');
   }
+
+  // cleanup after
+  cons.close(function(err) {
+    if (err) { throw err; }
+    silence.close(function(err) {
+      if (err) { console.error(err); }
+    });
+  });
 });
