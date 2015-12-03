@@ -1,19 +1,19 @@
 /**
  * Copyright 2014 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -26,8 +26,11 @@ if (process.getuid() !== 0) {
 var assert = require('assert');
 var net = require('net');
 var childProcess = require('child_process');
+var fs = require('fs');
+var c = require('constants');
 
 var async = require('async');
+var ws = require('nodejs-websocket');
 
 var tasks = [];
 var tasks2 = [];
@@ -279,6 +282,88 @@ tasks.push(function(done) {
       // write auth request
       var ms = net.createConnection(1234);
       ms.end(JSON.stringify(authReq) + '\n');
+      break;
+    default:
+      assert.deepEqual(msg, {
+        username: 'foo',
+        password: 'bar',
+        offset: 'qux'
+      });
+      child.kill();
+    }
+  });
+});
+
+// should start a secure websocket server and pass auth request to parent
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var cert, key, dhparam;
+
+  cert = __dirname + '/cert.pem';
+  key = __dirname + '/key.pem';
+  dhparam = __dirname + '/dhparam.pem';
+
+  var wsClientOpts = {
+    ca: fs.readFileSync(cert),
+    secureProtocol: 'SSLv23_client_method',
+    secureOptions: c.SSL_OP_NO_SSLv2|c.SSL_OP_NO_SSLv3|c.SSL_OP_NO_TLSv1|c.SSL_OP_NO_TLSv1_1,
+    ciphers: 'ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256'
+  };
+
+  var authReq = {
+    username: 'foo',
+    password: 'bar',
+    offset: 'qux'
+  };
+
+  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
+
+  child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  var stdout = '';
+  child.stderr.setEncoding('utf8');
+  child.stdout.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.on('close', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: logger.DEBUG },
+        port: 1234,
+        wss: true,
+        cert: cert,
+        key: key,
+        dhparam: dhparam
+      });
+      break;
+    case 'listen':
+      // write auth request via a wss client
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+
+      var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
+        client.sendText(JSON.stringify(authReq) + '\n');
+        // expect auth response
+        client.on('text', function(data) {
+          assert(data, JSON.stringify({ start: true }));
+          client.on('close', function(code, reason) {
+            assert(code, 9823);
+            assert(reason, 'test');
+            child.kill();
+          });
+          client.close(9823, 'test');
+        });
+      });
       break;
     default:
       assert.deepEqual(msg, {
