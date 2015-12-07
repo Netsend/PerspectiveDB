@@ -49,7 +49,8 @@ describe('authRequest', function () {
     it('should pass without offset', function() {
       var result = authRequest.valid({
         username: 'foo',
-        password: 'bar'
+        password: 'bar',
+        db: 'baz',
       });
       should.strictEqual(result, true);
     });
@@ -58,6 +59,7 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
+        db: 'baz',
         offset: '10'
       });
       should.strictEqual(result, true);
@@ -67,6 +69,7 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
+        db: 'baz',
         offset: undefined
       });
       should.strictEqual(result, true);
@@ -76,6 +79,7 @@ describe('authRequest', function () {
       var result = authRequest.valid({
         username: 'foo',
         password: 'bar',
+        db: 'baz',
         offset: 10,
         foo: 'bar'
       });
@@ -99,6 +103,15 @@ describe('authRequest', function () {
         should.strictEqual(result, false);
       });
 
+      it('should return false when db is not a string', function() {
+        var result = authRequest.valid({
+          username: 'foo',
+          password: 'bar',
+          db: 1
+        });
+        should.strictEqual(result, false);
+      });
+
       it('should return false when offset is not a string', function() {
         var result = authRequest.valid({
           username: 'foo',
@@ -113,7 +126,8 @@ describe('authRequest', function () {
       it('should return false when username is too short', function() {
         var result = authRequest.valid({
           username: '',
-          password: 'bar'
+          password: 'foo',
+          db: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -121,7 +135,8 @@ describe('authRequest', function () {
       it('should return false when password is too short', function() {
         var result = authRequest.valid({
           username: 'foo',
-          password: ''
+          password: '',
+          db: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -135,7 +150,8 @@ describe('authRequest', function () {
       it('should return false when username is too long', function() {
         var result = authRequest.valid({
           username: tooLong,
-          password: 'bar'
+          password: 'foo',
+          db: 'bar'
         });
         should.strictEqual(result, false);
       });
@@ -143,7 +159,17 @@ describe('authRequest', function () {
       it('should return false when password is too long', function() {
         var result = authRequest.valid({
           username: 'foo',
-          password: tooLong
+          password: tooLong,
+          db: 'bar'
+        });
+        should.strictEqual(result, false);
+      });
+
+      it('should return false when db is too long', function() {
+        var result = authRequest.valid({
+          username: 'foo',
+          password: 'bar',
+          db: tooLong
         });
         should.strictEqual(result, false);
       });
