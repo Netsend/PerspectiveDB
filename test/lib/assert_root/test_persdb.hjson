@@ -1,0 +1,38 @@
+# PersDB settings.
+
+# The strategy used for options in default.hjson shipped with PersDB is
+# to specify options with their default value where possible, but leave them
+# commented. Uncommented options override the default value.
+
+# Main
+
+#user: nobody
+#group: nobody
+#chroot: /var/empty
+
+log: {
+  console: true
+  level: debug
+}
+
+# Milliseconds between auto processing items
+autoProcessInterval: 100
+
+# DBs
+
+dbs: [{
+  name: someDb
+  chroot: /var/persdb/test_persdb_root
+  perspectives: [
+    {
+      name: someClient
+      password: "$2a$10$4Po9aCT665J1luJOwSnTYez/PWO0mOjxOcVOOOF7f13IrW9Tl3nq2" # password is "somepass"
+      export: {
+        hide: ["someOtherKey"]
+        filter: { someKey: "someVal" }
+      }
+    }
+  ]
+}]
+
+locaLPort: 1234

@@ -42,11 +42,11 @@ var async = require('async');
 var hjson = require('hjson');
 var program = require('commander');
 
-var logger = require('./lib/logger');
-var Master = require('./lib/master');
+var logger = require('../lib/logger');
+var Master = require('../lib/master');
 
 program
-  .version(require('./package.json').version)
+  .version(require('../package.json').version)
   .usage('config.hjson')
   .parse(process.argv);
 
@@ -67,48 +67,60 @@ if (configFile[0] !== '/') {
 }
 */
 
-var config = hjson.parse(fs.readFileSync(configFile));
+var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
-var logCfg = config.log;
-
-// load all users and register a User db per perspective
-function loadPassfiles(cfg) {
-  var passDbs = {};
-  cfg.dbs.forEach(function(dbCfg) {
-    dbCfg.perspectives.forEach(function(persCfg) {
-      if (typeof persCfg.users === 'string' && !passDbs[persCfg.users]) {
-        passDbs[persCfg.users] = hjson.parse(fs.readFileSync(persCfg.users));
-      }
-
-      var userDb = [];
-      Object.keys(passDbs[persCfg.users]).forEach(function(username) {
-        var password = passDbs[persCfg.users][username];
-        userDb.push({ username: username, password: password, realm: dbCfg.name });
-      });
-      persCfg.users = userDb;
-    });
-  });
-}
+var logCfg = config.log || {};
 
 function start() {
   (function(cb) {
+    var error;
     var tasks = [];
 
-    // load user accounts from password files for each perspective
-    loadPassfiles(config);
+    // load password hashes from config or password files for each perspective
+    var files = {};
+    config.dbs.forEach(function(dbCfg) {
+      dbCfg.perspectives.forEach(function(persCfg) {
+        var username = persCfg.username || persCfg.name;
+        var password = persCfg.password;
+
+        // support loading from a file
+        if (password.indexOf('$2a$') !== 0) {
+          if (!files[password]) {
+            files[password] = hjson.parse(fs.readFileSync(password));
+          }
+          password = files[persCfg.password][username];
+        }
+
+        if (!username) {
+          error = new Error('no name or username configured');
+          console.error('%s: %s: %s', programName, dbCfg.name, error);
+          cb(error);
+          return;
+        }
+        if (password.indexOf('$2a$') !== 0) {
+          error = new Error('no password configured');
+          console.error('%s: %s %s: %s', programName, dbCfg.name, persCfg.name, error);
+          cb(error);
+          return;
+        }
+
+        // set one user account
+        persCfg.users = [{ username: username, password: password, realm: dbCfg.name }];
+      });
+    });
 
     // setup logging files
     tasks.push(function(cb2) {
       // ensure specific log configurations overrule the global log config
       async.eachSeries(config.dbs, function(dbCfg, cb3) {
-        log.info(dbCfg.name);
+        log.info('loading db: %s', dbCfg.name);
 
         dbCfg.log = dbCfg.log || {};
 
         var dbLog = {};
 
         // copy global log config
-        Object.keys(logCfg).foreach(function(key) {
+        Object.keys(logCfg).forEach(function(key) {
           dbLog[key] = logCfg[key];
         });
 
@@ -119,16 +131,16 @@ function start() {
         if (gerror) { dbLog.error = gerror; }
 
         // overrule with db specific log config
-        Object.keys(dbCfg.log).foreach(function(key) {
+        Object.keys(dbCfg.log).forEach(function(key) {
           dbLog[key] = dbCfg.log[key];
         });
 
         if (dbCfg.log.level) {
-          dbLog.mask = logger.leveltoprio(dbCfg.log.level);
+          dbLog.mask = logger.levelToPrio(dbCfg.log.level);
         }
 
         // ensure async even without any other tasks
-        var tasks2 = [function(cb4) { process.nexttick(cb4); }];
+        var tasks2 = [function(cb4) { process.nextTick(cb4); }];
 
         if (dbCfg.log.file) {
           tasks2.push(function(cb4) {
@@ -155,12 +167,12 @@ function start() {
         }
 
         dbCfg.log = dbLog;
-
-        async.eachSeries(tasks2, cb3);
+        async.series(tasks2, cb3);
       }, cb2);
     });
 
     tasks.push(function(cb2) {
+      config.log = log;
       var master = new Master(config.dbs, config);
 
       process.once('SIGINT', function() {
@@ -198,6 +210,6 @@ logger(logCfg, function(err, l) {
 
   log = l;
 
-  log.notice('server started %s', startTime);
+  log.notice('init %s', startTime);
   start();
 });
