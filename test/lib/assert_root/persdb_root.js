@@ -49,7 +49,7 @@ var wsClientOpts = {
 };
 
 var tasks = [];
-var tasks = [];
+var tasks2 = [];
 
 // print line number
 function lnr() {
@@ -61,7 +61,7 @@ var chroot = '/var/persdb/test_persdb_root';
 var dbPath = '/data';
 
 // open loggers
-tasks.push(function(done) {
+tasks2.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
     cons = l;
@@ -167,7 +167,54 @@ tasks.push(function(done) {
   }, 1000);
 });
 
-async.series(tasks, function(err) {
+// should start a WSS server, and disconnect because of empty auth request
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert(/-127.0.0.1-1234 invalid auth request/.test(stderr));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  setTimeout(function() {
+    var authReq = {};
+
+    var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+      client.on('close', function() {
+        child.kill();
+      });
+      client.sendText(JSON.stringify(authReq) + '\n');
+      // expect auth response
+      /*
+      client.on('text', function(data) {
+        assert(data, JSON.stringify({ start: true }));
+        client.on('close', function(code, reason) {
+          assert(code, 9823);
+          assert(reason, 'test');
+          child.kill();
+        });
+        client.close(9823, 'test');
+      });
+      */
+    });
+  }, 1000);
+});
+
+async.series(tasks2, function(err) {
   if (err) {
     console.error(err);
   } else {
