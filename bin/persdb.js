@@ -29,7 +29,9 @@
 
 'use strict';
 
-var programName = require('path').basename(__filename, '.js');
+var path = require('path');
+var programName = path.basename(__filename, '.js');
+var dirname = path.dirname;
 
 if (process.getuid() !== 0) {
   console.error('%s: execute as root', programName);
@@ -68,6 +70,19 @@ if (configFile[0] !== '/') {
 */
 
 var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
+
+// prepend the dirname of the config file to all relative path specifications in the config file
+if (config.wss) {
+  if (config.wss.cert && config.wss.cert[0] !== '/') {
+    config.wss.cert = dirname(configFile) + '/' + config.wss.cert;
+  }
+  if (config.wss.key && config.wss.key[0] !== '/') {
+    config.wss.key = dirname(configFile) + '/' + config.wss.key;
+  }
+  if (config.wss.dhparam && config.wss.dhparam[0] !== '/') {
+    config.wss.dhparam = dirname(configFile) + '/' + config.wss.dhparam;
+  }
+}
 
 var logCfg = config.log || {};
 
