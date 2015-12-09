@@ -23,6 +23,7 @@ if (process.getuid() !== 0) {
   process.exit(1);
 }
 
+var c = require('constants');
 var assert = require('assert');
 var fs = require('fs');
 var net = require('net');
@@ -30,11 +31,25 @@ var spawn = require('child_process').spawn;
 
 var async = require('async');
 var rimraf = require('rimraf');
+var ws = require('nodejs-websocket');
 
 var logger = require('../../../lib/logger');
 
+var cert, key, dhparam;
+
+cert = __dirname + '/cert.pem';
+key = __dirname + '/key.pem';
+dhparam = __dirname + '/dhparam.pem';
+
+var wsClientOpts = {
+  ca: fs.readFileSync(cert),
+  secureProtocol: 'SSLv23_client_method',
+  secureOptions: c.SSL_OP_NO_SSLv2|c.SSL_OP_NO_SSLv3|c.SSL_OP_NO_TLSv1|c.SSL_OP_NO_TLSv1_1,
+  ciphers: 'ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256'
+};
+
 var tasks = [];
-var tasks2 = [];
+var tasks = [];
 
 // print line number
 function lnr() {
@@ -70,7 +85,7 @@ tasks.push(function(done) {
 
   var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb.hjson']);
 
-  child.stdout.pipe(process.stdout);
+  //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
 
   var stdout = '';
@@ -91,6 +106,62 @@ tasks.push(function(done) {
 
   setTimeout(function() {
     net.createConnection(1234, function() {
+      child.kill();
+    });
+  }, 1000);
+});
+
+// should try to start a WSS server and if this fails because of missing attributes (key, cert, dhparam) automatically shutdown
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_wrong_config.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    //assert.strictEqual(stderr.length, 0);
+    assert(/msg.key must be a non-empty string/.test(stderr));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+});
+
+// should start a WSS server, test by connecting with wss client
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert(/-127.0.0.1-1235: end \(no binary data received\)/.test(stdout));
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  setTimeout(function() {
+    ws.connect('wss://localhost:1235', wsClientOpts, function() {
       child.kill();
     });
   }, 1000);
