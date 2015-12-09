@@ -1,19 +1,19 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014, 2015 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -253,6 +253,16 @@ describe('logger', function () {
     });
   });
 
+  it('should return opts', function(done) {
+    var ws = through();
+
+    logger({ file: ws, some: 'a' }, function(err, log) {
+      if (err) { throw err; }
+      should.deepEqual(log.getOpts(), { file: ws, some: 'a' });
+      log.close(done);
+    });
+  });
+
   it('should return error stream', function(done) {
     var ws = through();
 
@@ -279,20 +289,20 @@ describe('logger', function () {
     should.strictEqual(logger.levelToPrio('debug2'),  logger.DEBUG2);
   });
 
-  it('should open and write to a file', function(done) {
+  it('should open and read from a file', function(done) {
     var log, path = '/tmp/sometest';
-
-    var ws = fs.createReadStream(path);
-
-    ws.on('data', function(data) {
-      should.strictEqual(/ logger\[[0-9]+] 5: foo\n$/.test(data), true);
-      log.close(done);
-    });
 
     logger({ file: path }, function(err, l) {
       if (err) { throw err; }
       log = l;
       log.notice('foo');
+
+      var ws = fs.createReadStream(path);
+
+      ws.on('data', function(data) {
+        should.strictEqual(/ logger\[[0-9]+] 5: foo\n$/.test(data), true);
+        log.close(done);
+      });
     });
   });
 
