@@ -24,12 +24,11 @@ if (process.getuid() !== 0) {
 }
 
 var assert = require('assert');
-var childProcess = require('child_process');
 var fs = require('fs');
-var spawn = childProcess.spawn;
+var net = require('net');
+var spawn = require('child_process').spawn;
 
 var async = require('async');
-var level = require('level');
 var rimraf = require('rimraf');
 
 var logger = require('../../../lib/logger');
@@ -44,8 +43,6 @@ function lnr() {
 
 var cons, silence;
 var chroot = '/var/persdb/test_persdb_root';
-var user = 'nobody';
-var group = 'nobody';
 var dbPath = '/data';
 
 // open loggers
@@ -67,7 +64,7 @@ tasks.push(function(done) {
   });
 });
 
-// should start a server and listen on port 1234, login and get some data from the server
+// should start a TCP server and listen on port 1234, test by connecting only
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -76,26 +73,27 @@ tasks.push(function(done) {
   child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
 
+  var stdout = '';
   var stderr = '';
+  child.stdout.setEncoding('utf8');
   child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
   child.stderr.on('data', function(data) { stderr += data; });
 
   child.on('exit', function(code, sig) {
-    assert(/error loading hooks: "foo,bar" /.test(stderr));
-    assert.strictEqual(code, 2);
+    assert.strictEqual(stderr.length, 0);
+    assert(/INET socket bound 127.0.0.1:1234/.test(stdout));
+    assert(/client connected 127.0.0.1-/.test(stdout));
+    assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
   });
 
-  child.on('message', function(msg) {
-    console.log("message");
-    switch(msg) {
-    case 'init':
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  });
+  setTimeout(function() {
+    net.createConnection(1234, function() {
+      child.kill();
+    });
+  }, 1000);
 });
 
 async.series(tasks, function(err) {

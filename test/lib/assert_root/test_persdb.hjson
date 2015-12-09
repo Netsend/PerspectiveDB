@@ -35,4 +35,4 @@ dbs: [{
   ]
 }]
 
-locaLPort: 1234
+localPort: 1234
