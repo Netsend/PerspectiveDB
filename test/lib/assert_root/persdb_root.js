@@ -203,13 +203,13 @@ tasks.push(function(done) {
 });
 
 // should start a WSS server, and disconnect because username does not exist in config
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
 
-  child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
 
   var stdout = '';
   var stderr = '';
@@ -228,6 +228,45 @@ tasks2.push(function(done) {
   setTimeout(function() {
     var authReq = {
       username: 'foo',
+      password: 'bar',
+      db: 'someDb'
+    };
+
+    var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+      client.on('close', function() {
+        child.kill();
+      });
+      client.sendText(JSON.stringify(authReq) + '\n');
+    });
+  }, 1000);
+});
+
+// should start a WSS server, and disconnect because password is incorrect
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  //child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert(/_verifyAuthRequest someDb someClient invalid credentials/.test(stderr));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  setTimeout(function() {
+    var authReq = {
+      username: 'someClient',
       password: 'bar',
       db: 'someDb'
     };
