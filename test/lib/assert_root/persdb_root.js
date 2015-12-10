@@ -281,7 +281,7 @@ tasks.push(function(done) {
 });
 
 // should start a WSS server, and disconnect because password is incorrect
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
@@ -315,6 +315,53 @@ tasks2.push(function(done) {
         child.kill();
       });
       client.sendText(JSON.stringify(authReq) + '\n');
+    });
+  }, 1000);
+});
+
+// should start a WSS server, and send an auth response that signals no data is expected (no import key in config)
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert(/successfully authenticated someClient/.test(stdout));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  setTimeout(function() {
+    var authReq = {
+      username: 'someClient',
+      password: 'somepass',
+      db: 'someDb'
+    };
+
+    var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+      client.sendText(JSON.stringify(authReq) + '\n');
+      // expect auth response
+      client.on('text', function(data) {
+        assert(data, JSON.stringify({ start: false }));
+        client.on('close', function(code, reason) {
+          assert(code, 9823);
+          assert(reason, 'test');
+          child.kill();
+        });
+        client.close(9823, 'test');
+      });
     });
   }, 1000);
 });
