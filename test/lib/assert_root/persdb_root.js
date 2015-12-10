@@ -61,7 +61,7 @@ var chroot = '/var/persdb/test_persdb_root';
 var dbPath = '/data';
 
 // open loggers
-tasks2.push(function(done) {
+tasks.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
     cons = l;
@@ -97,7 +97,7 @@ tasks.push(function(done) {
 
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert(/INET socket bound 127.0.0.1:1234/.test(stdout));
+    assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
     assert(/client connected 127.0.0.1-/.test(stdout));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
@@ -140,7 +140,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -171,7 +171,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -206,7 +206,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -245,7 +245,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -284,7 +284,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -320,10 +320,10 @@ tasks.push(function(done) {
 });
 
 // should start a WSS server, and send an auth response that signals no data is expected (no import key in config)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -366,7 +366,7 @@ tasks2.push(function(done) {
   }, 1000);
 });
 
-async.series(tasks2, function(err) {
+async.series(tasks, function(err) {
   if (err) {
     console.error(err);
   } else {
