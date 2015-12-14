@@ -52,17 +52,33 @@ describe('dataRequest', function () {
       should.strictEqual(result, false);
     });
 
-    it('should return true', function() {
-      var result = dataRequest.valid({ start: 'bar' });
-      should.strictEqual(result, true);
-    });
-
-    describe('field type checks', function() {
-      it('should return false when start is not a string', function() {
+    describe('field type checks string or boolean', function() {
+      it('should return false when start is a number', function() {
         var result = dataRequest.valid({
           start: 1
         });
         should.strictEqual(result, false);
+      });
+
+      it('should return true when start is a string', function() {
+        var result = dataRequest.valid({
+          start: 'foo'
+        });
+        should.strictEqual(result, true);
+      });
+
+      it('should return true when start is true', function() {
+        var result = dataRequest.valid({
+          start: true
+        });
+        should.strictEqual(result, true);
+      });
+
+      it('should return true when start is false', function() {
+        var result = dataRequest.valid({
+          start: false
+        });
+        should.strictEqual(result, true);
       });
     });
 
