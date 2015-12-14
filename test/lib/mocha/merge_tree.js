@@ -1393,6 +1393,84 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('scheduleMerge', function() {
+    var stageName = '_stage_scheduleMerge';
+    var pe = 'some';
+    var ldb;
+    var ldbPath = tmpdir() + '/test_merge_tree_scheduleMerge';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: pe, pa: [] }, b: { some: 'body' } };
+
+    before('should open a new db for scheduleMerge tests only', function(done) {
+      // ensure a db at start
+      rimraf(ldbPath, function(err) {
+        if (err) { throw err; }
+        level(ldbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, adb) {
+          if (err) { throw err; }
+          ldb = adb;
+          done();
+        });
+      });
+    });
+
+    after('should destroy this db', function(done) {
+      rimraf(ldbPath, done);
+    });
+
+    it('should require timeout to be a number', function() {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      (function() { mt.scheduleMerge(); }).should.throw('timeout must be a number');
+    });
+
+    it('should return right away if no dbs are updated', function(done) {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      mt.scheduleMerge(0, done);
+    });
+
+    it('should set updated flag if written to remote stream', function(done) {
+      var opts = { stage: stageName, vSize: 3, log: silence, perspectives: [pe] };
+      var mt = new MergeTree(ldb, opts);
+      should.equal(mt._updatedPerspectives[pe], undefined);
+      mt.createRemoteWriteStream(pe).write(item1, function(err) {
+        if (err) { throw err; }
+        should.equal(mt._updatedPerspectives[pe], true);
+        done();
+      });
+    });
+
+    it('should call the merge handler and write to the local database', function(done) {
+      var opts = {
+        stage: stageName,
+        vSize: 3,
+        log: silence,
+        perspectives: [pe]
+      };
+      var mt = new MergeTree(ldb, opts);
+      // make sure the local db is empty before testing
+      var rs = mt.createReadStream();
+      rs.on('data', function() {
+        throw new Error('db not empty');
+      });
+      rs.on('end', function() {
+        // signal update and use previously written item
+        mt._updatedPerspectives[pe] = true;
+        mt.scheduleMerge(0, function(err) {
+          if (err) { throw err; }
+          mt.createReadStream().on('data', function(item) {
+            should.deepEqual({
+              h: { id: 'XI', v: 'Aaaa', pa: [] },
+              b: { some: 'body' }
+            }, item);
+            done();
+          });
+        });
+      });
+    });
+  });
+
   describe('_versionContent', function() {
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
@@ -1423,84 +1501,6 @@ describe('MergeTree', function() {
     it('should version item2 and determine vSize automatically', function() {
       var v = MergeTree._versionContent(item2);
       should.deepEqual(v, 'nujg');
-    });
-  });
-
-  describe('_scheduleMerge', function() {
-    var stageName = '_stage_scheduleMerge';
-    var pe = 'some';
-    var ldb;
-    var ldbPath = tmpdir() + '/test_merge_tree_scheduleMerge';
-
-    // use 24-bit version numbers (base 64)
-    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: pe, pa: [] }, b: { some: 'body' } };
-
-    before('should open a new db for _scheduleMerge tests only', function(done) {
-      // ensure a db at start
-      rimraf(ldbPath, function(err) {
-        if (err) { throw err; }
-        level(ldbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, adb) {
-          if (err) { throw err; }
-          ldb = adb;
-          done();
-        });
-      });
-    });
-
-    after('should destroy this db', function(done) {
-      rimraf(ldbPath, done);
-    });
-
-    it('should require timeout to be a number', function() {
-      var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(ldb, opts);
-      (function() { mt._scheduleMerge(); }).should.throw('timeout must be a number');
-    });
-
-    it('should return right away if no dbs are updated', function(done) {
-      var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(ldb, opts);
-      mt._scheduleMerge(0, done);
-    });
-
-    it('should set updated flag if written to remote stream', function(done) {
-      var opts = { stage: stageName, vSize: 3, log: silence, perspectives: [pe] };
-      var mt = new MergeTree(ldb, opts);
-      should.equal(mt._updatedPerspectives[pe], undefined);
-      mt.createRemoteWriteStream(pe).write(item1, function(err) {
-        if (err) { throw err; }
-        should.equal(mt._updatedPerspectives[pe], true);
-        done();
-      });
-    });
-
-    it('should call the merge handler and write to the local database', function(done) {
-      var opts = {
-        stage: stageName,
-        vSize: 3,
-        log: silence,
-        perspectives: [pe]
-      };
-      var mt = new MergeTree(ldb, opts);
-      // make sure the local db is empty before testing
-      var rs = mt.createReadStream();
-      rs.on('data', function() {
-        throw new Error('db not empty');
-      });
-      rs.on('end', function() {
-        // signal update and use previously written item
-        mt._updatedPerspectives[pe] = true;
-        mt._scheduleMerge(0, function(err) {
-          if (err) { throw err; }
-          mt.createReadStream().on('data', function(item) {
-            should.deepEqual({
-              h: { id: 'XI', v: 'Aaaa', pa: [] },
-              b: { some: 'body' }
-            }, item);
-            done();
-          });
-        });
-      });
     });
   });
 });
