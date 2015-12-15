@@ -237,7 +237,7 @@ tasks.push(function(done) {
   });
 });
 
-// should proxy auth response back to websocket client
+// should proxy data request back to websocket client
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -293,7 +293,7 @@ tasks.push(function(done) {
 
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText(JSON.stringify(authReq) + '\n');
-        // expect auth response
+        // expect data request
         client.on('text', function(data) {
           assert(data, JSON.stringify({ start: true }));
           client.on('close', function(code, reason) {
