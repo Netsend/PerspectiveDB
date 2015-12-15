@@ -1471,6 +1471,13 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('close', function() {
+    it('should close and callback', function(done) {
+      var mt = new MergeTree(db, { vSize: 3, log: silence });
+      mt.close(done);
+    });
+  });
+
   describe('_versionContent', function() {
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
