@@ -57,7 +57,7 @@ var group = 'nobody';
 var dbPath = '/test_db_exec_root';
 
 // open loggers
-tasks2.push(function(done) {
+tasks.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
     cons = l;
@@ -76,7 +76,7 @@ tasks2.push(function(done) {
 });
 
 // should accept writable stream for log files (regression)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var logFile = fs.createWriteStream(tmpdir() + 'vce-test.log', { flags: 'a' });
@@ -89,7 +89,7 @@ tasks2.push(function(done) {
     });
 
     //child.stdout.pipe(process.stdout);
-    //child.stderr.pipe(process.stderr);
+    child.stderr.pipe(process.stderr);
 
     var stderr = '';
     child.stderr.setEncoding('utf8');
@@ -124,7 +124,7 @@ tasks2.push(function(done) {
 });
 
 // should fail if hooks not found
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -163,7 +163,7 @@ tasks2.push(function(done) {
 });
 
 // should fail with a valid configuration but non-existing hook paths
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -205,7 +205,7 @@ tasks2.push(function(done) {
 });
 
 // should not fail with valid configurations (include existing hook paths)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -247,7 +247,7 @@ tasks2.push(function(done) {
 });
 
 // should fail if configured hook is not loaded
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -290,7 +290,7 @@ tasks2.push(function(done) {
 });
 
 // should require a connection
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
@@ -324,7 +324,7 @@ tasks2.push(function(done) {
     case 'listen':
       // send stripped auth request
       child.send({
-        username: 'foo'
+        perspective: 'foo'
       });
       child.kill();
       break;
@@ -335,7 +335,7 @@ tasks2.push(function(done) {
 });
 
 // should require a valid remote identity
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // start an echo server that can receive auth responses
@@ -361,7 +361,7 @@ tasks2.push(function(done) {
   child.stderr.on('data', function(data) { stderr += data; });
 
   child.on('exit', function(code, sig) {
-    assert(/unknown remote/.test(stderr));
+    assert(/unknown perspective/.test(stderr));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -384,7 +384,7 @@ tasks2.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: 'webclient'
+          perspective: 'webclient'
         }, s);
       });
 
@@ -395,16 +395,16 @@ tasks2.push(function(done) {
   });
 });
 
-// should respond with an auth response that indicates no data is requested
-tasks2.push(function(done) {
+// should respond with a data request that indicates no data is requested
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // start an echo server that can receive auth responses
+  // start an echo server that can receive data requests
   var host = '127.0.0.1';
   var port = 1234;
 
   var server = net.createServer(function(conn) {
-    // expect an auth response that indicates no data is requested
+    // expect a data request that indicates no data is requested
     conn.on('data', function(data) {
       assert.deepEqual(JSON.parse(data), {
         start: false
@@ -453,7 +453,7 @@ tasks2.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: 'webclient'
+          perspective: 'webclient'
         }, s);
       });
       break;
@@ -463,8 +463,8 @@ tasks2.push(function(done) {
   });
 });
 
-// should accept incoming BSON data if a replication config is given
-tasks2.push(function(done) {
+// should accept a data request followed by BSON data if an import config is given
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -474,15 +474,18 @@ tasks2.push(function(done) {
   var host = '127.0.0.1';
   var port = 1234;
 
-  // start server to check if pull request is sent by vcexec
+  // start server to check response from db_exec
   var server = net.createServer(function(conn) {
     conn.on('data', function(data) {
       assert.deepEqual(JSON.parse(data), {
         start: true
       });
 
-      // now send a root node
-      var obj = { h: { id: 'abc', v: 'Aaaa', pa: [] }, b: { some: true } };
+      // send a data request signalling no data is requested
+      conn.write(JSON.stringify({ start: false }) + '\n');
+
+      // follow up with a root node in BSON
+      var obj = { h: { id: 'abd', v: 'Aaaa', pa: [] }, b: { some: true } };
       conn.end(BSON.serialize(obj));
       conn.on('close', function() {
         server.close(function() {
@@ -519,7 +522,7 @@ tasks2.push(function(done) {
       rs.on('data', function(item) {
         i++;
         assert.deepEqual(item, {
-          h: { id: 'abc', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+          h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
           b: { some: true }
         });
       });
@@ -555,10 +558,10 @@ tasks2.push(function(done) {
       });
       break;
     case 'listen':
-      // send stripped auth request
+      // forward authorized connection with connection
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: pe
+          perspective: pe
         }, s);
       });
       break;
@@ -569,7 +572,7 @@ tasks2.push(function(done) {
 });
 
 // should send back previously saved item (depends on previous test)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -586,14 +589,17 @@ tasks2.push(function(done) {
         start: 'Aaaa'
       });
 
+      // send a data request signalling data is requested from the start
+      conn.write(JSON.stringify({ start: true }) + '\n');
+
       conn.on('data', function(data) {
         assert.deepEqual(BSON.deserialize(data), {
-          h: { id: 'abc', v: 'Aaaa', pa: [] },
+          h: { id: 'abd', v: 'Aaaa', pa: [] },
           b: { some: true }
         });
 
         // now send a new child
-        var obj = { h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
+        var obj = { h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
         conn.end(BSON.serialize(obj), function() {
           server.close(function() {
             child.kill();
@@ -631,13 +637,13 @@ tasks2.push(function(done) {
         i++;
         if (i === 1) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
             b: { some: true }
           });
         }
         if (i === 2) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 2 },
+            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 2 },
             b: { some: 'other' }
           });
         }
@@ -677,7 +683,7 @@ tasks2.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: pe
+          perspective: pe
         }, s);
       });
       break;
@@ -688,7 +694,7 @@ tasks2.push(function(done) {
 });
 
 // should run export hooks and send back previously saved items (depends on two previous tests)
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -705,18 +711,21 @@ tasks2.push(function(done) {
         start: false
       });
 
+      // send a data request signalling data is requested from the start
+      conn.write(JSON.stringify({ start: true }) + '\n');
+
       var i = 0;
       conn.pipe(new BSONStream()).on('data', function(item) {
         i++;
         if (i === 1) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Aaaa', pa: [] },
+            h: { id: 'abd', v: 'Aaaa', pa: [] },
             b: { some: true }
           });
         }
         if (i === 2) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'] },
+            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] },
             b: { } // should have been stripped by export hook
           });
         }
@@ -778,7 +787,7 @@ tasks2.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: pe
+          perspective: pe
         }, s);
       });
       break;
@@ -789,7 +798,7 @@ tasks2.push(function(done) {
 });
 
 // should run import hooks
-tasks2.push(function(done) {
+tasks.push(function(done) {
   console.log('test #%d', lnr());
 
   // then fork a vce
@@ -805,6 +814,9 @@ tasks2.push(function(done) {
       assert.deepEqual(JSON.parse(data), {
         start: 'Bbbb'
       });
+
+      // send a data request signalling data is requested from the start
+      conn.write(JSON.stringify({ start: true }) + '\n');
 
       conn.end(BSON.serialize({
         h: { id: 'def', v: 'Dddd', pa: [] },
@@ -853,13 +865,13 @@ tasks2.push(function(done) {
         i++;
         if (i === 1) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
             b: { some: true }
           });
         }
         if (i === 2) {
           assert.deepEqual(item, {
-            h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 2 },
+            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 2 },
             b: { some: 'other' }
           });
         }
@@ -906,7 +918,7 @@ tasks2.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
-          username: pe
+          perspective: pe
         }, s);
       });
       break;
@@ -916,7 +928,7 @@ tasks2.push(function(done) {
   });
 });
 
-async.series(tasks2, function(err) {
+async.series(tasks, function(err) {
   if (err) {
     console.error(err);
   } else {
