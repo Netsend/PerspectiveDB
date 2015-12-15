@@ -122,7 +122,7 @@ tasks.push(function(done) {
   });
 });
 
-// should disconnect after receiving more than 512 bytes of data without newlines
+// should disconnect after receiving more than 1024 bytes of data without newlines
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -165,7 +165,7 @@ tasks.push(function(done) {
           ms.write(pattern, function(err) {
             if (err) {
               assert(/EPIPE|This socket is closed|This socket has been ended by the other party/.test(err.message));
-              assert(i >= 65 && i <= 67);
+              assert(i >= 125 && i <= 135);
               child.kill();
             } else {
               flood();
@@ -252,7 +252,7 @@ tasks.push(function(done) {
   var authReq = {
     username: 'foo',
     password: 'bar',
-    offset: 'qux'
+    db: 'qux'
   };
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
@@ -287,7 +287,7 @@ tasks.push(function(done) {
       assert.deepEqual(msg, {
         username: 'foo',
         password: 'bar',
-        offset: 'qux'
+        db: 'qux'
       });
       child.kill();
     }
@@ -314,7 +314,7 @@ tasks.push(function(done) {
   var authReq = {
     username: 'foo',
     password: 'bar',
-    offset: 'qux'
+    db: 'qux'
   };
 
   var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
@@ -342,9 +342,9 @@ tasks.push(function(done) {
         log: { console: true, mask: logger.DEBUG },
         port: 1234,
         wss: true,
-        cert: cert,
-        key: key,
-        dhparam: dhparam
+        wssCert: cert,
+        wssKey: key,
+        wssDhparam: dhparam
       });
       break;
     case 'listen':
@@ -369,7 +369,7 @@ tasks.push(function(done) {
       assert.deepEqual(msg, {
         username: 'foo',
         password: 'bar',
-        offset: 'qux'
+        db: 'qux'
       });
       child.kill();
     }
