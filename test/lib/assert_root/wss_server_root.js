@@ -30,6 +30,8 @@ var c = require('constants');
 var fs = require('fs');
 
 var async = require('async');
+var bson = require('bson');
+var BSON = new bson.BSONPure.BSON();
 var ws = require('nodejs-websocket');
 
 var cert, key, dhparam;
@@ -58,7 +60,7 @@ var logger = require('../../../lib/logger');
 var cons, silence;
 
 // open loggers
-tasks.push(function(done) {
+tasks2.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
     cons = l;
@@ -209,7 +211,7 @@ tasks.push(function(done) {
     // expect data that is fed to the wss server
     conn.setEncoding('utf8');
     conn.on('data', function(data) {
-      assert(data, 'some text text data');
+      assert.strictEqual(data, 'some text text data');
       tcpServer.close();
       child.kill();
     });
@@ -262,7 +264,7 @@ tasks.push(function(done) {
   var authReq = {
     username: 'foo',
     password: 'bar',
-    offset: 'qux'
+    db: 'qux'
   };
 
   var tcpPort = 1234;
@@ -270,7 +272,7 @@ tasks.push(function(done) {
   var tcpServer = net.createServer(function(conn) {
     // expect data that is fed to the wss server
     conn.on('data', function(data) {
-      assert(data.toString(), JSON.stringify(authReq));
+      assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
       conn.write(JSON.stringify({ start: true }) + '\n');
       tcpServer.close();
     });
@@ -295,10 +297,10 @@ tasks.push(function(done) {
         client.sendText(JSON.stringify(authReq) + '\n');
         // expect data request
         client.on('text', function(data) {
-          assert(data, JSON.stringify({ start: true }));
+          assert.strictEqual(data, JSON.stringify({ start: true }) + '\n');
           client.on('close', function(code, reason) {
-            assert(code, 9823);
-            assert(reason, 'test');
+            assert.strictEqual(code, 9823);
+            assert.strictEqual(reason, 'test');
             child.kill();
           });
           client.close(9823, 'test');
@@ -308,7 +310,97 @@ tasks.push(function(done) {
   });
 });
 
-async.series(tasks, function(err) {
+// should proxy data request + BSON response back to websocket client in two separate writes
+tasks2.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
+
+  var allDone;
+
+  child.stderr.pipe(process.stderr);
+  //child.stdout.pipe(process.stdout);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('close', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(allDone, true);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  var authReq = {
+    username: 'foo',
+    password: 'bar',
+    db: 'qux'
+  };
+
+  var dataReq = {
+    start: true
+  };
+
+  var bsonObj = { h: { id: true } };
+
+  var tcpPort = 1234;
+  // start a tcp server that the websocket server should proxy to
+  var tcpServer = net.createServer(function(conn) {
+    // expect data that is fed to the wss server
+    conn.on('data', function(data) {
+      assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
+      conn.write(JSON.stringify(dataReq) + '\n');
+      conn.write(BSON.serialize(bsonObj));
+      tcpServer.close();
+    });
+  });
+  tcpServer.listen(tcpPort);
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: logger.DEBUG },
+        cert: cert,
+        key: key,
+        dhparam: dhparam,
+        proxyPort: tcpPort
+      });
+      break;
+    case 'listen':
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+
+      var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
+        client.sendText(JSON.stringify(authReq) + '\n');
+        // expect data request back
+        client.on('text', function(data) {
+          assert.strictEqual(data, JSON.stringify(dataReq) + '\n');
+
+          // expect bson
+          client.on('binary', function(rs) {
+            rs.on('readable', function() {
+              var data = rs.read();
+              assert.strictEqual(data.toString('hex'), BSON.serialize(bsonObj).toString('hex'));
+              client.on('close', function(code, reason) {
+                assert.strictEqual(code, 9823);
+                assert.strictEqual(reason, 'test');
+                allDone = true;
+                child.kill();
+              });
+              client.close(9823, 'test');
+            });
+          });
+        });
+      });
+    }
+  });
+});
+
+async.series(tasks2, function(err) {
   if (err) {
     console.error(err);
   } else {
