@@ -1,19 +1,19 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2015 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -30,10 +30,14 @@ var net = require('net');
 var spawn = require('child_process').spawn;
 
 var async = require('async');
+var bson = require('bson');
+var BSON = new bson.BSONPure.BSON();
+var level = require('level');
 var rimraf = require('rimraf');
 var ws = require('nodejs-websocket');
 
 var logger = require('../../../lib/logger');
+var MergeTree = require('../../../lib/merge_tree');
 
 var cert, key, dhparam;
 
@@ -57,8 +61,8 @@ function lnr() {
 }
 
 var cons, silence;
-var chroot = '/var/persdb/test_persdb_root';
-var dbPath = '/data';
+var chroot = '/var/persdb';
+var dbPath = '/test_persdb_root';
 
 // open loggers
 tasks.push(function(done) {
@@ -167,7 +171,7 @@ tasks.push(function(done) {
   }, 1000);
 });
 
-// should start a WSS server, and disconnect because of empty auth request
+// should start a WSS server, and disconnect because of empty data request
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -319,7 +323,7 @@ tasks.push(function(done) {
   }, 1000);
 });
 
-// should start a WSS server, and send an auth response that signals no data is expected (no import key in config)
+// should start a WSS server, and send a data request that signals no data is expected (no import key in config)
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -337,7 +341,7 @@ tasks.push(function(done) {
 
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert(/successfully authenticated someClient/.test(stdout));
+    assert(/successfully authenticated "someClient"/.test(stdout));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -352,7 +356,7 @@ tasks.push(function(done) {
 
     var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
       client.sendText(JSON.stringify(authReq) + '\n');
-      // expect auth response
+      // expect data request
       client.on('text', function(data) {
         assert(data, JSON.stringify({ start: false }));
         client.on('close', function(code, reason) {
@@ -361,6 +365,146 @@ tasks.push(function(done) {
           child.kill();
         });
         client.close(9823, 'test');
+      });
+    });
+  }, 1000);
+});
+
+// should start a WSS server, and send a data request that signals data is expected (import true)
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_import.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert(/successfully authenticated "someClient"/.test(stdout));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  setTimeout(function() {
+    var authReq = {
+      username: 'someClient',
+      password: 'somepass',
+      db: 'someDb'
+    };
+
+    var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+      client.sendText(JSON.stringify(authReq) + '\n');
+      // expect data request
+      client.on('text', function(data) {
+        assert(data, JSON.stringify({ start: true }));
+        client.on('close', function(code, reason) {
+          assert(code, 9823);
+          assert(reason, 'test');
+          child.kill();
+        });
+        client.close(9823, 'test');
+      });
+    });
+  }, 1000);
+});
+
+// should start a WSS server, and accept a data request + two BSON items
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_import.hjson']);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var pe = 'someClient';
+  var vSize = 3;
+
+  child.on('exit', function(code, sig) {
+    // open and search in database if item is written
+    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      if (err) { throw err; }
+
+      var mt = new MergeTree(db, {
+        perspectives: [pe],
+        vSize: vSize,
+        log: silence
+      });
+      var rs = mt._pe[pe].createReadStream();
+      var i = 0;
+      rs.on('data', function(item) {
+        i++;
+        if (i === 1) {
+          assert.deepEqual(item, { h: { id: 'abc', v: 'Aaaa', pe: pe, i: 1, pa: [] }, b: { some: true } });
+        }
+        if (i === 2) {
+          assert.deepEqual(item, { h: { id: 'abc', v: 'Bbbb', pe: pe, i: 2, pa: ['Aaaa'] }, b: { some: 'other' } });
+        }
+      });
+
+      rs.on('end', function() {
+        assert.strictEqual(stderr.length, 0);
+        assert.strictEqual(code, 0);
+        assert.strictEqual(sig, null);
+        assert.strictEqual(i, 2);
+        mt.mergeWithLocal(mt._pe[pe], function(err) {
+          if (err) { throw err; }
+          db.close(done);
+        });
+      });
+    });
+  });
+
+  setTimeout(function() {
+    var authReq = {
+      username: pe,
+      password: 'somepass',
+      db: 'someDb'
+    };
+    var dataReq = {
+      start: true
+    };
+
+    var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+      client.sendText(JSON.stringify(authReq) + '\n');
+
+      // expect data request
+      client.on('text', function(data) {
+        assert(data, JSON.stringify({ start: true }));
+
+        client.sendText(JSON.stringify(dataReq) + '\n');
+
+        // now send a root node and a child
+        var obj1 = { h: { id: 'abc', v: 'Aaaa', pa: [] }, b: { some: true } };
+        var obj2 = { h: { id: 'abc', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
+
+        client.sendBinary(BSON.serialize(obj1));
+        client.sendBinary(BSON.serialize(obj2));
+
+        client.on('close', function(code, reason) {
+          assert(code, 9823);
+          assert(reason, 'test');
+          child.kill();
+        });
+        setTimeout(function() {
+          client.close(9823, 'test');
+        }, 100);
       });
     });
   }, 1000);

@@ -24,14 +24,14 @@ dbs: [{
   name: someDb
   chroot: /var/persdb
   path: /test_persdb_root
+  mergeTree: {
+    vSize: 3,
+  },
   perspectives: [
     {
       name: someClient
       password: "$2a$10$4Po9aCT665J1luJOwSnTYez/PWO0mOjxOcVOOOF7f13IrW9Tl3nq2" # password is "somepass"
-      export: {
-        hide: ["someOtherKey"]
-        filter: { someKey: "someVal" }
-      }
+      import: true
     }
   ]
 }]
