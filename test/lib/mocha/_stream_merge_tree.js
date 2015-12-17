@@ -255,6 +255,29 @@ describe('StreamMergeTree', function() {
       });
     });
 
+    it('should tail and not close', function(done) {
+      // use tailable is false to stop emitting documents after the last found doc
+      var smt = new StreamMergeTree(mt, { local: perspective, log: silence, tail: true, tailRetry: 1 });
+      var docs = [];
+
+      smt.on('data', function(doc) {
+        docs.push(doc);
+      });
+
+      var stopCalled;
+      setTimeout(function() {
+        smt.stop();
+        stopCalled = true;
+      }, 50);
+
+      smt.on('end', function() {
+        should.equal(docs.length, 7);
+        should.deepEqual(docs, [rA, rB, rC, rD, rE, rF, rG]);
+        should.strictEqual(stopCalled, true);
+        done();
+      });
+    });
+
     it('should reopen and return all elements again', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = new StreamMergeTree(mt, { local: perspective, log: silence });
