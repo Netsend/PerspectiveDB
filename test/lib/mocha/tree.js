@@ -1771,6 +1771,7 @@ describe('Tree', function() {
     var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
     var item3 = { h: { id: 'XI', v: 'Dddd', i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
     var item4 = { h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } };
+    var item5 = { h: { id: 'foo', v: 'Ffff', i: 5, pa: ['Eeee'] }, b: { som3: 'mooore' } };
 
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -2022,6 +2023,35 @@ describe('Tree', function() {
       s.on('end', function(err) {
         if (err) { throw err; }
         should.strictEqual(i, 1);
+        done();
+      });
+    });
+
+    it('should tail and read new item5 after it\'s written', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var s = t.createReadStream({ id: 'foo', tail: true, tailRetry: 2 });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i === 1) {
+          should.deepEqual({ h: { id: 'foo', v: 'Eeee', i: 4, pa: [] }, b: { som3: 'other' } }, obj);
+
+          // write item5
+          t.write(item5);
+        }
+        if (i > 1) {
+          // expect item5
+          should.deepEqual({ h: { id: 'foo', v: 'Ffff', i: 5, pa: ['Eeee'] }, b: { som3: 'mooore' } }, obj);
+          // stop soon
+          setTimeout(function() {
+            s.stop();
+          }, 3);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
         done();
       });
     });
