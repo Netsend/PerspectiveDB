@@ -723,11 +723,12 @@ tasks.push(function(done) {
             b: { some: true }
           });
         }
-        if (i === 2) {
+        if (i > 1) {
           assert.deepEqual(item, {
             h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] },
             b: { } // should have been stripped by export hook
           });
+          conn.end();
         }
       });
 
