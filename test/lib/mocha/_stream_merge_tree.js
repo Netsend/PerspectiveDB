@@ -264,16 +264,16 @@ describe('StreamMergeTree', function() {
         docs.push(doc);
       });
 
-      var stopCalled;
+      var closeCalled;
       setTimeout(function() {
-        smt.stop();
-        stopCalled = true;
+        smt.close();
+        closeCalled = true;
       }, 50);
 
       smt.on('end', function() {
         should.equal(docs.length, 7);
         should.deepEqual(docs, [rA, rB, rC, rD, rE, rF, rG]);
-        should.strictEqual(stopCalled, true);
+        should.strictEqual(closeCalled, true);
         done();
       });
     });
