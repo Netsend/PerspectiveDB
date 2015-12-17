@@ -96,14 +96,26 @@ function start() {
     config.dbs.forEach(function(dbCfg) {
       dbCfg.perspectives.forEach(function(persCfg) {
         var username = persCfg.username || persCfg.name;
-        var password = persCfg.password;
+        var password = persCfg.password || persCfg.users;
 
         // support loading from a file
         if (password.indexOf('$2a$') !== 0) {
-          if (!files[password]) {
-            files[password] = hjson.parse(fs.readFileSync(password));
+          var file = password;
+          // prepend the dirname of the config file to all relative path specifications in the config file
+          if (file && file[0] !== '/') {
+            file = dirname(configFile) + '/' + file;
           }
-          password = files[persCfg.password][username];
+          var stats = fs.statSync(file);
+          if ((stats.mode & 6) !== 0) {
+            error = new Error('should not be world readable or writable');
+            console.error('%s: %s: %s', programName, file, error);
+            cb(error);
+            return;
+          }
+          if (!files[file]) {
+            files[file] = hjson.parse(fs.readFileSync(file, { encoding: 'utf8' }));
+          }
+          password = files[file][username];
         }
 
         if (!username) {
