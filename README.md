@@ -10,6 +10,25 @@ Features:
 
 Work in progress, see [wiki](https://github.com/Netsend/persdb/wiki) for progress.
 
+# Installation
+
+Assuming Node.js 4.x is installed and you are in the PersDB project root.
+
+Install npm modules:
+```
+$ npm install
+```
+
+Add new unprivileged user:
+```
+$ sudo useradd -d /var/empty -r -s /bin/false -U _pdbnull
+```
+
+Add a user for your database:
+```
+$ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
+```
+
 # License
 
 Copyright 2012, 2013, 2014, 2015 Netsend.
