@@ -12,14 +12,25 @@ Work in progress, see [wiki](https://github.com/Netsend/persdb/wiki) for progres
 
 # Installation
 
-Assuming Node.js 4.x is installed and you are in the PersDB project root.
+Assuming Node.js 4.x is installed.
+
+Clone this repo and change your working dir to it:
+```
+$ git clone https://github.com/Netsend/persdb.git
+$ cd persdb
+```
 
 Install npm modules:
 ```
 $ npm install
 ```
 
-Add new unprivileged user:
+Ensure /var/empty exists for the chrooted processes:
+```
+$ sudo mkdir /var/empty
+```
+
+Add a new unprivileged user:
 ```
 $ sudo useradd -d /var/empty -r -s /bin/false -U _pdbnull
 ```
@@ -27,6 +38,11 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U _pdbnull
 Add a user for your database:
 ```
 $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
+```
+
+Edit config/example.hjson and start the server:
+```
+$ sudo bin/persdb.js config/example.hjson
 ```
 
 # License
