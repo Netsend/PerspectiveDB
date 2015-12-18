@@ -51,11 +51,11 @@ By default only a tcp server is started on 127.0.0.1 port 2344. Communication
 between different servers should be done over an ssh tunnel.
 
 Communication with browsers can be done by using WebSockets. It is required to
-start the WebSocket server over TLS so a key, certificate and Diffie-Hellman
-parameters file must be generated in order for this to work.
+start the WebSocket server over TLS with forward secrecy so a private key,
+certificate and Diffie-Hellman parameters file must exist for this to work.
 
 Generate DH parameters, a private key, a temporary csr and a self signed
-certificate:
+certificate (or use a certificate signed by one of the major CAs):
 ```
 $ umask 077
 $ openssl dhparam -outform PEM -out config/dhparam.pem 2048
