@@ -1,3 +1,4 @@
 config/*.json
+config/*.pem
 local
 node_modules
