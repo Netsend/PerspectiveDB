@@ -1,7 +1,33 @@
-{
-  "dbName": "test",
-  "dbPort": 27019,
-  "oplogCollectionName": "fubar",
-  "privUser": "ms",
-  "unprivUser": "nobody"
+log: {
+  console: true
+  level: debug
+  file: /var/log/persdb.log
+  error: /var/log/persdb-error.log
 }
+
+dbs: [
+  {
+    name: foo
+    user: pdblevel
+    group: pdblevel
+    chroot: /srv/persdb/foo
+    perspectives: [{
+      name: "john"
+      users: "passwd.hjson"
+      import: true
+      export: true
+    }]
+  }
+]
+
+#wss: {                       # enable to start a secure websocket server
+#  key: key.pem               # use `openssl genrsa -out key.pem 2048`
+#  cert: cert.pem             # use `openssl req -new -sha256 -key key.pem -out csr.pem && openssl x509 -req -in csr.pem -signkey key.pem -out cert.pem`
+#  dhparam: dhparam.pem       # use `openssl dhparam -outform PEM -out dhparam.pem 2048`
+#  #host: 127.0.0.1
+#  #port: 3344
+#}
+
+user: _pdbnull
+group: _pdbnull
+#chroot: /var/empty
