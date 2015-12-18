@@ -12,7 +12,7 @@ Work in progress, see [wiki](https://github.com/Netsend/persdb/wiki) for progres
 
 # Installation
 
-Assuming Node.js 4.x is installed.
+Note: Node.js 4.x is required.
 
 Clone this repo and change your working dir to it:
 ```
@@ -44,6 +44,27 @@ Edit config/example.hjson and start the server:
 ```
 $ sudo bin/persdb.js config/example.hjson
 ```
+
+# Adding a WebSocket server
+
+By default only a tcp server is started on 127.0.0.1 port 2344. Communication
+between different servers should be done over an ssh tunnel.
+
+Communication with browsers can be done by using WebSockets. It is required to
+start the WebSocket server over TLS so a key, certificate and Diffie-Hellman
+parameters file must be generated in order for this to work.
+
+Generate a private key, a temporary csr, a self signed certificate and a
+DH params file:
+```
+$ openssl genrsa -out key.pem 2048
+$ openssl req -new -sha256 -key key.pem -out csr.pem
+$ openssl x509 -req -in csr.pem -signkey key.pem -out cert.pem
+$ rm csr.pem
+$ openssl dhparam -outform PEM -out dhparam.pem 2048
+```
+
+Edit your config to enable the WebSocket server and include these three files.
 
 # License
 
