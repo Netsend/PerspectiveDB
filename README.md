@@ -54,14 +54,16 @@ Communication with browsers can be done by using WebSockets. It is required to
 start the WebSocket server over TLS so a key, certificate and Diffie-Hellman
 parameters file must be generated in order for this to work.
 
-Generate a private key, a temporary csr, a self signed certificate and a
-DH params file:
+Generate DH parameters, a private key, a temporary csr and a self signed
+certificate:
 ```
-$ openssl genrsa -out key.pem 2048
-$ openssl req -new -sha256 -key key.pem -out csr.pem
-$ openssl x509 -req -in csr.pem -signkey key.pem -out cert.pem
-$ rm csr.pem
-$ openssl dhparam -outform PEM -out dhparam.pem 2048
+$ umask 077
+$ openssl dhparam -outform PEM -out config/dhparam.pem 2048
+$ openssl genrsa -out config/key.pem 2048
+$ umask 022
+$ openssl req -new -sha256 -key config/key.pem -out config/csr.pem
+$ openssl x509 -req -in config/csr.pem -signkey config/key.pem -out config/cert.pem
+$ rm config/csr.pem
 ```
 
 Edit your config to enable the WebSocket server and include these three files.
