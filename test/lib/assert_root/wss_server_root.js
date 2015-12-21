@@ -104,6 +104,41 @@ tasks.push(function(done) {
   });
 });
 
+// should require msg.key to not be group or world readable or writable
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
+
+  //child.stderr.pipe(process.stderr);
+  child.stdout.pipe(process.stdout);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+  child.on('close', function(code, sig) {
+    assert(/msg.key should not be group or world readable or writable/.test(stderr));
+    assert.strictEqual(code, 12);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  child.on('message', function(msg) {
+    switch (msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: logger.DEBUG },
+        cert: cert,
+        key: cert,
+        dhparam: 'foo'
+      });
+      break;
+    case 'listen':
+      break;
+    }
+  });
+});
+
 // should require msg.cert, key and dhparam to exist
 tasks.push(function(done) {
   console.log('test #%d', lnr());
@@ -129,7 +164,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: logger.DEBUG },
         cert: 'foo',
-        key: 'foo',
+        key: key,
         dhparam: 'foo'
       });
       break;
