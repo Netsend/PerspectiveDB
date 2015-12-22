@@ -1,0 +1,8 @@
+{
+  "url": "wss://example.com:3344",
+  "auth": {
+    "username": "foo",
+    "password": "bar",
+    "db": "baz"
+  }
+}
