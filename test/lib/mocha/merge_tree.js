@@ -1209,7 +1209,7 @@ describe('MergeTree', function() {
 
     it('should require item to be an object', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
-      mt.createLocalWriteStream().write([], function(err) {
+      mt.createLocalWriteStream().write(1, function(err) {
         should.strictEqual(err.message, 'item must be an object');
         done();
       });
