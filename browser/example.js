@@ -2,13 +2,14 @@
 
 'use strict';
 
-var Proxy = require('./proxy');
+require('./proxy'); // loading proxy will transparently proxy indexedDB
+
 var connect = require('./connect');
 var MergeTree = require('../lib/merge_tree');
 
 var config = require('./config.json');
 
-connect(config.url, config.auth, function(msg) {
+connect(config.url, config.auth, function() {
   console.log('ready');
 }, function() {
   console.log('closed');

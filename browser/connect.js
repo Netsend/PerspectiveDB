@@ -71,6 +71,6 @@ function connect(url, authReq, ready, close) {
     // send an auth request
     ws.send(JSON.stringify(authReq) + '\n');
   };
-};
+}
 
 module.exports = connect;
