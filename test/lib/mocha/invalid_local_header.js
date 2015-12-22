@@ -24,7 +24,7 @@ var invalidLocalHeader = require('../../../lib/invalid_local_header');
 
 describe('invalidLocalHeader', function() {
   it('should require h to be an object', function() {
-    invalidLocalHeader([]).should.equal('h must be an object');
+    invalidLocalHeader(1).should.equal('h must be an object');
   });
 
   it('should require h.id to be a valid id', function() {
@@ -36,7 +36,7 @@ describe('invalidLocalHeader', function() {
   });
 
   it('should require h.v to be a string', function() {
-    invalidLocalHeader({ id: 'foo', v: [] }).should.equal('h.v must be a string');
+    invalidLocalHeader({ id: 'foo', v: 1 }).should.equal('h.v must be a string');
   });
 
   it('should be a valid item with h.v', function() {
