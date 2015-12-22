@@ -26,7 +26,7 @@ describe('invalidItem', function() {
   var header = { id: '', v: 'A', pa: [] };
 
   it('should require item to be an object', function() {
-    invalidItem([]).should.equal('item must be an object');
+    invalidItem(1).should.equal('item must be an object');
   });
 
   it('should require a valid header', function() {
