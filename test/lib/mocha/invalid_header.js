@@ -24,7 +24,7 @@ var invalidHeader = require('../../../lib/invalid_header');
 
 describe('invalidHeader', function() {
   it('should require h to be an object', function() {
-    invalidHeader([]).should.equal('h must be an object');
+    invalidHeader(1).should.equal('h must be an object');
   });
 
   it('should require h.id to be a valid id', function() {
@@ -32,7 +32,7 @@ describe('invalidHeader', function() {
   });
 
   it('should require h.v to be a string', function() {
-    invalidHeader({ id: 'foo', v: [] }).should.equal('h.v must be a string');
+    invalidHeader({ id: 'foo', v: 1 }).should.equal('h.v must be a string');
   });
 
   it('should require h.pa to be an array', function() {
