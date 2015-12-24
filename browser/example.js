@@ -2,14 +2,9 @@
 
 'use strict';
 
-require('./proxy'); // loading proxy will transparently proxy indexedDB
-
-var connect = require('./connect');
-
 var config = require('./config.json');
-
-connect(config.url, config.auth, function() {
-  console.log('ready');
-}, function() {
-  console.log('closed');
-});
+var worker = new Worker('build/worker.js');
+worker.onmessage = function (event) {
+  console.log(event.data);
+};
+console.log("OK");
