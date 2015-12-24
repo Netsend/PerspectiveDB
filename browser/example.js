@@ -5,7 +5,6 @@
 require('./proxy'); // loading proxy will transparently proxy indexedDB
 
 var connect = require('./connect');
-var MergeTree = require('../lib/merge_tree');
 
 var config = require('./config.json');
 
