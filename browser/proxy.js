@@ -21,13 +21,13 @@
 'use strict';
 
 var errors = [];
-if (!window.hasOwnProperty('indexedDB')) {
+if (typeof indexedDB !== 'object') {
   errors.push('missing Indexed Database API');
 }
-if (!window.hasOwnProperty('crypto')) {
+if (typeof crypto !== 'object') {
   errors.push('missing Web Cryptography API');
 }
-if (!window.hasOwnProperty('Proxy')) {
+if (typeof Proxy !== 'object') {
   errors.push('missing ES6 Proxy');
 }
 
