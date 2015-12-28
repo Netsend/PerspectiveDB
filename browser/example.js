@@ -4,7 +4,14 @@
 
 var config = require('./config.json');
 var worker = new Worker('build/worker.js');
-worker.onmessage = function (event) {
-  console.log(event.data);
+worker.onmessage = function(ev) {
+  if (ev.data !== 'init') {
+    throw new Error('expected init');
+  }
+
+  // send config
+  worker.postMessage({
+    perspectives: config
+  });
 };
-console.log("OK");
+console.log('OK');

@@ -35,7 +35,7 @@
     "read": "^1.0.5",
     "nest-namespace": "^0.0.2",
     "match-object": "^0.0.1",
-    "object-key-filter": "^0.0.1"
+    "object-key-filter": "^0.0.2"
   },
   "devDependencies": {
     "through2": "^2.0.0",

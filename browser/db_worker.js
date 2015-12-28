@@ -30,7 +30,6 @@ var websocket = require('websocket-stream');
 
 var proxy = require('./proxy');
 var dataRequest = require('../lib/data_request');
-var logger = require('../lib/logger');
 var MergeTree = require('../lib/merge_tree');
 var parsePersConfigs = require('../lib/parse_pers_configs');
 
@@ -49,12 +48,10 @@ var parsePersConfigs = require('../lib/parse_pers_configs');
  *
  * The first message emitted is "init" which signals that this worker is ready to
  * receive configuration data, which consists of the db config, including
- * perspective configs and log configuration.
+ * perspective configs.
  *
  * {
- *   log:            {Object}      // log configuration
- *   [name]:         {String}      // name of this database, defaults to "persdb"
- *   [debug]:        {Boolean}     // defaults to false
+ *   [name]:         {String}      // name of this database, defaults to "_pdb"
  *   [perspectives]: {Array}       // array of other perspectives with urls
  *   [mergeTree]:    {Object}      // any MergeTree options
  * }
@@ -74,6 +71,7 @@ var parsePersConfigs = require('../lib/parse_pers_configs');
  * }
  */
 
+var noop = function() {};
 var log; // used after receiving the log configuration
 
 var programName = 'dbw';
@@ -329,8 +327,8 @@ function start(cfg) {
     if (typeof cfg.connect.hostname !== 'string') { throw new TypeError('cfg.connect.hostname must be a string'); }
 
     // currently only wss is supported as a valid protocol
-    if (cfg.connect.protocol !== 'wss') { throw new TypeError('cfg.connect.protocol must be "wss"'); }
-    if (cfg.connect.port != null && typeof cfg.connect.port !== 'number') { throw new TypeError('cfg.connect.port must be a number'); }
+    if (cfg.connect.protocol !== 'wss:') { throw new TypeError('cfg.connect.protocol must be "wss:"'); }
+    if (cfg.connect.port != null && typeof cfg.connect.port !== 'string') { throw new TypeError('cfg.connect.port must be a string'); }
 
     log.notice('dbw setup WebSocket %j', debugReq(cfg));
 
@@ -395,55 +393,62 @@ if (typeof self.postMessage !== 'function') {
 self.postMessage('init');
 
 /**
- * Expect a db config, log config and any merge tree options.
+ * Expect a db config and any merge tree options.
  *
  * {
- *   log:            {Object}      // log configuration
- *   [name]:         {String}      // name of this database, defaults to "persdb"
- *   [debug]:        {Boolean}     // defaults to false
+ *   [name]:         {String}      // name of this database, defaults to "_pdb"
  *   [perspectives]: {Array}       // array of other perspectives with urls
  *   [mergeTree]:    {Object}      // any MergeTree options
  * }
  */
-function init(msg) {
+function init(ev) {
+  var msg = ev.data;
+  if (msg == null) {
+    msg = {};
+  }
   if (typeof msg !== 'object') { throw new TypeError('msg must be an object'); }
-  if (typeof msg.log !== 'object') { throw new TypeError('msg.log must be an object'); }
 
   if (msg.name != null && typeof msg.name !== 'string') { throw new TypeError('msg.name must be a string'); }
-  if (msg.debug != null && typeof msg.debug !== 'boolean') { throw new TypeError('msg.debug must be a string'); }
   if (msg.perspectives != null && !Array.isArray(msg.perspectives)) { throw new TypeError('msg.perspectives must be an array'); }
   if (msg.mergeTree != null && typeof msg.mergeTree !== 'object') { throw new TypeError('msg.mergeTree must be an object'); }
 
   self.onmessage = null;
 
-  programName = 'dbw ' + msg.name || 'persdb';
-
-  msg.log.ident = programName;
+  programName = 'dbw ' + msg.name || '_pdb';
 
   // open log
-  logger(msg.log, function(err, l) {
-    if (err) { l.err(err); throw err; }
+  log = {
+    emerg:   console.error.bind(console),
+    alert:   console.error.bind(console),
+    crit:    console.error.bind(console),
+    err:     console.error.bind(console),
+    warning: console.log.bind(console),
+    notice:  console.log.bind(console),
+    info:    console.log.bind(console),
+    debug:   console.log.bind(console),
+    debug2:  console.log.bind(console),
+    getFileStream: noop,
+    getErrorStream: noop,
+    close: noop
+  };
 
-    log = l; // use this logger in the mt's as well
+  // open db and call start or exit
+  function openDbAndProceed() {
+    level(msg.name, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, dbc) {
+      if (err) {
+        log.err('dbw opening db %s', err);
+        throw new Error(9);
+      }
+      log.info('dbw opened db %s', msg.name);
 
-    // open db and call start or exit
-    function openDbAndProceed() {
-      level(msg.name, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, dbc) {
-        if (err) {
-          log.err('dbw opening db %s', err);
-          throw new Error(9);
-        }
-        log.info('dbw opened db %s', msg.name);
+      db = dbc;
 
-        db = dbc;
+      start(msg);
+    });
+  }
 
-        start(msg);
-      });
-    }
-
-    // assume database exists
-    openDbAndProceed();
-  });
+  // assume database exists
+  openDbAndProceed();
 }
 
 self.onmessage = init;
