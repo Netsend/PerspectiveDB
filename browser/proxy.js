@@ -25,9 +25,20 @@ if (typeof indexedDB !== 'object') {
   errors.push('missing Indexed Database API');
 }
 if (typeof crypto !== 'object') {
-  errors.push('missing Web Cryptography API');
+  // wait for https://bugzilla.mozilla.org/show_bug.cgi?id=842818
+  //errors.push('missing Web Cryptography API');
+  console.log('WARNING: missing crypto interface, using a cryptographically INSECURE PRNG');
+  var crypto = {
+    // expect buffer to be an Uint8Array
+    getRandomValues: function(buffer) {
+      for (var i = 0; i < buffer.length; i++) {
+        buffer[i] = Math.floor(Math.random() * 256);
+      }
+    }
+  };
+  //errors.push('missing Web Cryptography API');
 }
-if (typeof Proxy !== 'object') {
+if (typeof Proxy !== 'function') {
   errors.push('missing ES6 Proxy');
 }
 
