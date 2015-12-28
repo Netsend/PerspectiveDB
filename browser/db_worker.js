@@ -97,7 +97,7 @@ var connections = {};
  * - maybe import data
  */
 function connHandler(conn, mt, pers) {
-  var connId = conn.url;
+  var connId = conn.uri;
   log.info('client connected %s', connId);
 
   if (connections[connId]) {
@@ -311,7 +311,6 @@ function start(cfg) {
   mtOpts.log = log;
   mtOpts.autoMergeInterval = mtOpts.autoMergeInterval || 1000;
 
-  // set global, used in connHandler
   var mt = new MergeTree(db, mtOpts);
 
   // 3. create authenticated WebSockets and start transfering BSON
@@ -338,9 +337,11 @@ function start(cfg) {
       db: cfg.connect.pathname.substr(1) // skip leading "/"
     };
 
-    var port = cfg.connect.port || 3344;
+    var port = cfg.connect.port || '3344';
 
-    var ws = websocket('wss://' + cfg.connect.hostname + ':' + port, 1); // support protocol 1 only
+    var uri = 'wss://' + cfg.connect.hostname + ':' + port;
+    var ws = websocket(uri, 1); // support protocol 1 only
+    ws.uri = uri;
 
     // send the auth request and pass the connection to connHandler
     ws.write(JSON.stringify(authReq) + '\n');
@@ -353,7 +354,7 @@ function start(cfg) {
     openConn(persCfg.pers[perspective], cb);
   }, function(err) {
     if (err) { throw err; }
-    log.notice('dbw all WebSockets initiatesd');
+    log.notice('dbw all WebSockets initiated');
   });
 
   // handle shutdown
@@ -414,7 +415,8 @@ function init(ev) {
 
   self.onmessage = null;
 
-  programName = 'dbw ' + msg.name || '_pdb';
+  var name = msg.name || '_pdb';
+  programName = 'dbw ' + name;
 
   // open log
   log = {
@@ -434,12 +436,12 @@ function init(ev) {
 
   // open db and call start or exit
   function openDbAndProceed() {
-    level(msg.name, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, dbc) {
+    level(name, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, dbc) {
       if (err) {
         log.err('dbw opening db %s', err);
         throw new Error(9);
       }
-      log.info('dbw opened db %s', msg.name);
+      log.info('dbw opened db %s', name);
 
       db = dbc;
 
