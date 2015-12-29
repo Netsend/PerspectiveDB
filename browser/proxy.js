@@ -36,8 +36,17 @@ if (errors.length) {
   throw new Error(errors.join(', '));
 }
 
-module.exports = function(name) {
+/**
+ * @param {String} [name]  name of the snapshot object store, defaults to _pdb
+ * @param {Object} writer  writable stream to the snapshot object store
+ */
+module.exports = function(name, writer) {
+  if (typeof name === 'object') {
+    writer = name;
+    name = null;
+  }
   if (name != null && typeof name !== 'string') { throw new TypeError('name must be a string'); }
+  if (writer == null || typeof writer !== 'object') { throw new TypeError('writer must be an object'); }
 
   var SNAPSHOT_COLLECTION = name || '_pdb';
 
@@ -111,66 +120,65 @@ module.exports = function(name) {
   }
 
   // pre and post handlers for objectStore.add, put, delete and clear
-  function preAdd(sc, os, value, key) {
+  function preAdd(os, value, key) {
     console.log('preAdd');
   }
 
-  function postAdd(sc, os, value, key) {
-    console.log('postAdd');
-    var obj = {
-      h: {
-        id: key,
-        v: _generateRandomVersion(),
-        pa: []
-      },
-      b: value
+  function postAdd(os, value, key, ret) {
+    console.log('postAdd', os.name);
+    // wait for return with key
+    ret.onsuccess = function(ev) {
+      var obj = {
+        h: { id: ev.target.result },
+        b: value
+      };
+      console.log(obj);
+      writer.write(obj);
     };
-    console.log(obj);
-    sc.add(obj);
   }
 
-  function prePut(sc, os, value, key) {
+  function prePut(os, value, key) {
     console.log('prePut');
   }
 
-  function postPut(sc, os, value, key) {
+  function postPut(os, value, key, ret) {
     console.log('postPut', os.name);
-    var obj = {
-      h: {
-        id: key,
-        v: _generateRandomVersion(),
-        pa: []
-      },
-      b: value
+    // wait for return with key
+    ret.onsuccess = function(ev) {
+      var obj = {
+        h: { id: ev.target.result },
+        b: value
+      };
+      console.log(obj);
+      writer.write(obj);
     };
-    console.log(obj);
-    sc.add(obj);
   }
 
-  function preDelete(sc, os, key) {
+  function preDelete(os, key, ret) {
     console.log('preDelete');
   }
 
-  function postDelete(sc, os, key) {
+  function postDelete(os, key, ret) {
     console.log('postDelete');
-    var obj = {
-      h: {
-        id: key,
-        v: _generateRandomVersion(),
-        pa: [],
-        d: true
-      }
+    // wait for return with key
+    ret.onsuccess = function(ev) {
+      var obj = {
+        h: {
+          id: ev.target.result,
+          d: true
+        }
+      };
+      console.log(obj);
+      writer.add(obj);
     };
-    console.log(obj);
-    sc.add(obj);
   }
 
-  function preClear(sc) {
+  function preClear() {
     console.log('preClear');
-    // todo: should be translated in a delete for every object
+    // TODO: should be translated in a delete for every object
   }
 
-  function postClear(sc) {
+  function postClear() {
     console.log('postClear');
   }
 
@@ -188,9 +196,6 @@ module.exports = function(name) {
 
         var obj = target.apply(that, args);
 
-        // handle to the snapshot collection
-        var sc = obj.transaction.objectStore(SNAPSHOT_COLLECTION);
-
         // proxy add, put, delete and clear
         var origAdd = obj.add;
         var origPut = obj.put;
@@ -199,33 +204,33 @@ module.exports = function(name) {
 
         // proxy add
         function proxyAdd(value, key) {
-          preAdd(sc, obj, value, key);
+          preAdd(obj, value, key);
           var ret = origAdd.apply(obj, arguments);
-          postAdd(sc, obj, value, key);
+          postAdd(obj, value, key, ret);
           return ret;
         }
 
         // proxy put
         function proxyPut(value, key) {
-          prePut.apply(obj, [sc, obj, value, key]);
+          prePut(obj, value, key);
           var ret = origPut.apply(obj, arguments);
-          postPut.apply(obj, [sc, obj, value, key]);
+          postPut(obj, value, key, ret);
           return ret;
         }
 
         // proxy delete by adding a delete item
         function proxyDelete(key) {
-          preDelete.apply(obj, [sc, obj, key]);
+          preDelete(obj, key);
           var ret = origDelete.apply(obj, arguments);
-          postDelete.apply(obj, [sc, obj, key]);
+          postDelete(obj, key, ret);
           return ret;
         }
 
         // proxy clear by adding one delete per item
         function proxyClear() {
-          preClear.apply(obj, [sc, obj]);
+          preClear(obj);
           var ret = origClear.apply(obj, arguments);
-          postClear.apply(obj, [sc, obj]);
+          postClear(obj, ret);
           return ret;
         }
 
