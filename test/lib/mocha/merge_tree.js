@@ -1202,7 +1202,8 @@ describe('MergeTree', function() {
     var stageName = '_stage_createLocalWriteStream';
 
     // use 24-bit version numbers (base 64)
-    var item1 = { h: { id: 'XI', v: 'Aaaa' }, b: { some: 'body' } };
+    var v1;
+    var item1 = { h: { id: 'XI'            }, b: { some: 'body' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc' }, b: { more2: 'body' } };
     var item4 = { h: { id: 'XI', v: 'Dddd' }, b: { more3: 'b' } };
@@ -1234,13 +1235,13 @@ describe('MergeTree', function() {
     it('should require items to not have h.pa defined', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
-      lws.write({ h: { id: 'XI', pa: ['Aaaa'] } }, function(err) {
+      lws.write({ h: { id: 'XI', pa: [v1] } }, function(err) {
         should.strictEqual(err.message, 'did not expect local item to have a parent defined');
         done();
       });
     });
 
-    it('should accept a new item, create parents and i', function(done) {
+    it('should accept a new item, version, create parents and i', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item1);
@@ -1249,8 +1250,9 @@ describe('MergeTree', function() {
       lws.end(function() {
         mt._local.iterateInsertionOrder(function(item, next) {
           i++;
+          v1 = item.h.v;
           should.deepEqual(item, {
-            h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+            h: { id: 'XI', v: v1, pa: [], i: 1 },
             b: { some: 'body' }
           });
           next();
@@ -1273,7 +1275,7 @@ describe('MergeTree', function() {
           i++;
           if (i > 1) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              h: { id: 'XI', v: 'Bbbb', pa: [v1], i: 2 },
               b: { more: 'body' }
             });
           }
@@ -1305,13 +1307,13 @@ describe('MergeTree', function() {
           i++;
           if (i === 1) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+              h: { id: 'XI', v: v1, pa: [], i: 1 },
               b: { some: 'body' }
             });
           }
           if (i === 2) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              h: { id: 'XI', v: 'Bbbb', pa: [v1], i: 2 },
               b: { more: 'body' }
             });
           }
@@ -1330,10 +1332,10 @@ describe('MergeTree', function() {
       });
     });
 
-    it('preload item4 in stage with parent set to of Aaaa (fork)', function(done) {
+    it('preload item4 in stage with parent set to v1 (fork)', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       mt._stage.write({
-        h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'] },
+        h: { id: 'XI', v: 'Dddd', pa: [v1] },
         b: { more3: 'b' }
       }, done);
     });
@@ -1348,13 +1350,13 @@ describe('MergeTree', function() {
           i++;
           if (i === 1) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+              h: { id: 'XI', v: v1, pa: [], i: 1 },
               b: { some: 'body' }
             });
           }
           if (i === 2) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 },
+              h: { id: 'XI', v: 'Bbbb', pa: [v1], i: 2 },
               b: { more: 'body' }
             });
           }
@@ -1366,7 +1368,7 @@ describe('MergeTree', function() {
           }
           if (i > 3) {
             should.deepEqual(item, {
-              h: { id: 'XI', v: 'Dddd', pa: ['Aaaa'], i: 4 },
+              h: { id: 'XI', v: 'Dddd', pa: [v1], i: 4 },
               b: { more3: 'b' }
             });
           }
