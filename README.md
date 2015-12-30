@@ -8,7 +8,8 @@ Features:
 * support systems that are built with privacy by design
 * [security by design](https://github.com/Netsend/persdb/wiki/privilege-separation)
 
-Work in progress, see [wiki](https://github.com/Netsend/persdb/wiki) for progress.
+Alpha status. Currently working on a browser based IndexedDB implementation
+using WebSockets.
 
 # Installation
 
