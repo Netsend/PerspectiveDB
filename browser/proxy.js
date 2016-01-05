@@ -48,7 +48,7 @@ module.exports = function(name, writer) {
   if (name != null && typeof name !== 'string') { throw new TypeError('name must be a string'); }
   if (writer == null || typeof writer !== 'object') { throw new TypeError('writer must be an object'); }
 
-  var SNAPSHOT_COLLECTION = name || '_pdb';
+  //var SNAPSHOT_COLLECTION = name || '_pdb';
 
   // from: https://gist.github.com/jonleighton/958841
   // Converts a TypedArray directly to base64, without any intermediate 'convert to string then
@@ -119,17 +119,21 @@ module.exports = function(name, writer) {
     return base64TypedArray(data);
   }
 
+  function _generateId(ev, cb) {
+    return ev.target.source.name + '\x01' + ev.target.result;
+  }
+
   // pre and post handlers for objectStore.add, put, delete and clear
   function preAdd(os, value, key) {
     console.log('preAdd');
   }
 
   function postAdd(os, value, key, ret) {
-    console.log('postAdd', os.name);
+    console.log('postAdd', os.name, key, value);
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: ev.target.result },
+        h: { id: _generateId(ev) },
         b: value
       };
       console.log(obj);
@@ -146,7 +150,7 @@ module.exports = function(name, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: ev.target.result },
+        h: { id: _generateId(ev) },
         b: value
       };
       console.log(obj);
@@ -164,7 +168,7 @@ module.exports = function(name, writer) {
     ret.onsuccess = function(ev) {
       var obj = {
         h: {
-          id: ev.target.result,
+          id: _generateId(ev),
           d: true
         }
       };
@@ -187,10 +191,13 @@ module.exports = function(name, writer) {
     return new Proxy(target, {
       apply: function(target, that, args) {
         // proxy all modification calls that are not on the snapshot collection itself
+        /*
+        TODO: incorporate object store differentiation in level
         if (args[0] === SNAPSHOT_COLLECTION) {
           console.log('target', target, 'that', that, 'args', args);
           return target.apply(that, args);
         }
+        */
 
         console.log('proxyObjectStore', target, args);
 
@@ -250,7 +257,8 @@ module.exports = function(name, writer) {
       apply: function(target, that, args) {
         // add snapshot collection to readwrite transactions
         if (args && args[1] && args[1] === 'readwrite') {
-          args[0].push(SNAPSHOT_COLLECTION);
+          // TODO: incorporate object store differentiation in level
+          //args[0].push(SNAPSHOT_COLLECTION);
           var obj = target.apply(that, args);
           obj.addEventListener('success', function(ev) {
             var transaction = ev.target.result;
@@ -282,7 +290,8 @@ module.exports = function(name, writer) {
           var db = ev.target.result;
 
           try {
-            db.createObjectStore(SNAPSHOT_COLLECTION, { keyPath: 'h.i', autoIncrement: true });
+            // TODO: incorporate object store differentiation in level
+            //db.createObjectStore(SNAPSHOT_COLLECTION, { keyPath: 'h.i', autoIncrement: true });
           } catch (err) {
             if (err.name !== 'ConstraintError') {
               throw err;
