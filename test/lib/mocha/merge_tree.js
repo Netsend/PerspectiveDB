@@ -844,6 +844,21 @@ describe('MergeTree', function() {
           done();
         });
       });
+
+      it('stats', function(done) {
+        var opts = { perspectives: [ sname, dname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            '_mergeTreesWithConflict_bar': { heads: { count: 1, conflict: 0, deleted: 0 } },
+            '_mergeTreesWithConflict_foo': { heads: { count: 1, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
+      });
     });
   });
 
@@ -917,6 +932,21 @@ describe('MergeTree', function() {
         if (err) { throw err; }
         should.strictEqual(v, 'Aaaa');
         done();
+      });
+    });
+
+    describe('stats', function() {
+      it('should return stats', function(done) {
+        var opts = { stage: stageName, vSize: 3, log: silence };
+        var mt = new MergeTree(ldb, opts);
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
       });
     });
   });
@@ -1111,6 +1141,21 @@ describe('MergeTree', function() {
         }, function(err) {
           if (err) { throw err; }
           should.strictEqual(i, 5);
+          done();
+        });
+      });
+    });
+
+    describe('stats', function() {
+      it('should return stats', function(done) {
+        var opts = { stage: stageName, vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 1, conflict: 0, deleted: 0 } }
+          });
           done();
         });
       });
@@ -1382,14 +1427,14 @@ describe('MergeTree', function() {
     });
 
     it('stage should be empty, since item4 is copied to local', function(done) {
-      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
-      var i = 0;
-      mt._stage.iterateInsertionOrder(function(item, next) {
-        i++;
-        next();
-      }, function(err) {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      mt.stats(function(err, stats) {
         if (err) { throw err; }
-        should.strictEqual(i, 0);
+        should.deepEqual(stats, {
+          local: { heads: { count: 2, conflict: 0, deleted: 0 } },
+          stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
+        });
         done();
       });
     });
