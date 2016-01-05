@@ -2205,6 +2205,55 @@ describe('Tree', function() {
     });
   });
 
+  describe('stats', function() {
+    var name = 'stats';
+
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true } };
+
+    it('should require cb to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.stats({}); }).should.throw('cb must be a function');
+    });
+
+    it('should return head stats', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.stats(function(err, stats) {
+        if (err) { throw err; }
+        should.deepEqual(stats, { heads: { count: 0, conflict: 0, deleted: 0 } });
+        done();
+      });
+    });
+
+    it('write item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item1, done);
+    });
+
+    it('should return head stats', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.stats(function(err, stats) {
+        if (err) { throw err; }
+        should.deepEqual(stats, { heads: { count: 1, conflict: 0, deleted: 0 } });
+        done();
+      });
+    });
+
+    it('write item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item2, done);
+    });
+
+    it('should return head stats with deleted item', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.stats(function(err, stats) {
+        if (err) { throw err; }
+        should.deepEqual(stats, { heads: { count: 1, conflict: 0, deleted: 1 } });
+        done();
+      });
+    });
+  });
+
   describe('_getDsKeyByVersion', function() {
     var name = '_getDsKeyByVersion';
 
