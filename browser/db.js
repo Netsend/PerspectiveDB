@@ -145,12 +145,12 @@ function connHandler(conn, mt, pers) {
   }
 
   conn.pipe(ls).once('data', function(req) {
-    log.info('req received %j', req);
+    log.info('req received', req);
 
     conn.unpipe(ls);
 
     if (!dataRequest.valid(req)) {
-      log.err('invalid data request %j', req);
+      log.err('invalid data request', req);
       connErrorHandler(conn, connId, 'invalid data request');
       return;
     }
@@ -195,7 +195,7 @@ function connHandler(conn, mt, pers) {
         return;
       }
 
-      log.info('dbw last %s %j', pers.name, last);
+      log.info('dbw last %s', pers.name, last);
 
       // create remote transform to ensure h.pe is set to this remote and run all hooks
       var wsOpts = {
@@ -228,7 +228,7 @@ function connHandler(conn, mt, pers) {
         dataReq.start = last;
       }
 
-      log.notice('dbw setup pipes and send back data request %j', dataReq);
+      log.notice('dbw setup pipes and send back data request', dataReq);
       conn.write(JSON.stringify(dataReq) + '\n');
 
       dataReqSent = true;
@@ -256,7 +256,7 @@ function start(cfg) {
 
   // setup list of connections to initiate and create an index by perspective name
   var persCfg = parsePersConfigs(cfg.perspectives || []);
-  log.info('dbw persCfg %j', debugReq(persCfg));
+  log.info('dbw persCfg', debugReq(persCfg));
 
   // 1. setup all import and export hooks, filters etc.
 
@@ -331,7 +331,7 @@ function start(cfg) {
     if (cfg.connect.protocol !== 'wss:') { throw new TypeError('cfg.connect.protocol must be "wss:"'); }
     if (cfg.connect.port != null && typeof cfg.connect.port !== 'string') { throw new TypeError('cfg.connect.port must be a string'); }
 
-    log.notice('dbw setup WebSocket %j', debugReq(cfg));
+    log.notice('dbw setup WebSocket', debugReq(cfg));
 
     var authReq = {
       username: cfg.username,
