@@ -37,8 +37,8 @@ var parsePersConfigs = require('../lib/parse_pers_configs');
  * Instantiates a merge tree, handles indexed DB updates via ES6 Proxy and
  * initiates WebSockets.
  *
- * 1. transparently proxy indexed DB updates
- * 2. setup all import and export hooks, filters etc.
+ * 1. setup all import and export hooks, filters etc.
+ * 2. transparently proxy indexed DB updates
  * 3. create authenticated WebSockets and start transfering BSON
  *
  * This module should be executed as a Web Worker. A message is sent when it enters
@@ -73,8 +73,7 @@ var parsePersConfigs = require('../lib/parse_pers_configs');
 
 var noop = function() {};
 var log; // used after receiving the log configuration
-
-var programName = 'dbw';
+var pm;  // postMessage handler to signal state
 
 // filter password out request
 function debugReq(req) {
@@ -248,9 +247,8 @@ function connHandler(conn, mt, pers) {
  * Instantiates a merge tree, handles indexed DB updates via ES6 Proxy and
  * initiates WebSockets.
  *
- * 1. transparently proxy indexed DB updates, automatically done by including
- *    proxy.js
- * 2. setup all import and export hooks, filters etc.
+ * 1. setup all import and export hooks, filters etc.
+ * 2. transparently proxy indexed DB updates
  * 3. create authenticated WebSockets and start transfering BSON
  */
 function start(cfg) {
@@ -312,6 +310,10 @@ function start(cfg) {
   mtOpts.autoMergeInterval = mtOpts.autoMergeInterval || 1000;
 
   var mt = new MergeTree(db, mtOpts);
+
+  // 2. transparently proxy indexed DB updates
+  var writer = mt.createLocalWriteStream();
+  proxy(cfg.name || '_pdb', writer);
 
   // 3. create authenticated WebSockets and start transfering BSON
   function openConn(cfg, cb) {
@@ -384,39 +386,39 @@ function start(cfg) {
   }
 
   // send a "listen" signal
-  self.postMessage('listen');
+  //self.postMessage('listen');
+  pm('listen');
 }
 
-if (typeof self.postMessage !== 'function') {
-  throw new Error('this module should be invoked as a Web Worker');
-}
+//if (typeof self.postMessage !== 'function') {
+  //throw new Error('this module should be invoked as a Web Worker');
+//}
 
-self.postMessage('init');
+//self.postMessage('init');
 
 /**
- * Expect a db config and any merge tree options.
+ * Start versioning the database transparently.
  *
- * {
- *   [name]:         {String}      // name of this database, defaults to "_pdb"
- *   [perspectives]: {Array}       // array of other perspectives with urls
- *   [mergeTree]:    {Object}      // any MergeTree options
- * }
+ * @param {Function} ipc  function called with current state
+ * @param {Object} [opts]  object containing configurable parameters
+ *
+ * opts:
+ *   name {String, default "_pdb"}  name of this database
+ *   perspectives {Array}           array of other perspectives with url
+ *   mergeTree {Object}             any MergeTree options
  */
-function init(ev) {
-  var msg = ev.data;
-  if (msg == null) {
-    msg = {};
-  }
-  if (typeof msg !== 'object') { throw new TypeError('msg must be an object'); }
+function init(ipc, opts) {
+  if (typeof ipc !== 'function') { throw new TypeError('ipc must be a function'); }
+  if (opts == null) { opts = {}; }
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
-  if (msg.name != null && typeof msg.name !== 'string') { throw new TypeError('msg.name must be a string'); }
-  if (msg.perspectives != null && !Array.isArray(msg.perspectives)) { throw new TypeError('msg.perspectives must be an array'); }
-  if (msg.mergeTree != null && typeof msg.mergeTree !== 'object') { throw new TypeError('msg.mergeTree must be an object'); }
+  if (opts.name != null && typeof opts.name !== 'string') { throw new TypeError('opts.name must be a string'); }
+  if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
+  if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
 
-  self.onmessage = null;
+  pm = ipc;
 
-  var name = msg.name || '_pdb';
-  programName = 'dbw ' + name;
+  //self.onmessage = null;
 
   // open log
   log = {
@@ -434,9 +436,12 @@ function init(ev) {
     close: noop
   };
 
+  var name = opts.name || 'pdb';
+  var prefix = '_';
+
   // open db and call start or exit
   function openDbAndProceed() {
-    level(name, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, dbc) {
+    level(name, { keyEncoding: 'binary', valueEncoding: 'binary', storePrefix: prefix }, function(err, dbc) {
       if (err) {
         log.err('dbw opening db %s', err);
         throw new Error(9);
@@ -445,12 +450,15 @@ function init(ev) {
 
       db = dbc;
 
-      start(msg);
+      start(opts);
     });
   }
+
+  pm('init');
 
   // assume database exists
   openDbAndProceed();
 }
 
-self.onmessage = init;
+//self.onmessage = init;
+module.exports = init;
