@@ -246,6 +246,55 @@ tasks.push(function(done) {
   });
 });
 
+// should show info on SIGUSR1
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert(/{ local: { heads: { count: 0, conflict: 0, deleted: 0 } },/.test(stdout));
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true },
+        path: dbPath,
+        hookPaths: ['/var/empty'],
+        name: 'test_vce_root',
+        user: user,
+        chroot: chroot,
+      });
+      break;
+    case 'listen':
+      child.kill('SIGUSR1');
+      process.nextTick(function() {
+        child.kill();
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
 // should fail if configured hook is not loaded
 tasks.push(function(done) {
   console.log('test #%d', lnr());
