@@ -246,7 +246,7 @@ tasks.push(function(done) {
   });
 });
 
-// should show info on SIGUSR1
+// should show info on SIGUSR2
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -264,7 +264,7 @@ tasks.push(function(done) {
 
   child.on('exit', function(code, sig) {
     assert.strictEqual(stderr.length, 0);
-    assert(/{ local: { heads: { count: 0, conflict: 0, deleted: 0 } },/.test(stdout));
+    assert(/{"local":{"heads":{"count":0,"conflict":0,"deleted":0}},"stage":{"heads":{"count":0,"conflict":0,"deleted":0}/.test(stdout));
     assert.strictEqual(code, 0);
     assert.strictEqual(sig, null);
     done();
@@ -284,7 +284,7 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      child.kill('SIGUSR1');
+      child.kill('SIGUSR2');
       process.nextTick(function() {
         child.kill();
       });
