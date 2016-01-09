@@ -164,6 +164,7 @@ function connHandler(conn, mt, pers) {
         log: log,
         first: req.offset,
         tail: true,
+        tailRetry: 10000,
         raw: true
       };
       if (typeof pers.export === 'object') {
@@ -307,7 +308,7 @@ function start(cfg) {
   var mtOpts = cfg.mergeTree || {};
   mtOpts.perspectives = Object.keys(persCfg.pers);
   mtOpts.log = log;
-  mtOpts.autoMergeInterval = mtOpts.autoMergeInterval || 1000;
+  mtOpts.autoMergeInterval = mtOpts.autoMergeInterval || 10000;
 
   var mt = new MergeTree(db, mtOpts);
 
