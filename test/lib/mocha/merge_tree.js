@@ -1558,6 +1558,22 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('getLocalTree', function() {
+    it('should return the local tree', function() {
+      var mt = new MergeTree(db);
+      var tree = mt.getLocalTree();
+      should.strictEqual(tree, mt._local);
+    });
+  });
+
+  describe('getStageTree', function() {
+    it('should return the stage tree', function() {
+      var mt = new MergeTree(db);
+      var tree = mt.getStageTree();
+      should.strictEqual(tree, mt._stage);
+    });
+  });
+
   describe('getRemoteTrees', function() {
     it('should return an empty object', function() {
       var mt = new MergeTree(db);
