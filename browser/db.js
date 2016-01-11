@@ -16,7 +16,6 @@
  * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* global self */
 /* jshint -W116 */
 
 'use strict';
@@ -257,7 +256,7 @@ function start(cfg) {
 
   // setup list of connections to initiate and create an index by perspective name
   var persCfg = parsePersConfigs(cfg.perspectives || []);
-  log.info('dbw persCfg', debugReq(persCfg));
+  log.info('db persCfg', debugReq(persCfg));
 
   // 1. setup all import and export hooks, filters etc.
 
@@ -332,7 +331,7 @@ function start(cfg) {
     if (cfg.connect.protocol !== 'wss:') { throw new TypeError('cfg.connect.protocol must be "wss:"'); }
     if (cfg.connect.port != null && typeof cfg.connect.port !== 'string') { throw new TypeError('cfg.connect.port must be a string'); }
 
-    log.notice('dbw setup WebSocket', debugReq(cfg));
+    log.notice('db setup WebSocket', debugReq(cfg));
 
     var authReq = {
       username: cfg.username,
@@ -357,34 +356,8 @@ function start(cfg) {
     openConn(persCfg.pers[perspective], cb);
   }, function(err) {
     if (err) { throw err; }
-    log.notice('dbw all WebSockets initiated');
+    log.notice('db all WebSockets initiated');
   });
-
-  // handle shutdown
-  function shutdown() {
-    log.notice('dbw shutting down');
-
-    async.each(Object.keys(connections), function(connId, cb) {
-      log.info('closing %s', connId);
-      var conn = connections[connId];
-      conn.once('close', cb);
-      conn.end();
-    }, function(err) {
-      if (err) { log.err('dbw error closing connection: %s', err); }
-
-      mt.close(function(err) {
-        if (err) { log.err('dbw error closing mt: %s', err); }
-
-        db.close(function(err) {
-          if (err) { log.err('dbw error closing db: %s', err); }
-
-          log.notice('dbw closed');
-
-          self.close();
-        });
-      });
-    });
-  }
 
   // send a "listen" signal
   //self.postMessage('listen');
@@ -444,10 +417,10 @@ function init(ipc, opts) {
   function openDbAndProceed() {
     level(name, { keyEncoding: 'binary', valueEncoding: 'binary', storePrefix: prefix }, function(err, dbc) {
       if (err) {
-        log.err('dbw opening db %s', err);
+        log.err('db opening db %s', err);
         throw new Error(9);
       }
-      log.info('dbw opened db %s', name);
+      log.info('db opened db %s', name);
 
       db = dbc;
 
