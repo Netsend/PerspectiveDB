@@ -103,102 +103,54 @@ function connHandler(conn, mt, pers) {
     return;
   }
 
-  var mtr, mtw, dataReqReceived, dataReqSent;
-
-  conn.on('error', function(err) {
-    log.err('%s: %s', connId, err);
-    if (mtr) { mtr.close(); }
-  });
-  conn.on('close', function() {
-    log.info('%s: close', connId);
-    if (mtr) { mtr.close(); }
-    delete connections[connId];
-  });
-
   connections[connId] = conn;
 
-  // expect one data request
-  // create line delimited json stream
-  var ls = new LDJSONStream({ maxBytes: 512 });
-
-  // setup mtr and mtw if data requests have been received and sent
-  function finalize() {
-    if (dataReqReceived && dataReqSent) {
-      // send data to remote if requested and allowed
-      if (mtr) { mtr.pipe(conn); }
-
-      // receive data from remote if requested and allowed
-      if (mtw) {
-        // expect bson
-        var bs = new BSONStream();
-
-        bs.on('error', function(err) {
-          log.err('dbw bson %s', err);
-          conn.end();
-        });
-
-        // receive data from remote
-        conn.pipe(bs).pipe(mtw);
-      }
-    }
-  }
-
-  conn.pipe(ls).once('data', function(req) {
-    log.info('req received', req);
-
-    conn.unpipe(ls);
-
-    if (!dataRequest.valid(req)) {
-      log.err('invalid data request', req);
-      connErrorHandler(conn, connId, 'invalid data request');
-      return;
-    }
-
-    dataReqReceived = true;
-
-    // determine start and whether there is an export key
-    // if so, open merge tree reader
-    if (req.start && pers.export) {
+  // after data request is sent and received, setup reader and writer
+  function finalize(req) {
+    // open reader if there is an export config and data is requested
+    if (pers.export && req.start) {
       var readerOpts = {
         log: log,
-        first: req.offset,
         tail: true,
         tailRetry: 10000,
         raw: true
       };
+      if (typeof req.start === 'string') {
+        readerOpts.first = req.start;
+      }
       if (typeof pers.export === 'object') {
         readerOpts.filter    = pers.export.filter;
         readerOpts.hooks     = pers.export.hooks;
         readerOpts.hooksOpts = pers.export.hooksOpts;
       }
 
-      mtr = mt.createReadStream(readerOpts);
+      var mtr = mt.createReadStream(readerOpts);
 
       mtr.on('error', function(err) {
-        log.err('dbw mtr error %s %s', connId, err);
+        log.err('db mtr error %s %s', connId, err);
       });
 
       mtr.on('end', function() {
-        log.notice('dbw mtr end %s', connId);
+        log.notice('db mtr end %s', connId);
+      });
+
+      mtr.pipe(conn);
+
+      conn.on('error', function(err) {
+        log.err('%s: %s', connId, err);
+        mtr.close();
+      });
+      conn.on('close', function() {
+        log.info('%s: close', connId);
+        mtr.close();
+        delete connections[connId];
       });
     }
-    finalize();
-  });
 
-  // send data request with last offset if there are any import rules
-  if (pers.import) {
-    // find last local item of this remote
-    mt.lastByPerspective(pers.name, 'base64', function(err, last) {
-      if (err) {
-        log.err('dbw connHandler lastByPerspective %s %s', err, pers.name);
-        connErrorHandler(conn, connId, err);
-        return;
-      }
-
-      log.info('dbw last %s', pers.name, last);
-
+    // handle data from remote if requested and allowed
+    if (pers.import) {
       // create remote transform to ensure h.pe is set to this remote and run all hooks
-      var wsOpts = {
+      var writerOpts = {
         db:         db,
         filter:     pers.import.filter || {},
         hooks:      pers.import.hooks || [],
@@ -206,41 +158,80 @@ function connHandler(conn, mt, pers) {
         log:        log
       };
       // some export hooks need the name of the database
-      wsOpts.hooksOpts.to = db;
+      writerOpts.hooksOpts.to = db;
 
       // set hooksOpts with all keys but the pre-configured ones
       Object.keys(pers.import).forEach(function(key) {
         if (!~['filter', 'hooks', 'hooksOpts'].indexOf(key)) {
-          wsOpts.hooksOpts[key] = pers.import[key];
+          writerOpts.hooksOpts[key] = pers.import[key];
         }
       });
 
-      mtw = mt.createRemoteWriteStream(pers.name, wsOpts);
+      var mtw = mt.createRemoteWriteStream(pers.name, writerOpts);
 
       mtw.on('error', function(err) {
-        log.err('dbw merge tree "%s"', err);
+        log.err('db merge tree "%s"', err);
         conn.end();
       });
 
-      // send data request with last offset
-      var dataReq = { start: true };
-      if (last) {
-        dataReq.start = last;
-      }
+      // expect bson
+      var bs = new BSONStream();
 
-      log.notice('dbw setup pipes and send back data request', dataReq);
-      conn.write(JSON.stringify(dataReq) + '\n');
+      bs.on('error', function(err) {
+        log.err('db bson %s', err);
+        conn.end();
+      });
 
-      dataReqSent = true;
-      finalize();
-    });
-  } else {
-    log.notice('dbw signal that no data is expected');
-    conn.write(JSON.stringify({ start: false }) + '\n');
-
-    dataReqSent = true;
-    finalize();
+      // receive data from remote
+      conn.pipe(bs).pipe(mtw);
+    }
   }
+
+  // expect one data request
+  var ls = new LDJSONStream({ flush: false, maxDocs: 1, maxBytes: 512 });
+
+  conn.pipe(ls).once('readable', function() {
+    var req = ls.read();
+    log.info('req received %j', req);
+
+    conn.unpipe(ls);
+
+    if (!dataRequest.valid(req)) {
+      log.err('invalid data request %j', req);
+      connErrorHandler(conn, connId, 'invalid data request');
+      return;
+    }
+
+    // send data request with last offset if there are any import rules
+    if (pers.import) {
+      // find last local item of this remote
+      mt.lastByPerspective(pers.name, 'base64', function(err, last) {
+        if (err) {
+          log.err('db connHandler lastByPerspective %s %s', err, pers.name);
+          connErrorHandler(conn, connId, err);
+          return;
+        }
+
+        log.info('db last %s', pers.name, last);
+
+        // send data request with last offset
+        var dataReq = { start: true };
+        if (last) {
+          dataReq.start = last;
+        }
+
+        log.notice('db setup pipes and send back data request', dataReq);
+        conn.write(JSON.stringify(dataReq) + '\n');
+
+        finalize(req);
+      });
+    } else {
+      log.notice('db signal that no data is expected');
+      conn.write(JSON.stringify({ start: false }) + '\n');
+
+      finalize(req);
+    }
+  });
 }
 
 /**
