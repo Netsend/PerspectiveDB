@@ -1558,6 +1558,20 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('getRemoteTrees', function() {
+    it('should return an empty object', function() {
+      var mt = new MergeTree(db);
+      var trees = mt.getRemoteTrees();
+      should.deepEqual(Object.keys(trees), []);
+    });
+
+    it('should return an empty object', function() {
+      var mt = new MergeTree(db, { perspectives: ['foo'] });
+      var trees = mt.getRemoteTrees();
+      should.deepEqual(Object.keys(trees), ['foo']);
+    });
+  });
+
   describe('proxy', function() {
     it('should proxy createReadStream', function() {
       var mt = new MergeTree(db);
