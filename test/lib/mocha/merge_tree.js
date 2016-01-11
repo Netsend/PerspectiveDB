@@ -1557,4 +1557,20 @@ describe('MergeTree', function() {
       should.deepEqual(v, 'nujg');
     });
   });
+
+  describe('proxy', function() {
+    it('should proxy createReadStream', function() {
+      var mt = new MergeTree(db);
+      if (typeof mt.createReadStream !== 'function') {
+        throw new Error('createReadStream is not a function');
+      }
+    });
+
+    it('should proxy getByVersion', function() {
+      var mt = new MergeTree(db);
+      if (typeof mt.getByVersion !== 'function') {
+        throw new Error('getByVersion is not a function');
+      }
+    });
+  });
 });
