@@ -52,22 +52,15 @@ program
   .usage('config.hjson')
   .parse(process.argv);
 
+var log;
+
+var startTime = new Date();
+
 var configFile = program.args[0];
 
 if (!configFile) {
   program.help();
 }
-
-var log;
-
-var startTime = new Date();
-
-// if relative, prepend current working dir
-/*
-if (configFile[0] !== '/') {
-  configFile = process.cwd() + '/' + configFile;
-}
-*/
 
 var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
