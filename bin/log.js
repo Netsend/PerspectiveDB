@@ -126,6 +126,11 @@ function fmtItem(item, parents) {
     } else {
       out += ' .';
     }
+    if (item.h.hasOwnProperty('c') && item.h.c) {
+      out += ' c';
+    } else {
+      out += ' .';
+    }
     out += ' ' + (item.h.pe || '_local');
     if (item.h.hasOwnProperty('i')) {
       out += ' (' + item.h.i + ')';
