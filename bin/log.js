@@ -163,7 +163,21 @@ function run(db, cfg, cb) {
     if (err) { cb(err); return; }
     console.log(fmtStats(stats));
 
-    mt.getLocalTree().iterateInsertionOrder({ reverse: true }, function(item, cb2) {
+    var tree, pe = program.pe;
+    var remoteTrees = mt.getRemoteTrees();
+
+    if (remoteTrees[pe]) {
+      tree = remoteTrees[pe];
+    } else if (pe === 'stage') {
+      tree = mt.getStageTree();
+    } else if (pe === 'local' || pe === mt._local.name) {
+      tree = mt.getLocalTree();
+    } else {
+      cb(new Error('unknown perspective'));
+      return;
+    }
+
+    tree.iterateInsertionOrder({ reverse: true }, function(item, cb2) {
       counter++;
 
       if (!program.patch || !item.h.pa.length) {
