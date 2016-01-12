@@ -39,7 +39,8 @@ lbeint  ::=  byte (byte*)           Large int - The byte is the number of bytes
 string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
                                     (byte*) + 1 (for the trailing '\x00'). The
                                     (byte*) is zero or more ASCII encoded
-                                    characters and must not contain '\x00' byte.
+                                    characters and must not contain '\x00' or
+                                    '\x01' bytes.
 opts    ::=  byte                   option bits, single byte:
                                       0x01 = conflict, when a merge with this
                                       item failed
