@@ -131,7 +131,7 @@ function fmtItem(item, parents) {
     } else {
       out += ' .';
     }
-    out += ' ' + (item.h.pe || '_local');
+    out += ' ' + (item.h.pe || 'local');
     if (item.h.hasOwnProperty('i')) {
       out += ' (' + item.h.i + ')';
     }
@@ -168,7 +168,7 @@ function run(db, cfg, cb) {
     if (err) { cb(err); return; }
     console.log(fmtStats(stats));
 
-    var tree, pe = program.pe;
+    var tree, pe = program.pe || 'local';
     var remoteTrees = mt.getRemoteTrees();
 
     if (remoteTrees[pe]) {
