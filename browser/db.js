@@ -117,6 +117,7 @@ function connHandler(conn, mt, pers) {
       };
       if (typeof req.start === 'string') {
         readerOpts.first = req.start;
+        readerOpts.excludeFirst = true;
       }
       if (typeof pers.export === 'object') {
         readerOpts.filter    = pers.export.filter;
