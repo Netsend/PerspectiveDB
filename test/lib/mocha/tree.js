@@ -3339,6 +3339,22 @@ describe('Tree', function() {
       var t = new Tree(db, name, { skipValidation: true, vSize: 3, log: silence });
       t.write(item3, done);
     });
+
+    it('should emit an error when invalid items are written with a callback error-handler (node behavior)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var cbCalled;
+      t.on('error', function(err) {
+        should.strictEqual(err.message, 'item.h must be an object');
+        should.strictEqual(cbCalled, true);
+        done();
+      });
+
+      t.write({}, function(err) {
+        cbCalled = true;
+        should.strictEqual(err.message, 'item.h must be an object');
+      });
+    });
   });
 
   describe('_writev regression', function() {
