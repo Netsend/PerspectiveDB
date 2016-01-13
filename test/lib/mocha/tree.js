@@ -1849,24 +1849,28 @@ describe('Tree', function() {
       t.end(item2, done);
     });
 
-    it('should wait with close before all items are iterated', function(done) {
+    it('should not wait with end if stream is paused (node stream behavior)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
       var s = t.createReadStream();
 
+      var ended;
       s.on('data', function() {
+        i++;
         s.pause();
         setTimeout(function() {
-          i++;
           s.resume();
+          if (i > 1) {
+            should.strictEqual(ended, true);
+            done();
+          }
         }, 10);
       });
 
-      s.on('end', function(err) {
-        if (err) { throw err; }
+      s.on('end', function() {
+        ended = true;
         should.strictEqual(i, 2);
-        done();
       });
     });
 
