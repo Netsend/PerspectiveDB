@@ -22,7 +22,7 @@
     "is-equal": "^1.2.3",
     "level-browserify": "^1.1.0",
     "level": "^1.4.0",
-    "bson-stream": "^0.0.7",
+    "bson-stream": "^0.0.8",
     "bson": "^0.4.11",
     "posix": "^4.0.0",
     "properties": "^1.2.1",
