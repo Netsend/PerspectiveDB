@@ -140,22 +140,30 @@ describe('StreamTree', function() {
     });
   });
 
-  it('should pause and wait with end before all items are emitted and resume is called', function(done) {
+  it('should end after last data event, even while paused (node stream behavior)', function(done) {
     var t = new Tree(db, name, { vSize: 3, log: silence });
 
+    var ended;
     var i = 0;
     var s = new StreamTree(t);
     s.on('data', function() {
       s.pause();
-      setTimeout(function() {
-        i++;
-        s.resume();
-      }, 10);
+      i++;
+      if (i === 1) {
+        setTimeout(function() {
+          s.resume();
+        }, 10);
+      } else {
+        setTimeout(function() {
+          should.strictEqual(ended, true);
+          done();
+        }, 10);
+      }
     });
 
     s.on('end', function() {
+      ended = true;
       should.strictEqual(i, 2);
-      done();
     });
   });
 
