@@ -228,6 +228,7 @@ if (config.dbs) {
     }
     // open database
     level(chroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      if (err) { cb(err); return; }
       run(db, dbCfg, function(err) {
         db.close();
         if (err) { cb(err); return; }
