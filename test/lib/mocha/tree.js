@@ -1,19 +1,19 @@
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -2066,8 +2066,8 @@ describe('Tree', function() {
 
     var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [], pe: 'lbp' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'], pe: 'lbp' } };
-    var item3 = { h: { id: 'XI', v: 'Cccc', i: 2, pa: ['Bbbb'], pe: 'lbp2' } };
-    var item4 = { h: { id: 'XI', v: 'Dddd', i: 2, pa: ['Aaaa'], pe: 'lbp' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', i: 3, pa: ['Bbbb'], pe: 'lbp2' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', i: 4, pa: ['Aaaa'], pe: 'lbp' } };
 
     it('should require pe to be a buffer or a string', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
