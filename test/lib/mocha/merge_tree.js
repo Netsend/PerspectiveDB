@@ -93,6 +93,13 @@ describe('MergeTree', function() {
     it('should construct', function() {
       (function() { mtree = new MergeTree(db); }).should.not.throwError();
     });
+
+    it('should set updated flag for remotes on init', function() {
+      var pe = 'foo';
+      var opts = { log: silence, perspectives: [pe] };
+      var mt = new MergeTree(db, opts);
+      should.equal(mt._updatedPerspectives[pe], true);
+    });
   });
 
   describe('_ensureMergeHandler', function() {
@@ -1577,7 +1584,8 @@ describe('MergeTree', function() {
     it('should set updated flag if written to remote stream', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence, perspectives: [pe] };
       var mt = new MergeTree(ldb, opts);
-      should.equal(mt._updatedPerspectives[pe], undefined);
+      should.equal(mt._updatedPerspectives[pe], true); // constructor should set true on init
+      mt._updatedPerspectives[pe] = false;
       mt.createRemoteWriteStream(pe).write(item1, function(err) {
         if (err) { throw err; }
         should.equal(mt._updatedPerspectives[pe], true);
