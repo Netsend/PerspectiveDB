@@ -95,6 +95,30 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('_ensureMergeHandler', function() {
+    it('should set default merge handler', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      should.strictEqual(typeof mt._mergeHandler, 'undefined');
+      mt._ensureMergeHandler();
+      should.strictEqual(typeof mt._mergeHandler, 'function');
+    });
+
+    it('should set given merge handler', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      var mh = function() {};
+
+      should.strictEqual(typeof mt._mergeHandler, 'undefined');
+      mt._ensureMergeHandler(mh);
+      should.strictEqual(typeof mt._mergeHandler, 'function');
+
+      should.strictEqual(mt._mergeHandler, mh);
+    });
+  });
+
   describe('_copyTo', function() {
     var sname = '_copyTo_foo';
     var dname = '_copyTo_bar';
@@ -1004,14 +1028,13 @@ describe('MergeTree', function() {
       var opts = {
         stage: stageName,
         vSize: 3,
-        log: silence,
-        mergeHandler: mergeHandler
+        log: silence
       };
       var mt = new MergeTree(db, opts);
       var stree = new Tree(db, sname, opts);
       var stage = mt._stage;
       var i = 0;
-      mt.mergeWithLocal(stree, function(err) {
+      mt.mergeWithLocal(stree, mergeHandler, function(err) {
         if (err) { throw err; }
         // inspect staging
         stage.iterateInsertionOrder(function(item, next) {
@@ -1040,14 +1063,13 @@ describe('MergeTree', function() {
       var opts = {
         stage: stageName,
         vSize: 3,
-        log: silence,
-        mergeHandler: mergeHandler
+        log: silence
       };
       var mt = new MergeTree(db, opts);
       var stree = new Tree(db, sname, opts);
       var stage = mt._stage;
       var i = 0;
-      mt.mergeWithLocal(stree, function(err) {
+      mt.mergeWithLocal(stree, mergeHandler, function(err) {
         if (err) { throw err; }
         // inspect staging
         stage.iterateInsertionOrder(function(item, next) {
@@ -1102,12 +1124,11 @@ describe('MergeTree', function() {
       var mt = new MergeTree(db, {
         stage: stageName,
         vSize: 3,
-        log: silence,
-        mergeHandler: mergeHandler
+        log: silence
       });
       var stree = new Tree(db, sname, { vSize: 3, log: silence});
       var stage = mt._stage;
-      mt.mergeWithLocal(stree, function(err) {
+      mt.mergeWithLocal(stree, mergeHandler, function(err) {
         if (err) { throw err; }
         // inspect staging
         var i = 0;
@@ -1440,16 +1461,16 @@ describe('MergeTree', function() {
     });
   });
 
-  describe('scheduleMerge', function() {
-    var stageName = '_stage_scheduleMerge';
+  describe('mergeAll', function() {
+    var stageName = '_stage_mergeAll';
     var pe = 'some';
     var ldb;
-    var ldbPath = tmpdir() + '/test_merge_tree_scheduleMerge';
+    var ldbPath = tmpdir() + '/test_merge_tree_mergeAll';
 
     // use 24-bit version numbers (base 64)
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: pe, pa: [] }, b: { some: 'body' } };
 
-    before('should open a new db for scheduleMerge tests only', function(done) {
+    before('should open a new db for mergeAll tests only', function(done) {
       // ensure a db at start
       rimraf(ldbPath, function(err) {
         if (err) { throw err; }
@@ -1465,16 +1486,10 @@ describe('MergeTree', function() {
       rimraf(ldbPath, done);
     });
 
-    it('should require timeout to be a number', function() {
-      var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(ldb, opts);
-      (function() { mt.scheduleMerge(); }).should.throw('timeout must be a number');
-    });
-
     it('should return right away if no dbs are updated', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
       var mt = new MergeTree(ldb, opts);
-      mt.scheduleMerge(0, done);
+      mt.mergeAll({ done: done });
     });
 
     it('should set updated flag if written to remote stream', function(done) {
@@ -1504,15 +1519,17 @@ describe('MergeTree', function() {
       rs.on('end', function() {
         // signal update and use previously written item
         mt._updatedPerspectives[pe] = true;
-        mt.scheduleMerge(0, function(err) {
-          if (err) { throw err; }
-          mt.createReadStream().on('data', function(item) {
-            should.deepEqual({
-              h: { id: 'XI', v: 'Aaaa', pa: [] },
-              b: { some: 'body' }
-            }, item);
-            done();
-          });
+        mt.mergeAll({
+          done: function(err) {
+            if (err) { throw err; }
+            mt.createReadStream().on('data', function(item) {
+              should.deepEqual({
+                h: { id: 'XI', v: 'Aaaa', pa: [] },
+                b: { some: 'body' }
+              }, item);
+              done();
+            });
+          }
         });
       });
     });
