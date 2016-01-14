@@ -2061,6 +2061,80 @@ describe('Tree', function() {
     });
   });
 
+  describe('lastVersion', function() {
+    var name = 'lastVersion';
+
+    var item1 = { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', i: 3, pa: ['Bbbb'] } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', i: 4, pa: ['Aaaa'] } };
+
+    it('should return null with empty databases', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastVersion(function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, null);
+        done();
+      });
+    });
+
+    it('needs item1', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item1, done);
+    });
+
+    it('should return version of item1 as a number by default', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastVersion(function(err, v) {
+        if (err) { throw err; }
+        // var b = new Buffer(item1.h.v, 'base64');
+        // var num = b.readUIntBE(0, b.length);
+        // version number Aaaa base64 is 108186
+
+        should.strictEqual(v, 108186);
+        done();
+      });
+    });
+
+    it('should return version of item1 base64', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastVersion('base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Aaaa');
+        done();
+      });
+    });
+
+    it('needs item2 and item3', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item2);
+      t.end(item3, done);
+    });
+
+    it('should return version of item3', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastVersion('base64', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, 'Cccc');
+        done();
+      });
+    });
+
+    it('needs item4', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.end(item4, done);
+    });
+
+    it('should return version of item4 in hex', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.lastVersion('hex', function(err, v) {
+        if (err) { throw err; }
+        should.equal(v, '0dd75d');
+        done();
+      });
+    });
+  });
+
   describe('lastByPerspective', function() {
     var name = 'lastByPerspective';
 
