@@ -2088,12 +2088,15 @@ describe('Tree', function() {
       t.end(item1, done);
     });
 
-    it('should return version of item1', function(done) {
+    it('should return version of item1 as a number by default', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.lastByPerspective('lbp', function(err, v) {
         if (err) { throw err; }
-        var b = new Buffer('Aaaa', 'base64');
-        should.equal(v.toString('hex'), b.toString('hex'));
+        // var b = new Buffer(item1.h.v, 'base64');
+        // var num = b.readUIntBE(0, b.length);
+        // version number Aaaa base64 is 108186
+
+        should.strictEqual(v, 108186);
         done();
       });
     });
@@ -2935,7 +2938,7 @@ describe('Tree', function() {
     it('inspect keys: should have created one usKey with the perspective and version of item2', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       db.get(t._composeUsKey(item2.h.pe), function(err, v) {
-        should.strictEqual(v.toString('base64'), 'Bbbb');
+        should.strictEqual(Tree.parseKey(v, { decodeV: 'base64' }).v, 'Bbbb');
         done();
       });
     });
@@ -3108,7 +3111,7 @@ describe('Tree', function() {
     it('inspect keys: should *not* have updated the usKey for the perspective "other" of item2', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       db.get(t._composeUsKey(item2.h.pe), function(err, v) {
-        should.strictEqual(v.toString('base64'), 'Bbbb');
+        should.strictEqual(Tree.parseKey(v, { decodeV: 'base64' }).v, 'Bbbb');
         done();
       });
     });
@@ -3134,7 +3137,7 @@ describe('Tree', function() {
     it('inspect keys: should have updated the usKey for the perspective "other" of item4', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       db.get(t._composeUsKey(item2.h.pe), function(err, v) {
-        should.strictEqual(v.toString('base64'), 'Dddd');
+        should.strictEqual(Tree.parseKey(v, { decodeV: 'base64' }).v, 'Dddd');
         done();
       });
     });
@@ -3152,7 +3155,7 @@ describe('Tree', function() {
     it('inspect keys: should have updated the usKey for the perspective "other" to previously written key, item2', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       db.get(t._composeUsKey(item2.h.pe), function(err, v) {
-        should.strictEqual(v.toString('base64'), 'Bbbb');
+        should.strictEqual(Tree.parseKey(v, { decodeV: 'base64' }).v, 'Bbbb');
         done();
       });
     });
