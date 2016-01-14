@@ -976,6 +976,87 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('lastReceivedFromRemote', function() {
+    var name = 'lastReceivedFromRemote';
+    var stageName = '_stage_lastReceivedFromRemote';
+    var ldb;
+    var ldbPath = tmpdir() + '/test_merge_tree_lastReceivedFromRemote';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: name, pa: [] }, b: { some: 'body' } };
+
+    before('should open a new db for lastReceivedFromRemote tests only', function(done) {
+      // ensure a db at start
+      rimraf(ldbPath, function(err) {
+        if (err) { throw err; }
+        level(ldbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, adb) {
+          if (err) { throw err; }
+          ldb = adb;
+          done();
+        });
+      });
+    });
+
+    after('should destroy this db', function(done) {
+      rimraf(ldbPath, done);
+    });
+
+    it('should require remote to be a string', function() {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      (function() { mt.lastReceivedFromRemote(); }).should.throw('remote must be a string');
+    });
+
+    it('should require cb to be a function', function() {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      (function() { mt.lastReceivedFromRemote(''); }).should.throw('cb must be a function');
+    });
+
+    it('should throw with non-existing perspective', function() {
+      var opts = { stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      (function() { mt.lastReceivedFromRemote(name, function() {}); }).should.throw('remote not found');
+    });
+
+    it('should return with empty database', function(done) {
+      var opts = { perspectives: [name], stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      mt.lastReceivedFromRemote(name, function(err, v) {
+        if (err) { throw err; }
+        should.strictEqual(v, null);
+        done();
+      });
+    });
+
+    it('save item1 from remote "lastReceivedFromRemote"', function(done) {
+      var opts = { perspectives: [name], stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      mt._pe[name].write(item1, done);
+    });
+
+    it('should return with last saved version as a number by default', function(done) {
+      var opts = { perspectives: [name], stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      mt.lastReceivedFromRemote(name, function(err, v) {
+        if (err) { throw err; }
+        // version number Aaaa base64 is 108186
+        should.strictEqual(v, 108186);
+        done();
+      });
+    });
+
+    it('should return with last saved version, decoded in base64', function(done) {
+      var opts = { perspectives: [name], stage: stageName, vSize: 3, log: silence };
+      var mt = new MergeTree(ldb, opts);
+      mt.lastReceivedFromRemote(name, 'base64', function(err, v) {
+        if (err) { throw err; }
+        should.strictEqual(v, 'Aaaa');
+        done();
+      });
+    });
+  });
+
   describe('mergeWithLocal', function() {
     var sname = 'mergeWithLocal_foo';
     var stageName = '_stage_mergeWithLocal';
