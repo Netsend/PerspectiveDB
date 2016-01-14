@@ -939,12 +939,13 @@ describe('MergeTree', function() {
       mt._local.write(item1, done);
     });
 
-    it('should return with last saved item as a buffer by default', function(done) {
+    it('should return with last saved item as a number by default', function(done) {
       var opts = { stage: stageName, vSize: 3, log: silence };
       var mt = new MergeTree(ldb, opts);
-      mt.lastByPerspective(name, 'base64', function(err, v) {
+      mt.lastByPerspective(name, function(err, v) {
         if (err) { throw err; }
-        should.strictEqual(v.toString('base64'), 'Aaaa');
+        // version number Aaaa base64 is 108186
+        should.strictEqual(v, 108186);
         done();
       });
     });
