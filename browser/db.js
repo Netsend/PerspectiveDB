@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -111,7 +111,7 @@ function connHandler(conn, mt, pers) {
       var readerOpts = {
         log: log,
         tail: true,
-        tailRetry: 1000,
+        tailRetry: 5000,
         raw: true
       };
       if (typeof req.start === 'string') {
@@ -205,9 +205,9 @@ function connHandler(conn, mt, pers) {
     // send data request with last offset if there are any import rules
     if (pers.import) {
       // find last local item of this remote
-      mt.lastByPerspective(pers.name, 'base64', function(err, last) {
+      mt.lastReceivedFromRemote(pers.name, 'base64', function(err, last) {
         if (err) {
-          log.err('db connHandler lastByPerspective %s %s', err, pers.name);
+          log.err('db connHandler lastReceivedFromRemote %s %s', err, pers.name);
           connErrorHandler(conn, connId, err);
           return;
         }
@@ -305,13 +305,12 @@ function start(idb, cfg, cb) {
 
   // 2. transparently proxy indexed DB updates
   var writer = mt.createLocalWriteStream();
-  var pusher = proxy(idb, writer);
+  var reader = proxy(idb, writer.write.bind(writer));
 
   // start auto-merging
   mt.mergeAll({
-    // TODO: enable pusher and writing back to object store
-    //mergeHandler: pusher,
-    interval: mtOpts.autoMergeInterval || 1000
+    mergeHandler: reader,
+    interval: mtOpts.autoMergeInterval || 5000
   });
 
   // 3. create authenticated WebSockets and start transfering BSON
