@@ -5,6 +5,28 @@
 <title>PersDB browser</title>
 </head>
 <body>
+
+<div id="msg"></div>
+
+<h1>Customer</h1>
+<form id="addCustomerForm">
+
+<input id="addCustomerSsn"   placeholder="SSN" required>
+<input id="addCustomerName"  placeholder="Name">
+<input id="addCustomerEmail" placeholder="Email" type="email" required>
+<input id="addCustomerAge"   placeholder="Age" type="number" min="0" max="130">
+
+<input type="submit" value="Save">
+</form>
+
+<table>
+<thead>
+  <tr> <th>SSN</th> <th>Name</th> <th>Email</th> <th>Age</th> </tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
 <script type="text/javascript" src="build/build.js"></script>
 </body>
 </html>

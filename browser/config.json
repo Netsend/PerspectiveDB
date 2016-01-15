@@ -1,8 +1,10 @@
-{
-  "url": "wss://example.com:3344",
-  "auth": {
+[
+  {
+    "name": "server",
     "username": "foo",
     "password": "bar",
-    "db": "baz"
+    "connect": "wss://localhost:3344/baz",
+    "import": true,
+    "export": true
   }
-}
+]
