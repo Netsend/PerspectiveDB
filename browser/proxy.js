@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -37,19 +37,22 @@ if (errors.length) {
 }
 
 /**
- * @param {String} [name]  name of the snapshot object store, defaults to _pdb
- * @param {Object} writer  writable stream to the snapshot object store
+ * @param {IndexedDB} idb  IndexedDB instance to monitor and sync
+ * @param {Function} writer  write new local versions: function(newObj, cb)
+ * @return {Function} reader(newVersion, prevVersion, cb)
  */
-module.exports = function(name, writer) {
-  if (typeof name === 'object') {
-    writer = name;
-    name = null;
-  }
-  if (name != null && typeof name !== 'string') { throw new TypeError('name must be a string'); }
-  if (writer == null || typeof writer !== 'object') { throw new TypeError('writer must be an object'); }
+module.exports = function(idb, writer) {
+  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
+  if (writer == null || typeof writer !== 'function') { throw new TypeError('writer must be a function'); }
 
-  function _generateId(ev, cb) {
+  function _generateId(ev) {
     return ev.target.source.name + '\x01' + ev.target.result;
+  }
+
+  // @return {Array}  contaiing name of object store and id
+  function _objectStoreFromId(id) {
+    // expect only one 0x01
+    return id.split('\x01', 1);
   }
 
   // pre and post handlers for objectStore.add, put, delete and clear
@@ -66,7 +69,7 @@ module.exports = function(name, writer) {
         b: value
       };
       console.log(obj);
-      writer.write(obj);
+      writer(obj);
     };
   }
 
@@ -83,7 +86,7 @@ module.exports = function(name, writer) {
         b: value
       };
       console.log(obj);
-      writer.write(obj);
+      writer(obj);
     };
   }
 
@@ -102,7 +105,7 @@ module.exports = function(name, writer) {
         }
       };
       console.log(obj);
-      writer.add(obj);
+      writer(obj);
     };
   }
 
@@ -190,7 +193,7 @@ module.exports = function(name, writer) {
           //args[0].push(SNAPSHOT_COLLECTION);
           var obj = target.apply(that, args);
           obj.addEventListener('success', function(ev) {
-            var transaction = ev.target.result;
+            //var transaction = ev.target.result;
             console.log('proxyTransaction success');
           });
 
@@ -208,6 +211,7 @@ module.exports = function(name, writer) {
   }
 
   // proxy indexedDB.open method and catch the creation of new database instances
+  /*
   function proxyIdbOpen(target) {
     return new Proxy(target, {
       apply: function(target, that, args) {
@@ -243,4 +247,33 @@ module.exports = function(name, writer) {
   }
 
   indexedDB.open = proxyIdbOpen(indexedDB.open);
+  */
+
+  var origTransaction = idb.transaction.bind(idb);
+  idb.transaction = proxyTransaction(idb.transaction);
+
+  // remote item handler
+  return function reader(newVersion, prevVersion, cb) {
+    var osName = _objectStoreFromId(newVersion.h.id);
+
+    console.log('READER', osName, newVersion.h);
+
+    // open a rw transaction on the object store
+    var os = origTransaction([osName], 'readwrite').objectStore(osName);
+
+    // new items should not have a parent
+    delete newVersion.h.pa;
+
+    // prepare for local write
+    if (prevVersion && !prevVersion.h.d) {
+      console.log('put', newVersion.b);
+      os.put(newVersion.b);
+    } else {
+      console.log('add', newVersion.b);
+      os.add(newVersion.b);
+    }
+
+    // confirm new version is written
+    writer(newVersion, cb);
+  };
 };
