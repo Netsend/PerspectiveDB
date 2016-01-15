@@ -159,7 +159,21 @@ var req = indexedDB.open('MyTestDatabase');
 req.onsuccess = function(ev) {
   var db = ev.target.result;
 
-  var opts = { perspectives: config };
+  var opts = {
+    perspectives: config,
+    iterator: function(item) {
+      // update the list
+      var msg   = document.querySelector('#msg');
+      var table = document.querySelector('tbody');
+      reloadList(db, 'customers', table, function(err) {
+        if (err) {
+          console.error(err);
+          msg.textContent = err.message;
+          return;
+        }
+      });
+    }
+  };
 
   // start PersDB
   PersDB(db, opts, function(err) {

@@ -244,8 +244,10 @@ function connHandler(conn, mt, pers) {
  */
 function start(idb, cfg, cb) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-  if (cfg == null || typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
+  if (typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var iterator = cfg.iterator || noop;
 
   // setup list of connections to initiate and create an index by perspective name
   var persCfg = parsePersConfigs(cfg.perspectives || []);
@@ -309,7 +311,14 @@ function start(idb, cfg, cb) {
 
   // start auto-merging
   mt.mergeAll({
-    mergeHandler: reader,
+    mergeHandler: function(newVersion, prevVersion, cb) {
+      reader(newVersion, prevVersion, function(err) {
+        if (err) { cb(err); return; }
+        // call iterator with new item
+        iterator(newVersion);
+        cb();
+      });
+    },
     interval: mtOpts.autoMergeInterval || 5000
   });
 
@@ -369,6 +378,7 @@ function start(idb, cfg, cb) {
  *
  * opts:
  *   name {String, default "_pdb"}  name of this database
+ *   iterator {Function}            called with every new item from a remote
  *   perspectives {Array}           array of other perspectives with url
  *   mergeTree {Object}             any MergeTree options
  */
@@ -384,6 +394,7 @@ function init(idb, opts, cb) {
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   if (opts.name != null && typeof opts.name !== 'string') { throw new TypeError('opts.name must be a string'); }
+  if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
   if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
   if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
 
