@@ -150,8 +150,7 @@ function main(db) {
   reloadCustomersList();
 }
 
-var config = require('./config.json');
-var PersDB = require('./db');
+if (typeof PersDB !== 'object') { throw new Error('make sure PersDB is loaded'); }
 
 // open db and write an object
 var req = indexedDB.open('MyTestDatabase');
@@ -160,7 +159,16 @@ req.onsuccess = function(ev) {
   var db = ev.target.result;
 
   var opts = {
-    perspectives: config,
+    perspectives: [
+      {
+        name: 'theServer',
+        username: 'foo',
+        password: 'bar',
+        connect: 'wss://localhost:3344/baz',
+        import: true,
+        export: true
+      }
+    ],
     iterator: function(item) {
       // update the list
       var msg   = document.querySelector('#msg');
@@ -176,7 +184,7 @@ req.onsuccess = function(ev) {
   };
 
   // start PersDB
-  PersDB(db, opts, function(err) {
+  PersDB.init(db, opts, function(err) {
     if (err) { throw err; }
     main(db);
   });

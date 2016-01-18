@@ -432,4 +432,6 @@ function init(idb, opts, cb) {
   });
 }
 
-module.exports = init;
+module.exports = global.PersDB = {
+  init: init
+};
