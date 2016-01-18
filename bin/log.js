@@ -138,7 +138,7 @@ function fmtItem(item, parents) {
     out += ' ' + JSON.stringify(item.h.pa);
     if (program.patch && parents.length) {
       parents.forEach(function(p) {
-        var diff = doDiff(item.b, p.b);
+        var diff = doDiff(item.b || {}, p.b);
         if (parents.length > 1) {
           out += ' ' + p.h.v;
         }
