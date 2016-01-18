@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PersDB browser</title>
+</head>
+<body>
+
+<div id="msg"></div>
+
+<h1>Customer</h1>
+<form id="addCustomerForm">
+
+<input id="addCustomerSsn"   placeholder="SSN" required>
+<input id="addCustomerName"  placeholder="Name">
+<input id="addCustomerEmail" placeholder="Email" type="email" required>
+<input id="addCustomerAge"   placeholder="Age" type="number" min="0" max="130">
+
+<input type="submit" value="Save">
+</form>
+
+<table>
+<thead>
+  <tr> <th>SSN</th> <th>Name</th> <th>Email</th> <th>Age</th> </tr>
+</thead>
+<tbody>
+</tbody>
+</table>
+
+<script type="text/javascript" src="build/build.js"></script>
+<script>
+var config = {
+  name: 'myServer',
+  username: 'fubar',
+  password: 'bar',
+  connect: 'wss://localhost:3344/baz',
+  import: true,
+  export: true
+};
+</script>
+<script type="text/javascript" src="example.js"></script>
+</body>
+</html>
