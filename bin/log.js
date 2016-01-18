@@ -113,7 +113,7 @@ function fmtItem(item, parents) {
         out += '\u2523\u2501 ';
       }
       var diff = doDiff(item.b, p.b);
-      out += ' ' + p.h.id + ' ' + p.h.v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p);
+      out += ' ' + p.h.id + ' ' + p.h.v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p.b);
       if (i !== parents.length) {
         out += '\n';
       }
@@ -142,7 +142,7 @@ function fmtItem(item, parents) {
         if (parents.length > 1) {
           out += ' ' + p.h.v;
         }
-        out += ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p);
+        out += ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p.b);
       });
     }
   }
