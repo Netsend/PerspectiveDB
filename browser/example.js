@@ -150,6 +150,7 @@ function main(db) {
   reloadCustomersList();
 }
 
+if (typeof config !== 'object') { throw new Error('make sure config is set'); }
 if (typeof PersDB !== 'object') { throw new Error('make sure PersDB is loaded'); }
 
 // open db and write an object
@@ -159,16 +160,7 @@ req.onsuccess = function(ev) {
   var db = ev.target.result;
 
   var opts = {
-    perspectives: [
-      {
-        name: 'theServer',
-        username: 'foo',
-        password: 'bar',
-        connect: 'wss://localhost:3344/baz',
-        import: true,
-        export: true
-      }
-    ],
+    perspectives: [config],
     iterator: function(item) {
       // update the list
       var msg   = document.querySelector('#msg');
