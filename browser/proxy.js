@@ -45,8 +45,8 @@ module.exports = function(idb, writer) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
   if (writer == null || typeof writer !== 'function') { throw new TypeError('writer must be a function'); }
 
-  function _generateId(ev) {
-    return ev.target.source.name + '\x01' + ev.target.result;
+  function _generateId(ev, key) {
+    return ev.target.source.name + '\x01' + key;
   }
 
   // @return {Array}  contaiing name of object store and id
@@ -65,7 +65,7 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev) },
+        h: { id: _generateId(ev, ev.target.result) },
         b: value
       };
       console.log(obj);
@@ -78,11 +78,11 @@ module.exports = function(idb, writer) {
   }
 
   function postPut(os, value, key, ret) {
-    console.log('postPut', os.name);
+    console.log('postPut', os.name, key, value);
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev) },
+        h: { id: _generateId(ev, ev.target.result) },
         b: value
       };
       console.log(obj);
@@ -95,12 +95,12 @@ module.exports = function(idb, writer) {
   }
 
   function postDelete(os, key, ret) {
-    console.log('postDelete');
+    console.log('postDelete', os.name, key);
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
         h: {
-          id: _generateId(ev),
+          id: _generateId(ev, key),
           d: true
         }
       };
@@ -264,16 +264,28 @@ module.exports = function(idb, writer) {
     // new items should not have a parent
     delete newVersion.h.pa;
 
+    os.onsuccess = function(ev) {
+      // success
+      console.log('READER success', ev);
+
+      // confirm new version is written
+      writer(newVersion, cb);
+      cb();
+    };
+
+    os.onerror = function(ev) {
+      // error
+      console.error('READER error', ev);
+      cb(ev.target);
+    };
+
     // prepare for local write
-    if (prevVersion && !prevVersion.h.d) {
+    if (newVersion.h.d) {
+      console.log('delete', newVersion.h);
+      os.delete(newVersion.h.id);
+    } else {
       console.log('put', newVersion.b);
       os.put(newVersion.b);
-    } else {
-      console.log('add', newVersion.b);
-      os.add(newVersion.b);
     }
-
-    // confirm new version is written
-    writer(newVersion, cb);
   };
 };
