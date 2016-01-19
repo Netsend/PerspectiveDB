@@ -199,10 +199,9 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
 };
 
 /**
- * Handles indexed DB updates via ES6 Proxy and initiates WebSockets.
+ * Handles indexed DB updates via ES6 Proxy.
  *
- * 1. transparently proxy indexed DB updates
- * 2. create authenticated WebSockets and start transfering BSON
+ * transparently proxy indexed DB updates
  *
  * @param {Function} cb    function called when everything is setup
  */
@@ -228,8 +227,20 @@ PersDB.prototype.start = function start(cb) {
     },
     interval: that._autoMergeInterval
   });
+};
 
-  // 2. create authenticated WebSockets and start transfering BSON
+/**
+ * Initiate WebSockets.
+ *
+ * Create authenticated WebSockets and start transfering BSON
+ *
+ * @param {Function} cb    function called when everything is setup
+ */
+PersDB.prototype.connect = function connect(cb) {
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var that = this;
+
   function openConn(cfg, cb2) {
     if (typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
     if (typeof cb2 !== 'function') { throw new TypeError('cb2 must be a function'); }
