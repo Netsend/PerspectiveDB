@@ -52,7 +52,7 @@ module.exports = function(idb, writer) {
   // @return {Array}  contaiing name of object store and id
   function _objectStoreFromId(id) {
     // expect only one 0x01
-    return id.split('\x01', 1);
+    return id.split('\x01', 1)[0];
   }
 
   // pre and post handlers for objectStore.add, put, delete and clear
@@ -259,12 +259,10 @@ module.exports = function(idb, writer) {
     console.log('READER', osName, newVersion.h);
 
     // open a rw transaction on the object store
-    var os = origTransaction([osName], 'readwrite').objectStore(osName);
+    var tr = origTransaction([osName], 'readwrite');
+    var os = tr.objectStore(osName);
 
-    // new items should not have a parent
-    delete newVersion.h.pa;
-
-    os.onsuccess = function(ev) {
+    tr.oncomplete = function(ev) {
       // success
       console.log('READER success', ev);
 
@@ -273,13 +271,22 @@ module.exports = function(idb, writer) {
       cb();
     };
 
-    os.onerror = function(ev) {
+    tr.onabort = function(ev) {
+      // abort
+      console.error('READER abort', ev);
+      cb(ev.target);
+    };
+
+    tr.onerror = function(ev) {
       // error
       console.error('READER error', ev);
       cb(ev.target);
     };
 
     // prepare for local write
+    // new items should not have a parent
+    delete newVersion.h.pa;
+
     if (newVersion.h.d) {
       console.log('delete', newVersion.h);
       os.delete(newVersion.h.id);
