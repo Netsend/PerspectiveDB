@@ -134,6 +134,10 @@ function PersDB(idb, opts) {
   this._idb = idb;
   this._opts = opts;
   this._connections = {};
+  this._mergeInterval = this._opts.mergeInterval;
+  if (this._mergeInterval == null) {
+    this._mergeInterval = 5000;
+  }
 
   this._db = level(name, { keyEncoding: 'binary', valueEncoding: 'binary', storePrefix: prefix });
 
@@ -207,7 +211,7 @@ function PersDB(idb, opts) {
         });
         that.emit('merge', newVersion);
       },
-      interval: that._opts.mergeInterval || 5000
+      interval: that._mergeInterval
     });
   } else {
     // transparently proxy indexed DB updates via ES6 Proxy
@@ -222,7 +226,7 @@ function PersDB(idb, opts) {
           cb2();
         });
       },
-      interval: that._opts.mergeInterval || 5000
+      interval: that._mergeInterval
     });
   }
 }
