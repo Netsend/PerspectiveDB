@@ -3432,6 +3432,31 @@ describe('Tree', function() {
         should.strictEqual(err.message, 'item.h must be an object');
       });
     });
+
+    it('should return false after writing 16 objects into the buffer', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      var falses = 0;
+      var truths = 0;
+
+      for (var i = 1; i < 18; i++) {
+        var v = new Buffer('Aaaa', 'base64');
+        var num = v.readUIntBE(0, 3) + i;
+        v.writeIntBE(num, 0, 3);
+        var item = { h: { id: 'XI' + i, v: v.toString('base64'), i: i, pa: [] }, b: { some: 'data' } };
+        var cont = t.write(item);
+        if (cont) {
+          truths++;
+        } else {
+          falses++;
+        }
+      }
+
+      should.strictEqual(falses, 2);
+      should.strictEqual(truths, 15);
+
+      t.end(null, done);
+    });
   });
 
   describe('_writev regression', function() {
