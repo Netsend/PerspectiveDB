@@ -290,13 +290,21 @@ PersDB.prototype.connect = function connect(cb) {
     var ws = websocket(uri, 1); // support protocol 1 only
     ws.uri = uri;
 
+    var cbCalled = false;
     ws.on('error', function(err) {
-      that._log.err(err);
+      that._log.err('ws error', err);
+      if (!cbCalled) { cb2(err); }
+      cbCalled = true;
     });
 
     // send the auth request and pass the connection to connHandler
     ws.write(JSON.stringify(authReq) + '\n', function(err) {
-      if (err) { cb2(err); return; }
+      if (err) {
+        that._log.err('ws write error', err);
+        if (!cbCalled) { cb2(err); }
+        cbCalled = true;
+        return;
+      }
 
       that._connHandler(ws, that._mt, cfg);
       cb2();
@@ -342,6 +350,11 @@ PersDB.prototype._connHandler = function _connHandler(conn, pers) {
   }
 
   this._connections[connId] = conn;
+
+  conn.on('close', function() {
+    that._log.info('%s: close', connId);
+    delete that._connections[connId];
+  });
 
   // after data request is sent and received, setup reader and writer
   function finalize(req) {
