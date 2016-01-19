@@ -245,12 +245,16 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
   return this._mt.createReadStream(opts);
 };
 
+PersDB.prototype.status = function status() {
+  return Object.keys(this._connections).length ? 'connected' : 'disconnected';
+};
+
 /**
  * Initiate WebSockets.
  *
  * Create authenticated WebSockets and start transfering BSON
  *
- * @param {Function} cb    function called when everything is setup
+ * @param {Function} cb  function called when all connections are setup
  */
 PersDB.prototype.connect = function connect(cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
@@ -286,10 +290,17 @@ PersDB.prototype.connect = function connect(cb) {
     var ws = websocket(uri, 1); // support protocol 1 only
     ws.uri = uri;
 
+    ws.on('error', function(err) {
+      that._log.err(err);
+    });
+
     // send the auth request and pass the connection to connHandler
-    ws.write(JSON.stringify(authReq) + '\n');
-    that._connHandler(ws, that._mt, cfg);
-    cb2();
+    ws.write(JSON.stringify(authReq) + '\n', function(err) {
+      if (err) { cb2(err); return; }
+
+      that._connHandler(ws, that._mt, cfg);
+      cb2();
+    });
   }
 
   // open WebSocket connections
@@ -301,6 +312,16 @@ PersDB.prototype.connect = function connect(cb) {
   });
 
   cb();
+};
+
+PersDB.prototype.disconnect = function disconnect(cb) {
+  var that = this;
+  async.each(Object.keys(this._connections), function(connId, cb2) {
+    that._log.info('closing %s', connId);
+    var conn = that._connections[connId];
+    conn.once('close', cb2);
+    conn.end();
+  }, cb);
 };
 
 /**
