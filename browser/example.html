@@ -4,35 +4,35 @@
 <meta charset="utf-8">
 <title>PersDB browser</title>
 <style>
-div.pdbStatus {
+div#networkStatus {
   color: black;
-  padding: 0 0 0 10px;
+  padding: 0 0 0 12px;
   position: relative;
 }
-
-div.pdbStatus:before {
+div#networkStatus:before {
   display: inline-block;
   position: absolute;
   left: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  content: '';
+  top: 4px;
 }
-
-div.pdbStatus.connected {
+div#networkStatus.connected:before {
   background-color: green;
 }
-div.pdbStatus.connecting {
+div#networkStatus.connecting:before {
   background-color: blue;
 }
-div.pdbStatus.disconnected {
+div#networkStatus.disconnected:before {
   background-color: red;
 }
 </style>
 </head>
 <body>
 
-<div class="pdbStatus disconnected">Disconnected</div>
+<div id="networkStatus" class="disconnected">Disconnected</div>
 
 <button id="connect">Connect</button>
 
@@ -60,7 +60,6 @@ div.pdbStatus.disconnected {
 <table id="persdb">
 </table>
 
-<script type="text/javascript" src="build/persdb.js"></script>
 <script>
 var config = {
   name: 'theServer',
@@ -71,6 +70,7 @@ var config = {
   export: true
 };
 </script>
+<script type="text/javascript" src="build/persdb.js"></script>
 <script type="text/javascript" src="example.js"></script>
 </body>
 </html>

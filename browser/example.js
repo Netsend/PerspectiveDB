@@ -80,16 +80,51 @@ function pdbView(reader) {
 
 // main program
 function main(db, pdb) {
-  var msg    = document.querySelector('#msg');
+  var msg     = document.querySelector('#msg');
 
-  var table  = document.querySelector('table#idb tbody');
+  var netstat = document.querySelector('#networkStatus');
+  var conn    = document.querySelector('#connect');
 
-  var form   = document.querySelector('form');
+  var table   = document.querySelector('table#idb tbody');
 
-  var ssn    = document.querySelector('#addCustomerSsn');
-  var name   = document.querySelector('#addCustomerName');
-  var email  = document.querySelector('#addCustomerEmail');
-  var age    = document.querySelector('#addCustomerAge');
+  var form    = document.querySelector('form');
+
+  var ssn     = document.querySelector('#addCustomerSsn');
+  var name    = document.querySelector('#addCustomerName');
+  var email   = document.querySelector('#addCustomerEmail');
+  var age     = document.querySelector('#addCustomerAge');
+
+  pdb.on('error', function(err) {
+    console.error('error disconnecting', err);
+    msg.textContent = err.message;
+  });
+
+  // handle connect
+  conn.onclick = function(ev) {
+    if (pdb.status() === 'connected') {
+      pdb.disconnect(function(err) {
+        if (err) {
+          console.error('error disconnecting', err);
+          msg.textContent = err.message;
+          return;
+        }
+        netstat.className = 'disconnected';
+        netstat.textContent = 'Disconnected';
+        conn.textContent = 'Connect';
+      });
+    } else {
+      pdb.connect(function(err) {
+        if (err) {
+          console.error('error connecting', err);
+          msg.textContent = err.message;
+          return;
+        }
+        netstat.className = 'connected';
+        netstat.textContent = 'Connected';
+        conn.textContent = 'Disconnect';
+      });
+    }
+  };
 
   // handle form
   form.onsubmit = function(ev) {
@@ -181,23 +216,11 @@ var req = indexedDB.open('MyTestDatabase');
 req.onsuccess = function(ev) {
   var db = ev.target.result;
 
+  // start PersDB
   var opts = {
     perspectives: [config],
-    iterator: function(item) {
-      // update the list
-      var msg   = document.querySelector('#msg');
-      var table = document.querySelector('tbody');
-      reloadList(db, 'customers', table, function(err) {
-        if (err) {
-          console.error(err);
-          msg.textContent = err.message;
-          return;
-        }
-      });
-    }
+    mergeInterval: 0
   };
-
-  // start PersDB
   var pdb = new PersDB(db, opts);
   main(db, pdb);
 
