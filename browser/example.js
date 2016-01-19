@@ -66,7 +66,7 @@ function pdbView(reader) {
 
   reader.on('readable', function() {
     var item = reader.read();
-    //if (item == null) { return; }
+    if (item == null) { return; }
 
     var tr = document.createElement('tr');
     var td;
@@ -224,7 +224,7 @@ req.onsuccess = function(ev) {
   var pdb = new PersDB(db, opts);
   main(db, pdb);
 
-  var reader = pdb.createReadStream({ tail: true });
+  var reader = pdb.createReadStream({ tail: false });
   pdbView(reader);
 };
 
