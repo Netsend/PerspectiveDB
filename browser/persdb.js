@@ -35,44 +35,6 @@ var dataRequest = require('../lib/data_request');
 var MergeTree = require('../lib/merge_tree');
 var parsePersConfigs = require('../lib/parse_pers_configs');
 
-/**
- * Instantiates a merge tree, handles indexed DB updates via ES6 Proxy and
- * initiates WebSockets.
- *
- * 1. setup all import and export hooks, filters etc.
- * 2. transparently proxy indexed DB updates
- * 3. create authenticated WebSockets and start transfering BSON
- *
- * This module should be executed as a Web Worker. A message is sent when it enters
- * a certain state and to signal the parent it's ready to receive messages.
- *
- * Full FSM: init --> listen
- *
- * The first message emitted is "init" which signals that this worker is ready to
- * receive configuration data, which consists of the db config, including
- * perspective configs.
- *
- * {
- *   [name]:         {String}      // name of this database, defaults to "_pdb"
- *   [perspectives]: {Array}       // array of other perspectives with urls
- *   [mergeTree]:    {Object}      // any MergeTree options
- * }
- *
- * After the database is opened and hooks are loaded, this worker emits a message
- * named "listen", signalling that it's ready to initiate data requests.
- *
- * Any subsequent messages sent to this worker should be a list of WebSockets to
- * initiate. This worker will open the socket and send an authenticated auth
- * request.
- *
- * A data request is sent on the incoming connection and one is expected from the
- * other side.
- * {
- *   start:          {String|Boolean}  whether or not to receive data as well. Either a
- *                                     boolean or a base64 encoded version number.
- * }
- */
-
 var noop = function() {};
 
 // filter password out request
@@ -81,9 +43,18 @@ function debugReq(req) {
 }
 
 /**
- * Start versioning the database transparently.
+ * Start a PersDB instance.
  *
- * @param {Object} idb     indexedDB instance
+ * Instantiates a merge tree, hooks, filters and handles IndexedDB updates. Use
+ * "status()" and "connect()" to initiate WebSocket connections.
+ *
+ * This class emits "merge" events when new merges have been saved.
+ *
+ * 1. setup all import and export hooks, filters etc.
+ * 2. use mergeHandler or use ES6 Proxy to transparently proxy IndexedDB updates
+ * 3. connect() creates authenticated WebSockets and starts transfering BSON
+ *
+ * @param {Object} idb     IndexedDB instance
  * @param {Object} [opts]  object containing configurable parameters
  *
  * opts:
@@ -214,7 +185,7 @@ function PersDB(idb, opts) {
       interval: that._mergeInterval
     });
   } else {
-    // transparently proxy indexed DB updates via ES6 Proxy
+    // transparently proxy IndexedDB updates via ES6 Proxy
     var reader = proxy(this._idb, writer.write.bind(writer));
 
     // start auto-merging
