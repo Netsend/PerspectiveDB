@@ -277,7 +277,7 @@ PersDB.prototype.connect = function connect(cb) {
         return;
       }
 
-      that._connHandler(ws, that._mt, cfg);
+      that._connHandler(ws, cfg);
       cb2();
     });
   }
