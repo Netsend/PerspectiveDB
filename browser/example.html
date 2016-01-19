@@ -3,8 +3,38 @@
 <head>
 <meta charset="utf-8">
 <title>PersDB browser</title>
+<style>
+div.pdbStatus {
+  color: black;
+  padding: 0 0 0 10px;
+  position: relative;
+}
+
+div.pdbStatus:before {
+  display: inline-block;
+  position: absolute;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+div.pdbStatus.connected {
+  background-color: green;
+}
+div.pdbStatus.connecting {
+  background-color: blue;
+}
+div.pdbStatus.disconnected {
+  background-color: red;
+}
+</style>
 </head>
 <body>
+
+<div class="pdbStatus disconnected">Disconnected</div>
+
+<button id="connect">Connect</button>
 
 <div id="msg"></div>
 
