@@ -282,4 +282,42 @@ describe('StreamTree', function() {
       });
     });
   });
+
+  it('should drain if reading more items than fit in the buffer', function(done) {
+    var t = new Tree(db, name, { vSize: 3, log: silence });
+
+    var s = new StreamTree(t, { highWaterMark: 1 });
+
+    var reads = 0;
+    var drains = 0;
+
+    s.on('drain', function() {
+      drains++;
+      while (s.read()) {
+        reads++;
+      }
+    });
+
+    // slow reader
+    function scheduleReader() {
+      setTimeout(function() {
+        s.once('readable', function() {
+          if (s.read()) {
+            reads++;
+          }
+        });
+        scheduleReader();
+      }, 10);
+    }
+    scheduleReader();
+
+    s.on('end', function(err) {
+      if (err) { throw err; }
+
+      should.strictEqual(reads, 4); // the number of items written in previous tests
+      should.strictEqual(drains, 3); // must drain after each item
+
+      done();
+    });
+  });
 });
