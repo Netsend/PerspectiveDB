@@ -79,7 +79,7 @@ function pdbView(reader) {
 }
 
 // main program
-function main(db) {
+function main(db, pdb) {
   var msg    = document.querySelector('#msg');
 
   var table  = document.querySelector('table#idb tbody');
@@ -166,6 +166,10 @@ function main(db) {
   }
 
   reloadCustomersList();
+
+  pdb.on('merge', function(item) {
+    console.log('new version merged', item);
+  });
 }
 
 if (typeof config !== 'object') { throw new Error('make sure config is set'); }
@@ -195,10 +199,7 @@ req.onsuccess = function(ev) {
 
   // start PersDB
   var pdb = new PersDB(db, opts);
-  pdb.start(function(err) {
-    if (err) { throw err; }
-    main(db);
-  });
+  main(db, pdb);
 
   var reader = pdb.createReadStream({ tail: true });
   pdbView(reader);

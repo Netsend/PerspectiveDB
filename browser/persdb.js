@@ -20,6 +20,9 @@
 
 'use strict';
 
+var EE = require('events');
+var util = require('util');
+
 var async = require('async');
 var BSONStream = require('bson-stream');
 var LDJSONStream = require('ld-jsonstream');
@@ -87,6 +90,11 @@ function debugReq(req) {
  *   name {String, default "_pdb"}  name of this database
  *   iterator {Function}            called with every new item from a remote
  *   perspectives {Array}           array of other perspectives with url
+ *   mergeInterval {Number, default 5000} time in ms to wait and repeat a merge, 0
+ *                                  means off.
+ *   mergeHandler {Function}        function to handle newly created merges
+ *                                  signature: function (merged, lhead, next). If
+ *                                  not provided a transparent ES6 Proxy is used.
  *   mergeTree {Object}             any MergeTree options
  */
 function PersDB(idb, opts) {
@@ -98,7 +106,11 @@ function PersDB(idb, opts) {
   if (opts.name != null && typeof opts.name !== 'string') { throw new TypeError('opts.name must be a string'); }
   if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
   if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
+  if (opts.mergeInterval != null && typeof opts.mergeInterval !== 'number') { throw new TypeError('opts.mergeInterval must be a number'); }
+  if (opts.mergeHandler != null && typeof opts.mergeHandler !== 'function') { throw new TypeError('opts.mergeHandler must be a function'); }
   if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
+
+  EE.call(this, opts);
 
   // open log
   this._log = {
@@ -183,8 +195,39 @@ function PersDB(idb, opts) {
 
   this._mt = new MergeTree(that._db, mtOpts);
 
-  this._autoMergeInterval = mtOpts.autoMergeInterval || 5000;
+  var writer = this._mt.createLocalWriteStream();
+
+  if (this._opts.mergeHandler) {
+    // use mergeHandler
+    this._mt.mergeAll({
+      mergeHandler: function(newVersion, prevVersion, cb2) {
+        that._opts.mergeHandler(newVersion, prevVersion, function(err) {
+          if (err) { cb2(err); return; }
+          writer.write(cb2);
+        });
+        that.emit('merge', newVersion);
+      },
+      interval: that._opts.mergeInterval || 5000
+    });
+  } else {
+    // transparently proxy indexed DB updates via ES6 Proxy
+    var reader = proxy(this._idb, writer.write.bind(writer));
+
+    // start auto-merging
+    this._mt.mergeAll({
+      mergeHandler: function(newVersion, prevVersion, cb2) {
+        reader(newVersion, prevVersion, function(err) {
+          if (err) { cb2(err); return; }
+          that.emit('merge', newVersion);
+          cb2();
+        });
+      },
+      interval: that._opts.mergeInterval || 5000
+    });
+  }
 }
+
+util.inherits(PersDB, EE);
 
 module.exports = global.PersDB = PersDB;
 
@@ -196,37 +239,6 @@ PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, er
 PersDB.prototype.createReadStream = function createReadStream(opts) {
   if (this._mt == null || typeof this._mt !== 'object') { throw new TypeError('mt must be instantiated'); }
   return this._mt.createReadStream(opts);
-};
-
-/**
- * Handles indexed DB updates via ES6 Proxy.
- *
- * transparently proxy indexed DB updates
- *
- * @param {Function} cb    function called when everything is setup
- */
-PersDB.prototype.start = function start(cb) {
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  var that = this;
-  var iterator = this._opts.iterator || noop;
-
-  // 1. transparently proxy indexed DB updates
-  var writer = this._mt.createLocalWriteStream();
-  var reader = proxy(this._idb, writer.write.bind(writer));
-
-  // start auto-merging
-  this._mt.mergeAll({
-    mergeHandler: function(newVersion, prevVersion, cb) {
-      reader(newVersion, prevVersion, function(err) {
-        if (err) { cb(err); return; }
-        // call iterator with new item
-        iterator(newVersion);
-        cb();
-      });
-    },
-    interval: that._autoMergeInterval
-  });
 };
 
 /**
