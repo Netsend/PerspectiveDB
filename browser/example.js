@@ -60,11 +60,29 @@ function reloadList(db, osName, el, cb) {
   }, cb);
 }
 
+// persdb view
+function pdbView(reader) {
+  var table  = document.querySelector('table#persdb');
+
+  reader.on('readable', function() {
+    var item = reader.read();
+    //if (item == null) { return; }
+
+    var tr = document.createElement('tr');
+    var td;
+    td = document.createElement('td');
+    td.textContent = JSON.stringify(item.h);
+    tr.appendChild(td);
+
+    table.appendChild(tr);
+  });
+}
+
 // main program
 function main(db) {
   var msg    = document.querySelector('#msg');
 
-  var table  = document.querySelector('tbody');
+  var table  = document.querySelector('table#idb tbody');
 
   var form   = document.querySelector('form');
 
@@ -151,7 +169,7 @@ function main(db) {
 }
 
 if (typeof config !== 'object') { throw new Error('make sure config is set'); }
-if (typeof PersDB !== 'object') { throw new Error('make sure PersDB is loaded'); }
+if (typeof PersDB !== 'function') { throw new Error('make sure PersDB is loaded'); }
 
 // open db and write an object
 var req = indexedDB.open('MyTestDatabase');
@@ -176,10 +194,14 @@ req.onsuccess = function(ev) {
   };
 
   // start PersDB
-  PersDB.init(db, opts, function(err) {
+  var pdb = new PersDB(db, opts);
+  pdb.start(function(err) {
     if (err) { throw err; }
     main(db);
   });
+
+  var reader = pdb.createReadStream({ tail: true });
+  pdbView(reader);
 };
 
 req.onerror = function(ev) {
