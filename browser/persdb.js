@@ -182,35 +182,37 @@ function PersDB(idb, opts) {
   this._mt = new MergeTree(that._db, mtOpts);
 
   var writer = this._mt.createLocalWriteStream();
+  var w = function(item, cb) {
+    cb = cb || noop;
+    writer.write(item, function(err) {
+      if (err) { cb(err); return; }
+      cb();
+      that.emit('data', item);
+    });
+  };
 
+  var mergeHandler;
   if (this._opts.mergeHandler) {
-    // use mergeHandler
-    this._mt.mergeAll({
-      mergeHandler: function(newVersion, prevVersion, cb2) {
-        that._opts.mergeHandler(newVersion, prevVersion, function(err) {
-          if (err) { cb2(err); return; }
-          writer.write(cb2);
-        });
-        that.emit('merge', newVersion);
-      },
-      interval: that._mergeInterval
-    });
+    // use given mergeHandler
+    mergeHandler = function(newVersion, prevVersion, cb) {
+      that._opts.mergeHandler(newVersion, prevVersion, function(err) {
+        if (err) { cb(err); return; }
+        w(newVersion, cb);
+      });
+    };
   } else {
-    // transparently proxy IndexedDB updates via ES6 Proxy
-    var reader = proxy(this._idb, writer.write.bind(writer));
-
-    // start auto-merging
-    this._mt.mergeAll({
-      mergeHandler: function(newVersion, prevVersion, cb2) {
-        reader(newVersion, prevVersion, function(err) {
-          if (err) { cb2(err); return; }
-          that.emit('merge', newVersion);
-          cb2();
-        });
-      },
-      interval: that._mergeInterval
-    });
+    // transparently proxy IndexedDB updates using proxy module
+    var reader = proxy(this._idb, w);
+    mergeHandler = function(newVersion, prevVersion, cb) {
+      reader(newVersion, prevVersion, cb);
+    };
   }
+
+  // start auto-merging
+  this._mt.mergeAll({
+    mergeHandler: mergeHandler,
+    interval: that._mergeInterval
+  });
 }
 
 util.inherits(PersDB, EE);

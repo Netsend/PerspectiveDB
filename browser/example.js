@@ -223,7 +223,7 @@ function main(db, pdb) {
     msg.textContent = err.message;
   });
 
-  pdb.on('merge', function(item) {
+  pdb.on('data', function(item) {
     pdbTable.appendChild(createPdbTableRow(item));
   });
 
@@ -308,10 +308,6 @@ function main(db, pdb) {
   }
 
   reloadCustomersList();
-
-  pdb.on('merge', function(item) {
-    console.log('new version merged', item);
-  });
 }
 
 if (typeof config !== 'object') { throw new Error('make sure config is set'); }
