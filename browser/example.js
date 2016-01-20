@@ -66,6 +66,28 @@ function connectionManager(pdb) {
 
   var conns = pdb.connections();
 
+  pdb.on('connection:connect', function(pe) {
+    var li = ul.querySelector('li.' + pe);
+    if (!li) { return; }
+
+    li.classList.remove('disconnecting');
+    li.classList.remove('disconnected');
+    li.classList.add('connected');
+    var button = li.querySelector('button');
+    button.textContent = 'disconnect';
+  });
+
+  pdb.on('connection:disconnect', function(pe) {
+    var li = ul.querySelector('li.' + pe);
+    if (!li) { return; }
+
+    li.classList.remove('connecting');
+    li.classList.remove('connected');
+    li.classList.add('disconnected');
+    var button = li.querySelector('button');
+    button.textContent = 'connect';
+  });
+
   Object.keys(conns).forEach(function(name) {
     var stat = conns[name];
 
@@ -73,9 +95,8 @@ function connectionManager(pdb) {
     var button = document.createElement('button');
     var span   = document.createElement('span');
 
-    li.className = 'disconnected';
-    button.className = 'toggleConnection';
-    span.className = 'error';
+    li.classList.add(name);
+    li.classList.add('disconnected');
 
     li.textContent = stat.name;
     li.title = stat.uri;
@@ -89,37 +110,47 @@ function connectionManager(pdb) {
 
     button.onclick = function(ev) {
       span.textContent = '';
+
       if (li.classList.contains('connected')) {
+        li.classList.remove('connected');
+        li.classList.add('disconnecting');
+        button.disabled = true;
+        button.textContent = 'disconnecting';
+
         pdb.disconnect(function(err) {
+          li.classList.remove('disconnecting');
+          button.disabled = false;
+
           if (err) {
-            console.error('error disconnecting', err);
-            li.textContent = stat.name + ' error disconnecting';
-            li.appendChild(button);
+            li.classList.add('connected');
+            button.textContent = 'disconnect';
+
+            span.textContent = 'error disconnecting';
             return;
           }
-          li.className = 'disconnected';
+          li.classList.remove('connected');
+          li.classList.add('disconnected');
           button.textContent = 'connect';
         });
       } else {
-        li.className = 'connecting';
+        li.classList.remove('disconnected');
+        li.classList.add('connecting');
         button.disabled = true;
         button.textContent = 'connecting';
 
         pdb.connect(stat.name, function(err) {
+          li.classList.remove('connecting');
           button.disabled = false;
 
           if (err) {
-            console.error('error connecting', err);
-
-            li.className = 'disconnected';
+            li.classList.add('disconnected');
             button.textContent = 'connect';
 
             span.textContent = 'error connecting';
-            li.appendChild(span);
             return;
           }
-
-          li.className = 'connected';
+          li.classList.remove('disconnected');
+          li.classList.add('connected');
           button.textContent = 'disconnect';
         });
       }
