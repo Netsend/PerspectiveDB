@@ -4,6 +4,28 @@
 <meta charset="utf-8">
 <title>PersDB browser</title>
 <style>
+table, form, ul#connections {
+  background-color: #eee;
+  margin: 10px;
+  margin-bottom: 20px;
+  padding: 10px;
+  /*border-radius: 5%;*/
+}
+table {
+  display: block;
+}
+td {
+  padding-top: 12px;
+}
+table caption, thead {
+  text-align: left;
+}
+body {
+  font-family: sans-serif;
+}
+thead {
+  font-size: 1rem;
+}
 ul#connections li {
   color: black;
   padding: 0 0 0 12px;
@@ -45,9 +67,8 @@ ul#connections span.error {
 
 <div id="msg"></div>
 
-<h1>Customer</h1>
 <form id="addCustomerForm">
-
+<legend>Customer</legend>
 <input id="addCustomerSsn"   placeholder="SSN" required>
 <input id="addCustomerName"  placeholder="Name">
 <input id="addCustomerEmail" placeholder="Email" type="email" required>
@@ -57,6 +78,7 @@ ul#connections span.error {
 </form>
 
 <table id="idb">
+<caption>IndexedDB</caption>
 <thead>
   <tr> <th>SSN</th> <th>Name</th> <th>Email</th> <th>Age</th> </tr>
 </thead>
@@ -65,6 +87,12 @@ ul#connections span.error {
 </table>
 
 <table id="persdb">
+<caption>PersDB</caption>
+<thead>
+  <tr> <th>id</th> <th>version</th> <th>parents</th> <th>flags</th> <th>perspective</th> <th>doc</th> <th>meta</th> </tr>
+</thead>
+<tbody>
+</tbody>
 </table>
 
 <script>

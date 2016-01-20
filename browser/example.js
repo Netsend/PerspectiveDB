@@ -129,7 +129,7 @@ function connectionManager(pdb) {
 
 // persdb view
 function pdbView(reader) {
-  var table  = document.querySelector('table#persdb');
+  var table  = document.querySelector('table#persdb tbody');
 
   reader.on('readable', function() {
     var item = reader.read();
@@ -138,7 +138,30 @@ function pdbView(reader) {
     var tr = document.createElement('tr');
     var td;
     td = document.createElement('td');
-    td.textContent = JSON.stringify(item.h);
+    td.textContent = JSON.stringify(item.h.id);
+    tr.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = item.h.v;
+    tr.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = JSON.stringify(item.h.pa);
+    tr.appendChild(td);
+
+    td = document.createElement('td');
+    var attrs = [];
+    if (item.h.c) { attrs.push('c'); }
+    if (item.h.d) { attrs.push('d'); }
+    td.textContent = attrs.join(' ');
+    tr.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = JSON.stringify(item.m);
+    tr.appendChild(td);
+
+    td = document.createElement('td');
+    td.textContent = JSON.stringify(item.b);
     tr.appendChild(td);
 
     table.appendChild(tr);
