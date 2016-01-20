@@ -60,6 +60,50 @@ function reloadList(db, osName, el, cb) {
   }, cb);
 }
 
+// connection view/handler
+function connectionManager(pdb) {
+  var ul = document.querySelector('ul#connections');
+  var conns = pdb.connections();
+
+  Object.keys(conns).forEach(function(name) {
+    var stat = conns[name];
+
+    var li = document.createElement('li');
+    var button = document.createElement('button');
+    li.className = 'disconnected';
+    li.textContent = stat.name;
+    li.title = stat.uri;
+    button.textContent = (stat.status === 'connected') ? 'disconnect' : 'connect';
+
+    li.appendChild(button);
+    ul.appendChild(li);
+
+    button.onclick = function(ev) {
+      if (li.classList.contains('connected')) {
+        pdb.disconnect(function(err) {
+          if (err) {
+            console.error('error disconnecting', err);
+            msg.textContent = err.message;
+            return;
+          }
+          li.className = 'disconnected';
+          button.textContent = 'connect';
+        });
+      } else {
+        pdb.connect(function(err) {
+          if (err) {
+            console.error('error connecting', err);
+            msg.textContent = err.message;
+            return;
+          }
+          li.className = 'connected';
+          button.textContent = 'disconnect';
+        });
+      }
+    };
+  });
+}
+
 // persdb view
 function pdbView(reader) {
   var table  = document.querySelector('table#persdb');
@@ -82,9 +126,6 @@ function pdbView(reader) {
 function main(db, pdb) {
   var msg     = document.querySelector('#msg');
 
-  var netstat = document.querySelector('#networkStatus');
-  var conn    = document.querySelector('#connect');
-
   var table   = document.querySelector('table#idb tbody');
 
   var form    = document.querySelector('form');
@@ -99,32 +140,7 @@ function main(db, pdb) {
     msg.textContent = err.message;
   });
 
-  // handle connect
-  conn.onclick = function(ev) {
-    if (pdb.status() === 'connected') {
-      pdb.disconnect(function(err) {
-        if (err) {
-          console.error('error disconnecting', err);
-          msg.textContent = err.message;
-          return;
-        }
-        netstat.className = 'disconnected';
-        netstat.textContent = 'Disconnected';
-        conn.textContent = 'Connect';
-      });
-    } else {
-      pdb.connect(function(err) {
-        if (err) {
-          console.error('error connecting', err);
-          msg.textContent = err.message;
-          return;
-        }
-        netstat.className = 'connected';
-        netstat.textContent = 'Connected';
-        conn.textContent = 'Disconnect';
-      });
-    }
-  };
+  connectionManager(pdb);
 
   // handle form
   form.onsubmit = function(ev) {

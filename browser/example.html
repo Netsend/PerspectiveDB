@@ -4,12 +4,13 @@
 <meta charset="utf-8">
 <title>PersDB browser</title>
 <style>
-div#networkStatus {
+ul#connections li {
   color: black;
   padding: 0 0 0 12px;
   position: relative;
+  list-style: none;
 }
-div#networkStatus:before {
+ul#connections li:before {
   display: inline-block;
   position: absolute;
   left: 0;
@@ -19,22 +20,25 @@ div#networkStatus:before {
   content: '';
   top: 4px;
 }
-div#networkStatus.connected:before {
+ul#connections li.connected:before {
   background-color: green;
 }
-div#networkStatus.connecting:before {
+ul#connections li.connecting:before {
   background-color: blue;
 }
-div#networkStatus.disconnected:before {
+ul#connections li.disconnected:before {
   background-color: red;
+}
+ul#connections button {
+  text-transform: capitalize;
+  margin-left: 5px;
 }
 </style>
 </head>
 <body>
 
-<div id="networkStatus" class="disconnected">Disconnected</div>
-
-<button id="connect">Connect</button>
+<ul id="connections">
+</ul>
 
 <div id="msg"></div>
 

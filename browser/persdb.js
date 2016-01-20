@@ -220,7 +220,7 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
 /**
  * Create an overview of the status of the connection of each perspective.
  *
- * @return {Object} status of each connection with the uri as key
+ * @return {Object} status of each connection with the perspective name as key
  */
 PersDB.prototype.connections = function connections() {
   var that = this;
@@ -228,7 +228,16 @@ PersDB.prototype.connections = function connections() {
   Object.keys(this._persCfg.pers).forEach(function(name) {
     var pers = that._persCfg.pers[name];
     var uri = pers.connect.href;
-    result[uri] = that._connections[uri] ? 'connected' : 'disconnected';
+    var obj = {
+      name: name,
+      uri: uri
+    };
+    if (that._connections[uri]) {
+      obj.status = 'connected';
+    } else {
+      obj.status = 'disconnected';
+    }
+    result[name] = obj;
   });
 
   return result;
