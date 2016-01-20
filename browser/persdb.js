@@ -46,7 +46,8 @@ function debugReq(req) {
  * Start a PersDB instance.
  *
  * Instantiates a merge tree, hooks, filters and handles IndexedDB updates. Use
- * "status()" and "connect()" to initiate WebSocket connections.
+ * "connections()" for an overview of connected systems and "connect()" to
+ * initiate WebSocket connections.
  *
  * This class emits "merge" events when new merges have been saved.
  *
@@ -216,8 +217,21 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
   return this._mt.createReadStream(opts);
 };
 
-PersDB.prototype.status = function status() {
-  return Object.keys(this._connections).length ? 'connected' : 'disconnected';
+/**
+ * Create an overview of the status of the connection of each perspective.
+ *
+ * @return {Object} status of each connection with the uri as key
+ */
+PersDB.prototype.connections = function connections() {
+  var that = this;
+  var result = {};
+  Object.keys(this._persCfg.pers).forEach(function(name) {
+    var pers = that._persCfg.pers[name];
+    var uri = pers.connect.href;
+    result[uri] = that._connections[uri] ? 'connected' : 'disconnected';
+  });
+
+  return result;
 };
 
 /**
