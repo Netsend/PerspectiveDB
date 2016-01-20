@@ -49,10 +49,16 @@ module.exports = function(idb, writer) {
     return ev.target.source.name + '\x01' + key;
   }
 
-  // @return {Array}  contaiing name of object store and id
+  // @return {Array}  containing name of object store and id
   function _objectStoreFromId(id) {
     // expect only one 0x01
     return id.split('\x01', 1)[0];
+  }
+
+  // @return {Array}  containing name of object store and id
+  function _idFromId(id) {
+    // expect only one 0x01
+    return id.split('\x01', 2)[1];
   }
 
   // pre and post handlers for objectStore.add, put, delete and clear
@@ -261,6 +267,7 @@ module.exports = function(idb, writer) {
   // remote item handler
   return function reader(newVersion, prevVersion, cb) {
     var osName = _objectStoreFromId(newVersion.h.id);
+    var id = _idFromId(newVersion.h.id);
 
     console.log('READER', osName, newVersion.h);
 
@@ -294,7 +301,7 @@ module.exports = function(idb, writer) {
 
     if (newVersion.h.d) {
       console.log('delete', newVersion.h);
-      os.delete(newVersion.h.id);
+      os.delete(id);
     } else {
       console.log('put', newVersion.b);
       os.put(newVersion.b);
