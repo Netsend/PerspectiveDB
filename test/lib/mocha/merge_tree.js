@@ -1446,7 +1446,7 @@ describe('MergeTree', function() {
     it('should not accept an existing version', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
-      lws.write(item1, function(err) {
+      lws.write(item2, function(err) {
         should.strictEqual(err.message, 'not a valid new item');
         done();
       });
