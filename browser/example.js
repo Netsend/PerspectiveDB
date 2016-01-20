@@ -176,6 +176,7 @@ function createPdbTableRow(item) {
   tr.appendChild(td);
 
   td = document.createElement('td');
+  td.classList.add('flags');
   var attrs = [];
   if (item.h.c) { attrs.push('c'); }
   if (item.h.d) { attrs.push('d'); }

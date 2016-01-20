@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <title>PersDB browser</title>
 <style>
+body {
+  font-family: sans-serif;
+}
+
+/* table row counter */
+table { counter-reset: rowNumber; }
+table tbody tr { counter-increment: rowNumber; }
+table tbody tr td:first-child::before {
+  content: counter(rowNumber);
+  min-width: 1em;
+  margin-right: 0.5em;
+}
+
 table, form, ul#connections {
   background-color: #eee;
   margin: 10px;
@@ -20,12 +33,13 @@ td {
 table caption, thead {
   text-align: left;
 }
-body {
-  font-family: sans-serif;
-}
 thead {
   font-size: 1rem;
 }
+td.flags {
+  font-weight: bold;
+}
+
 ul#connections li {
   color: black;
   padding: 0 0 0 12px;
