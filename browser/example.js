@@ -62,40 +62,63 @@ function reloadList(db, osName, el, cb) {
 
 // connection view/handler
 function connectionManager(pdb) {
-  var ul = document.querySelector('ul#connections');
+  var ul  = document.querySelector('ul#connections');
+
   var conns = pdb.connections();
 
   Object.keys(conns).forEach(function(name) {
     var stat = conns[name];
 
-    var li = document.createElement('li');
+    var li     = document.createElement('li');
     var button = document.createElement('button');
+    var span   = document.createElement('span');
+
     li.className = 'disconnected';
+    button.className = 'toggleConnection';
+    span.className = 'error';
+
     li.textContent = stat.name;
     li.title = stat.uri;
+
     button.textContent = (stat.status === 'connected') ? 'disconnect' : 'connect';
 
+
     li.appendChild(button);
+    li.appendChild(span);
     ul.appendChild(li);
 
     button.onclick = function(ev) {
+      span.textContent = '';
       if (li.classList.contains('connected')) {
         pdb.disconnect(function(err) {
           if (err) {
             console.error('error disconnecting', err);
-            msg.textContent = err.message;
+            li.textContent = stat.name + ' error disconnecting';
+            li.appendChild(button);
             return;
           }
           li.className = 'disconnected';
           button.textContent = 'connect';
         });
       } else {
-        pdb.connect(function(err) {
+        li.className = 'connecting';
+        button.disabled = true;
+        button.textContent = 'connecting';
+
+        pdb.connect(stat.name, function(err) {
+          button.disabled = false;
+
           if (err) {
             console.error('error connecting', err);
-            msg.textContent = err.message;
+
+            li.className = 'disconnected';
+            button.textContent = 'connect';
+
+            span.textContent = 'error connecting';
+            li.appendChild(span);
             return;
           }
+
           li.className = 'connected';
           button.textContent = 'disconnect';
         });
