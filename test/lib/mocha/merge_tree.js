@@ -1665,6 +1665,21 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('_generateRandomVersion', function() {
+    it('should generate a new id of 5 bytes', function() {
+      MergeTree._generateRandomVersion(5).length.should.equal(8);
+    });
+    it('should encode in base64', function() {
+      MergeTree._generateRandomVersion(3).should.match(/^[a-z0-9/+A-Z]{4}$/);
+    });
+    it('should generate a new id of 6 bytes default', function() {
+      MergeTree._generateRandomVersion().should.match(/^[a-z0-9/+A-Z]{8}$/);
+    });
+    it('should error with unsupported sizes', function() {
+      (function() { MergeTree._generateRandomVersion('a'); }).should.throwError('size must be a number >= 0');
+    });
+  });
+
   describe('getLocalTree', function() {
     it('should return the local tree', function() {
       var mt = new MergeTree(db);
