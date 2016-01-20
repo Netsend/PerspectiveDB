@@ -168,11 +168,11 @@ function createPdbTableRow(item) {
   tr.appendChild(td);
 
   td = document.createElement('td');
-  td.textContent = item.h.v;
+  td.textContent = JSON.stringify(item.h.pa);
   tr.appendChild(td);
 
   td = document.createElement('td');
-  td.textContent = JSON.stringify(item.h.pa);
+  td.textContent = item.h.v;
   tr.appendChild(td);
 
   td = document.createElement('td');
