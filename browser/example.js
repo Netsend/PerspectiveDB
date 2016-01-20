@@ -235,7 +235,7 @@ req.onsuccess = function(ev) {
   // start PersDB
   var opts = {
     perspectives: [config],
-    mergeInterval: 0
+    //mergeInterval: 0
   };
   var pdb = new PersDB(db, opts);
   main(db, pdb);
