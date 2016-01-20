@@ -158,65 +158,78 @@ function connectionManager(pdb) {
   });
 }
 
-// persdb view
-function pdbView(reader) {
-  var table  = document.querySelector('table#persdb tbody');
+// add item to persdb view
+function createPdbTableRow(item) {
+  var tr = document.createElement('tr');
+  var td;
 
+  td = document.createElement('td');
+  td.textContent = JSON.stringify(item.h.id);
+  tr.appendChild(td);
+
+  td = document.createElement('td');
+  td.textContent = item.h.v;
+  tr.appendChild(td);
+
+  td = document.createElement('td');
+  td.textContent = JSON.stringify(item.h.pa);
+  tr.appendChild(td);
+
+  td = document.createElement('td');
+  var attrs = [];
+  if (item.h.c) { attrs.push('c'); }
+  if (item.h.d) { attrs.push('d'); }
+  td.textContent = attrs.join(' ');
+  tr.appendChild(td);
+
+  td = document.createElement('td');
+  td.textContent = JSON.stringify(item.m);
+  tr.appendChild(td);
+
+  td = document.createElement('td');
+  td.textContent = JSON.stringify(item.b);
+  tr.appendChild(td);
+
+  return tr;
+}
+
+// persdb view
+function pdbView(table, reader) {
   reader.on('readable', function() {
     var item = reader.read();
     if (item == null) { return; }
 
-    var tr = document.createElement('tr');
-    var td;
-    td = document.createElement('td');
-    td.textContent = JSON.stringify(item.h.id);
-    tr.appendChild(td);
-
-    td = document.createElement('td');
-    td.textContent = item.h.v;
-    tr.appendChild(td);
-
-    td = document.createElement('td');
-    td.textContent = JSON.stringify(item.h.pa);
-    tr.appendChild(td);
-
-    td = document.createElement('td');
-    var attrs = [];
-    if (item.h.c) { attrs.push('c'); }
-    if (item.h.d) { attrs.push('d'); }
-    td.textContent = attrs.join(' ');
-    tr.appendChild(td);
-
-    td = document.createElement('td');
-    td.textContent = JSON.stringify(item.m);
-    tr.appendChild(td);
-
-    td = document.createElement('td');
-    td.textContent = JSON.stringify(item.b);
-    tr.appendChild(td);
-
-    table.appendChild(tr);
+    table.appendChild(createPdbTableRow(item));
   });
 }
 
 // main program
 function main(db, pdb) {
-  var msg     = document.querySelector('#msg');
+  var msg      = document.querySelector('#msg');
 
-  var table   = document.querySelector('table#idb tbody');
+  var idbTable = document.querySelector('table#idb tbody');
+  var pdbTable = document.querySelector('table#persdb tbody');
 
-  var form    = document.querySelector('form');
+  var form     = document.querySelector('form');
 
-  var ssn     = document.querySelector('#addCustomerSsn');
-  var name    = document.querySelector('#addCustomerName');
-  var email   = document.querySelector('#addCustomerEmail');
-  var age     = document.querySelector('#addCustomerAge');
+  var ssn      = document.querySelector('#addCustomerSsn');
+  var name     = document.querySelector('#addCustomerName');
+  var email    = document.querySelector('#addCustomerEmail');
+  var age      = document.querySelector('#addCustomerAge');
 
   pdb.on('error', function(err) {
     console.error('error disconnecting', err);
     msg.textContent = err.message;
   });
 
+  pdb.on('merge', function(item) {
+    pdbTable.appendChild(createPdbTableRow(item));
+  });
+
+  var reader = pdb.createReadStream({ tail: false });
+  pdbView(pdbTable, reader);
+
+  // setup connection manager
   connectionManager(pdb);
 
   // handle form
@@ -251,7 +264,7 @@ function main(db, pdb) {
   };
 
   // handle list deletion clicks
-  table.onclick = function(ev) {
+  idbTable.onclick = function(ev) {
     // clear messages
     msg.textContent = '';
 
@@ -284,7 +297,7 @@ function main(db, pdb) {
   // show list entries
   function reloadCustomersList() {
     // refill
-    reloadList(db, 'customers', table, function(err) {
+    reloadList(db, 'customers', idbTable, function(err) {
       if (err) {
         console.error(err);
         msg.textContent = err.message;
@@ -316,9 +329,6 @@ req.onsuccess = function(ev) {
   };
   var pdb = new PersDB(db, opts);
   main(db, pdb);
-
-  var reader = pdb.createReadStream({ tail: false });
-  pdbView(reader);
 };
 
 req.onerror = function(ev) {
