@@ -225,6 +225,7 @@ function main(db, pdb) {
 
   pdb.on('data', function(item) {
     pdbTable.appendChild(createPdbTableRow(item));
+    reloadCustomersList();
   });
 
   var reader = pdb.createReadStream({ tail: false });
