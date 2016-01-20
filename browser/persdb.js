@@ -84,6 +84,8 @@ function PersDB(idb, opts) {
 
   EE.call(this, opts);
 
+  var that = this;
+
   // open log
   this._log = {
     emerg:   console.error.bind(console),
@@ -117,6 +119,16 @@ function PersDB(idb, opts) {
   this._persCfg = parsePersConfigs(this._opts.perspectives || []);
   this._log.info('db persCfg', debugReq(this._persCfg));
 
+  // inspect protocols, currently only wss is supported as a valid protocol
+  this._persCfg.connect.forEach(function(pe) {
+    var cfg = that._persCfg.pers[pe];
+    if (cfg.connect.protocol !== 'wss:') {
+      var err = new Error('only possible to connect to perspectives via wss');
+      that._log.err('perspective config error: %s %s', err, cfg.connect);
+      throw err;
+    }
+  });
+
   // setup all import and export hooks, filters and a MergeTree
 
   // return hooksOpts with all but the pre-configured keys
@@ -131,8 +143,6 @@ function PersDB(idb, opts) {
 
     return hooksOpts;
   }
-
-  var that = this;
 
   // if hooksOpts has a hide key, push a new hook in hooks
   function ensureHideHook(hooksOpts, hooks) {
@@ -244,76 +254,71 @@ PersDB.prototype.connections = function connections() {
 };
 
 /**
- * Initiate WebSockets.
- *
- * Create authenticated WebSockets and start transfering BSON
+ * Initiate a WebSocket to all perspectives.
  *
  * @param {Function} cb  function called when all connections are setup
  */
-PersDB.prototype.connect = function connect(cb) {
+PersDB.prototype.connect = function connectAll(cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   var that = this;
 
-  function openConn(cfg, cb2) {
-    if (typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
-    if (typeof cb2 !== 'function') { throw new TypeError('cb2 must be a function'); }
-
-    if (typeof cfg.username !== 'string') { throw new TypeError('cfg.username must be a string'); }
-    if (typeof cfg.password !== 'string') { throw new TypeError('cfg.password must be a string'); }
-    if (typeof cfg.connect !== 'object') { throw new TypeError('cfg.connect must be an object'); }
-    if (typeof cfg.connect.pathname !== 'string') { throw new TypeError('cfg.connect.pathname must be a string'); }
-    if (typeof cfg.connect.protocol !== 'string') { throw new TypeError('cfg.connect.protocol must be a string'); }
-    if (typeof cfg.connect.hostname !== 'string') { throw new TypeError('cfg.connect.hostname must be a string'); }
-
-    // currently only wss is supported as a valid protocol
-    if (cfg.connect.protocol !== 'wss:') { throw new TypeError('cfg.connect.protocol must be "wss:"'); }
-    if (cfg.connect.port != null && typeof cfg.connect.port !== 'string') { throw new TypeError('cfg.connect.port must be a string'); }
-
-    that._log.notice('db setup WebSocket', debugReq(cfg));
-
-    var authReq = {
-      username: cfg.username,
-      password: cfg.password,
-      db: cfg.connect.pathname.substr(1) // skip leading "/"
-    };
-
-    var port = cfg.connect.port || '3344';
-
-    var uri = 'wss://' + cfg.connect.hostname + ':' + port;
-    var ws = websocket(uri, 1); // support protocol 1 only
-    ws.uri = uri;
-
-    var cbCalled = false;
-    ws.on('error', function(err) {
-      that._log.err('ws error', err);
-      if (!cbCalled) { cb2(err); }
-      cbCalled = true;
-    });
-
-    // send the auth request and pass the connection to connHandler
-    ws.write(JSON.stringify(authReq) + '\n', function(err) {
-      if (err) {
-        that._log.err('ws write error', err);
-        if (!cbCalled) { cb2(err); }
-        cbCalled = true;
-        return;
-      }
-
-      that._connHandler(ws, cfg);
-      cb2();
-    });
-  }
-
   // open WebSocket connections
-  async.each(this._persCfg.connect, function(perspective, cb2) {
-    openConn(that._persCfg.pers[perspective], cb2);
-  }, function(err) {
-    if (err) { throw err; }
-    that._log.notice('db all WebSockets initiated');
+  async.each(this._persCfg.connect, function(pe, cb2) {
+    that.connect(that._persCfg.pers[pe].name, cb2);
+  }, cb);
+};
+
+/**
+ * Initiate a WebSocket connection.
+ *
+ * Create authenticated WebSockets and start transfering BSON
+ *
+ * @param {String} pe  name of the perspective to connect to
+ * @param {Function} cb  function called when all connections are setup
+ */
+PersDB.prototype.connect = function connect(pe, cb) {
+  if (typeof pe !== 'string') { throw new TypeError('pe must be a string'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var cfg = this._persCfg.pers[pe];
+  if (cfg == null || typeof cfg !== 'object') { throw new Error('perspective configuration not found'); }
+
+  this._log.notice('db setup WebSocket', debugReq(cfg));
+
+  var that = this;
+
+  var authReq = {
+    username: cfg.username,
+    password: cfg.password,
+    db: cfg.connect.pathname.substr(1) // skip leading "/"
+  };
+
+  var port = cfg.connect.port || '3344';
+
+  var uri = 'wss://' + cfg.connect.hostname + ':' + port;
+  var ws = websocket(uri, 1); // support protocol 1 only
+  ws.uri = uri;
+
+  var cbCalled = false;
+  ws.on('error', function(err) {
+    that._log.err('ws error', err);
+    if (!cbCalled) { cb(err); }
+    cbCalled = true;
   });
 
-  cb();
+  // send the auth request and pass the connection to connHandler
+  ws.write(JSON.stringify(authReq) + '\n', function(err) {
+    if (err) {
+      that._log.err('ws write error', err);
+      if (!cbCalled) { cb(err); }
+      cbCalled = true;
+      return;
+    }
+
+    that._connHandler(ws, cfg);
+    cb();
+  });
 };
 
 PersDB.prototype.disconnect = function disconnect(cb) {
