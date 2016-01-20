@@ -68,7 +68,7 @@ module.exports = function(idb, writer) {
         h: { id: _generateId(ev, ev.target.result) },
         b: value
       };
-      console.log(obj);
+      console.log('postAdd', obj);
       writer(obj);
     };
   }
@@ -85,7 +85,7 @@ module.exports = function(idb, writer) {
         h: { id: _generateId(ev, ev.target.result) },
         b: value
       };
-      console.log(obj);
+      console.log('postPut', obj);
       writer(obj);
     };
   }
@@ -104,7 +104,7 @@ module.exports = function(idb, writer) {
           d: true
         }
       };
-      console.log(obj);
+      console.log('postDelete', obj);
       writer(obj);
     };
   }
@@ -188,7 +188,13 @@ module.exports = function(idb, writer) {
     return new Proxy(target, {
       apply: function(target, that, args) {
         // add snapshot collection to readwrite transactions
-        if (args && args[1] && args[1] === 'readwrite') {
+        var method;
+        try {
+          method = args[1];
+        } catch(err) {
+        }
+
+        if (method === 'readwrite') {
           // TODO: incorporate object store differentiation in level
           //args[0].push(SNAPSHOT_COLLECTION);
           var obj = target.apply(that, args);
@@ -204,7 +210,7 @@ module.exports = function(idb, writer) {
           return obj;
         }
 
-        console.log('proxyTransaction not a readwrite transaction', target.mode);
+        console.log('proxyTransaction not a readwrite transaction:', method);
         return target.apply(that, args);
       }
     });
@@ -268,7 +274,6 @@ module.exports = function(idb, writer) {
 
       // confirm new version is written
       writer(newVersion, cb);
-      cb();
     };
 
     tr.onabort = function(ev) {
