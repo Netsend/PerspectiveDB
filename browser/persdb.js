@@ -258,7 +258,7 @@ PersDB.prototype.connections = function connections() {
  *
  * @param {Function} cb  function called when all connections are setup
  */
-PersDB.prototype.connect = function connectAll(cb) {
+PersDB.prototype.connectAll = function connectAll(cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   var that = this;
@@ -297,18 +297,17 @@ PersDB.prototype.connect = function connect(pe, cb) {
   var port = cfg.connect.port || '3344';
 
   var uri = 'wss://' + cfg.connect.hostname + ':' + port;
-  var ws = websocket(uri, 1); // support protocol 1 only
-  ws.uri = uri;
+  var conn = websocket(uri, 1); // support protocol 1 only
 
   var cbCalled = false;
-  ws.on('error', function(err) {
+  conn.on('error', function(err) {
     that._log.err('ws error', err);
     if (!cbCalled) { cb(err); }
     cbCalled = true;
   });
 
   // send the auth request and pass the connection to connHandler
-  ws.write(JSON.stringify(authReq) + '\n', function(err) {
+  conn.write(JSON.stringify(authReq) + '\n', function(err) {
     if (err) {
       that._log.err('ws write error', err);
       if (!cbCalled) { cb(err); }
@@ -316,7 +315,7 @@ PersDB.prototype.connect = function connect(pe, cb) {
       return;
     }
 
-    that._connHandler(ws, cfg);
+    that._connHandler(conn, cfg);
     cb();
   });
 };
@@ -338,7 +337,7 @@ PersDB.prototype.disconnect = function disconnect(cb) {
  * - maybe import data
  */
 PersDB.prototype._connHandler = function _connHandler(conn, pers) {
-  var connId = conn.uri;
+  var connId = pers.name;
   this._log.info('client connected %s', connId);
 
   var that = this;
@@ -350,9 +349,14 @@ PersDB.prototype._connHandler = function _connHandler(conn, pers) {
 
   this._connections[connId] = conn;
 
+  this.emit('connection', connId);
+  this.emit('connection:connect', connId);
+
   conn.on('close', function() {
     that._log.info('%s: close', connId);
     delete that._connections[connId];
+    that.emit('connection', connId);
+    that.emit('connection:disconnect', connId);
   });
 
   // after data request is sent and received, setup reader and writer
