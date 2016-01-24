@@ -520,6 +520,7 @@ describe('MergeTree', function() {
     var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pe: sname, pa: ['Cccc'] }, b: { more3: 'body' } };
 
     it('should require stree to be an object', function() {
       var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
@@ -646,6 +647,49 @@ describe('MergeTree', function() {
         }, function(err) {
           if (err) { throw err; }
           should.strictEqual(i, 3);
+          done();
+        });
+      });
+    });
+
+    it('needs item4 stree', function(done) {
+      var tree = new Tree(db, sname, { vSize: 3, log: silence });
+
+      tree.write(item4);
+      tree.end(null, done);
+    });
+
+    it('should transform and copy item4 to stage', function(done) {
+      var transform = function(item, cb) {
+        item.b.transformed = true;
+        cb(null, item);
+      };
+
+      var opts = { transform: transform, stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, sname, { vSize: 3, log: silence });
+      var i = 0;
+      mt._copyMissingToStage(stree, dtree, function(err) {
+        if (err) { throw err; }
+        mt._stage.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, pe: sname }, b: { some: 'body' } });
+          }
+          if (i === 2) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2, pe: sname }, b: { more: 'body' } });
+          }
+          if (i === 3) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3, pe: sname }, b: { more2: 'body' } });
+          }
+          if (i > 3) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4, pe: sname }, b: { more3: 'body', transformed: true } });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 4);
           done();
         });
       });
