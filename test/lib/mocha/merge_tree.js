@@ -511,6 +511,147 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('_copyMissingToStage', function() {
+    var sname = '_copyMissingToStage_foo';
+    var dname = '_copyMissingToStage_bar';
+    var stageName = '_stage_copyMissingToStage';
+
+    // use 24-bit version numbers (base 64)
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+    it('should require stree to be an object', function() {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      (function() { mt._copyMissingToStage(); }).should.throw('stree must be an object');
+    });
+
+    it('should require dtree to be an object', function() {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      (function() { mt._copyMissingToStage({}); }).should.throw('dtree must be an object');
+    });
+
+    it('should require cb to be a function', function() {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      (function() { mt._copyMissingToStage({}, {}); }).should.throw('cb must be a function');
+    });
+
+    it('should iterate over an empty database', function(done) {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, sname, { vSize: 3, log: silence });
+      mt._copyMissingToStage(stree, dtree, function(err) {
+        if (err) { throw err; }
+        // inspect stage
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_bar': { heads: { count: 0, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
+      });
+    });
+
+    it('needs item1 in stree', function(done) {
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      stree.end(item1, done);
+    });
+
+    it('should copy item1 to stage', function(done) {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, sname, { vSize: 3, log: silence });
+      mt._copyMissingToStage(stree, dtree, function(err) {
+        if (err) { throw err; }
+        // inspect stage
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_foo': { heads: { count: 1, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_bar': { heads: { count: 0, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
+      });
+    });
+
+    it('needs item1 and item2 in dtree', function(done) {
+      var tree = new Tree(db, dname, { vSize: 3, log: silence });
+
+      tree.write(item1);
+      tree.write(item2);
+      tree.end(null, done);
+    });
+
+    it('should not copy anything to stage', function(done) {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, sname, { vSize: 3, log: silence });
+      mt._copyMissingToStage(stree, dtree, function(err) {
+        if (err) { throw err; }
+        // inspect stage
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+            stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_foo': { heads: { count: 1, conflict: 0, deleted: 0 } },
+            '_copyMissingToStage_bar': { heads: { count: 1, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
+      });
+    });
+
+    it('needs item2 and item3 in stree', function(done) {
+      var tree = new Tree(db, sname, { vSize: 3, log: silence });
+
+      tree.write(item2);
+      tree.write(item3);
+      tree.end(null, done);
+    });
+
+    it('should copy item2 and item3 to stage (and skip item1 that is already in stage)', function(done) {
+      var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      var stree = new Tree(db, sname, { vSize: 3, log: silence });
+      var dtree = new Tree(db, sname, { vSize: 3, log: silence });
+      var i = 0;
+      mt._copyMissingToStage(stree, dtree, function(err) {
+        if (err) { throw err; }
+        mt._stage.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, pe: sname }, b: { some: 'body' } });
+          }
+          if (i === 2) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2, pe: sname }, b: { more: 'body' } });
+          }
+          if (i > 2) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3, pe: sname }, b: { more2: 'body' } });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 3);
+          done();
+        });
+      });
+    });
+  });
+
   describe('_mergeTrees', function() {
     describe('parameter checking', function() {
       it('should require stree to be an object', function() {
