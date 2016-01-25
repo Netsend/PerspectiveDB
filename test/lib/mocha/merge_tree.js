@@ -541,10 +541,10 @@ describe('MergeTree', function() {
     var stageName = '_stage_copyMissingToStage';
 
     // use 24-bit version numbers (base 64)
-    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
-    var item2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } };
-    var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
-    var item4 = { h: { id: 'XI', v: 'Dddd', pe: sname, pa: ['Cccc'] }, b: { more3: 'body' } };
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] }, b: { more: 'body' } };
+    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] }, b: { more2: 'body' } };
+    var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'] }, b: { more3: 'body' } };
 
     it('should require stree to be an object', function() {
       var opts = { stage: stageName, perspectives: [ sname, dname ], vSize: 3, log: silence };
