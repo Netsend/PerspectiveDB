@@ -2337,6 +2337,108 @@ describe('Tree', function() {
     });
   });
 
+  describe('setConflictByVersion', function() {
+    var name = 'stats';
+
+    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] } };
+
+    it('should require version to be a number or a base64 string', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.setConflictByVersion({}); }).should.throw('version must be a number or a base64 string');
+    });
+
+    it('should require cb to be a function', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.setConflictByVersion('', {}); }).should.throw('cb must be a function');
+    });
+
+    it('write item1 and item2', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(item1);
+      t.write(item2);
+      t.end(null, done);
+    });
+
+    it('should mark non-head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.setConflictByVersion(item1.h.v, function(err) {
+        if (err) { throw err; }
+        var i = 0;
+        t.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, c: true } });
+          }
+          if (i > 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 } });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          t.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, { heads: { count: 1, conflict: 0, deleted: 0 } });
+            done();
+          });
+        });
+      });
+    });
+
+    it('should be idempotent (redo, no changes)', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.setConflictByVersion(item1.h.v, function(err) {
+        if (err) { throw err; }
+        var i = 0;
+        t.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, c: true } });
+          }
+          if (i > 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 } });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          t.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, { heads: { count: 1, conflict: 0, deleted: 0 } });
+            done();
+          });
+        });
+      });
+    });
+
+    it('should mark head', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.setConflictByVersion(item2.h.v, function(err) {
+        if (err) { throw err; }
+        var i = 0;
+        t.iterateInsertionOrder(function(item, next) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, c: true } });
+          }
+          if (i > 1) {
+            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2, c: true } });
+          }
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 2);
+          t.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, { heads: { count: 1, conflict: 1, deleted: 0 } });
+            done();
+          });
+        });
+      });
+    });
+  });
+
   describe('_getDsKeyByVersion', function() {
     var name = '_getDsKeyByVersion';
 
