@@ -102,6 +102,30 @@ describe('MergeTree', function() {
     });
   });
 
+  describe('_ensureConflictHandler', function() {
+    it('should set default conflict handler', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      should.strictEqual(typeof mt._conflictHandler, 'undefined');
+      mt._ensureConflictHandler();
+      should.strictEqual(typeof mt._conflictHandler, 'function');
+    });
+
+    it('should set given conflict handler', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      var mh = function() {};
+
+      should.strictEqual(typeof mt._conflictHandler, 'undefined');
+      mt._ensureConflictHandler(mh);
+      should.strictEqual(typeof mt._conflictHandler, 'function');
+
+      should.strictEqual(mt._conflictHandler, mh);
+    });
+  });
+
   describe('_ensureMergeHandler', function() {
     it('should set default merge handler', function() {
       var opts = { vSize: 3, log: silence };
