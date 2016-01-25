@@ -1577,9 +1577,10 @@ describe('Tree', function() {
           i++;
           next();
         }, 10);
-      }, function(err) {
+      }, function(err, lastContinue) {
         if (err) { throw err; }
         should.strictEqual(i, 2);
+        should.strictEqual(lastContinue, undefined);
         done();
       });
     });
@@ -1594,9 +1595,10 @@ describe('Tree', function() {
         setTimeout(function() {
           next(error); 
         }, 10);
-      }, function(err) {
+      }, function(err, lastContinue) {
         should.strictEqual(err.message, 'custom error');
         should.strictEqual(i, 1);
+        should.strictEqual(lastContinue, undefined);
         done();
       });
     });
@@ -1610,9 +1612,10 @@ describe('Tree', function() {
         setTimeout(function() {
           next(null, false); 
         }, 10);
-      }, function(err) {
+      }, function(err, lastContinue) {
         if (err) { throw err; }
         should.strictEqual(i, 1);
+        should.strictEqual(lastContinue, false);
         done();
       });
     });
