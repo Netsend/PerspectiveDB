@@ -1309,8 +1309,9 @@ describe('Tree', function() {
         if (i === 1) { should.deepEqual(item, item3); }
         if (i > 1) { should.deepEqual(item, item4); }
         next();
-      }, function() {
+      }, function(err, lastContinue) {
         should.strictEqual(i, 2);
+        should.strictEqual(lastContinue, undefined);
         done();
       });
     });
@@ -1323,9 +1324,10 @@ describe('Tree', function() {
         if (i === 1) { should.deepEqual(item, item3); }
         if (i > 1) { should.deepEqual(item, item4); }
         next(null, false);
-      }, function(err) {
+      }, function(err, lastContinue) {
         if (err) { throw err; }
         should.strictEqual(i, 1);
+        should.strictEqual(lastContinue, false);
         done();
       });
     });
