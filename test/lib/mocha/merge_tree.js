@@ -720,383 +720,514 @@ describe('MergeTree', function() {
     });
   });
 
-  describe('_mergeTrees', function() {
-    describe('parameter checking', function() {
-      it('should require stree to be an object', function() {
-        (function() { MergeTree._mergeTrees(); }).should.throw('stree must be an object');
-      });
+  describe('_mergeStageWithLocal', function() {
+    var sname = '_mergeStageWithLocal_foo';
+    var localName = '_local_mergeStageWithLocal';
+    var stageName = '_stage_mergeStageWithLocal';
 
-      it('should require dtree to be an object', function() {
-        (function() { MergeTree._mergeTrees({}); }).should.throw('dtree must be an object');
-      });
-
-      it('should require iterator to be a function', function() {
-        (function() { MergeTree._mergeTrees({}, {}, {}); }).should.throw('iterator must be a function');
-      });
-
-      it('should require cb to be a function', function() {
-        (function() { MergeTree._mergeTrees({}, {}, function() {}); }).should.throw('cb must be a function');
-      });
+    it('should require cb to be a function', function() {
+      var opts = { local: localName, stage: stageName, perspectives: [ sname ], vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+      (function() { mt._mergeStageWithLocal(); }).should.throw('cb must be a function');
     });
 
     describe('empty databases and root merge', function() {
-      var sname = '_mergeTreesEmptyDatabases_foo';
-      var dname = '_mergeTreesEmptyDatabases_bar';
-
       // use 24-bit version numbers (base 64)
       var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
-      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
 
-      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
-      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { some: 'body' } };
 
-      it('should call back without calling the iterator when the database is empty', function(done) {
-        var stree = new Tree(db, sname, { log: silence });
-        var dtree = new Tree(db, dname, { log: silence });
-        var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function() {
-          i++;
-        }, function(err) {
+      it('should return and do nothing if both local and stage are empty', function(done) {
+        var opts = { local: localName, stage: stageName, perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 0);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocal_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
 
-      it('write sitem1', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem1, done);
+      it('write sitem1 to stage', function(done) {
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1, done);
       });
 
-      it('should iterate over sitem1 (fast-forward) because it misses in dtree', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+      it('should call merge handler with sitem1 (fast-forward) because it misses in local', function(done) {
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var mergeHandler = function(merged, lhead, next) {
           i++;
-          should.deepEqual(smerge, null);
-          should.deepEqual(dmerge, null);
-          should.deepEqual(shead, sitem1);
-          should.deepEqual(dhead, null);
+          should.deepEqual(merged, { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [], i: 1 }, b: { some: 'body' } });
           next();
-        }, function(err) {
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 1);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1);
+            should.deepEqual(stats, {
+              local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocal_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
 
-      it('write ditem1', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem1, done);
+      it('write litem1', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1, done);
       });
 
-      it('should merge sitem1 and ditem1 since this perspective is not written to dtree', function(done) {
+      it('should not call merge handler with sitem1 since litem1 is in local (although perspective is not written to local)', function(done) {
         // this happens when a new remote is added that is a subset of the existing items
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
-          i++;
-          should.deepEqual(smerge, null);
-          should.deepEqual(dmerge, null);
-          should.deepEqual(shead, sitem1);
-          should.deepEqual(dhead, ditem1);
-          next();
-        }, function(err) {
-          if (err) { throw err; }
-          should.strictEqual(i, 1);
-          done();
-        });
-      });
-
-      it('write sitem2 and ditem2', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem2, function(err) {
-        if (err) { throw err; }
-          stree.write(sitem2, done);
-        });
-      });
-
-      it('write sitem2 to dtree (should update last by perspective)', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(sitem2, done);
-      });
-
-      it('should not iterate over sitem1 or sitem2 since sitem2 is written to dtree (perspective update)', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var mergeHandler = function(merged, lhead, next) {
           i++;
           next();
-        }, function(err) {
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 0);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 0);
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocal_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
     });
 
     describe('merge one and two heads in stree', function() {
-      var sname = '_mergeTreesOneTwoHeads_foo';
-      var dname = '_mergeTreesOneTwoHeads_bar';
+      var sname = '_mergeStageWithLocalOneTwoHeads_foo';
+      var localName = '_local_oneTwoHeadsMergeStageWithLocal';
+      var stageName = '_stage_oneTwoHeadsMergeStageWithLocal';
 
       // use 24-bit version numbers (base 64)
       var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { more1: 'body' } };
       var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
       var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more3: 'body' } };
 
-      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { more1: 'body' } };
-      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { more1: 'body' } };
 
       it('write sitem1, sitem2', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem1);
-        stree.write(sitem2);
-        stree.end(done);
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.end(done);
       });
 
-      it('write ditem1, ditem2', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem1);
-        dtree.write(ditem2);
-        dtree.end(done);
+      it('write litem1', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.end(done);
       });
 
-      it('write sitem1 to dtree', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(sitem1);
-        dtree.end(done);
+      it('write sitem1 to ltree to update perspective', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.end(sitem1, done);
       });
 
-      it('should merge sitem2 with ditem2 (fast-forward to existing items)', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
+      it('should merge sitem2 with local (fast-forward)', function(done) {
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var mergeHandler = function(merge, lhead, next) {
           i++;
-          should.deepEqual(smerge, null);
-          should.deepEqual(dmerge, null);
-          should.deepEqual(shead, sitem2);
-          should.deepEqual(dhead, ditem2);
+          should.deepEqual(merge, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
+          should.deepEqual(lhead, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } });
           next();
-        }, function(err) {
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 1);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1);
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocalOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
 
       it('write sitem3', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem3, done);
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem3, done);
       });
 
-      it('should merge sitem2 with ditem2 (ff) and sitem3 with ditem2 (merge)', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
+      it('should merge sitem2 with litem2 (ff), sitem3 litem2 (merge) (return false) and retry sitem3 with litem2 (merge)', function(done) {
+        var local = new Tree(db, localName, { vSize: 3, log: silence });
 
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var firstMerge;
+        var mergeHandler = function(merge, lhead, next) {
           i++;
           if (i === 1) {
-            should.deepEqual(smerge, null);
-            should.deepEqual(dmerge, null);
-            should.deepEqual(shead, sitem2);
-            should.deepEqual(dhead, ditem2);
+            should.deepEqual(merge, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
+            should.deepEqual(lhead, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } });
+
+            // ref this merge so in next iteration it can be saved to the local tree
+            firstMerge = merge;
+            next();
           }
           if (i === 2) {
-            // should add content based version number to merges
-            should.deepEqual(smerge, {
-              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
-              b: { more2: 'body', more3: 'body' }
+            // update the version in local like a normal client would do at some point, using the previous merge
+            local.write(firstMerge, function(err) {
+              if (err) { throw err; }
+
+              should.deepEqual(merge, { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 3 }, b: { more3: 'body' } });
+              should.deepEqual(lhead, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } });
+
+              // break iteration as if lhead does not match anymore
+              // should break iteration since lhead !== the last head in local
+              next(false);
             });
-            should.deepEqual(dmerge, {
-              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
-              b: { more2: 'body', more3: 'body' }
-            });
-            should.deepEqual(shead, sitem3);
-            should.deepEqual(dhead, ditem2);
           }
-          next();
-        }, function(err) {
+          if (i > 2) {
+            // this iteration should start after _mergeStageWithLocal is invoked again
+            // should merge and use a content based version number
+            should.deepEqual(merge, { h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more2: 'body', more3: 'body' } });
+            should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
+            next();
+          }
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
           should.strictEqual(i, 2);
-          done();
+          mt._mergeStageWithLocal(function(err) {
+            if (err) { throw err; }
+            should.strictEqual(i, 3);
+            mt.stats(function(err, stats) {
+              if (err) { throw err; }
+              should.deepEqual(stats, {
+                local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                '_mergeStageWithLocalOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              });
+              done();
+            });
+          });
         });
       });
     });
 
     describe('merge two heads one deleted in stree', function() {
-      var sname = '_mergeTreesTwoHeadsOneDeleted_foo';
-      var dname = '_mergeTreesTwoHeadsOneDeleted_bar';
+      var sname = '_mergeStageWithLocalTwoHeadsOneDelete_foo';
+      var localName = '_local_twoHeadsOneDeleteMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneDeleteMergeStageWithLocal';
 
       // use 24-bit version numbers (base 64)
       var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },                b: { some: 'body' } };
       var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
       var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] },          b: { more3: 'body' } };
 
-      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },                b: { some: 'body' } };
-      var ditem2 = { h: { id: 'XI', v: 'Bbbb', pe: dname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
 
       it('write sitem1, sitem2', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem1);
-        stree.write(sitem2);
-        stree.end(done);
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.end(done);
       });
 
-      it('write ditem1', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem1);
-        dtree.end(done);
+      it('write litem1 and sitem1 to local', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.write(sitem1);
+        tree.end(done);
       });
 
-      it('write sitem1 to dtree', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(sitem1);
-        dtree.end(done);
-      });
-
-      it('should merge sitem2 with ditem1 (merge ff in dtree)', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
+      it('should merge sitem2 with litem1 (merge ff in ltree)', function(done) {
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var mergeHandler = function(merge, lhead, next) {
           i++;
-          should.deepEqual(smerge, {
-            h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 2 },
-            b: { more2: 'body' }
-          });
-          should.deepEqual(dmerge, {
-            h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true },
-            b: { more2: 'body' }
-          });
-          should.deepEqual(shead, sitem2);
-          should.deepEqual(dhead, ditem1);
+          should.deepEqual(merge, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } });
+          should.deepEqual(lhead, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } });
           next();
-        }, function(err) {
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 1);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1);
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              '_mergeStageWithLocalTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
 
-      it('write ditem2', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem2);
-        dtree.end(done);
+
+      it('write litem2', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem2);
+        tree.end(done);
       });
 
       it('write sitem3', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem3);
-        stree.end(done);
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem3);
+        tree.end(done);
       });
 
-      it('should merge sitem2 (ff) and sitem3 with ditem2 (merge, no deleted flag)', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
+      it('should merge sitem3 with litem2 (merge, no deleted flag)', function(done) {
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var mergeHandler = function(merge, lhead, next) {
           i++;
-          if (i === 1) {
-            // sitem2 with ditem2
-            should.deepEqual(smerge, null);
-            should.deepEqual(dmerge, null);
-            should.deepEqual(shead, sitem2);
-            should.deepEqual(dhead, ditem2);
-          }
-
-          if (i === 2) {
-            // sitem3 with ditem2
-            should.deepEqual(smerge, {
-              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
-              b: { more2: 'body', more3: 'body' }
-            });
-            should.deepEqual(dmerge, {
-              h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'] },
-              b: { more2: 'body', more3: 'body' }
-            });
-            should.deepEqual(shead, sitem3);
-            should.deepEqual(dhead, ditem2);
-          }
+          should.deepEqual(merge, { h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more2: 'body', more3: 'body' } });
+          should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } });
           next();
-        }, function(err) {
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 2);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1);
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocalTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
       });
     });
 
-    describe('merge with conflict', function() {
-      var sname = '_mergeTreesWithConflict_foo';
-      var dname = '_mergeTreesWithConflict_bar';
+    describe('merge with conflict (unresolved)', function() {
+      var sname = '_mergeStageWithLocalTwoHeadsOneConflict_foo';
+      var localName = '_local_twoHeadsOneConflictMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneConflictMergeStageWithLocal';
 
       // use 24-bit version numbers (base 64)
       var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
       var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
 
-      var ditem1 = { h: { id: 'XI', v: 'Aaaa', pe: dname, pa: [] },       b: { some: 'body' } };
-      var ditem2 = { h: { id: 'XI', v: 'Cccc', pe: dname, pa: ['Aaaa'] }, b: { more2: 'other' } };
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                  b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] },            b: { more2: 'other' } };
 
       it('write sitem1, sitem2', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        stree.write(sitem1);
-        stree.write(sitem2);
-        stree.end(done);
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.end(done);
       });
 
-      it('write ditem1, ditem2', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(ditem1);
-        dtree.write(ditem2);
-        dtree.end(done);
+      it('write litem1, litem2, sitem1 to local', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.write(litem2);
+        tree.write(sitem1);
+        tree.end(done);
       });
 
-      it('write sitem1 to dtree', function(done) {
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-        dtree.write(sitem1);
-        dtree.end(done);
-      });
-
-      it('should merge sitem2 with ditem2, conflict on "more2"', function(done) {
-        var stree = new Tree(db, sname, { vSize: 3, log: silence });
-        var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
+      it('should merge sitem2 with litem2, conflict on "more2" (unresolved, mark in conflict)', function(done) {
         var i = 0;
-        MergeTree._mergeTrees(stree, dtree, function(smerge, dmerge, shead, dhead, next) {
+        var j = 0;
+        var conflictHandler = function(attrs, shead, lhead, next) {
           i++;
-          should.deepEqual(smerge, ['more2']);
-          should.deepEqual(dmerge, null);
-          should.deepEqual(shead, sitem2);
-          should.deepEqual(dhead, ditem2);
+          should.deepEqual(attrs, ['more2']);
+          should.deepEqual(shead, { more2: 'body' });
+          should.deepEqual(lhead, { more2: 'other' });
           next();
-        }, function(err) {
+        };
+        var mergeHandler = function(merge, lhead, next) {
+          j++;
+          next();
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          conflictHandler: conflictHandler,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.strictEqual(i, 1);
-          done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1); // expect one call to conflict handler
+            should.strictEqual(j, 0); // expect no merge handler
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 1, deleted: 0 } }, // should have marked in conflict
+              '_mergeStageWithLocalTwoHeadsOneConflict_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+
+            // invoke twice to make sure old conflicts don't bubble up again
+            mt._mergeStageWithLocal(function(err) {
+              if (err) { throw err; }
+              mt.stats(function(err, stats) {
+                if (err) { throw err; }
+                should.strictEqual(i, 1); // expect no extra calls to conflict handler
+                should.strictEqual(j, 0); // expect no merge handler
+                should.deepEqual(stats, {
+                  local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                  stage: { heads: { count: 1, conflict: 1, deleted: 0 } }, // should have marked in conflict
+                  '_mergeStageWithLocalTwoHeadsOneConflict_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+                });
+                done();
+              });
+            });
+          });
         });
       });
+    });
 
-      it('stats', function(done) {
-        var opts = { perspectives: [ sname, dname ], vSize: 3, log: silence };
+    describe('merge with conflict (resolved)', function() {
+      var sname = '_mergeStageWithLocalTwoHeadsOneConflictResolved_foo';
+      var localName = '_local_twoHeadsOneConflictResolvedMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneConflictResolvedMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                  b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] },            b: { more2: 'other' } };
+
+      it('write sitem1, sitem2', function(done) {
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.end(done);
+      });
+
+      it('write litem1, litem2, sitem1 to local', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.write(litem2);
+        tree.write(sitem1);
+        tree.end(done);
+      });
+
+      it('should merge sitem2 with litem2, conflict on "more2" (resolved)', function(done) {
+        var i = 0;
+        var j = 0;
+        var conflictHandler = function(attrs, shead, lhead, next) {
+          i++;
+          should.deepEqual(attrs, ['more2']);
+          should.deepEqual(shead, { more2: 'body' });
+          should.deepEqual(lhead, { more2: 'other' });
+          next({ mergedManually: true });
+        };
+        // should be called with new resolved conflict if _mergeStageWithLocal is invoked twice
+        var mergeHandler = function(merge, lhead, next) {
+          j++;
+          should.deepEqual(merge, { h: { id: 'XI', v: 'f1l4', pa: ['Bbbb', 'Cccc'], i: 3 }, b: { mergedManually: true} });
+          next();
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          conflictHandler: conflictHandler,
+          mergeHandler: mergeHandler
+        };
         var mt = new MergeTree(db, opts);
-        mt.stats(function(err, stats) {
+        mt._mergeStageWithLocal(function(err) {
           if (err) { throw err; }
-          should.deepEqual(stats, {
-            local: { heads: { count: 0, conflict: 0, deleted: 0 } },
-            stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
-            '_mergeTreesWithConflict_bar': { heads: { count: 1, conflict: 0, deleted: 0 } },
-            '_mergeTreesWithConflict_foo': { heads: { count: 1, conflict: 0, deleted: 0 } }
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1); // expect one call to conflict handler
+            should.strictEqual(j, 0); // expect no merge handler
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } }, // should have marked in conflict
+              '_mergeStageWithLocalTwoHeadsOneConflictResolved_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+
+            // invoke twice to process resolved merge conflict
+            mt._mergeStageWithLocal(function(err) {
+              if (err) { throw err; }
+              mt.stats(function(err, stats) {
+                if (err) { throw err; }
+                should.strictEqual(i, 1); // expect no extra calls to conflict handler
+                should.strictEqual(j, 1); // expect no one call to merge handler
+                should.deepEqual(stats, {
+                  local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                  stage: { heads: { count: 1, conflict: 0, deleted: 0 } }, // should have marked in conflict
+                  '_mergeStageWithLocalTwoHeadsOneConflictResolved_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+                });
+                done();
+              });
+            });
           });
-          done();
         });
       });
     });
