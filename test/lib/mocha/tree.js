@@ -2341,7 +2341,7 @@ describe('Tree', function() {
   });
 
   describe('setConflictByVersion', function() {
-    var name = 'stats';
+    var name = 'setConflictByVersion';
 
     var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] } };
     var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'] } };
