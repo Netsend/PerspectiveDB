@@ -239,16 +239,6 @@ function main(db, pdb) {
   var email    = document.querySelector('#addCustomerEmail');
   var age      = document.querySelector('#addCustomerAge');
 
-  pdb.on('error', function(err) {
-    console.error('error disconnecting', err);
-    msg.textContent = err.message;
-  });
-
-  pdb.on('data', function(item) {
-    pdbTable.appendChild(createPdbTableRow(item));
-    reloadCustomersList();
-  });
-
   // create a table for the local tree
   var localTable = createPdbTable('local');
   appendToTable(localTable, pdb.createReadStream({ tail: false }));
@@ -268,6 +258,16 @@ function main(db, pdb) {
     var table = createPdbTable(pe);
     appendToTable(table, pdb._mt._pe[pe].createReadStream({ tail: false }));
     pdbDiv.appendChild(table);
+  });
+
+  pdb.on('error', function(err) {
+    console.error('error disconnecting', err);
+    msg.textContent = err.message;
+  });
+
+  pdb.on('data', function(item) {
+    localTable.appendChild(createPdbTableRow(item));
+    reloadCustomersList();
   });
 
   // setup connection manager
