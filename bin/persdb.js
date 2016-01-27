@@ -108,7 +108,7 @@ function start() {
           if (!files[file]) {
             files[file] = hjson.parse(fs.readFileSync(file, { encoding: 'utf8' }));
           }
-          password = files[file][username];
+          password = files[file][username] || '';
         }
 
         if (!username) {
