@@ -67,6 +67,10 @@ function debugReq(req) {
  *   mergeHandler {Function}        function to handle newly created merges
  *                                  signature: function (merged, lhead, next). If
  *                                  not provided a transparent ES6 Proxy is used.
+ *   conflictHandler {Function}     function to handle merges with conflicts
+ *                                  signature: function (attrs, shead, lhead, next)
+ *                                  call next with a new item or null if not
+ *                                  resolved.
  *   mergeTree {Object}             any MergeTree options
  */
 function PersDB(idb, opts) {
@@ -80,6 +84,7 @@ function PersDB(idb, opts) {
   if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
   if (opts.mergeInterval != null && typeof opts.mergeInterval !== 'number') { throw new TypeError('opts.mergeInterval must be a number'); }
   if (opts.mergeHandler != null && typeof opts.mergeHandler !== 'function') { throw new TypeError('opts.mergeHandler must be a function'); }
+  if (opts.conflictHandler != null && typeof opts.conflictHandler !== 'function') { throw new TypeError('opts.conflictHandler must be a function'); }
   if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
 
   EE.call(this, opts);
@@ -175,8 +180,11 @@ function PersDB(idb, opts) {
     }
   });
 
+  // set options
+  // merge handler needs a writable stream, pass it later to mergeAll
   var mtOpts = this._opts.mergeTree || {};
   mtOpts.perspectives = Object.keys(this._persCfg.pers);
+  mtOpts.conflictHandler = this._opts.conflictHandler;
   mtOpts.log = this._log;
 
   this._mt = new MergeTree(that._db, mtOpts);

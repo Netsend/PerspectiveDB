@@ -323,7 +323,11 @@ req.onsuccess = function(ev) {
   // start PersDB
   var opts = {
     perspectives: [config],
-    //mergeInterval: 0
+    conflictHandler: function(attrs, newHead, lhead, cb) {
+      console.error('merge conflict', attrs, newHead, lhead);
+      var msg = document.querySelector('#msg');
+      msg.textContent = 'Error merging ' +  JSON.stringify(newHead) + ' with ' + JSON.stringify(lhead) + ': ' + attrs.join(' ');
+    }
   };
   var pdb = new PersDB(db, opts);
   main(db, pdb);
