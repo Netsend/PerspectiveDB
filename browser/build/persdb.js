@@ -3478,6 +3478,7 @@ MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
         };
         merge(sX, sY, opts, function(err, smerge, lmerge) {
           if (err) {
+            that._log.notice('_mergeStageWithLocal merge conflict %s %j %j', err.conflict, shead, lhead);
             that._conflictHandler(err.conflict, shead.b, lhead.b, function(item) {
               if (item) {
                 // use new item body as new version
