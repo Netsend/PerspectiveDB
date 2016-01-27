@@ -2237,7 +2237,7 @@ function _doMerge(itemX, itemY, lcaX, lcaY) {
   // if lca version is set and equals one item, fast-forward to the other item and create a merged fast-forward for the missing perspective
   if (lcaVersion != null && lcaVersion === itemX.h.v) {
     // ff to itemY and recreate itemY from the other perspective
-    mergeX = threeWayMerge(itemX.b, itemY.b, lcaX.b, lcaY.b);
+    mergeX = threeWayMerge(itemX.b || {}, itemY.b || {}, lcaX.b, lcaY.b);
 
     if (Array.isArray(mergeX)) {
       throw new MergeConflict(mergeX);
@@ -2259,7 +2259,7 @@ function _doMerge(itemX, itemY, lcaX, lcaY) {
 
   if (lcaVersion != null && lcaVersion === itemY.h.v) {
     // ff to itemX and recreate itemX from the other perspective
-    mergeY = threeWayMerge(itemY.b, itemX.b, lcaY.b, lcaX.b);
+    mergeY = threeWayMerge(itemY.b || {}, itemX.b || {}, lcaY.b, lcaX.b);
 
     if (Array.isArray(mergeY)) {
       throw new MergeConflict(mergeY);
@@ -2298,12 +2298,12 @@ function _doMerge(itemX, itemY, lcaX, lcaY) {
     Array.prototype.push.apply(headerY.pa, itemY.h.pa);
   }
 
-  mergeX = threeWayMerge(itemX.b, itemY.b, lcaX.b, lcaY.b);
+  mergeX = threeWayMerge(itemX.b || {}, itemY.b || {}, lcaX.b, lcaY.b);
   if (Array.isArray(mergeX)) {
     throw new MergeConflict(mergeX);
   }
 
-  mergeY = threeWayMerge(itemY.b, itemX.b, lcaY.b, lcaX.b);
+  mergeY = threeWayMerge(itemY.b || {}, itemX.b || {}, lcaY.b, lcaX.b);
   if (Array.isArray(mergeY)) {
     throw new MergeConflict(mergeY);
   }
@@ -3466,7 +3466,7 @@ MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
 
         var lhead = lheads[0];
 
-        that._log.debug('_mergeStageWithLocal merge %s with %s in local', sitem.h.v, lhead.h.v);
+        that._log.debug('_mergeStageWithLocal merge %j with %j', sitem.h, lhead.h);
 
         // merge with previous head in stage
         var sX = new ConcatReadStream([ stage.createReadStream({ id: shead.h.id, reverse: true }), local.createReadStream({ id: lhead.h.id, reverse: true }) ]);
@@ -3478,8 +3478,13 @@ MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
         };
         merge(sX, sY, opts, function(err, smerge, lmerge) {
           if (err) {
-            that._log.notice('_mergeStageWithLocal merge conflict %s %j %j', err.conflict, shead, lhead);
+            if (err.name !== 'MergeConflict') {
+              that._log.err('_mergeStageWithLocal merge error %s %j %j', err, shead, lhead, err.stack);
+              shnext(err);
+              return;
+            }
             that._conflictHandler(err.conflict, shead.b, lhead.b, function(item) {
+              that._log.notice('_mergeStageWithLocal merge conflict %s %j %j', err.conflict, shead, lhead);
               if (item) {
                 // use new item body as new version
                 var newItem = {
