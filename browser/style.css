@@ -1,0 +1,68 @@
+body {
+  font-family: sans-serif;
+}
+
+/* table row counter */
+table { counter-reset: rowNumber; }
+table tbody tr { counter-increment: rowNumber; }
+table tbody tr td:first-child::before {
+  content: counter(rowNumber);
+  min-width: 1em;
+  margin-right: 0.5em;
+}
+
+table, form, ul#connections {
+  background-color: #eee;
+  margin: 10px;
+  margin-bottom: 20px;
+  padding: 10px;
+  /*border-radius: 5%;*/
+}
+table {
+  display: block;
+}
+td {
+  padding-top: 12px;
+}
+table caption, thead {
+  text-align: left;
+}
+thead {
+  font-size: 1rem;
+}
+td.flags {
+  font-weight: bold;
+}
+
+ul#connections li {
+  color: black;
+  padding: 0 0 0 12px;
+  position: relative;
+  list-style: none;
+}
+ul#connections li:before {
+  display: inline-block;
+  position: absolute;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  content: '';
+  top: 4px;
+}
+ul#connections li.connected:before {
+  background-color: green;
+}
+ul#connections li.connecting:before {
+  background-color: blue;
+}
+ul#connections li.disconnected:before {
+  background-color: red;
+}
+ul#connections button {
+  text-transform: capitalize;
+  margin-left: 5px;
+}
+ul#connections span.error {
+  margin-left: 5px;
+}
