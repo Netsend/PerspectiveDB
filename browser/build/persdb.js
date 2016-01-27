@@ -240,6 +240,15 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
 };
 
 /**
+ * Create an array with perspectives.
+ *
+ * @return {Array} names of all perspectives
+ */
+PersDB.prototype.getPerspectives = function getPerspectives() {
+  return Object.keys(this._persCfg.pers);
+};
+
+/**
  * Create an overview of the status of the connection of each perspective.
  *
  * @return {Object} status of each connection with the perspective name as key
