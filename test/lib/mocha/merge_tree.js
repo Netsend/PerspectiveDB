@@ -103,12 +103,10 @@ describe('MergeTree', function() {
   });
 
   describe('_ensureConflictHandler', function() {
-    it('should set default conflict handler', function() {
+    it('should set default conflict handler on construction', function() {
       var opts = { vSize: 3, log: silence };
       var mt = new MergeTree(db, opts);
 
-      should.strictEqual(typeof mt._conflictHandler, 'undefined');
-      mt._ensureConflictHandler();
       should.strictEqual(typeof mt._conflictHandler, 'function');
     });
 
@@ -118,21 +116,18 @@ describe('MergeTree', function() {
 
       var mh = function() {};
 
-      should.strictEqual(typeof mt._conflictHandler, 'undefined');
-      mt._ensureConflictHandler(mh);
       should.strictEqual(typeof mt._conflictHandler, 'function');
-
-      should.strictEqual(mt._conflictHandler, mh);
+      should.strictEqual(mt._conflictHandler === mh, false);
+      mt._ensureConflictHandler(mh);
+      should.strictEqual(mt._conflictHandler === mh, true);
     });
   });
 
   describe('_ensureMergeHandler', function() {
-    it('should set default merge handler', function() {
+    it('should set default merge handler on construction', function() {
       var opts = { vSize: 3, log: silence };
       var mt = new MergeTree(db, opts);
 
-      should.strictEqual(typeof mt._mergeHandler, 'undefined');
-      mt._ensureMergeHandler();
       should.strictEqual(typeof mt._mergeHandler, 'function');
     });
 
@@ -142,11 +137,10 @@ describe('MergeTree', function() {
 
       var mh = function() {};
 
-      should.strictEqual(typeof mt._mergeHandler, 'undefined');
-      mt._ensureMergeHandler(mh);
       should.strictEqual(typeof mt._mergeHandler, 'function');
-
-      should.strictEqual(mt._mergeHandler, mh);
+      should.strictEqual(mt._mergeHandler === mh, false);
+      mt._ensureMergeHandler(mh);
+      should.strictEqual(mt._mergeHandler === mh, true);
     });
   });
 
