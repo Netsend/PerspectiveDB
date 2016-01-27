@@ -1951,7 +1951,7 @@ describe('MergeTree', function() {
       }, done);
     });
 
-    it('write item4 (fork, use item from stage)', function(done) {
+    it('write item4 (fork, move item from stage)', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       lws.write(item4);
@@ -1987,21 +1987,16 @@ describe('MergeTree', function() {
         }, function(err) {
           if (err) { throw err; }
           should.strictEqual(i, 4);
-          done();
+          // stage should be empty, since item4 is copied to local
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 2, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
         });
-      });
-    });
-
-    it('stage should be empty, since item4 is copied to local', function(done) {
-      var opts = { stage: stageName, vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
-      mt.stats(function(err, stats) {
-        if (err) { throw err; }
-        should.deepEqual(stats, {
-          local: { heads: { count: 2, conflict: 0, deleted: 0 } },
-          stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
-        });
-        done();
       });
     });
   });
