@@ -39,6 +39,7 @@ program
   .option('-s, --show', 'show complete objects')
   .option('-p, --patch', 'show patch compared to previous version')
   .option('    --pe <perspective>', 'perspective')
+  .option('-a  --all', 'print the trees of all configured perspectives')
   .option('-n, --number <number>', 'number of latest versions to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
@@ -151,6 +152,42 @@ function fmtItem(item, parents) {
 
 var noop = function() {};
 
+function printTree(mt, tree, cb) {
+  var counter = 0;
+  console.log('%s:', tree.name);
+  tree.iterateInsertionOrder({ reverse: true }, function(item, cb2) {
+    counter++;
+
+    if (!program.patch || !item.h.pa.length) {
+      console.log(fmtItem(item));
+
+      cb2(null, counter < program.number);
+      return;
+    }
+
+    var parents = [];
+    async.eachSeries(item.h.pa, function(pa, cb3) {
+      mt.getByVersion(pa, function(err, p) {
+        if (err) { cb3(err); return; }
+        if (!p) {
+          var error = new Error('parent not found');
+          cb3(error);
+          return;
+        }
+
+        parents.push(p);
+        cb3();
+      });
+    }, function(err) {
+      if (err) { cb2(err); return; }
+
+      console.log(fmtItem(item, parents));
+
+      cb2(null, counter < program.number);
+    });
+  }, cb);
+}
+
 function run(db, cfg, cb) {
   cfg = cfg || {};
   cfg.log = {
@@ -162,57 +199,42 @@ function run(db, cfg, cb) {
   };
   var mt = new MergeTree(db, cfg);
 
-  var counter = 0;
-
   mt.stats(function(err, stats) {
     if (err) { cb(err); return; }
     console.log(fmtStats(stats));
 
-    var tree, pe = program.pe || 'local';
     var remoteTrees = mt.getRemoteTrees();
 
-    if (remoteTrees[pe]) {
-      tree = remoteTrees[pe];
-    } else if (pe === 'stage') {
-      tree = mt.getStageTree();
-    } else if (pe === 'local' || pe === mt._local.name) {
-      tree = mt.getLocalTree();
+    if (program.all) {
+      async.eachSeries(Object.keys(remoteTrees), function(name, cb2) {
+        printTree(mt, remoteTrees[name], cb2);
+      }, function(err) {
+        if (err) { cb(err); return; }
+        printTree(mt, mt.getStageTree(), function(err) {
+          if (err) { cb(err); return; }
+          printTree(mt, mt.getLocalTree(), function(err) {
+            if (err) { cb(err); return; }
+            cb();
+          });
+        });
+      });
     } else {
-      cb(new Error('unknown perspective'));
-      return;
-    }
+      // print one tree, default to the local tree
+      var tree, pe = program.pe || 'local';
 
-    tree.iterateInsertionOrder({ reverse: true }, function(item, cb2) {
-      counter++;
-
-      if (!program.patch || !item.h.pa.length) {
-        console.log(fmtItem(item));
-
-        cb2(null, counter < program.number);
+      if (remoteTrees[pe]) {
+        tree = remoteTrees[pe];
+      } else if (pe === 'stage') {
+        tree = mt.getStageTree();
+      } else if (pe === 'local' || pe === mt._local.name) {
+        tree = mt.getLocalTree();
+      } else {
+        cb(new Error('unknown perspective'));
         return;
       }
 
-      var parents = [];
-      async.eachSeries(item.h.pa, function(pa, cb3) {
-        mt.getByVersion(pa, function(err, p) {
-          if (err) { cb3(err); return; }
-          if (!p) {
-            var error = new Error('parent not found');
-            cb3(error);
-            return;
-          }
-
-          parents.push(p);
-          cb3();
-        });
-      }, function(err) {
-        if (err) { cb2(err); return; }
-
-        console.log(fmtItem(item, parents));
-
-        cb2(null, counter < program.number);
-      });
-    }, cb);
+      printTree(mt, tree, cb);
+    }
   });
 }
 
