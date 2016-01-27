@@ -78,12 +78,12 @@ function fmtStats(stats) {
   return result;
 }
 
-// shows old values of deleted and changed attributes
-function fmtPatch(patch, oldItem) {
+// shows new values of added and changed attributes
+function fmtPatch(patch, newItem) {
   var result = {};
   Object.keys(patch).forEach(function(key) {
-    if (patch[key] !== '+') {
-      result[key] = oldItem[key];
+    if (patch[key] !== '-') {
+      result[key] = newItem[key];
     }
   });
   return JSON.stringify(result);
@@ -114,7 +114,7 @@ function fmtItem(item, parents) {
         out += '\u2523\u2501 ';
       }
       var diff = doDiff(item.b, p.b);
-      out += ' ' + p.h.id + ' ' + p.h.v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p.b);
+      out += ' ' + p.h.id + ' ' + p.h.v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, item.b);
       if (i !== parents.length) {
         out += '\n';
       }
@@ -143,7 +143,7 @@ function fmtItem(item, parents) {
         if (parents.length > 1) {
           out += ' ' + p.h.v;
         }
-        out += ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, p.b);
+        out += ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, item.b);
       });
     }
   }
