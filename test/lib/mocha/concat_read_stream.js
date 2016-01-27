@@ -181,4 +181,53 @@ describe('ConcatReadStream', function() {
       throw new Error('should not "end"');
     });
   });
+
+  it('should reopen a new stream', function(done) {
+    var arr1 = [1,2,3,4];
+    var arr2 = ['a','b','c','d'];
+    var s1 = streamify(arr1);
+    var s2 = streamify(arr2);
+
+    // make sure the streams in the concat stream support reopen
+    s1.reopen = function() {
+      return streamify(arr1);
+    };
+    s2.reopen = function() {
+      return streamify(arr2);
+    };
+
+    var i = 0;
+    var s = new ConcatReadStream([s1, s2]);
+
+    s.on('data', function() {
+      i++;
+    });
+
+    s.on('end', function() {
+      should.strictEqual(i, 8);
+
+      var u = s.reopen();
+
+      u.on('data', function(item) {
+        switch (i) {
+          case 8: should.strictEqual(item, 1); break;
+          case 9: should.strictEqual(item, 2); break;
+          case 10: should.strictEqual(item, 3); break;
+          case 11: should.strictEqual(item, 4); break;
+          case 12: should.strictEqual(item, 'a'); break;
+          case 13: should.strictEqual(item, 'b'); break;
+          case 14: should.strictEqual(item, 'c'); break;
+          case 15: should.strictEqual(item, 'd'); break;
+          default:
+            throw new Error('should not happen');
+        }
+        i++;
+      });
+
+      u.on('end', function() {
+        should.strictEqual(i, 16);
+        done();
+      });
+    });
+  });
 });
