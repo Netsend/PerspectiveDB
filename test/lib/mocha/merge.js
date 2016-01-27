@@ -161,6 +161,56 @@ describe('_doMerge', function() {
           }
         });
       });
+
+      it('should copy itemY.h.d on fast-forward of X to Y (without itemY.b)', function() {
+        var itemX = { h: { id: 'XI', v: 'a' }, b: {} };
+        var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var itemY = { h: { id: 'XI', v: 'b', pa: ['a'], d: true } };
+        var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+        should.deepEqual(merge[0], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+        should.deepEqual(merge[1], { h: { id: 'XI', v: 'b', pa: ['a'], d: true } });
+      });
+
+      it('should copy itemX.h.d on fast-forward of Y to X (without itemX.b)', function() {
+        var itemX = { h: { id: 'XI', v: 'b', pa: ['a'], d: true } };
+        var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var itemY = { h: { id: 'XI', v: 'a' }, b: {} };
+        var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+        should.deepEqual(merge[0], { h: { id: 'XI', v: 'b', pa: ['a'], d: true } });
+        should.deepEqual(merge[1], { h: { id: 'XI', v: 'b', pa: ['a'], d: true }, b: {} });
+      });
+
+      it('should not copy itemY.h.d on merge of X and Y (without itemY.b)', function() {
+        var itemX = { h: { id: 'XI', v: 'c', pa: ['a'] }, b: {} };
+        var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var itemY = { h: { id: 'XI', v: 'b', pa: ['a'], d: true } };
+        var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+
+        var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+        should.deepEqual(merge[0], { h: { id: 'XI', pa: ['c', 'b'] }, b: {} });
+        should.deepEqual(merge[1], { h: { id: 'XI', pa: ['c', 'b'] }, b: {} });
+      });
+
+      it('should not copy itemX.h.d on merge of X and Y (without itemX.b)', function() {
+        var itemX = { h: { id: 'XI', v: 'c', pa: ['a'], d: true } };
+        var lcaX  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+        var itemY = { h: { id: 'XI', v: 'b', pa: ['a'] }, b: {} };
+        var lcaY  = { h: { id: 'XI', v: 'a' }, b: {} };
+
+
+        var merge = _doMerge(itemX, itemY, lcaX, lcaY);
+        should.deepEqual(merge[0], { h: { id: 'XI', pa: ['c', 'b'] }, b: {} });
+        should.deepEqual(merge[1], { h: { id: 'XI', pa: ['c', 'b'] }, b: {} });
+      });
     });
   });
 });
