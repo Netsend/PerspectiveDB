@@ -158,6 +158,26 @@ function connectionManager(pdb) {
   });
 }
 
+// create a new pdb tree view
+function createPdbTable(name) {
+  var table = document.createElement('table');
+  table.id = name;
+
+  var caption = document.createElement('caption');
+  caption.textContent = name;
+
+  var thead = document.createElement('thead');
+  thead.innerHTML = '<tr> <th>id</th> <th>parents</th> <th>version</th> <th>flags</th> <th>perspective</th> <th>doc</th> <th>meta</th> </tr>';
+
+  var tbody = document.createElement('tbody');
+
+  table.appendChild(caption);
+  table.appendChild(thead);
+  table.appendChild(tbody);
+
+  return table;
+}
+
 // add item to persdb view
 function createPdbTableRow(item) {
   var tr = document.createElement('tr');
@@ -195,7 +215,8 @@ function createPdbTableRow(item) {
 }
 
 // persdb view
-function pdbView(table, reader) {
+function appendToTable(table, reader) {
+  var tbody = table.querySelector('tbody');
   reader.on('readable', function() {
     var item = reader.read();
     if (item == null) { return; }
@@ -209,7 +230,7 @@ function main(db, pdb) {
   var msg      = document.querySelector('#msg');
 
   var idbTable = document.querySelector('table#idb tbody');
-  var pdbTable = document.querySelector('table#persdb tbody');
+  var pdbDiv   = document.querySelector('div#persdb');
 
   var form     = document.querySelector('form');
 
@@ -228,8 +249,26 @@ function main(db, pdb) {
     reloadCustomersList();
   });
 
-  var reader = pdb.createReadStream({ tail: false });
-  pdbView(pdbTable, reader);
+  // create a table for the local tree
+  var localTable = createPdbTable('local');
+  appendToTable(localTable, pdb.createReadStream({ tail: false }));
+
+  // create view of internal stage tree using the private api
+  var stageTable = createPdbTable('stage');
+  appendToTable(stageTable, pdb._mt.getStageTree().createReadStream({ tail: false }));
+
+  // append tables of different trees
+  pdbDiv.appendChild(localTable);
+  pdbDiv.appendChild(stageTable);
+
+  // do the same for every perspective
+  var perspectives = pdb.getPerspectives();
+  perspectives.forEach(function(pe) {
+    // create view of pe tree using the private api
+    var table = createPdbTable(pe);
+    appendToTable(table, pdb._mt._pe[pe].createReadStream({ tail: false }));
+    pdbDiv.appendChild(table);
+  });
 
   // setup connection manager
   connectionManager(pdb);
