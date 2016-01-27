@@ -1,5 +1,4 @@
 browser/config.json
-browser/build
 config/*.json
 config/*.pem
 local
