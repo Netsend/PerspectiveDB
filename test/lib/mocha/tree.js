@@ -3564,22 +3564,53 @@ describe('Tree', function() {
 
       t.end(null, done);
     });
-  });
 
-  describe('_writev regression', function() {
-    var name = '_writev';
+    describe('write with parents in batch', function() {
+      var name = '_writevWithParentsInBatch';
 
-    // use 24-bit version numbers (base 64)
-    var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
-    var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other' }, b: { more: 'body' } };
-    var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa', 'Bbbb'] }, b: { more2: 'body' } };
+      // use 24-bit version numbers (base 64)
+      var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+      var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], pe: 'other' }, b: { more: 'body' } };
+      var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa', 'Bbbb'] }, b: { more2: 'body' } };
 
-    it('should look in written batch if not all parents are in the databse yet', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.write(item1);
-      t.write(item2);
-      t.write(item3);
-      t.end(null, done);
+      it('should look in batch if not all parents are in the database yet', function(done) {
+        var t = new Tree(db, name, { vSize: 3, log: silence });
+        t.write(item1);
+        t.write(item2);
+        t.write(item3);
+        t.end(null, done);
+      });
+    });
+
+    describe('write with deletes', function() {
+      var name = '_writevWithDeletes';
+
+      // use 24-bit version numbers (base 64)
+      var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
+      var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true } };
+      var item3 = { h: { id: 'XI', v: 'Cccc', pa: [] }, b: { some: 'new' } };
+
+      var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], d: true }, b: { som4: 'body' } };
+      var item5 = { h: { id: 'XI', v: 'Eeee', pa: [] } };
+      var item6 = { h: { id: 'XI', v: 'Ffff', pa: ['Eeee'], d: true }, b: { som5: 'new' } };
+      var item7 = { h: { id: 'XI', v: 'Gggg', pa: [] },                b: { som6: 'new' } };
+
+      it('should look in batch for deleted items if new root does not connect', function(done) {
+        var t = new Tree(db, name, { vSize: 3, log: silence });
+        t.write(item1);
+        t.write(item2);
+        t.write(item3);
+        t.end(null, done);
+      });
+
+      it('should look in batch for deleted items if new root does not connect (multiple root + delete in batch)', function(done) {
+        var t = new Tree(db, name, { vSize: 3, log: silence });
+        t.write(item4);
+        t.write(item5);
+        t.write(item6);
+        t.write(item7);
+        t.end(null, done);
+      });
     });
   });
 });
