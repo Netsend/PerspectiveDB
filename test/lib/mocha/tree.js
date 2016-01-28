@@ -2881,10 +2881,10 @@ describe('Tree', function() {
 
     it('root in an empty database is valid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item1, function(err, valid, missingParents, exists) {
+      t._validNewItem(item1, function(err, valid, heads, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(heads, []);
         should.strictEqual(exists, false);
         done();
       });
@@ -2892,10 +2892,10 @@ describe('Tree', function() {
 
     it('non-root in an empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item2, function(err, valid, missingParents, exists) {
+      t._validNewItem(item2, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, ['Aaaa']);
+        should.deepEqual(problemParents, ['Aaaa']);
         should.strictEqual(exists, false);
         done();
       });
@@ -2908,10 +2908,10 @@ describe('Tree', function() {
 
     it('root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(itemA, function(err, valid, missingParents, exists) {
+      t._validNewItem(itemA, function(err, valid, heads, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(heads, ['Aaaa']);
         should.strictEqual(exists, false);
         done();
       });
@@ -2919,10 +2919,10 @@ describe('Tree', function() {
 
     it('existing root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item1, function(err, valid, missingParents, exists) {
+      t._validNewItem(item1, function(err, valid, heads, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(heads, ['Aaaa']);
         should.strictEqual(exists, true);
         done();
       });
@@ -2930,10 +2930,10 @@ describe('Tree', function() {
 
     it('connecting non-root in a non-empty database (fast-forward) is valid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item2, function(err, valid, missingParents, exists) {
+      t._validNewItem(item2, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, false);
         done();
       });
@@ -2941,10 +2941,10 @@ describe('Tree', function() {
 
     it('connecting non-root in a non-empty database (fork) is valid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item4, function(err, valid, missingParents, exists) {
+      t._validNewItem(item4, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, false);
         done();
       });
@@ -2952,10 +2952,10 @@ describe('Tree', function() {
 
     it('non-connecting non-root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item3, function(err, valid, missingParents, exists) {
+      t._validNewItem(item3, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, ['Bbbb']);
+        should.deepEqual(problemParents, ['Bbbb']);
         should.strictEqual(exists, false);
         done();
       });
@@ -2968,10 +2968,10 @@ describe('Tree', function() {
 
     it('existing connecting non-root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item2, function(err, valid, missingParents, exists) {
+      t._validNewItem(item2, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, true);
         done();
       });
@@ -2982,48 +2982,33 @@ describe('Tree', function() {
     var item5 = { h: { id: 'XI', v: 'Eeee', pa: ['Bbbb'], d: true } };
 
     var item10 = { h: { id: 'XI', v: 'Ffff', i: 1, pa: [] } };
-    var item20 = { h: { id: 'XI', v: 'Gggg', i: 2, pa: ['Ffff'] } };
+
+    var item20 = { h: { id: 'XI', v: 'Gggg', i: 2, pa: ['Eeee'] } }; // connect to deleted head
     var item30 = { h: { id: 'XI', v: 'Hhhh', pa: ['Gggg'] } };
-    var item40 = { h: { id: 'XI', v: 'Iiii', pa: ['Ffff'] } };
+    var item40 = { h: { id: 'XI', v: 'Iiii', pa: ['Eeee'] } };
 
     it('item5 (delete head)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.write(item5, done);
     });
 
-    it('non-root in a database with deleted heads is invalid', function(done) {
+    it('non-existing root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item20, function(err, valid, missingParents, exists) {
+      t._validNewItem(item10, function(err, valid, heads, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, ['Ffff']);
+        should.deepEqual(heads, ['Eeee']);
         should.strictEqual(exists, false);
         done();
       });
     });
 
-    it('item10', function(done) {
+    it('existing root in a non-empty database is invalid (return heads)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.write(item10, done);
-    });
-
-    it('root in a non-empty database is invalid', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(itemA, function(err, valid, missingParents, exists) {
+      t._validNewItem(item1, function(err, valid, heads, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
-        should.strictEqual(exists, false);
-        done();
-      });
-    });
-
-    it('existing root in a non-empty database is invalid', function(done) {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item10, function(err, valid, missingParents, exists) {
-        if (err) { throw err; }
-        should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(heads, ['Eeee']);
         should.strictEqual(exists, true);
         done();
       });
@@ -3031,10 +3016,10 @@ describe('Tree', function() {
 
     it('connecting non-root in a non-empty database (fast-forward) is valid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item20, function(err, valid, missingParents, exists) {
+      t._validNewItem(item20, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, false);
         done();
       });
@@ -3042,10 +3027,10 @@ describe('Tree', function() {
 
     it('connecting non-root in a non-empty database (fork) is valid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item40, function(err, valid, missingParents, exists) {
+      t._validNewItem(item40, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, true);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, false);
         done();
       });
@@ -3053,10 +3038,10 @@ describe('Tree', function() {
 
     it('non-connecting non-root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item30, function(err, valid, missingParents, exists) {
+      t._validNewItem(item30, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, ['Gggg']);
+        should.deepEqual(problemParents, ['Gggg']);
         should.strictEqual(exists, false);
         done();
       });
@@ -3069,10 +3054,10 @@ describe('Tree', function() {
 
     it('existing connecting non-root in a non-empty database is invalid', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._validNewItem(item20, function(err, valid, missingParents, exists) {
+      t._validNewItem(item20, function(err, valid, problemParents, exists) {
         if (err) { throw err; }
         should.strictEqual(valid, false);
-        should.deepEqual(missingParents, []);
+        should.deepEqual(problemParents, []);
         should.strictEqual(exists, true);
         done();
       });
@@ -3588,12 +3573,12 @@ describe('Tree', function() {
       // use 24-bit version numbers (base 64)
       var item1 = { h: { id: 'XI', v: 'Aaaa', pa: [] }, b: { some: 'body' } };
       var item2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true } };
-      var item3 = { h: { id: 'XI', v: 'Cccc', pa: [] }, b: { some: 'new' } };
+      var item3 = { h: { id: 'XI', v: 'Cccc', pa: ['Bbbb'] }, b: { some: 'new' } };
 
-      var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], d: true }, b: { som4: 'body' } };
-      var item5 = { h: { id: 'XI', v: 'Eeee', pa: [] } };
-      var item6 = { h: { id: 'XI', v: 'Ffff', pa: ['Eeee'], d: true }, b: { som5: 'new' } };
-      var item7 = { h: { id: 'XI', v: 'Gggg', pa: [] },                b: { som6: 'new' } };
+      var item4 = { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], d: true } };
+      var item5 = { h: { id: 'XI', v: 'Eeee', pa: ['Dddd'] } };
+      var item6 = { h: { id: 'XI', v: 'Ffff', pa: ['Eeee'], d: true } };
+      var item7 = { h: { id: 'XI', v: 'Gggg', pa: ['Ffff'] }, b: { som6: 'new' } };
 
       it('should look in batch for deleted items if new root does not connect', function(done) {
         var t = new Tree(db, name, { vSize: 3, log: silence });
@@ -3610,6 +3595,20 @@ describe('Tree', function() {
         t.write(item6);
         t.write(item7);
         t.end(null, done);
+      });
+
+      it('should have updated the number of heads with every new root', function(done) {
+        var t = new Tree(db, name, { vSize: 3, log: silence });
+        var i = 0;
+        t.getHeads(function(item, next) {
+          i++;
+          should.deepEqual(item, { h: { id: 'XI', v: 'Gggg', pa: ['Ffff'], i: 7 }, b: { som6: 'new' } });
+          next();
+        }, function(err) {
+          if (err) { throw err; }
+          should.strictEqual(i, 1);
+          done();
+        });
       });
     });
   });
