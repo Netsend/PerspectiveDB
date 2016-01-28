@@ -1,19 +1,19 @@
 /**
- * Copyright 2014, 2015 Netsend.
+ * Copyright 2014, 2015, 2015 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -669,6 +669,46 @@ describe('merge', function() {
             }
           });
           should.deepEqual(mergeX, mergeY);
+          done();
+        });
+      });
+    });
+
+    describe('deleted head and a new root', function() {
+      // create the following structure:
+      //  A---Bd   C (new root)
+
+      var A = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'quux'
+        }
+      };
+
+      var Bd = {
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'], d: true }
+      };
+
+      var C = {
+        h: { id: id, v: 'Cccc', pa: [] },
+        b: {
+          some: 'new'
+        }
+      };
+
+      var DAG = [A, Bd, C];
+
+      // one graph with a deleted head, one graph with an extra new root
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
+
+      it('Bd and C are two different DAGs, error', function(done) {
+        var x = streamifier(dB);
+        var y = streamifier(dC);
+        merge(x, y, { log: silence }, function(err) {
+          should.strictEqual(err.message, 'no lca found');
           done();
         });
       });
