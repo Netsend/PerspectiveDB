@@ -540,12 +540,7 @@ describe('merge', function() {
       };
 
       var Cd = {
-        h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true },
-        b: {
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'quux'
-        }
+        h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true }
       };
 
 
@@ -556,38 +551,22 @@ describe('merge', function() {
       var dB = DAG.slice(0, 2).reverse();
       var dC = DAG.slice(0, 3).reverse();
 
-      it('B and C = merge, no delete', function(done) {
+      it('B and Cd = conflict (because C deleted body)', function(done) {
         var x = streamifier(dB);
         var y = streamifier(dC);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
-          if (err) { throw err; }
-          should.deepEqual(mergeX, {
-            h: { id: id, pa: ['Bbbb', 'Cccc'] },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
-          should.deepEqual(mergeX, mergeY);
+        merge(x, y, { log: silence }, function(err) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['qux']);
           done();
         });
       });
 
-      it('C and B = merge, no delete', function(done) {
+      it('Cd and B = conflict (because C deleted body)', function(done) {
         var x = streamifier(dC);
         var y = streamifier(dB);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
-          if (err) { throw err; }
-          should.deepEqual(mergeX, {
-            h: { id: id, pa: ['Cccc', 'Bbbb'] },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
-          });
-          should.deepEqual(mergeX, mergeY);
+        merge(x, y, { log: silence }, function(err) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['qux']);
           done();
         });
       });
@@ -612,21 +591,11 @@ describe('merge', function() {
       };
 
       var Bd = {
-        h: { id: id, v: 'Bbbb', pa: ['Aaaa'], d: true },
-        b: {
-          foo: 'bar',
-          bar: 'baz',
-          qux: 'qux'
-        }
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'], d: true }
       };
 
       var Cd = {
-        h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true },
-        b: {
-          foo: 'bar',
-          bar: 'raboof',
-          qux: 'quux'
-        }
+        h: { id: id, v: 'Cccc', pa: ['Aaaa'], d: true }
       };
 
 
@@ -644,11 +613,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'], d: true },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
+            b: {}
           });
           should.deepEqual(mergeX, mergeY);
           done();
@@ -662,11 +627,7 @@ describe('merge', function() {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Cccc', 'Bbbb'], d: true },
-            b: {
-              foo: 'bar',
-              bar: 'raboof',
-              qux: 'qux'
-            }
+            b: {}
           });
           should.deepEqual(mergeX, mergeY);
           done();
@@ -709,6 +670,69 @@ describe('merge', function() {
         var y = streamifier(dC);
         merge(x, y, { log: silence }, function(err) {
           should.strictEqual(err.message, 'no lca found');
+          done();
+        });
+      });
+    });
+
+    describe('deleted head and a connecting new "root"', function() {
+      // create the following structure:
+      //  A---Bd   C (new root)
+
+      var A = {
+        h: { id: id, v: 'Aaaa', pa: [] },
+        b: {
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'quux'
+        }
+      };
+
+      var Bd = {
+        h: { id: id, v: 'Bbbb', pa: ['Aaaa'], d: true }
+      };
+
+      var C = {
+        h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
+        b: {
+          some: 'new'
+        }
+      };
+
+      var DAG = [A, Bd, C];
+
+      // one graph with a deleted head, one graph with an extra new root
+      var dB = DAG.slice(0, 2).reverse();
+      var dC = DAG.slice(0, 3).reverse();
+
+      it('Bd and C = fast-forward', function(done) {
+        var x = streamifier(dB);
+        var y = streamifier(dC);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
+            b: {
+              some: 'new'
+            }
+          });
+          should.deepEqual(mergeX, mergeY);
+          done();
+        });
+      });
+
+      it('C and Bd = fast-forward', function(done) {
+        var x = streamifier(dC);
+        var y = streamifier(dB);
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+          if (err) { throw err; }
+          should.deepEqual(mergeX, {
+            h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
+            b: {
+              some: 'new'
+            }
+          });
+          should.deepEqual(mergeX, mergeY);
           done();
         });
       });
@@ -1040,7 +1064,7 @@ describe('merge', function() {
       var dBII = DAGII.slice(0, 2).reverse();
       var dCII = DAGII.slice(0, 3).reverse();
 
-      it('BI and CII = merge, no delete', function(done) {
+      it('BI and CIId = merge, no delete (because CIId didn\'t change body)', function(done) {
         var x = streamifier(dBI);
         var y = streamifier(dCII);
         merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
@@ -1066,7 +1090,7 @@ describe('merge', function() {
         });
       });
 
-      it('BII and CI = merge, no delete', function(done) {
+      it('BII and CId = merge, no delete (because CId didn\'t change body)', function(done) {
         var x = streamifier(dBII);
         var y = streamifier(dCI);
         merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
