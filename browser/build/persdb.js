@@ -2246,7 +2246,7 @@ function _doMerge(itemX, itemY, lcaX, lcaY) {
   // if lca version is set and equals one item, fast-forward to the other item and create a merged fast-forward for the missing perspective
   if (lcaVersion != null && lcaVersion === itemX.h.v) {
     // ff to itemY and recreate itemY from the other perspective
-    mergeX = threeWayMerge(itemX.b || {}, itemY.b || {}, lcaX.b, lcaY.b);
+    mergeX = threeWayMerge(itemX.b || {}, itemY.b || {}, lcaX.b || {}, lcaY.b || {});
 
     if (Array.isArray(mergeX)) {
       throw new MergeConflict(mergeX);
@@ -2268,7 +2268,7 @@ function _doMerge(itemX, itemY, lcaX, lcaY) {
 
   if (lcaVersion != null && lcaVersion === itemY.h.v) {
     // ff to itemX and recreate itemX from the other perspective
-    mergeY = threeWayMerge(itemY.b || {}, itemX.b || {}, lcaY.b, lcaX.b);
+    mergeY = threeWayMerge(itemY.b || {}, itemX.b || {}, lcaY.b || {}, lcaX.b || {});
 
     if (Array.isArray(mergeY)) {
       throw new MergeConflict(mergeY);
@@ -5245,22 +5245,8 @@ Tree.prototype._writev = function(items, cb) {
     }
 
     // check if this item is valid or only misses some parents that are still in the batch
-    that._validNewItem(item, function(err, valid, missingParents, exists) {
+    that._validNewItem(item, items, function(err, valid, missingParents, exists) {
       if (err) { cb(err); return; }
-
-      // if it's not valid but there are missing parents, chances are those are in the batch
-      if (!valid && missingParents.length) {
-        if (missingParents.every(function(pa) {
-          return items.some(function(oitem) {
-            return oitem.chunk.h.v === pa;
-          });
-        })) {
-          that._log.info('t:%s _writev parent(s) are not in DAG but in batch, set valid %j', that.name, item.h);
-          valid = true;
-        } else {
-          that._log.info('t:%s _writev parent(s) are not in DAG and not in batch %j', that.name, item.h);
-        }
-      }
 
       // always accept existing items from remote (happens if a new remote is added)
       if (!valid && exists && item.h.pe && item.h.pe !== that.name) {
@@ -5616,24 +5602,37 @@ Tree.prototype._nextI = function _nextI(cb) {
 };
 
 /**
- * Check if the item has a valid connection to the tree. This means making sure
- * the version does not already exist, and furthermore:
- *   - for root items, check if no non-deleted heads exist for this id
+ * Check if the item has a valid connection to the tree. This means making sure the
+ * version does not already exist, and furthermore:
+ *   - for root items, check if there does not already exist a DAG for this id, and
+ *     return an array of existing heads
  *   - for non-root items, check if all parents do exist and return an extra
- *     array that contain's all missing parents.
+ *     array that contains all parents that do not exist.
  *
  * @param {Object} item  item to inspect
- * @param {Function} cb  First parameter is an error object or null. Second
- *                       parameter a boolean about whether this item would be a
- *                       valid new version in the tree. If this is not the case
- *                       and if this is not a root item, then a third parameter
- *                       will be an array with all missing parents. Fourth para-
- *                       meter is a boolean about whether this version aready 
- *                       exists.
+ * @param {Array} batch  optional batch with new items that are not yet in the tree
+ *                       the batch must be topologically sorted and item must be in
+ *                       this batch as well (used with _writev)
+ * @param {Function} cb  The first parameter is an error object or null. The second
+ *                       parameter is a boolean about whether this item would be a
+ *                       valid new version in the tree. If this is not a valid new
+ *                       version the third parameter will be an array of
+ *                       problematic versions.
+ *                       If this as a root item, the third parameter is an array
+ *                       of existing heads.
+ *                       If this is not a root item, then the third parameter will
+ *                       be an array with all missing parents. The fourth parameter
+ *                       is a boolean about whether this version already exists.
  */
-Tree.prototype._validNewItem = function _validNewItem(item, cb) {
+Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
   var error;
   var that = this;
+
+  if (typeof batch === 'function') {
+    cb = batch;
+    batch = null;
+  }
+  if (batch == null) { batch = []; }
 
   var id = item.h.id;
   var version = item.h.v;
@@ -5644,38 +5643,40 @@ Tree.prototype._validNewItem = function _validNewItem(item, cb) {
   // make sure this version does not exist
   var vKey = this._composeVKey(version);
 
-  this._db.get(vKey, function(err, dsKey) {
-    if (err && !err.notFound) {
-      that._log.err('t:%s _validNewItem item lookup error %j', that.name, err);
-      cb(err);
-      return;
-    }
-
-    // db.get returns a notFound error if the version does not exist
-    if (!err) {
-      var key = Tree.parseKey(dsKey, { decodeId: 'utf8' });
-      if (key.id !== id) {
-        error = 'version exists for a different id';
-        that._log.err('t:%s _validNewItem %j %s %s', that.name, error, key.id, version);
-        cb(error);
-        return;
-      } else {
-        // the version does already exist
-        that._log.debug('t:%s _validNewItem version already exists %s', that.name, version);
-        cb(null, false, [], true);
+  // for non-root items, check if all parents do exist and return an extra
+  // array that contain's all missing parents.
+  if (parents.length) {
+    // first check if this item already exists
+    this._db.get(vKey, function(err, dsKey) {
+      if (err && !err.notFound) {
+        that._log.err('t:%s _validNewItem item lookup error %j', that.name, err);
+        cb(err);
         return;
       }
-    }
 
-    that._log.debug('t:%s _validNewItem good, this version does not exist in the tree', that.name);
+      // db.get returns a notFound error if the version does not exist
+      if (!err) {
+        var key = Tree.parseKey(dsKey, { decodeId: 'utf8' });
+        if (key.id !== id) {
+          error = 'version exists for a different id';
+          that._log.err('t:%s _validNewItem %j %s %s', that.name, error, key.id, version);
+          cb(error);
+          return;
+        } else {
+          // the version does already exist
+          that._log.debug('t:%s _validNewItem version already exists %s', that.name, version);
+          // call back with missing parents
+          cb(null, false, [], true);
+          return;
+        }
+      }
 
-    // for non-root items, check if all parents do exist and return an extra
-    // array that contain's all missing parents.
-    if (parents.length) {
+      that._log.debug('t:%s _validNewItem good, this version does not exist in the tree', that.name);
+
       // check which parents do not exist in the tree
       var missingParents = [];
       async.each(parents, function(pa, cb2) {
-        that._log.info('t:%s _validNewItem parent lookup %s', that.name, pa);
+        that._log.debug2('t:%s _validNewItem parent lookup %s', that.name, pa);
 
         // check if this parent exists
         that._db.get(that._composeVKey(pa), function(err, dsKey) {
@@ -5700,39 +5701,108 @@ Tree.prototype._validNewItem = function _validNewItem(item, cb) {
             return;
           }
 
+          that._log.debug('t:%s _validNewItem parent exists %s', that.name, pa);
           cb2();
         });
       }, function(err) {
         if (err) { cb(err); return; }
 
+        // if there are missing parents and there is a batch with new items, chances are the parents are in the batch
+        // TODO: check if any parents found in the batch are connected to the DAG
+        // TODO: rewrite to process whole batch at once incrementally: examineItems(items, cb(err, newItems, existingItems, invalidItems)
+        if (missingParents.length && batch.length) {
+          if (missingParents.every(function(pa) {
+            return batch.some(function(oitem) {
+              return oitem.chunk.h.v === pa;
+            });
+          })) {
+            that._log.info('t:%s _validNewItem parent(s) are not in DAG but in batch, set valid %j', that.name, item.h);
+            missingParents = [];
+          } else {
+            that._log.info('t:%s _validNewItem parent(s) are not in DAG and not in batch %j', that.name, item.h);
+          }
+        }
+
         cb(null, !missingParents.length, missingParents, false);
       });
-    } else {
-      // for root items, make sure no non-deleted heads exist for this id
-      var r = that.getHeadKeyRange(Tree._toBuffer(id));
-      var it = that._db.createValueStream({ gte: r.s, lt: r.e });
+    });
+  } else {
+    // for root items, make sure no heads exist for this id
+    var r = that.getHeadKeyRange(Tree._toBuffer(id));
+    var it = that._db.createKeyStream({ gte: r.s, lt: r.e });
 
-      var nonDeletedHead;
+    var heads = {};
 
-      it.on('error', cb);
+    it.on('error', cb);
 
-      it.on('data', function(headVal) {
-        var parsedHeadVal = Tree.parseHeadVal(headVal);
-        if (parsedHeadVal.d) {
-          that._log.debug('t:%s _validNewItem missingParents head deleted %j continue...', that.name, parsedHeadVal);
-        } else {
-          that._log.info('t:%s _validNewItem non-deleted head exists %j for %j', that.name, parsedHeadVal, item.h);
-          // not deleted
-          // a head item for this root exists, not ok, stop searching any further
-          nonDeletedHead = true;
+    it.on('readable', function() {
+      var headKey = it.read();
+      if (headKey) {
+        // record this head version
+        heads[Tree.parseKey(headKey, { decodeV: 'base64' }).v] = true;
+        return;
+      }
+
+      // done iterating tree, check batch with new items
+      batch.some(function(item) {
+        item = item.chunk;
+
+        if (item.h.v === item.h.v) {
+          // done
+          return true;
         }
+
+        if (item.h.id !== item.h.id) {
+          // different DAG, skip
+          return false;
+        }
+
+        // ensure existing head is replaced
+        item.h.pa.forEach(function(pa) {
+          delete heads[pa];
+        });
+        heads[item.h.v] = true;
+
+        // continue
+        return false;
       });
 
-      it.on('end', function() {
-        cb(null, !nonDeletedHead, [], false);
+      // finally check if this root item itself already exists
+      that._db.get(vKey, function(err, dsKey) {
+        if (err && !err.notFound) {
+          that._log.err('t:%s _validNewItem item lookup error %j', that.name, err);
+          cb(err);
+          return;
+        }
+
+        heads = Object.keys(heads);
+        if (heads.length) {
+          that._log.info('t:%s _validNewItem invalid root item %j, head(s) already exist in the tree %s', that.name, item.h, heads);
+        }
+
+        // db.get returns a notFound error if the version does not exist
+        if (!err) {
+          var key = Tree.parseKey(dsKey, { decodeId: 'utf8' });
+          if (key.id !== id) {
+            error = 'version exists for a different id';
+            that._log.err('t:%s _validNewItem %j %s %s', that.name, error, key.id, version);
+            cb(error);
+            return;
+          } else {
+            // the version does already exist
+            that._log.debug('t:%s _validNewItem version already exists %s', that.name, version);
+            // call back with existing heads
+            cb(null, !heads.length, heads, true);
+            return;
+          }
+        }
+
+        that._log.debug('t:%s _validNewItem good, this version does not exist in the tree', that.name);
+
+        cb(null, !heads.length, heads, false);
       });
-    }
-  });
+    });
+  }
 };
 
 }).call(this,require('_process'),require("buffer").Buffer)
