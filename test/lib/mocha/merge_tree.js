@@ -1897,6 +1897,7 @@ describe('MergeTree', function() {
     var item2 = { h: { id: 'XI', v: 'Bbbb' }, b: { more: 'body' } };
     var item3 = { h: { id: 'XI', v: 'Cccc' }, b: { more2: 'body' } };
     var item4 = { h: { id: 'XI', v: 'Dddd' }, b: { more3: 'b' } };
+    var item5 = { h: { id: 'XI', v: 'Eeee', d: true } };
 
     it('should require item to be an object', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
@@ -2074,6 +2075,72 @@ describe('MergeTree', function() {
               stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
             });
             done();
+          });
+        });
+      });
+    });
+
+    it('should not accept items as long as multiple non-conflicting parents exist', function(done) {
+      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
+      var lws = mt.createLocalWriteStream();
+
+      lws.on('error', function(err) {
+        should.strictEqual(err.message, 'more than one non-conflicting head in local tree');
+        done();
+      });
+
+      lws.write(item5);
+    });
+
+    describe('new root after delete', function() {
+      var localName = '_local_createLocalWriteStreamNewRootAfterDelete';
+      var stageName = '_stage_createLocalWriteStreamNewRootAfterDelete';
+
+      // use 24-bit version numbers (base 64)
+      var item1 = { h: { id: 'XI', v: 'Aaaa' },         b: { some: 'body' } };
+      var item2 = { h: { id: 'XI', v: 'Bbbb', d: true } };
+      var item3 = { h: { id: 'XI', v: 'Cccc' },         b: { more3: 'b' } };  // new "root" (should piont to item5)
+
+      it('write items, new root should point to last delete', function(done) {
+        var mt = new MergeTree(db, { local: localName, stage: stageName, vSize: 3, log: silence });
+        var lws = mt.createLocalWriteStream();
+        lws.write(item1);
+        lws.write(item2);
+        lws.write(item3);
+        lws.end(function() {
+          var i = 0;
+          mt._local.iterateInsertionOrder(function(item, next) {
+            i++;
+            if (i === 1) {
+              should.deepEqual(item, {
+                h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },
+                b: { some: 'body' }
+              });
+            }
+            if (i === 2) {
+              should.deepEqual(item, {
+                h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2, d: true }
+              });
+            }
+            if (i === 3) {
+              should.deepEqual(item, {
+                h: { id: 'XI', v: 'Cccc', pa: ['Bbbb'], i: 3 },
+                b: { more3: 'b' }
+              });
+            }
+            next();
+          }, function(err) {
+            if (err) { throw err; }
+            should.strictEqual(i, 3);
+            // stage should be empty, since item4 is copied to local
+            mt.stats(function(err, stats) {
+              if (err) { throw err; }
+              should.deepEqual(stats, {
+                local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                stage: { heads: { count: 0, conflict: 0, deleted: 0 } }
+              });
+              done();
+            });
           });
         });
       });
