@@ -2891,10 +2891,10 @@ MergeTree.prototype.createLocalWriteStream = function createLocalWriteStream() {
           });
         }, cb);
       } else {
-        that._log.info('merge_tree createLocalWriteStream new item %j determine parent by last non-deleted and non-conflicting head in local', item.h);
+        that._log.info('merge_tree createLocalWriteStream new item %j determine parent by last non-conflicting head in local', item.h);
 
         var heads = [];
-        local.getHeads({ id: item.h.id, skipDeletes: true, skipConflicts: true }, function(head, next) {
+        local.getHeads({ id: item.h.id, skipConflicts: true }, function(head, next) {
           heads.push(head.h.v);
           next();
         }, function(err) {
@@ -2903,7 +2903,7 @@ MergeTree.prototype.createLocalWriteStream = function createLocalWriteStream() {
           that._log.debug('merge_tree createLocalWriteStream found heads %s', heads);
 
           if (heads.length > 1) {
-            error = 'more than one non-deleted and non-conflicting head in local tree';
+            error = 'more than one non-conflicting head in local tree';
             that._log.err('merge_tree createLocalWriteStream %s %j', error, item);
             cb(new Error(error));
             return;
@@ -3418,12 +3418,13 @@ MergeTree.prototype._copyMissingToStage = function _copyMissingToStage(stree, dt
 };
 
 /**
- * Merge stage with local. Merge every head in insertion order with every head in
- * local. Call merge handler with the head from stage, the head from local and the
- * merged result. If there is a merge conflict, the conflictHandler is invoked with
- * an array of conflicting attributes and both items.
+ * Merge stage with local. Merge every non-conflicting head in stage in insertion
+ * order with the one non-conflicting head in local. Call merge handler with the
+ * head from stage, the head from local and the merged result. If there is a merge
+ * conflict, the conflict handler is invoked with an array of conflicting
+ * attributes and both heads.
  *
- * merge handler is called at most (heads in stage) * (heads in local) times.
+ * merge handler is called at most "number of heads in stage" times.
  *
  * @param {Function} cb  First parameter will be an error object or null.
  */
@@ -3439,7 +3440,6 @@ MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
     that._log.debug('_mergeStageWithLocal process %s', sitem.h.v);
     var headOpts = {
       id: sitem.h.id,
-      //skipDeletes: true,
       skipConflicts: true
     };
     stage.getHeads(headOpts, function(shead, shnext) {
@@ -3451,18 +3451,17 @@ MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
 
       that._log.debug('_mergeStageWithLocal item %s is a head', sitem.h.v);
 
-      // merge with the head in local
+      // merge with the one non-conflicting head in local
       var lheads = [];
-      local.getHeads({ id: sitem.h.id }, function(lhead, dnext) {
+      local.getHeads(headOpts, function(lhead, lnext) {
         lheads.push(lhead);
-        dnext();
+        lnext();
       }, function(err) {
         if (err) { shnext(err); return; }
 
         if (lheads.length > 1) {
           var error = new Error('more than one head in local');
           that._log.err('_mergeStageWithLocal error %s %j', error, lheads);
-          // TODO: try to merge
           shnext(error);
           return;
         }
