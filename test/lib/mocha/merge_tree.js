@@ -1058,6 +1058,85 @@ describe('MergeTree', function() {
       });
     });
 
+    describe('merge new connecting root after delete', function() {
+      var sname = '_mergeStageWithLocalNewRootAfterDelete_foo';
+      var localName = '_local_newRootAfterDeleteMergeStageWithLocal';
+      var stageName = '_stage_newRootAfterDeleteMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },                b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'] },          b: { more3: 'body' } }; // the "root"
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('write sitem1, sitem2 and sitem3', function(done) {
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.write(sitem3);
+        tree.end(done);
+      });
+
+      it('write litem1 and litem2 to local', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.write(litem2);
+        tree.end(done);
+      });
+
+      it('should have one deleted head in local and one head in stage', function(done) {
+        var opts = {
+          local: localName,
+          stage: stageName,
+          vSize: 3,
+          log: silence
+        };
+        var mt = new MergeTree(db, opts);
+        mt.stats(function(err, stats) {
+          if (err) { throw err; }
+          should.deepEqual(stats, {
+            local: { heads: { count: 1, conflict: 0, deleted: 1 } },
+            stage: { heads: { count: 1, conflict: 0, deleted: 0 } }
+          });
+          done();
+        });
+      });
+
+      it('should merge item3 (new "root")', function(done) {
+        var i = 0;
+        var mergeHandler = function(merge, lhead, next) {
+          i++;
+          should.deepEqual(merge, { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'], i: 3 }, b: { more3: 'body' } });
+          should.deepEqual(null);
+          next();
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
+          if (err) { throw err; }
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1);
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_mergeStageWithLocalNewRootAfterDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
     describe('merge with conflict (unresolved)', function() {
       var sname = '_mergeStageWithLocalTwoHeadsOneConflict_foo';
       var localName = '_local_twoHeadsOneConflictMergeStageWithLocal';
