@@ -1,6 +1,6 @@
 {
   "name": "PersBD",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "author": {
     "name": "Tim Kuijsten",
     "email": "tim@netsend.nl",
@@ -20,7 +20,7 @@
     "daemon": "^1.1.0",
     "hjson": "^1.7.4",
     "is-equal": "^1.2.3",
-    "level-browserify": "^1.1.0",
+    "level-js": "https://github.com/timkuijsten/level.js.git#idbunwrapper",
     "level": "^1.4.0",
     "bson-stream": "^0.0.8",
     "bson": "^0.4.11",
@@ -35,7 +35,7 @@
     "read": "^1.0.5",
     "nest-namespace": "^0.0.2",
     "match-object": "^0.0.1",
-    "object-key-filter": "^0.0.2"
+    "object-key-filter": "^0.0.4"
   },
   "devDependencies": {
     "through2": "^2.0.0",
