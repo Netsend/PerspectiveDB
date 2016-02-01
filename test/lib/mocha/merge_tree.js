@@ -918,8 +918,8 @@ describe('MergeTree', function() {
           }
           if (i > 2) {
             // this iteration should start after _mergeStageWithLocal is invoked again
-            // should merge and use a content based version number
-            should.deepEqual(merge, { h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more2: 'body', more3: 'body' } });
+            // should merge and use a content based version number (parents must be sorted)
+            should.deepEqual(merge, { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more2: 'body', more3: 'body' } });
             should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
             next();
           }
@@ -1029,7 +1029,7 @@ describe('MergeTree', function() {
         var i = 0;
         var mergeHandler = function(merge, lhead, next) {
           i++;
-          should.deepEqual(merge, { h: { id: 'XI', v: 'CkiF', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more2: 'body', more3: 'body' } });
+          should.deepEqual(merge, { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more2: 'body', more3: 'body' } });
           should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } });
           next();
         };
@@ -1753,9 +1753,9 @@ describe('MergeTree', function() {
       var j = 0;
       var mergeHandler = function(merge, lhead, next) {
         j++;
-        // the previously created merge in stage is used
+        // the previously created merge in stage is used (parents are sorted)
         if (j > 0) {
-          should.deepEqual(merge, { h: { id: 'XI', v: 'HFFj', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more: 'body', more2: 'body' } });
+          should.deepEqual(merge, { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more: 'body', more2: 'body' } });
           should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more: 'body' } });
         }
         next();
@@ -1786,7 +1786,7 @@ describe('MergeTree', function() {
             should.deepEqual(item, item3);
           }
           if (i > 3) {
-            should.deepEqual(item, { h: { id: 'XI', v: 'HFFj', pa: ['Cccc', 'Bbbb'], i: 4 }, b: { more: 'body', more2: 'body' } });
+            should.deepEqual(item, { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more: 'body', more2: 'body' } });
           }
           next();
         }, function(err) {
