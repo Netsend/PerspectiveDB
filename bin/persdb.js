@@ -89,7 +89,7 @@ function start() {
     config.dbs.forEach(function(dbCfg) {
       dbCfg.perspectives.forEach(function(persCfg) {
         var username = persCfg.username || persCfg.name;
-        var password = persCfg.password || persCfg.users;
+        var password = persCfg.password || persCfg.passdb;
 
         // support loading from a file
         if (password.indexOf('$2a$') !== 0) {
@@ -125,7 +125,7 @@ function start() {
         }
 
         // set one user account
-        persCfg.users = [{ username: username, password: password, realm: dbCfg.name }];
+        persCfg.passdb = [{ username: username, password: password, realm: dbCfg.name }];
       });
     });
 
