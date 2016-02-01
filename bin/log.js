@@ -113,7 +113,7 @@ function fmtItem(item, parents) {
       } else {
         out += '\u2523\u2501 ';
       }
-      var diff = doDiff(item.b, p.b);
+      var diff = doDiff(item.b || {}, p.b || {});
       out += ' ' + p.h.id + ' ' + p.h.v + ' diff: ' + JSON.stringify(diff) + ' ' + fmtPatch(diff, item.b);
       if (i !== parents.length) {
         out += '\n';
@@ -139,7 +139,7 @@ function fmtItem(item, parents) {
     out += ' ' + JSON.stringify(item.h.pa);
     if (program.patch && parents.length) {
       parents.forEach(function(p) {
-        var diff = doDiff(item.b || {}, p.b);
+        var diff = doDiff(item.b || {}, p.b || {});
         if (parents.length > 1) {
           out += ' ' + p.h.v;
         }
