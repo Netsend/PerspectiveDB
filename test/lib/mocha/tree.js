@@ -23,7 +23,7 @@ var tmpdir = require('os').tmpdir;
 var should = require('should');
 var rimraf = require('rimraf');
 var async = require('async');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var bson = require('bson');
 var BSON = new bson.BSONPure.BSON();
 

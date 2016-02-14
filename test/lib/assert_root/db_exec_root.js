@@ -31,7 +31,7 @@ var childProcess = require('child_process');
 
 var async = require('async');
 var BSONStream = require('bson-stream');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var bson = require('bson');
 

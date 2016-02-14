@@ -20,7 +20,7 @@
 
 var should = require('should');
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var streamify = require('stream-array');
 
 // wrapper around streamify that supports "reopen" recursively

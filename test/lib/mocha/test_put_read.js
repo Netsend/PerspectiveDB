@@ -4,7 +4,7 @@ var cp = require('child_process');
 var tmpdir = require('os').tmpdir;
 
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 
 var db;
 var dbPath = tmpdir() + '/test_iterator';

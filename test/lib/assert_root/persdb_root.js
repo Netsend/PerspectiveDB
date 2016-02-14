@@ -32,7 +32,7 @@ var spawn = require('child_process').spawn;
 var async = require('async');
 var bson = require('bson');
 var BSON = new bson.BSONPure.BSON();
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var ws = require('nodejs-websocket');
 

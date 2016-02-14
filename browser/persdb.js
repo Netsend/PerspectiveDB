@@ -27,7 +27,7 @@ var async = require('async');
 var BSONStream = require('bson-stream');
 var LDJSONStream = require('ld-jsonstream');
 var keyFilter = require('object-key-filter');
-var level = require('level-js');
+var level = require('level-packager')(require('level-js'));
 var websocket = require('websocket-stream');
 
 var proxy = require('./proxy');

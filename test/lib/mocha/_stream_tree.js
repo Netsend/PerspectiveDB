@@ -22,7 +22,7 @@ var tmpdir = require('os').tmpdir;
 
 var should = require('should');
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 
 var Tree = require('../../../lib/tree');
 var StreamTree = require('../../../lib/_stream_tree');

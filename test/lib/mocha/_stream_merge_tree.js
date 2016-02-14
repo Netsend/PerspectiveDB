@@ -26,7 +26,7 @@ var should = require('should');
 var bson = require('bson');
 var BSON = new bson.BSONPure.BSON();
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 
 var StreamMergeTree = require('../../../lib/_stream_merge_tree');
 var MergeTree = require('../../../lib/merge_tree');

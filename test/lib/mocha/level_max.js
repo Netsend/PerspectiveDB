@@ -23,7 +23,7 @@ var tmpdir = require('os').tmpdir;
 
 require('should');
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 
 var db;
 var dbPath = tmpdir() + '/test_level_max';

@@ -23,7 +23,7 @@ var cp = require('child_process');
 
 var should = require('should');
 var rimraf = require('rimraf');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var async = require('async');
 
 var Tree = require('../../../lib/tree');
