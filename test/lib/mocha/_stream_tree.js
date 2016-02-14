@@ -82,11 +82,11 @@ describe('StreamTree', function() {
     t.write(item1, done);
   });
 
-  it('should emit raw buffers', function(done) {
+  it('should emit bson buffers', function(done) {
     var t = new Tree(db, name, { vSize: 3, log: silence });
 
     var i = 0;
-    var s = new StreamTree(t, { raw: true });
+    var s = new StreamTree(t, { bson: true });
     s.on('data', function(obj) {
       i++;
       should.strictEqual(Buffer.isBuffer(obj), true);

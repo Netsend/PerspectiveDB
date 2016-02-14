@@ -1440,9 +1440,9 @@ describe('Tree', function() {
       });
     });
 
-    it('should return the raw version', function(done) {
+    it('should return the bson version', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.getByVersion('Aaaa', { raw: true }, function(err, found) {
+      t.getByVersion('Aaaa', { bson: true }, function(err, found) {
         if (err) { throw err; }
         should.deepEqual(BSON.deserialize(found), item);
         done();
@@ -1489,10 +1489,10 @@ describe('Tree', function() {
       (function() { t.iterateInsertionOrder({ last: 'a' }, function() { }, function() { }); }).should.throw('opts.last must be the same size as the configured vSize');
     });
 
-    it('should require raw to be a buffer', function() {
+    it('should require bson to be a boolean', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.iterateInsertionOrder({ raw: 'a' }, function() { }, function() { }); }).should.throw('opts.raw must be a boolean');
+      (function() { t.iterateInsertionOrder({ bson: 'a' }, function() { }, function() { }); }).should.throw('opts.bson must be a boolean');
     });
 
     it('should call cb directly with an empty database', function(done) {
@@ -1505,11 +1505,11 @@ describe('Tree', function() {
       t.end(item1, done);
     });
 
-    it('should emit raw buffers', function(done) {
+    it('should emit bson buffers', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
-      t.iterateInsertionOrder({ raw: true }, function(obj, next) {
+      t.iterateInsertionOrder({ bson: true }, function(obj, next) {
         i++;
         should.strictEqual(Buffer.isBuffer(obj), true);
         next();
@@ -1795,10 +1795,10 @@ describe('Tree', function() {
       (function() { t.createReadStream({ last: 'a' }, function() { }, function() { }); }).should.throw('opts.last must be the same size as the configured vSize');
     });
 
-    it('should require opts.raw to be a buffer', function() {
+    it('should require opts.bson to be a boolean', function() {
       // configure 2 bytes and call with 3 bytes (base64)
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.createReadStream({ raw: 'a' }, function() { }, function() { }); }).should.throw('opts.raw must be a boolean');
+      (function() { t.createReadStream({ bson: 'a' }, function() { }, function() { }); }).should.throw('opts.bson must be a boolean');
     });
 
     it('should call end directly with an empty database (if data event is handled)', function(done) {
@@ -1813,11 +1813,11 @@ describe('Tree', function() {
       t.end(item1, done);
     });
 
-    it('should emit raw buffers', function(done) {
+    it('should emit bson buffers', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       var i = 0;
-      var s = t.createReadStream({ raw: true });
+      var s = t.createReadStream({ bson: true });
 
       s.on('data', function(obj) {
         i++;

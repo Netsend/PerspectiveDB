@@ -386,7 +386,7 @@ PersDB.prototype._connHandler = function _connHandler(conn, pers) {
         log: that._log,
         tail: true,
         tailRetry: 5000,
-        raw: true
+        bson: true
       };
       if (typeof req.start === 'string') {
         readerOpts.first = req.start;

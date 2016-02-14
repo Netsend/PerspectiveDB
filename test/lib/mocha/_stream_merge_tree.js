@@ -91,10 +91,10 @@ describe('StreamMergeTree', function() {
       }).should.throw('opts.log must be an object');
     });
 
-    it('should require opts.raw to be a boolean', function() {
+    it('should require opts.bson to be a boolean', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { raw: {}, log: silence });
-      }).should.throw('opts.raw must be a boolean');
+        smt = new StreamMergeTree(mt, { bson: {}, log: silence });
+      }).should.throw('opts.bson must be a boolean');
     });
 
     it('should require opts.filter to be an object', function() {
@@ -305,12 +305,12 @@ describe('StreamMergeTree', function() {
       });
     });
 
-    it('should return raw buffer instances', function(done) {
+    it('should return bson buffer instances', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = new StreamMergeTree(mt, {
         local: perspective,
         log: silence,
-        raw: true
+        bson: true
       });
       var docs = [];
 
