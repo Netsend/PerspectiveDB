@@ -107,8 +107,7 @@ function PersDB(idb, opts) {
     close: noop
   };
 
-  var name = opts.name || 'pdb';
-  var prefix = '_';
+  var name = opts.name || '_pdb';
 
   this._idb = idb;
   this._opts = opts;
@@ -118,7 +117,7 @@ function PersDB(idb, opts) {
     this._mergeInterval = 5000;
   }
 
-  this._db = level(name, { keyEncoding: 'binary', valueEncoding: 'binary', storePrefix: prefix });
+  this._db = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, storeName: name });
 
   // setup list of connections to initiate and create an index by perspective name
   this._persCfg = parsePersConfigs(this._opts.perspectives || []);

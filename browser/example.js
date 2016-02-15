@@ -361,6 +361,7 @@ req.onsuccess = function(ev) {
 
   // start PersDB
   var opts = {
+    name: 'demo',
     perspectives: [config],
     conflictHandler: function(attrs, newHead, lhead, cb) {
       console.error('merge conflict', attrs, newHead, lhead);
