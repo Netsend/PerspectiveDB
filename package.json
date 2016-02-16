@@ -15,6 +15,7 @@
     "transformation"
   ],
   "dependencies": {
+    "mongodb": "^2.1.7",
     "websocket-stream": "^2.3.0",
     "nodejs-websocket": "^1.4.1",
     "daemon": "^1.1.0",
