@@ -1,19 +1,19 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014-2016 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -28,16 +28,16 @@ var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
 var BSONStream = require('bson-stream');
 
-var OplogReader = require('../../../lib/oplog_reader');
+var oplogReader = require('../../../adapter/mongo/oplog_reader');
 var logger = require('../../../lib/logger');
 
-var silence;
+var silence, cons;
 var oplogDb, oplogColl;
 
 var db;
 var databaseName = 'test_oplog_reader';
 var collectionName = 'foo';
-var Database = require('../../_database');
+var Database = require('./_database');
 
 // open database connection
 var database = new Database(databaseName);
@@ -45,12 +45,16 @@ before(function(done) {
   logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
     silence = l;
-    database.connect(function(err, dbc) {
+    logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
       if (err) { throw err; }
-      db = dbc;
-      oplogDb = db.db('local');
-      oplogColl = oplogDb.collection('oplog.$main');
-      done(err);
+      cons = l;
+      database.connect(function(err, dbc) {
+        if (err) { throw err; }
+        db = dbc;
+        oplogDb = db.db('local');
+        oplogColl = oplogDb.collection('oplog.$main');
+        done(err);
+      });
     });
   });
 });
@@ -62,62 +66,64 @@ after(function(done) {
   });
 });
 
-describe('OplogReader', function() {
+describe('oplogReader', function() {
   var ns = databaseName + '.' + collectionName;
 
   describe('constructor', function() {
-    it('should require oplogColl to be an instance of mongdb.Collection', function() {
-      (function() { new OplogReader(); }).should.throw('oplogColl must be an instance of mongodb.Collection');
+    it('should require oplogColl to be an object', function() {
+      (function() { oplogReader(); }).should.throw('oplogColl must be an object');
     });
 
     it('should require ns to be a string', function() {
-      (function() { new OplogReader(oplogColl); }).should.throw('ns must be a string');
+      (function() { oplogReader(oplogColl); }).should.throw('ns must be a string');
     });
 
     it('should require ns to contain a dot', function() {
-      (function() { new OplogReader(oplogColl, ''); }).should.throw('ns must contain at least two parts');
+      (function() { oplogReader(oplogColl, ''); }).should.throw('ns must contain at least two parts');
     });
 
     it('should require ns to contain a database name', function() {
-      (function() { new OplogReader(oplogColl, '.'); }).should.throw('ns must contain a database name');
+      (function() { oplogReader(oplogColl, '.'); }).should.throw('ns must contain a database name');
     });
 
     it('should require ns to contain a collection name', function() {
-      (function() { new OplogReader(oplogColl, 'foo.'); }).should.throw('ns must contain a collection name');
+      (function() { oplogReader(oplogColl, 'foo.'); }).should.throw('ns must contain a collection name');
     });
 
     it('should require opts to be an object', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', 1); }).should.throw('opts must be an object');
+      (function() { oplogReader(oplogColl, 'foo.bar', 1); }).should.throw('opts must be an object');
     });
 
     it('should require opts.filter to be an object', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { filter: '' }); }).should.throw('opts.filter must be an object');
+      (function() { oplogReader(oplogColl, 'foo.bar', { filter: '' }); }).should.throw('opts.filter must be an object');
     });
 
-    it('should require opts.offset to be an instance of mongodb.Timestamp', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { offset: '' }); }).should.throw('opts.offset must be an instance of mongodb.Timestamp');
+    it('should require opts.offset to be an object', function() {
+      (function() { oplogReader(oplogColl, 'foo.bar', { offset: '' }); }).should.throw('opts.offset must be an object');
     });
 
     it('should require opts.includeOffset to be a boolean', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
+      (function() { oplogReader(oplogColl, 'foo.bar', { includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
     });
 
     it('should require opts.tailable to be a boolean', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { tailable: '' }); }).should.throw('opts.tailable must be a boolean');
+      (function() { oplogReader(oplogColl, 'foo.bar', { tailable: '' }); }).should.throw('opts.tailable must be a boolean');
     });
 
     it('should require opts.tailableRetryInterval to be a number', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
+      (function() { oplogReader(oplogColl, 'foo.bar', { tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
     });
 
     it('should require opts.log to be an object', function() {
-      (function() { new OplogReader(oplogColl, 'foo.bar', { log: '' }); }).should.throw('opts.log must be an object');
+      (function() { oplogReader(oplogColl, 'foo.bar', { log: '' }); }).should.throw('opts.log must be an object');
     });
 
-    it('should construct', function(done) {
-      var or = new OplogReader(oplogColl, ns, { log: silence });
-      // needs a data handler resume() to start flowing and needs to flow before an end will be emitted
-      or.resume();
+    it('should construct and start reading', function(done) {
+      var or = oplogReader(oplogColl, ns, { log: silence });
+      // move to the end by repeatedly calling read
+      or.on('readable', function() {
+        while (or.read()) {}
+      });
       or.on('end', done);
     });
 
@@ -129,7 +135,7 @@ describe('OplogReader', function() {
     });
 
     it('should emit previously inserted items from reading the oplog after offset', function(done) {
-      var or = new OplogReader(oplogColl, ns, { offset: offset, log: silence });
+      var or = new oplogReader(oplogColl, ns, { offset: offset, log: silence });
       var i = 0;
       or.pipe(new BSONStream()).on('data', function(obj) {
         should.strictEqual(obj.op, 'i');
@@ -143,7 +149,7 @@ describe('OplogReader', function() {
     });
 
     it('should pause and resume', function(done) {
-      var or = new OplogReader(oplogColl, ns, { offset: offset, log: silence });
+      var or = oplogReader(oplogColl, ns, { offset: offset, log: silence });
       var i = 0;
       function errHandler() {
         throw new Error('should not execute');
@@ -172,7 +178,7 @@ describe('OplogReader', function() {
     });
 
     it('should tail and not close', function(done) {
-      var or = new OplogReader(oplogColl, ns, { offset: offset, tailable: true, log: silence });
+      var or = oplogReader(oplogColl, ns, { offset: offset, tailable: true, log: silence });
       var i = 0;
       or.on('data', function() {
         i++;
@@ -187,7 +193,7 @@ describe('OplogReader', function() {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var or = new OplogReader(oplogColl, ns, { offset: items[1].ts, log: silence });
+        var or = oplogReader(oplogColl, ns, { offset: items[1].ts, log: silence });
         var i = 0;
         or.on('data', function() { i++; });
         or.on('end', function() {
@@ -201,7 +207,7 @@ describe('OplogReader', function() {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var or = new OplogReader(oplogColl, ns, { offset: items[1].ts, includeOffset: true, log: silence });
+        var or = oplogReader(oplogColl, ns, { offset: items[1].ts, includeOffset: true, log: silence });
         var i = 0;
         or.on('data', function() { i++; });
         or.on('end', function() {
@@ -214,7 +220,7 @@ describe('OplogReader', function() {
 
   describe('close', function() {
     it('should close', function(done) {
-      var or = new OplogReader(oplogColl, ns, { tailable: true, log: silence });
+      var or = oplogReader(oplogColl, ns, { tailable: true, log: silence });
 
       or.on('end', done);
       or.resume();
