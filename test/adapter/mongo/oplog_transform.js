@@ -28,14 +28,15 @@ var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
 var BSONStream = require('bson-stream');
 
-var oplogReader = require('../../../adapter/mongo/oplog_reader');
+var OplogTransform = require('../../../adapter/mongo/oplog_transform');
 var logger = require('../../../lib/logger');
 
 var silence, cons;
 var oplogDb, oplogColl;
+var oplogCollName = 'oplog.$main';
 
 var db;
-var databaseName = 'test_oplog_reader';
+var databaseName = 'test_oplog_transform';
 var collectionName = 'foo';
 var Database = require('./_database');
 
@@ -52,7 +53,7 @@ before(function(done) {
         if (err) { throw err; }
         db = dbc;
         oplogDb = db.db('local');
-        oplogColl = oplogDb.collection('oplog.$main');
+        oplogColl = oplogDb.collection(oplogCollName);
         done(err);
       });
     });
@@ -66,60 +67,81 @@ after(function(done) {
   });
 });
 
-describe('oplogReader', function() {
+describe('OplogTransform', function() {
   var ns = databaseName + '.' + collectionName;
 
   describe('constructor', function() {
-    it('should require oplogColl to be an object', function() {
-      (function() { oplogReader(); }).should.throw('oplogColl must be an object');
+    it('should require oplogDb to be an object', function() {
+      (function() { new OplogTransform(); }).should.throw('oplogDb must be an object');
     });
 
-    it('should require ns to be a string', function() {
-      (function() { oplogReader(oplogColl); }).should.throw('ns must be a string');
+    it('should require oplogCollName to be a non-empty string', function() {
+      (function() { new OplogTransform(oplogDb); }).should.throw('oplogCollName must be a non-empty string');
+    });
+
+    it('should require ns to be a non-empty string', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, ''); }).should.throw('ns must be a non-empty string');
+    });
+
+    it('should require reqChan to be an object', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' '); }).should.throw('reqChan must be an object');
     });
 
     it('should require ns to contain a dot', function() {
-      (function() { oplogReader(oplogColl, ''); }).should.throw('ns must contain at least two parts');
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', {}); }).should.throw('ns must contain at least two parts');
     });
 
     it('should require ns to contain a database name', function() {
-      (function() { oplogReader(oplogColl, '.'); }).should.throw('ns must contain a database name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, '.', {}); }).should.throw('ns must contain a database name');
     });
 
     it('should require ns to contain a collection name', function() {
-      (function() { oplogReader(oplogColl, 'foo.'); }).should.throw('ns must contain a collection name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.', {}); }).should.throw('ns must contain a collection name');
     });
 
     it('should require opts to be an object', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', 1); }).should.throw('opts must be an object');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, 1); }).should.throw('opts must be an object');
     });
 
+    it('should construct', function() {
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {});
+    });
+  });
+
+  describe('_oplogReader', function() {
     it('should require opts.filter to be an object', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { filter: '' }); }).should.throw('opts.filter must be an object');
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ filter: '' }); }).should.throw('opts.filter must be an object');
     });
 
     it('should require opts.offset to be an object', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { offset: '' }); }).should.throw('opts.offset must be an object');
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ offset: '' }); }).should.throw('opts.offset must be an object');
+    });
+
+    it('should require opts.bson to be a boolean', function() {
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ bson: '' }); }).should.throw('opts.bson must be a boolean');
     });
 
     it('should require opts.includeOffset to be a boolean', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
     });
 
     it('should require opts.tailable to be a boolean', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { tailable: '' }); }).should.throw('opts.tailable must be a boolean');
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ tailable: '' }); }).should.throw('opts.tailable must be a boolean');
     });
 
     it('should require opts.tailableRetryInterval to be a number', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
-    });
-
-    it('should require opts.log to be an object', function() {
-      (function() { oplogReader(oplogColl, 'foo.bar', { log: '' }); }).should.throw('opts.log must be an object');
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      (function() { ot._oplogReader({ tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
     });
 
     it('should construct and start reading', function(done) {
-      var or = oplogReader(oplogColl, ns, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', {}, { log: silence });
+      var or = ot._oplogReader({ log: silence });
       // move to the end by repeatedly calling read
       or.on('readable', function() {
         while (or.read()) {}
@@ -135,11 +157,12 @@ describe('oplogReader', function() {
     });
 
     it('should emit previously inserted items from reading the oplog after offset', function(done) {
-      var or = new oplogReader(oplogColl, ns, { offset: offset, log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, {}, { log: silence });
+      var or = ot._oplogReader({ offset: offset });
       var i = 0;
       or.pipe(new BSONStream()).on('data', function(obj) {
         should.strictEqual(obj.op, 'i');
-        should.strictEqual(obj.ns, 'test_oplog_reader.foo');
+        should.strictEqual(obj.ns, 'test_oplog_transform.foo');
         i++;
       });
       or.on('end', function() {
@@ -149,7 +172,8 @@ describe('oplogReader', function() {
     });
 
     it('should pause and resume', function(done) {
-      var or = oplogReader(oplogColl, ns, { offset: offset, log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, {}, { log: silence });
+      var or = ot._oplogReader({ offset: offset });
       var i = 0;
       function errHandler() {
         throw new Error('should not execute');
@@ -177,23 +201,34 @@ describe('oplogReader', function() {
       or.resume();
     });
 
-    it('should tail and not close', function(done) {
-      var or = oplogReader(oplogColl, ns, { offset: offset, tailable: true, log: silence });
+    it('should tail and not manually close', function(done) {
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, {}, { log: silence });
+      var or = ot._oplogReader({ offset: offset, tailable: true, tailableRetryInterval: 10 });
+
+      var closeCalled = false;
+      or.on('end', function() {
+        should.strictEqual(closeCalled, true);
+        done();
+      });
+
       var i = 0;
       or.on('data', function() {
         i++;
-        if (i > 1) {
-          done();
+        if (i >= 2) {
+          setTimeout(function() {
+            closeCalled = true;
+            or.close();
+          }, 20);
         }
       });
-      or.on('end', function() { throw new Error('should not close'); });
     });
 
     it('should exclude offset by default', function(done) {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var or = oplogReader(oplogColl, ns, { offset: items[1].ts, log: silence });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, {}, { log: silence });
+        var or = ot._oplogReader({ offset: items[1].ts });
         var i = 0;
         or.on('data', function() { i++; });
         or.on('end', function() {
@@ -207,7 +242,8 @@ describe('oplogReader', function() {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var or = oplogReader(oplogColl, ns, { offset: items[1].ts, includeOffset: true, log: silence });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, {}, { log: silence });
+        var or = ot._oplogReader({ offset: items[1].ts, includeOffset: true });
         var i = 0;
         or.on('data', function() { i++; });
         or.on('end', function() {
@@ -217,15 +253,4 @@ describe('oplogReader', function() {
       });
     });
   });
-
-  describe('close', function() {
-    it('should close', function(done) {
-      var or = oplogReader(oplogColl, ns, { tailable: true, log: silence });
-
-      or.on('end', done);
-      or.resume();
-      or.close();
-    });
-  });
-
 });
