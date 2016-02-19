@@ -26,10 +26,13 @@
 var should = require('should');
 var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
+var MongoClient = mongodb.MongoClient;
 var BSONStream = require('bson-stream');
 
 var OplogTransform = require('../../../adapter/mongo/oplog_transform');
 var logger = require('../../../lib/logger');
+
+var config = require('./config.json');
 
 var silence, cons;
 var oplogDb, oplogColl;
@@ -38,10 +41,8 @@ var oplogCollName = 'oplog.$main';
 var db;
 var databaseName = 'test_oplog_transform';
 var collectionName = 'foo';
-var Database = require('./_database');
 
 // open database connection
-var database = new Database(databaseName);
 before(function(done) {
   logger({ silence: true }, function(err, l) {
     if (err) { throw err; }
@@ -49,9 +50,9 @@ before(function(done) {
     logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
       if (err) { throw err; }
       cons = l;
-      database.connect(function(err, dbc) {
+      MongoClient.connect(config.url, function(err, dbc) {
         if (err) { throw err; }
-        db = dbc;
+        db = dbc.db(databaseName);
         oplogDb = db.db('local');
         oplogColl = oplogDb.collection(oplogCollName);
         done(err);
@@ -63,7 +64,7 @@ before(function(done) {
 after(function(done) {
   silence.close(function(err) {
     if (err) { throw err; }
-    database.disconnect(done);
+    db.close(done);
   });
 });
 
