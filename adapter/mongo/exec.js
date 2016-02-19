@@ -36,11 +36,11 @@ var net = require('net');
 
 var async = require('async');
 var chroot = require('chroot');
-var BSONStream = require('bson-stream');
 var MongoClient = require('mongodb').MongoClient;
 var posix = require('posix');
 
-var logger = require('./logger');
+var logger = require('../../lib/logger');
+var OplogTransform = require('./oplog_transform');
 
 /**
  * Instantiate a connection to a mongo database and read the oplog and write to
@@ -72,50 +72,27 @@ var logger = require('./logger');
  */
 
 // globals
-var versionControl; // expect a version request/receive channel on fd 7
-var db, oplogDb; // handle to db and oplog db connection
 var log; // used after receiving the log configuration
 
 /**
- * ask last version
- *  * open oplog after that item
- *  * for each oplog item
- *    * if insert, insert new version via local write stream
- *    * if delete, insert new version via local write stream
- *    * if update by full doc, insert new version via local write stream
- *    * if update by update doc:
- *    * ask last version for h.id
- *      * save in tmp collection
- *      * apply update doc
- *      * insert new version via local write stream
- *  * pass new version
- *  * receive new version with parent (via remote)
- *  * pass confirm via new version
+ * Start oplog transformer:
+ *  * pass new versions and confirms to data channel
+ *  * receive new versions with parent from data channel
+ *
+ * @param {mongodb.Db} oplogDb  connection to the oplog database
+ * @param {String} oplogCollName  oplog collection name, defaults to oplog.$main
+ * @param {String} ns  namespace of the database.collection to follow
+ * @param {Object} versionControl  version control channel
+ * @param {Object} dataChannel  data channel
+ * @param {Object} versionControl  version control channel
  */
-function start() {
-  // expect responses back in bson
-  var bs = new BSONStream();
-  versionControl.pipe(bs);
+function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
+  log.debug('start oplog transform...');
+  var ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, { log: log });
+  ot.pipe(dataChannel);
+  ot.startStream();
 
-  // receive data from remote
-  bs.on('readable', function() {
-    var data = bs.read();
-    if (!data) {
-      // eof
-      return;
-    }
-
-    // TODO: got a version
-  });
-
-  bs.on('error', function(err) {
-    log.err('bson %s', err);
-    versionControl.unpipe(bs);
-  });
-
-  // write id/version requests in ld-json
-  // ask last version of any id
-  versionControl.write(JSON.stringify({ id: null }) + '\n');
+  // TODO: handle new incoming objects
 }
 
 /**
@@ -146,6 +123,7 @@ process.once('message', function(msg) {
 
   if (msg.authorative != null && typeof msg.authorative !== 'boolean') { throw new TypeError('msg.authorative must be a boolean'); }
   if (msg.url != null && typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
+  if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.mongoOpts != null && typeof msg.mongoOpts !== 'object') { throw new TypeError('msg.mongoOpts must be an object'); }
   if (msg.chroot != null && typeof msg.chroot !== 'string') { throw new TypeError('msg.chroot must be a string'); }
@@ -169,6 +147,10 @@ process.once('message', function(msg) {
   var newRoot = msg.chroot || '/var/empty';
 
   msg.log.ident = programName;
+
+  var db, oplogDb; // handle to db and oplog db connection
+  var dataChannel; // expect a data request/receive channel on fd 6
+  var versionControl; // expect a version request/receive channel on fd 7
 
   // open log
   logger(msg.log, function(err, l) {
@@ -223,6 +205,13 @@ process.once('message', function(msg) {
         });
       });
 
+      // expect a data request/receive channel on fd 6
+      startupTasks.push(function(cb) {
+        log.debug('setup data channel...');
+        dataChannel = new net.Socket({ fd: 6, readable: true, writable: true });
+        cb();
+      });
+
       // expect a version request/receive channel on fd 7
       startupTasks.push(function(cb) {
         log.debug('setup version control...');
@@ -231,8 +220,17 @@ process.once('message', function(msg) {
       });
 
       shutdownTasks.push(function(cb) {
-        log.info('closing connection...');
-        versionControl.end();
+        log.info('closing data channel...');
+        dataChannel.end(cb);
+      });
+
+      shutdownTasks.push(function(cb) {
+        log.info('closing version control...');
+        versionControl.end(cb);
+      });
+
+      shutdownTasks.push(function(cb) {
+        log.info('closing database connection...');
         db.close(cb);
       });
 
@@ -256,7 +254,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start();
+        start(oplogDb, oplogCollName, dbName + '.' + collName, dataChannel, versionControl);
       });
 
       // listen to kill signals

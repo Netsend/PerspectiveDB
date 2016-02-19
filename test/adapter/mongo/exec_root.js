@@ -39,7 +39,7 @@ var tasks2 = [];
 
 // print line number
 function lnr() {
-  return new Error().stack.split('\n')[2].match(/mongo_client_exec_root.js:([0-9]+):[0-9]+/)[1];
+  return new Error().stack.split('\n')[2].match(/exec_root.js:([0-9]+):[0-9]+/)[1];
 }
 
 var logger = require('../../../lib/logger');
@@ -63,7 +63,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = childProcess.fork(__dirname + '/../../../lib/mongo_client_exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../adapter/mongo/exec', { silent: true });
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -96,7 +96,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../lib/mongo_client_exec'], {
+  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongo/exec'], {
     cwd: '/',
     env: {},
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
@@ -140,8 +140,8 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        db: 'test_mongo_client_exec_root',
-        coll: 'test_mongo_client_exec_root',
+        db: 'test_mongo_exec_root',
+        coll: 'test_mongo_exec_root',
         url: 'mongodb://127.0.0.1:' + dbPort
       });
       break;
