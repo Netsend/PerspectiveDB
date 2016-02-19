@@ -35,7 +35,8 @@ var noop = function() {};
  * @param {Object} oplogDb  connection to the oplog database
  * @param {String} oplogCollName  oplog collection name, defaults to oplog.$main
  * @param {String} ns  namespace of the database.collection to follow
- * @param {Object} reqChan  request channel to get latest versions
+ * @param {Object} reqChan  request channel to ask for latest versions
+ * @param {Object} resChan  response channel to recive latest versions
  * @param {Object} [opts]  object containing configurable parameters
  *
  * opts:
@@ -46,11 +47,12 @@ var noop = function() {};
  *
  * @class represents a OplogTransform of a database and collection
  */
-function OplogTransform(oplogDb, oplogCollName, ns, reqChan, opts) {
+function OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, opts) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
   if (reqChan == null || typeof reqChan !== 'object') { throw new TypeError('reqChan must be an object'); }
+  if (resChan == null || typeof resChan !== 'object') { throw new TypeError('resChan must be an object'); }
 
   if (opts == null) opts = opts || {};
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
@@ -69,7 +71,11 @@ function OplogTransform(oplogDb, oplogCollName, ns, reqChan, opts) {
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
 
+  // write ld-json to the request channel
   this._reqChan = reqChan;
+
+  // expect bson on the response channel
+  this._resChan = resChan.pipe(new BSONStream());
 
   this._tmpCollection = oplogDb.collection('_pdb.' + ns);
 
@@ -93,9 +99,10 @@ util.inherits(OplogTransform, Transform);
 module.exports = OplogTransform;
 
 /**
- * Start reading the oplog and converting items to new versions.
+ * Ask for last version and start reading the oplog after that. Convert oplog items
+ * to new versions.
  *
- * ask last version
+ * Ask last version
  *  * open oplog after that item
  *  * for each oplog item
  *    * if insert, delete or update by full doc, emit
@@ -108,19 +115,13 @@ module.exports = OplogTransform;
 OplogTransform.prototype.startStream = function startStream() {
   var that = this;
 
-  // expect bson responses from the request channel
-  this._resChan = this._reqChan.pipe(new BSONStream());
-
-  // ask for last version (not id restricted)
-  // write version requests in ld-json
-  this._reqChan.write(JSON.stringify({ id: null }) + '\n');
-
   // listen for response, expect it to be the last stored version
   this._resChan.once('readable', function() {
     var obj = that._resChan.read();
     if (!obj) {
       // eof, request channel closed
-      throw new Error('response channel closed unexpectedly');
+      that._log.notice('ot startStream request channel closed before opening the oplog');
+      return;
     }
 
     // expect the last version in the DAG with an oplog offset
@@ -130,16 +131,20 @@ OplogTransform.prototype.startStream = function startStream() {
     }
 
     // open oplog reader starting at this offset
-    var opts2 = {
+    var opts = {
       tailable: true,
       offset: offset,
       log: that._log
     };
 
     // handle new oplog items via this._transform
-    var or = that._oplogReader(opts2);
+    var or = that._oplogReader(opts);
     or.pipe(that);
   });
+
+  // ask for last version (not id restricted)
+  // write version requests in ld-json
+  this._reqChan.write(JSON.stringify({ id: null }) + '\n');
 };
 
 /**
@@ -198,26 +203,16 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
  *
  * @param {Object} oplogItem  item from the oplog
  * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the new version of the document.
+ *                       the second parameter will be undefined. On success the
+ *                       first parameter will be null and the second parameter will
+ *                       be the new version of the document.
  */
 OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
-  if (oplogItem == null || typeof oplogItem !== 'object') { throw new TypeError('oplogItem must be an object'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   if (OplogTransform._invalidOplogItem(oplogItem)) {
     process.nextTick(function() {
-      cb(new Error('invalid oplogItem'), oplogItem);
-    });
-    return;
-  }
-
-  try {
-    if (!oplogItem.o) { throw new Error('missing oplogItem.o'); }
-  } catch(err) {
-    process.nextTick(function() {
-      cb(err, oplogItem);
+      cb(new Error('invalid oplogItem'));
     });
     return;
   }
@@ -232,7 +227,7 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
       if (!oplogItem.o2._id) { throw new Error('missing oplogItem.o2._id'); }
     } catch(err) {
       process.nextTick(function() {
-        cb(err, oplogItem);
+        cb(err);
       });
       return;
     }
@@ -242,10 +237,10 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
 
   switch (operator) {
   case 'i':
-    this._applyOplogInsertItem(oplogItem, cb);
+    this._applyOplogFullDoc(oplogItem, cb);
     break;
   case 'uf':
-    this._applyOplogUpdateFullDoc(oplogItem, cb);
+    this._applyOplogFullDoc(oplogItem, cb);
     break;
   case 'u':
     this._applyOplogUpdateModifier(oplogItem, cb);
@@ -255,7 +250,7 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     break;
   default:
     process.nextTick(function() {
-      cb(new Error('unsupported operator: ' + operator), oplogItem);
+      cb(new Error('unsupported operator: ' + operator));
     });
     return;
   }
@@ -269,9 +264,7 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
  * @return {Boolean} true if the object contains any modifiers, false otherwise.
  */
 OplogTransform._oplogUpdateContainsModifier = function _oplogUpdateContainsModifier(oplogItem) {
-  //if (!oplogItem) { return false; }
-  //if (!oplogItem.o) { return false; }
-  //if (typeof oplogItem.o !== 'object' || Array.isArray(oplogItem)) { return false; }
+  if (typeof oplogItem.o !== 'object' || Array.isArray(oplogItem)) { return false; }
 
   var keys = Object.keys(oplogItem.o);
   if (keys[0] && keys[0][0] === '$') {
@@ -282,27 +275,23 @@ OplogTransform._oplogUpdateContainsModifier = function _oplogUpdateContainsModif
 };
 
 /**
- * Create a new version by applying an update document in a temporary collection.
+ * Create a new version by applying the update in a temporary collection.
  *
  * @param {Object} dagItem  item from the snapshot
  * @param {Object} oplogItem  the update item from the oplog.
  * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the new version of the document.
+ *                       the second parameter will be undefined. On success the
+ *                       first parameter will be null and the second parameter will
+ *                       be the new version of the document.
  */
 OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersionByUpdateDoc(dagItem, oplogItem, cb) {
-  if (typeof dagItem !== 'object') { throw new TypeError('dagItem must be an object'); }
-  if (typeof oplogItem !== 'object') { throw new TypeError('oplogItem must be an object'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
   try {
     if (oplogItem.op !== 'u') { throw new Error('oplogItem op must be "u"'); }
     if (!oplogItem.o2._id) { throw new Error('missing oplogItem.o2._id'); }
     if (oplogItem.o._id) { throw new Error('oplogItem contains o._id'); }
   } catch(err) {
     process.nextTick(function() {
-      cb(err, oplogItem);
+      cb(err);
     });
     return;
   }
@@ -310,165 +299,148 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
   var that = this;
   var error;
 
-  // save the previous head and apply the update modifiers to get the new version of the doc
-  that._tmpCollection.insert(dagItem.b, {w: 1, comment: '_createNewVersionByUpdateDoc'}, function(err, inserted) {
-    if (err) { cb(err, oplogItem); return; }
+  var selector = { _id: dagItem.h.id };
 
-    if (inserted.length !== 1) {
+  // save the previous head and apply the update modifiers to get the new version of the doc
+  that._tmpCollection.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
+    if (err) { cb(err); return; }
+
+    if (result.modifiedCount !== 1) {
       error = new Error('new version not inserted in tmp collection');
-      that._log.err('vc _createNewVersionByUpdateDoc %s %j %j', error, dagItem, inserted);
+      that._log.err('ot _createNewVersionByUpdateDoc %s %j %j', error, dagItem, result);
       cb(error);
       return;
     }
 
     // update the just created copy
-    var selector = { '_id': dagItem.h.id };
-    that._log.info('vc _createNewVersionByUpdateDoc selector %j', selector);
+    that._log.info('ot _createNewVersionByUpdateDoc selector %j', selector);
 
-    that._tmpCollection.findAndModify(selector, [], oplogItem.o, {w: 0, new: true}, function(err, newObj) {
+    that._tmpCollection.findOneAndUpdate(selector, oplogItem.o, { returnOriginal: false }, function(err, result) {
       if (err) {
-        that._log.err('vc _createNewVersionByUpdateDoc', err);
-        cb(err, oplogItem);
+        that._log.err('ot _createNewVersionByUpdateDoc', err);
+        cb(err);
         return;
       }
-      if (!newObj) {
-        that._log.err('vc _createNewVersionByUpdateDoc new doc not created %j %j %j', dagItem, selector, oplogItem.o);
-        cb(new Error('new doc not created'), oplogItem);
+      if (!result.ok) {
+        that._log.err('ot _createNewVersionByUpdateDoc new doc not created %j %j %j', dagItem, selector, oplogItem.o);
+        cb(new Error('new doc not created'));
         return;
       }
 
-      // clear tmp collection
-      that._tmpCollection.remove(function(err) {
-        if (err) {
-          that._log.err('vc _createNewVersionByUpdateDoc clear _tmpCollection', err);
-          cb(err, oplogItem);
+      var newObj = result.value;
+
+      // remove object from collection
+      that._tmpCollection.deleteOne(selector, function(err, result) {
+        if (err || result.deletedCount !== 1) {
+          that._log.err('ot _createNewVersionByUpdateDoc remove update ', err, result);
+          cb(err);
           return;
         }
 
-        cb(null, newObj);
+        cb(null, {
+          h: { id: dagItem.h.id },
+          m: { _op: oplogItem.ts },
+          b: newObj
+        });
       });
     });
   });
 };
 
 /**
- * Insert a new root element into the DAG. The root element can be inserted in the
- * collection first (locally created), in which case it might still need a new
- * version, or in the DAG first (from a remote) and then in the collection.
- *
- * @param {Object} oplogItem  the item from the oplog.
- * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the saved versioned document.
- */
-OplogTransform.prototype._applyOplogInsertItem = function _applyOplogInsertItem(oplogItem, cb) {
-  this._log.info('vc _applyOplogInsertItem', JSON.stringify(oplogItem));
-  this._applyOplogUpdateFullDoc(oplogItem, cb);
-};
-
-/**
- * Update an existing version of a document by applying an oplog update item with
- * full doc. Insert a new document in the DAG.
+ * Create a new version with only the id and the body straight from the oplog item.
+ * Supports oplog by full doc and oplog insert items.
  *
  * @param {Object} oplogItem  the update item from the oplog.
  * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the new version of the document.
+ *                       the second parameter will be undefined. On success the
+ *                       first parameter will be null and the second parameter will
+ *                       be the new version of the document.
  */
-OplogTransform.prototype._applyOplogUpdateFullDoc = function _applyOplogUpdateFullDoc(oplogItem, cb) {
-  this._log.info('vc _applyOplogUpdateFullDoc', JSON.stringify(oplogItem));
+OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogItem, cb) {
+  this._log.info('ot _applyOplogFullDoc', JSON.stringify(oplogItem));
 
   try {
     if (oplogItem.op !== 'u' && oplogItem.op !== 'i') { throw new Error('oplogItem.op must be "u" or "i"'); }
     if (!oplogItem.o._id) { throw new Error('missing oplogItem.o._id'); }
   } catch(err) {
     process.nextTick(function() {
-      cb(err, oplogItem);
+      cb(err);
     });
     return;
   }
 
-  cb(null, {
-    h: {
-      id: oplogItem.o._id
-    },
-    m: {
-      _op: oplogItem.ts
-    },
-    b: oplogItem.o
+  process.nextTick(function() {
+    cb(null, {
+      h: { id: oplogItem.o._id },
+      m: { _op: oplogItem.ts },
+      b: oplogItem.o
+    });
   });
 };
 
 /**
  * Update an existing version of a document by applying an oplog update item.  
  *
+ * Request the current version on the request channel. Insert it into a temporary
+ * collection to update it and pass the result back on the data channel.
+ *
  * Every mongodb update modifier is supported since the update operation is executed
- * by the database engine in a temporary collection.
+ * by the database engine.
  *
  * @param {Object} oplogItem  the update item from the oplog.
  * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the new version of the document.
+ *                       the second parameter will be undefined. On success the
+ *                       first parameter will be null and the second parameter will
+ *                       be the new version of the document.
  */
 OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateModifier(oplogItem, cb) {
-  this._log.info('vc _applyOplogUpdateModifier', JSON.stringify(oplogItem));
-
-  if (typeof cb !== 'function') { throw new Error('cb must be a function'); }
+  this._log.info('ot _applyOplogUpdateModifier', JSON.stringify(oplogItem));
 
   var that = this;
-
-  // copy the parent of this item from the DAG to a temporary collection
-  // update it there and insert it back into the DAG
-
-  // ask for last version of this id
-  this._reqChan.write(JSON.stringify({ id: oplogItem.o._id }) + '\n');
 
   // listen for response, expect it to be the last stored version
   this._resChan.once('readable', function() {
     var head = that._resChan.read();
-    if (!head) return void cb(new Error('previous version of doc not found'), oplogItem);
+    if (!head || !head.h) return void cb(new Error('previous version of doc not found'));
 
     that._createNewVersionByUpdateDoc(head, oplogItem, cb);
   });
+
+  // ask for last version of this id
+  this._reqChan.write(JSON.stringify({ id: oplogItem.o2._id }) + '\n');
 };
 
 /**
- * Save a new document with only the _id of the doc, _d: true and a reference to
- * it's parent.
+ * Create a new version with only the id, h.d set to true and no body.
  *
  * @param {Object} oplogItem  the delete item from the oplog.
  * @param {Function} cb  On error the first parameter will be the Error object and
- *                       the second parameter will be the original document. On 
- *                       success the first parameter will be null and the second
- *                       parameter will be the new version of the document.
+ *                       the second parameter will be undefined. On success the
+ *                       first parameter will be null and the second parameter will
+ *                       be the new version of the document.
  */
 OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(oplogItem, cb) {
-  this._log.info('vc _applyOplogDeleteItem', JSON.stringify(oplogItem));
-
-  if (typeof cb !== 'function') { throw new Error('cb must be a function'); }
+  this._log.info('ot _applyOplogDeleteItem', JSON.stringify(oplogItem));
 
   try {
     if (oplogItem.op !== 'd') { throw new Error('oplogItem.op must be "d"'); }
     if (!oplogItem.o._id) { throw new Error('missing oplogItem.o._id'); }
   } catch(err) {
     process.nextTick(function() {
-      cb(err, oplogItem);
+      cb(err);
     });
     return;
   }
 
-  cb(null, {
-    h: {
-      id: oplogItem.o._id,
-      d: true,
-    },
-    m: {
-      _op: oplogItem.ts
-    },
-    b: oplogItem.o
+  process.nextTick(function() {
+    cb(null, {
+      h: {
+        id: oplogItem.o._id,
+        d: true,
+      },
+      m: { _op: oplogItem.ts }
+    });
   });
 };
 
