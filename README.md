@@ -5,11 +5,11 @@
 Features:
 * built on the principles of owning your own data
 * multi-master replication with transformations
+* support for browsers via IndexedDB and WebSockets
 * support systems that are built with privacy by design
 * [security by design](https://github.com/Netsend/persdb/wiki/privilege-separation)
 
-Alpha status. Currently working on a browser based IndexedDB implementation
-using WebSockets.
+Alpha status. Currently working on a MongoDB adapter.
 
 # Installation
 
@@ -48,18 +48,22 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 
 Create a user account database:
 ```
-$ touch config/passwd.hjson
-$ chmod 600 config/passwd.hjson
+$ umask 077 && touch local/config/passwd.hjson
 ```
 
 Grant access to a user for remote login, i.e. "john":
 ```
-$ ./bin/adduser john >> config/passwd.hjson
+$ ./bin/adduser john >> local/config/passwd.hjson
 ```
 
-Edit config/example.hjson and start the server:
+Copy and edit a config file, i.e. example.hjson:
 ```
-$ sudo bin/persdb config/example.hjson
+$ cp config/example.hjson local/config/pdb.hjson
+```
+
+Start the server:
+```
+$ sudo bin/persdb local/config/pdb.hjson
 ```
 
 # Adding a WebSocket server
@@ -85,11 +89,11 @@ $ rm config/csr.pem
 
 Edit your config to enable the WebSocket server and include these three files.
 Relative paths are relative to the directory of the config file that specifies
-them.
+them. An example is given in config/example-with-websocket.hjson.
 
 # License
 
-Copyright 2012, 2013, 2014, 2015 Netsend.
+Copyright 2012-2016 Netsend.
 
 This file is part of PersDB.
 

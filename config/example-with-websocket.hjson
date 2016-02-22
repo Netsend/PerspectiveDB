@@ -20,9 +20,8 @@ dbs: [
   }
 ]
 
-wss: {                         # enable to start a secure websocket server
-                                # relative paths are relative to the directory of this config file
-  key: "key.pem"               # use `openssl genrsa -out key.pem 2048`
+wss: {
+  key: "key.pem"               # use `umask 077 && openssl genrsa -out key.pem 2048`
   cert: "cert.pem"             # use `openssl req -new -sha256 -key key.pem -out csr.pem && openssl x509 -req -in csr.pem -signkey key.pem -out cert.pem`
   dhparam: "dhparam.pem"       # use `openssl dhparam -outform PEM -out dhparam.pem 2048`
   #host: 127.0.0.1
