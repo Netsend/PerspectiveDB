@@ -31,6 +31,11 @@ Ensure /var/empty exists for the chrooted processes:
 $ sudo mkdir /var/empty
 ```
 
+Ensure database directory exists, i.e. /srv/persdb/foo:
+```
+$ sudo mkdir -m600 /srv/persdb/foo
+```
+
 Create a dedicated system user for the main process:
 ```
 $ sudo useradd -d /var/empty -r -s /bin/false -U _pdbnull
@@ -41,7 +46,7 @@ Create a dedicated system user for the database process:
 $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 ```
 
-Create a password database:
+Create a user account database:
 ```
 $ touch config/passwd.hjson
 $ chmod 600 config/passwd.hjson
