@@ -74,8 +74,8 @@ after(function(done) {
 
 describe('OplogTransform', function() {
   describe('constructor', function() {
-    var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-    var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
     it('should require oplogDb to be an object', function() {
       (function() { new OplogTransform(); }).should.throw('oplogDb must be an object');
@@ -89,32 +89,32 @@ describe('OplogTransform', function() {
       (function() { new OplogTransform(oplogDb, oplogCollName, ''); }).should.throw('ns must be a non-empty string');
     });
 
-    it('should require reqChan to be an object', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, ' '); }).should.throw('reqChan must be an object');
+    it('should require controlWrite to be an object', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' '); }).should.throw('controlWrite must be an object');
     });
 
-    it('should require resChan to be an object', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', reqChan); }).should.throw('resChan must be an object');
+    it('should require controlRead to be an object', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite); }).should.throw('controlRead must be an object');
     });
 
     it('should require ns to contain a dot', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', reqChan, resChan); }).should.throw('ns must contain at least two parts');
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite, controlRead); }).should.throw('ns must contain at least two parts');
     });
 
     it('should require ns to contain a database name', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, '.', reqChan, resChan); }).should.throw('ns must contain a database name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, '.', controlWrite, controlRead); }).should.throw('ns must contain a database name');
     });
 
     it('should require ns to contain a collection name', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.', reqChan, resChan); }).should.throw('ns must contain a collection name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.', controlWrite, controlRead); }).should.throw('ns must contain a collection name');
     });
 
     it('should require opts to be an object', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, 1); }).should.throw('opts must be an object');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, 1); }).should.throw('opts must be an object');
     });
 
     it('should construct', function() {
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan);
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead);
     });
   });
 
@@ -123,51 +123,51 @@ describe('OplogTransform', function() {
     var ns = databaseName + '.' + collectionName;
 
     it('should require opts.filter to be an object', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ filter: '' }); }).should.throw('opts.filter must be an object');
     });
 
     it('should require opts.offset to be an object', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ offset: '' }); }).should.throw('opts.offset must be an object');
     });
 
     it('should require opts.bson to be a boolean', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ bson: '' }); }).should.throw('opts.bson must be a boolean');
     });
 
     it('should require opts.includeOffset to be a boolean', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
     });
 
     it('should require opts.tailable to be a boolean', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ tailable: '' }); }).should.throw('opts.tailable must be a boolean');
     });
 
     it('should require opts.tailableRetryInterval to be a number', function() {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       (function() { ot._oplogReader({ tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
     });
 
     it('should construct and start reading', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, { log: silence });
       var or = ot._oplogReader({ log: silence });
       // move to the end by repeatedly calling read
       or.on('readable', function() {
@@ -184,9 +184,9 @@ describe('OplogTransform', function() {
     });
 
     it('should emit previously inserted items from reading the oplog after offset', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var or = ot._oplogReader({ offset: offset });
       var i = 0;
       or.pipe(new BSONStream()).on('data', function(obj) {
@@ -201,9 +201,9 @@ describe('OplogTransform', function() {
     });
 
     it('should pause and resume', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var or = ot._oplogReader({ offset: offset });
       var i = 0;
       function errHandler() {
@@ -233,9 +233,9 @@ describe('OplogTransform', function() {
     });
 
     it('should tail and not manually close', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var or = ot._oplogReader({ offset: offset, tailable: true, tailableRetryInterval: 10 });
 
       var closeCalled = false;
@@ -260,9 +260,9 @@ describe('OplogTransform', function() {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         var or = ot._oplogReader({ offset: items[1].ts });
         var i = 0;
         or.on('data', function() { i++; });
@@ -277,9 +277,9 @@ describe('OplogTransform', function() {
       oplogColl.find({ ns: ns }, { ts: true }, { limit: 2, sort: { $natural: -1 } }).toArray(function(err, items) {
         if (err) { throw err; }
 
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         var or = ot._oplogReader({ offset: items[1].ts, includeOffset: true });
         var i = 0;
         or.on('data', function() { i++; });
@@ -296,9 +296,9 @@ describe('OplogTransform', function() {
     var ns = databaseName + '.' + collectionName;
 
     it('should require a valid oplog item', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot.write({ o: { } }, function(err) {
         should.equal('invalid oplogItem', err.message);
         done();
@@ -317,9 +317,9 @@ describe('OplogTransform', function() {
       };
 
       it('should handle an oplog insert item', function(done) {
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         ot.write(oplogItem);
         ot.on('readable', function() {
           var newVersion = ot.read();
@@ -359,9 +359,9 @@ describe('OplogTransform', function() {
       };
 
       it('should handle an oplog update by full doc item', function(done) {
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         ot.write(oplogItem);
         ot.on('readable', function() {
           var newVersion = ot.read();
@@ -409,11 +409,11 @@ describe('OplogTransform', function() {
       };
 
       it('should handle an oplog update by modifier item (request last version)', function(done) {
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
         var ls = new LDJSONStream();
-        reqChan.pipe(ls).on('readable', function() {
+        controlWrite.pipe(ls).on('readable', function() {
           var obj = ls.read();
           if (!obj) { throw new Error('expected version request'); } // end reached
 
@@ -421,10 +421,10 @@ describe('OplogTransform', function() {
           should.strictEqual(obj.id, 'foo');
 
           // send back the DAG item
-          resChan.write(BSON.serialize(dagItem));
+          controlRead.write(BSON.serialize(dagItem));
         });
 
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         ot.write(oplogItem);
         ot.on('readable', function() {
           var newVersion = ot.read();
@@ -461,9 +461,9 @@ describe('OplogTransform', function() {
       };
 
       it('should handle an oplog delete item', function(done) {
-        var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-        var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+        var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+        var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
         ot.write(oplogItem);
         ot.on('readable', function() {
           var newVersion = ot.read();
@@ -512,8 +512,8 @@ describe('OplogTransform', function() {
   describe('_createNewVersionByUpdateDoc', function() {
     var collectionName = '_createNewVersionByUpdateDoc';
     var ns = databaseName + '.' + collectionName;
-    var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-    var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
     var dagItem = {
       h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
@@ -526,7 +526,7 @@ describe('OplogTransform', function() {
     var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
 
     it('should require op to be "u"', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var updateItem = {
         ts: 123,
         op: 'i',
@@ -541,7 +541,7 @@ describe('OplogTransform', function() {
     });
 
     it('should require an o2 object', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u' }, function(err) {
         should.equal(err.message, 'Cannot read property \'_id\' of undefined');
         done();
@@ -549,7 +549,7 @@ describe('OplogTransform', function() {
     });
 
     it('should require oplogItem.o2._id', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(dagItem, { o: mod, op: 'u', o2: { } }, function(err) {
         should.equal(err.message, 'missing oplogItem.o2._id');
         done();
@@ -562,7 +562,7 @@ describe('OplogTransform', function() {
         op: 'u',
         o2: { _id: 'applyOplogItemTest' }
       };
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(dagItem, item, function(err) {
         should.equal(err.message, 'oplogItem contains o._id');
         done();
@@ -570,7 +570,7 @@ describe('OplogTransform', function() {
     });
 
     it('should create a new version', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(dagItem, oplogItem, function(err, item) {
         if (err) { throw err; }
 
@@ -603,7 +603,7 @@ describe('OplogTransform', function() {
           bar: 'qux'
         }
       };
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(item, oplogItem, function(err, newVersion) {
         if (err) { throw err; }
 
@@ -623,8 +623,8 @@ describe('OplogTransform', function() {
   describe('_applyOplogFullDoc', function() {
     var collectionName = '_applyOplogFullDoc';
     var ns = databaseName + '.' + collectionName;
-    var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-    var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
     var time = new Date();
 
@@ -641,7 +641,7 @@ describe('OplogTransform', function() {
     };
 
     it('should require op to be "u" or "i"', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var updateItem = {
         op: 'd'
       };
@@ -652,7 +652,7 @@ describe('OplogTransform', function() {
     });
 
     it('should require oplogItem.o._id', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogFullDoc({ o: {}, op: 'u' }, function(err) {
         should.equal(err.message, 'missing oplogItem.o._id');
         done();
@@ -660,7 +660,7 @@ describe('OplogTransform', function() {
     });
 
     it('should create a new version of an insert oplog item', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogFullDoc(oplogItemInsert, function(err, item) {
         if (err) { throw err; }
 
@@ -677,7 +677,7 @@ describe('OplogTransform', function() {
       });
     });
     it('should create a new version of an update by full doc oplog item', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogFullDoc(oplogItemUpdate, function(err, item) {
         if (err) { throw err; }
 
@@ -721,12 +721,12 @@ describe('OplogTransform', function() {
 
     it('should complain about missing parent and don\'t add to the DAG', function(done) {
       var versionRequested = false;
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
-      // expect ld-json on the request channel
+      // expect ld-json on the request stream
       var ls = new LDJSONStream();
-      reqChan.pipe(ls).on('readable', function() {
+      controlWrite.pipe(ls).on('readable', function() {
         var obj = ls.read();
         if (!obj) { throw new Error('expected version request'); } // end reached
 
@@ -735,10 +735,10 @@ describe('OplogTransform', function() {
         versionRequested = true;
 
         // send back an empty response as if this version does not exist yet
-        resChan.write(BSON.serialize({}));
+        controlRead.write(BSON.serialize({}));
       });
 
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogUpdateModifier(oplogItem, function(err, newVersion) {
         should.equal(err.message, 'previous version of doc not found');
         should.strictEqual(versionRequested, true);
@@ -748,9 +748,9 @@ describe('OplogTransform', function() {
     });
 
     it('should make new version based on the passed head and oplog item', function(done) {
-      var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
 
       var head = {
         h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
@@ -760,12 +760,12 @@ describe('OplogTransform', function() {
         }
       };
 
-      // expect ld-json on the request channel and send back the head
+      // expect ld-json on the request stream and send back the head
       var ls = new LDJSONStream();
-      reqChan.pipe(ls).on('readable', function() {
+      controlWrite.pipe(ls).on('readable', function() {
         var obj = ls.read();
         should.strictEqual(obj.id, 'foo');
-        resChan.write(BSON.serialize(head));
+        controlRead.write(BSON.serialize(head));
       });
 
       ot._applyOplogUpdateModifier(oplogItem, function(err, newVersion) {
@@ -795,8 +795,8 @@ describe('OplogTransform', function() {
   describe('_applyOplogDeleteItem', function() {
     var collectionName = '_applyOplogDeleteItem';
     var ns = databaseName + '.' + collectionName;
-    var reqChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
-    var resChan = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+    var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
     var oplogItem = {
       ts: new Timestamp(1234, 1),
@@ -805,7 +805,7 @@ describe('OplogTransform', function() {
     };
 
     it('should require op to be "d"', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       var updateItem = {
         op: 'i',
         o: { qux: 'quux' }
@@ -817,7 +817,7 @@ describe('OplogTransform', function() {
     });
 
     it('should require oplogItem.o._id', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogDeleteItem({ o: {}, op: 'd' }, function(err) {
         should.equal(err.message, 'missing oplogItem.o._id');
         done();
@@ -825,7 +825,7 @@ describe('OplogTransform', function() {
     });
 
     it('should create a new version with the right id, no body and the oplog timestamp', function(done) {
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._applyOplogDeleteItem(oplogItem, function(err, newVersion) {
         if (err) { throw err; }
 

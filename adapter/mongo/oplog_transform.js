@@ -35,8 +35,8 @@ var noop = function() {};
  * @param {Object} oplogDb  connection to the oplog database
  * @param {String} oplogCollName  oplog collection name, defaults to oplog.$main
  * @param {String} ns  namespace of the database.collection to follow
- * @param {Object} reqChan  request channel to ask for latest versions
- * @param {Object} resChan  response channel to recive latest versions
+ * @param {Object} controlWrite  request stream to ask for latest versions
+ * @param {Object} controlRead  response stream to recieve latest versions
  * @param {Object} [opts]  object containing configurable parameters
  *
  * opts:
@@ -44,15 +44,13 @@ var noop = function() {};
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
- *
- * @class represents a OplogTransform of a database and collection
  */
-function OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, opts) {
+function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, opts) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
-  if (reqChan == null || typeof reqChan !== 'object') { throw new TypeError('reqChan must be an object'); }
-  if (resChan == null || typeof resChan !== 'object') { throw new TypeError('resChan must be an object'); }
+  if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
+  if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
 
   if (opts == null) opts = opts || {};
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
@@ -71,11 +69,11 @@ function OplogTransform(oplogDb, oplogCollName, ns, reqChan, resChan, opts) {
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
 
-  // write ld-json to the request channel
-  this._reqChan = reqChan;
+  // write ld-json to the request stream
+  this._controlWrite = controlWrite;
 
-  // expect bson on the response channel
-  this._resChan = resChan.pipe(new BSONStream());
+  // expect bson on the response stream
+  this._controlRead = controlRead.pipe(new BSONStream());
 
   this._tmpCollection = oplogDb.collection('_pdb.' + ns);
 
@@ -116,11 +114,11 @@ OplogTransform.prototype.startStream = function startStream() {
   var that = this;
 
   // listen for response, expect it to be the last stored version
-  this._resChan.once('readable', function() {
-    var obj = that._resChan.read();
+  this._controlRead.once('readable', function() {
+    var obj = that._controlRead.read();
     if (!obj) {
-      // eof, request channel closed
-      that._log.notice('ot startStream request channel closed before opening the oplog');
+      // eof, request stream closed
+      that._log.notice('ot startStream control read stream closed before opening the oplog');
       return;
     }
 
@@ -144,7 +142,7 @@ OplogTransform.prototype.startStream = function startStream() {
 
   // ask for last version (not id restricted)
   // write version requests in ld-json
-  this._reqChan.write(JSON.stringify({ id: null }) + '\n');
+  this._controlWrite.write(JSON.stringify({ id: null }) + '\n');
 };
 
 /**
@@ -382,8 +380,8 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
 /**
  * Update an existing version of a document by applying an oplog update item.  
  *
- * Request the current version on the request channel. Insert it into a temporary
- * collection to update it and pass the result back on the data channel.
+ * Request the current version on the control read stream. Insert it into a temporary
+ * collection to update it and pass the result back on the data stream.
  *
  * Every mongodb update modifier is supported since the update operation is executed
  * by the database engine.
@@ -400,15 +398,15 @@ OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateM
   var that = this;
 
   // listen for response, expect it to be the last stored version
-  this._resChan.once('readable', function() {
-    var head = that._resChan.read();
+  this._controlRead.once('readable', function() {
+    var head = that._controlRead.read();
     if (!head || !head.h) return void cb(new Error('previous version of doc not found'));
 
     that._createNewVersionByUpdateDoc(head, oplogItem, cb);
   });
 
   // ask for last version of this id
-  this._reqChan.write(JSON.stringify({ id: oplogItem.o2._id }) + '\n');
+  this._controlWrite.write(JSON.stringify({ id: oplogItem.o2._id }) + '\n');
 };
 
 /**
