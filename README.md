@@ -31,14 +31,19 @@ Ensure /var/empty exists for the chrooted processes:
 $ sudo mkdir /var/empty
 ```
 
-Add a new unprivileged user:
+Create a dedicated system user for the main process:
 ```
 $ sudo useradd -d /var/empty -r -s /bin/false -U _pdbnull
 ```
 
-Add a user for your database:
+Create a dedicated system user for the database process:
 ```
 $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
+```
+
+Grant access to a user for remote login:
+```
+$ ./bin/adduser.js > config/passwd.hjson
 ```
 
 Edit config/example.hjson and start the server:
