@@ -43,12 +43,12 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 
 Grant access to a user for remote login, i.e. "john":
 ```
-$ ./bin/adduser.js john > config/passwd.hjson
+$ ./bin/adduser john > config/passwd.hjson
 ```
 
 Edit config/example.hjson and start the server:
 ```
-$ sudo bin/persdb.js config/example.hjson
+$ sudo bin/persdb config/example.hjson
 ```
 
 # Adding a WebSocket server
