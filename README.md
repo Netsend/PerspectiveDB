@@ -41,9 +41,15 @@ Create a dedicated system user for the database process:
 $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 ```
 
+Create a password database:
+```
+$ touch config/passwd.hjson
+$ chmod 600 config/passwd.hjson
+```
+
 Grant access to a user for remote login, i.e. "john":
 ```
-$ ./bin/adduser john > config/passwd.hjson
+$ ./bin/adduser john >> config/passwd.hjson
 ```
 
 Edit config/example.hjson and start the server:
