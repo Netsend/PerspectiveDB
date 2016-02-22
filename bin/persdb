@@ -89,7 +89,7 @@ function start() {
     config.dbs.forEach(function(dbCfg) {
       dbCfg.perspectives.forEach(function(persCfg) {
         var username = persCfg.username || persCfg.name;
-        var password = persCfg.password || persCfg.passdb;
+        var password = persCfg.password || persCfg.users;
 
         // support loading from a file
         if (password.indexOf('$2a$') !== 0) {
