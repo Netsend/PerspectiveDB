@@ -26,31 +26,54 @@ var User = require('array-bcrypt-user');
 
 program
   .version('0.0.3')
-  .usage('adduser.js')
+  .usage('adduser.js [username]')
   .description('create a passwd entry containing a username and a bcrypt password')
   .parse(process.argv);
 
-read({ prompt: 'username:' }, function(err, username) {
-  if (err) { console.error(err.message); process.exit(1); }
+var username = program.args[0];
 
-  read({ prompt: 'password:', silent: true }, function(err, password) {
-    if (err) { console.error(err.message); process.exit(1); }
+// cb(err, username)
+function askUsername(cb) {
+  if (username) {
+    process.nextTick(function() {
+      cb(null, username);
+    });
+    return;
+  } else {
+    read({ output: process.stderr, prompt: 'username:' }, cb);
+  }
+}
 
-    read({ prompt: 'repeat password:', silent: true }, function(err, password2) {
-      if (err) { console.error(err.message); process.exit(1); }
+// cb(err, password)
+function askPassword(cb) {
+  read({ output: process.stderr, prompt: 'password:', silent: true }, function(err, password) {
+    if (err) { cb(err); return; }
+
+    read({ output: process.stderr, prompt: 'repeat password:', silent: true }, function(err, password2) {
+      if (err) { cb(err); return; }
 
       if (password !== password2) {
-        console.log('passwords are not equal');
-        process.exit(2);
+        cb(new Error('passwords are not equal'));
+        return;
       }
 
-      var db = [];
-      User.register(db, username, password, function(err) {
-        if (err) { console.error(err.message); process.exit(1); }
+      cb(null, password);
+    });
+  });
+}
 
-        console.log('%s:%s', db[0].username, db[0].password);
-        process.exit();
-      });
+askUsername(function(err, username) {
+  if (err) { console.error(err.message); process.exit(1); }
+
+  askPassword(function(err, password) {
+    if (err) { console.error(err.message); process.exit(2); }
+
+    var db = [];
+    User.register(db, username, password, function(err) {
+      if (err) { console.error(err.message); process.exit(3); }
+
+      console.log('%s:%s', db[0].username, db[0].password);
+      process.exit();
     });
   });
 });
