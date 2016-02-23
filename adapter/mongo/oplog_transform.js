@@ -193,14 +193,16 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
     selector = { $and: [selector, opts.filter] };
   }
 
-  var mongoOpts = {
+  var mongoOpts = xtend({
     raw: true,
+    tailable: false,
+    tailableRetryInterval: 1000,
+    awaitData: false,
     sort: { '$natural': 1 },
     comment: 'oplog_reader'
-  };
+  }, opts);
   if (typeof opts.bson === 'boolean') { mongoOpts.raw = opts.bson; }
-  if (opts.tailable) { mongoOpts.tailable = true; }
-  mongoOpts.tailableRetryInterval = opts.tailableRetryInterval || 1000;
+  //mongoOpts.awaitData = !!mongoOpts.tailable;
 
   this._log.info('ot oplogReader offset: %s %s, selector: %j, opts: %j', opts.offset, opts.includeOffset ? 'include' : 'exclude', selector, mongoOpts);
 

@@ -183,7 +183,7 @@ tasks.push(function(done) {
   var bs = new BSONStream();
   dataChannel.pipe(bs).on('readable', function() {
     var obj = bs.read();
-    if (!obj) { return; } // TODO: fix closing oplog cursor
+    if (!obj) { return; }
 
     var ts = obj.m._op;
     assert.strictEqual(ts.greaterThan(offset), true);

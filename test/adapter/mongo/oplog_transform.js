@@ -584,10 +584,9 @@ describe('OplogTransform', function() {
         }
       });
 
-      var j = 0;
       ot.on('readable', function() {
         var obj = ot.read();
-        if (!obj) { return; } // TODO: the oplog cursor should never be closed
+        if (!obj) { return; }
 
         var ts = obj.m._op;
         should.strictEqual(lastOplogTs.lessThan(ts), true);
@@ -599,10 +598,6 @@ describe('OplogTransform', function() {
             foo: 'buz'
           }
         });
-        j++;
-      });
-      ot.on('end', function() {
-        should.strictEqual(j, 1);
         done();
       });
 
