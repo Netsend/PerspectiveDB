@@ -20,10 +20,13 @@
 
 'use strict';
 
+var bson = require('bson');
+var BSONStream = require('bson-stream');
 var Transform = require('stream').Transform;
 var util = require('util');
+var xtend = require('xtend');
 
-var BSONStream = require('bson-stream');
+var BSON = new bson.BSONPure.BSON();
 
 var noop = function() {};
 
@@ -41,6 +44,7 @@ var noop = function() {};
  *
  * opts:
  *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
+ *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
@@ -60,14 +64,18 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
   if (!nsParts[0].length) { throw new TypeError('ns must contain a database name'); }
   if (!nsParts[1].length) { throw new TypeError('ns must contain a collection name'); }
 
-  opts.objectMode = true;
+  Transform.call(this, xtend(opts, { objectMode: true }));
 
-  Transform.call(this, opts);
-
+  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
 
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
+  this._opts = opts;
+
+  // ensure bson option is set
+  this._bson = false;
+  if (opts.bson != null) { this._bson = opts.bson; }
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -209,6 +217,7 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   if (OplogTransform._invalidOplogItem(oplogItem)) {
+    this._log.err('ot _transform invalid oplog item: %j', oplogItem);
     process.nextTick(function() {
       cb(new Error('invalid oplogItem'));
     });
@@ -288,6 +297,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
     if (!oplogItem.o2._id) { throw new Error('missing oplogItem.o2._id'); }
     if (oplogItem.o._id) { throw new Error('oplogItem contains o._id'); }
   } catch(err) {
+    this._log.err('ot _createNewVersionByUpdateDoc %s, %j', err, oplogItem);
     process.nextTick(function() {
       cb(err);
     });
@@ -296,6 +306,8 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
 
   var that = this;
   var error;
+
+  var bson = this._bson;
 
   var selector = { _id: dagItem.h.id };
 
@@ -335,11 +347,12 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
           return;
         }
 
-        cb(null, {
+        var obj = {
           h: { id: dagItem.h.id },
           m: { _op: oplogItem.ts },
           b: newObj
-        });
+        };
+        cb(null, bson ? BSON.serialize(obj) : obj);
       });
     });
   });
@@ -368,12 +381,14 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     return;
   }
 
+  var bson = this._bson;
   process.nextTick(function() {
-    cb(null, {
+    var obj = {
       h: { id: oplogItem.o._id },
       m: { _op: oplogItem.ts },
       b: oplogItem.o
-    });
+    };
+    cb(null, bson ? BSON.serialize(obj) : obj);
   });
 };
 
@@ -431,14 +446,16 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     return;
   }
 
+  var bson = this._bson;
   process.nextTick(function() {
-    cb(null, {
+    var obj = {
       h: {
         id: oplogItem.o._id,
         d: true,
       },
       m: { _op: oplogItem.ts }
-    });
+    };
+    cb(null, bson ? BSON.serialize(obj) : obj);
   });
 };
 
