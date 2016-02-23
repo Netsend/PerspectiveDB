@@ -36,7 +36,7 @@ var noop = function() {};
  * Transform oplog items into new versions.
  *
  * @param {Object} oplogDb  connection to the oplog database
- * @param {String} oplogCollName  oplog collection name, defaults to oplog.$main
+ * @param {String} oplogCollName  oplog collection name
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
@@ -147,7 +147,7 @@ OplogTransform.prototype.startStream = function startStream() {
     // handle new oplog items via this._transform
     var or = that._oplogReader(xtend(that._opts, { offset: offset, bson: false, tailable: true }));
     or.on('end', function() {
-      that._log.err('ot startStream unexpected end of tailable oplog cursor');
+      that._log.notice('ot startStream unexpected end of tailable oplog cursor');
     });
     or.pipe(that);
   });

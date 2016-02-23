@@ -27,12 +27,17 @@ var assert = require('assert');
 var childProcess = require('child_process');
 
 var async = require('async');
+var bson = require('bson');
+var BSONStream = require('bson-stream');
 var LDJSONStream = require('ld-jsonstream');
+var mongodb = require('mongodb');
 
+var config = require('./config.json');
 var logger = require('../../../lib/logger');
 
-// make sure a mongo test database is running
-var dbPort = 27019;
+var BSON = new bson.BSONPure.BSON();
+var MongoClient = mongodb.MongoClient;
+var Timestamp = mongodb.Timestamp;
 
 var tasks = [];
 var tasks2 = [];
@@ -44,9 +49,11 @@ function lnr() {
 
 var logger = require('../../../lib/logger');
 
-var cons, silence;
+var cons, silence, db;
+var databaseName = 'test_exec_root';
+var collectionName = 'test_exec_root';
 
-// open loggers
+// open loggers and a connection to the database
 tasks.push(function(done) {
   logger({ console: true, mask: logger.DEBUG2 }, function(err, l) {
     if (err) { throw err; }
@@ -54,7 +61,11 @@ tasks.push(function(done) {
     logger({ silence: true }, function(err, l) {
       if (err) { throw err; }
       silence = l;
-      done();
+      MongoClient.connect(config.url, function(err, dbc) {
+        if (err) { throw err; }
+        db = dbc.db(databaseName);
+        db.collection(collectionName).deleteMany({}, done);
+      });
     });
   });
 });
@@ -140,9 +151,119 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        db: 'test_mongo_exec_root',
-        coll: 'test_mongo_exec_root',
-        url: 'mongodb://127.0.0.1:' + dbPort
+        db: databaseName,
+        coll: collectionName,
+        url: config.url
+      });
+      break;
+    case 'listen':
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should send a new version based on an oplog update
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  var offset = new Timestamp(0, (new Date()).getTime() / 1000);
+
+  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongo/exec'], {
+    cwd: '/',
+    env: {},
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
+  });
+
+  var dataChannel = child.stdio[6];
+  var versionControl = child.stdio[7];
+
+  var bs = new BSONStream();
+  dataChannel.pipe(bs).on('readable', function() {
+    var obj = bs.read();
+    if (!obj) { return; } // TODO: fix closing oplog cursor
+
+    var ts = obj.m._op;
+    assert.strictEqual(ts.greaterThan(offset), true);
+    assert.deepEqual(obj, {
+      h: { id: 'foo' },
+      m: { _op: ts },
+      b: { _id: 'foo', bar: 'baz' }
+    });
+    child.kill();
+  });
+
+  // expect version requests in ld-json format
+  var ls = new LDJSONStream();
+
+  versionControl.pipe(ls);
+
+  var i = 0;
+  ls.on('data', function(data) {
+    i++;
+
+    // expect a request for the last version in the DAG
+    if (i === 1) {
+      assert.deepEqual(data, { id: null });
+
+      var offset = new Timestamp(0, (new Date()).getTime() / 1000);
+
+      // send response with current timestamp in oplog
+      versionControl.write(BSON.serialize({
+        h: { id: 'foo' },
+        m: { _op: offset }, 
+        b: {}
+      }));
+
+      // and insert an item into the collection
+      var coll = db.collection(collectionName);
+      coll.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
+        if (err) { throw err; }
+      });
+    }
+
+    // expect a request for the last version of the inserted item
+    if (i === 2) {
+      assert.deepEqual(data, { id: 'foo' });
+
+      // send response with a fake version
+      versionControl.write(BSON.serialize({
+        h: { id: 'foo', v: 'Aaaaaa' },
+        b: {
+          some: 'data'
+        }
+      }));
+
+      // this should make the process emit a new version on the data channel
+    }
+  });
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    assert.strictEqual(i, 1);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: logger.DEBUG2 },
+        db: databaseName,
+        coll: collectionName,
+        url: config.url
       });
       break;
     case 'listen':
@@ -166,6 +287,7 @@ async.series(tasks, function(err) {
     if (err) { throw err; }
     silence.close(function(err) {
       if (err) { console.error(err); }
+      db.close();
     });
   });
 });

@@ -43,8 +43,9 @@ var logger = require('../../lib/logger');
 var OplogTransform = require('./oplog_transform');
 
 /**
- * Instantiate a connection to a mongo database and read the oplog and write to
- * a colection.
+ * Instantiate a connection to a mongo database and read changes of a collection
+ * via the oplog. Furthermore accept new versions from a db_exec instance and try
+ * to write them to the mongo collection.
  *
  * Full FSM: init --> listen
  *
@@ -88,7 +89,7 @@ var log; // used after receiving the log configuration
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   log.debug('start oplog transform...');
-  var ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, { log: log });
+  var ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, { log: log, bson: true });
   ot.pipe(dataChannel);
   ot.startStream();
 
@@ -108,7 +109,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
  *   [url]:          {String}      // mongodb connection string, defaults
  *                                 // to mongodb://127.0.0.1:27017/local
  *   [oplogDb]:      {String}      // oplog database, defaults to local
- *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.rs
+ *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [mongoOpts]:    {Object}      // any other mongodb driver options
  *   [chroot]:       {String}      // defaults to /var/empty
  *   [user]:         {String}      // defaults to "nobody"
@@ -135,7 +136,7 @@ process.once('message', function(msg) {
   var authorative = !!msg.authorative;
   var url = msg.url || 'mongodb://127.0.0.1:27017/local';
   var oplogDbName = msg.oplogDb || 'local';
-  var oplogCollName = msg.oplogColl || 'oplog.rs';
+  var oplogCollName = msg.oplogColl || 'oplog.$main';
 
   programName = 'mongo';
 
