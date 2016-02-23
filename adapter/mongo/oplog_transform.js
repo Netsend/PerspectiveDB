@@ -131,20 +131,24 @@ OplogTransform.prototype.startStream = function startStream() {
     }
 
     // expect the last version in the DAG with an oplog offset
-    var offset = obj.m.op;
-    if (!offset) {
-      throw new Error('unable to determine offset');
+    var offset;
+    try {
+      var err = new Error('unable to determine offset');
+      offset = obj.m._op;
+      if (!offset) {
+        throw err;
+      }
+    } catch(e) {
+      that._log.err('ot startStream %j %j', err, e);
+      that.emit('error', err);
+      return;
     }
 
-    // open oplog reader starting at this offset
-    var opts = {
-      tailable: true,
-      offset: offset,
-      log: that._log
-    };
-
     // handle new oplog items via this._transform
-    var or = that._oplogReader(opts);
+    var or = that._oplogReader(xtend(that._opts, { offset: offset, bson: false, tailable: true }));
+    or.on('end', function() {
+      that._log.err('ot startStream unexpected end of tailable oplog cursor');
+    });
     or.pipe(that);
   });
 

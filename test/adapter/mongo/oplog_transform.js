@@ -487,6 +487,133 @@ describe('OplogTransform', function() {
     });
   });
 
+  describe('startStream', function() {
+    var collectionName = 'foo';
+    var ns = databaseName + '.' + collectionName;
+    var coll;
+
+    // ensure empty collection
+    before(function(done) {
+      coll = db.collection(collectionName);
+      coll.deleteMany({}, done);
+    });
+
+    it('should ask for the last version of any id', function(done) {
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
+      ot.startStream();
+
+      var ls = new LDJSONStream();
+      controlWrite.pipe(ls).on('readable', function() {
+        var obj = ls.read();
+        if (!obj) { throw new Error('expected version request'); } // end reached
+
+        // expect a request for the last version of any id
+        should.deepEqual(obj, { id: null });
+        done();
+      });
+    });
+
+    it('should require to have m._op on the last version', function(done) {
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
+      ot.startStream();
+
+      ot.on('error', function(err) {
+        should.strictEqual(err.message, 'unable to determine offset');
+        done();
+      });
+
+      var ls = new LDJSONStream();
+      controlWrite.pipe(ls).on('readable', function() {
+        var obj = ls.read();
+        should.deepEqual(obj, { id: null });
+
+        // send back a fake DAG item without a timestamp
+        var dagItem = {
+          h: { id: 'foo', v: 'Aaaaaa', pa: [] },
+          b: { foo: 'bar' }
+        };
+        controlRead.write(BSON.serialize(dagItem));
+      });
+    });
+
+    var lastOplogTs;
+    it('should last oplog item for next tests', function(done) {
+      oplogColl.find({ ns: ns }).limit(1).sort({ $natural: -1 }).next(function(err, obj){
+        if (err) { throw err; }
+        lastOplogTs = obj.ts;
+        done();
+      });
+    });
+
+    it('should process new oplog items on collection insert', function(done) {
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      this.timeout(10000);
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence, tailableRetryInterval: 10 });
+      ot.startStream();
+
+      // expect a request for the last item in the DAG
+      // and later a request for oplog insert item
+      var i = 0;
+      var ls = new LDJSONStream();
+      controlWrite.pipe(ls).on('readable', function() {
+        i++;
+        var obj = ls.read();
+
+        if (i === 1) {
+          should.deepEqual(obj, { id: null });
+
+          // send back a fake DAG item with the timestamp of the last oplog item
+          var dagItem = {
+            h: { id: 'some', v: 'Aaaaaa', pa: [] },
+            m: { _op: lastOplogTs },
+            b: { foo: 'bar' }
+          };
+          controlRead.write(BSON.serialize(dagItem));
+        }
+
+        if (i === 2) {
+          should.deepEqual(obj, { id: 'foo' });
+
+          // send back a fake DAG item as if there is non-existing yet
+          controlRead.write(BSON.serialize({}));
+        }
+      });
+
+      var j = 0;
+      ot.on('readable', function() {
+        var obj = ot.read();
+        if (!obj) { return; } // TODO: the oplog cursor should never be closed
+
+        var ts = obj.m._op;
+        should.strictEqual(lastOplogTs.lessThan(ts), true);
+        should.deepEqual(obj, {
+          h: { id: 'foo' },
+          m: { _op: ts },
+          b: {
+            _id: 'foo',
+            foo: 'buz'
+          }
+        });
+        j++;
+      });
+      ot.on('end', function() {
+        should.strictEqual(j, 1);
+        done();
+      });
+
+      // write something to the collection that is monitored so that the oplog gets a new entry
+      coll.insertOne({
+        _id: 'foo',
+        foo: 'buz'
+      });
+    });
+  });
+
   describe('_oplogUpdateContainsModifier', function() {
     it('should return false on objects where o is an array', function() {
       should.equal(OplogTransform._oplogUpdateContainsModifier({ o: ['$set'] }), false);
