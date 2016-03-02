@@ -1801,6 +1801,12 @@ describe('Tree', function() {
       (function() { t.createReadStream({ bson: 'a' }, function() { }, function() { }); }).should.throw('opts.bson must be a boolean');
     });
 
+    it('should error on tail and reverse while not supported', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createReadStream({ tail: true, reverse: true }, function() { }, function() { }); }).should.throw('opts.reverse is mutually exclusive with opts.tail');
+    });
+
     it('should call end directly with an empty database (if data event is handled)', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var s = t.createReadStream();
@@ -1876,6 +1882,29 @@ describe('Tree', function() {
       s.on('end', function() {
         ended = true;
         should.strictEqual(i, 2);
+      });
+    });
+
+    it('should read in reverse', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var s = t.createReadStream({ id: 'XI', reverse: true });
+
+      s.on('data', function(obj) {
+        i++;
+        if (i === 1) {
+          // expect item2
+          should.deepEqual({ h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] }, b: { some: 'more' } }, obj);
+        }
+        if (i > 1) {
+          // expect item1
+          should.deepEqual({ h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] }, b: { some: 'data' } }, obj);
+        }
+      });
+
+      s.on('end', function() {
+        should.strictEqual(i, 2);
+        done();
       });
     });
 
