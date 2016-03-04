@@ -1,19 +1,19 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014-2016 Netsend.
  *
- * This file is part of Mastersync.
+ * This file is part of PersDB.
  *
- * Mastersync is free software: you can redistribute it and/or modify it under the
+ * PersDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
+ * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -79,7 +79,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var logFile = fs.createWriteStream(tmpdir() + 'vce-test.log', { flags: 'a' });
+  var logFile = fs.createWriteStream(tmpdir() + 'dbe-test.log', { flags: 'a' });
 
   logFile.on('open', function() {
     var child = childProcess.spawn(process.execPath, [__dirname + '/../../../lib/db_exec'], {
@@ -109,7 +109,7 @@ tasks.push(function(done) {
         child.send({
           log: { console: true },
           path: dbPath,
-          name: 'test_vce_root',
+          name: 'test_dbe_root',
         });
         break;
       case 'listen':
@@ -151,7 +151,7 @@ tasks.push(function(done) {
         log: { console: true },
         path: dbPath,
         hookPaths: ['foo', 'bar'],
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         chroot: chroot
       });
@@ -190,7 +190,7 @@ tasks.push(function(done) {
         log: { console: true },
         path: dbPath,
         hookPaths: ['/some'],
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         chroot: chroot
       });
@@ -232,7 +232,7 @@ tasks.push(function(done) {
         log: { console: true },
         path: dbPath,
         hookPaths: ['/var/empty'],
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         chroot: chroot,
       });
@@ -278,7 +278,7 @@ tasks.push(function(done) {
         log: { console: true },
         path: dbPath,
         hookPaths: ['/var/empty'],
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         chroot: chroot,
       });
@@ -299,7 +299,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // then fork a vce
+  // then fork a dbe
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   //child.stdout.pipe(process.stdout);
@@ -323,7 +323,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         debug: false,
         size: 1,
         perspectives: [{ name: 'foo', import: { hooks: ['a'] } }]
@@ -365,7 +365,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         chroot: chroot
       });
@@ -424,7 +424,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         group: group,
         chroot: chroot
@@ -493,7 +493,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: 7 },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         group: group,
         chroot: chroot,
@@ -519,7 +519,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // then fork a vce
+  // then fork a dbe
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
@@ -599,7 +599,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: 7 },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         group: group,
         chroot: chroot,
@@ -628,7 +628,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // then fork a vce
+  // then fork a dbe
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
@@ -722,7 +722,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: 7 },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         user: user,
         group: group,
         chroot: chroot,
@@ -751,7 +751,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // then fork a vce
+  // then fork a dbe
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
@@ -827,7 +827,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: 7 },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         hookPaths: [__dirname + '/../../../hooks'],
         user: user,
         group: group,
@@ -857,7 +857,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  // then fork a vce
+  // then fork a dbe
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   // start an echo server that can receive auth requests and sends some BSON data
@@ -959,7 +959,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: 7 },
         path: dbPath,
-        name: 'test_vce_root',
+        name: 'test_dbe_root',
         hookPaths: [__dirname + '/../../../hooks'],
         user: user,
         group: group,
