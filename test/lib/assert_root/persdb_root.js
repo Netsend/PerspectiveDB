@@ -87,7 +87,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -119,7 +119,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_wrong_config.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_wrong_config.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -144,7 +144,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -175,7 +175,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -210,7 +210,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -249,7 +249,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -288,7 +288,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -327,7 +327,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -374,7 +374,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_import.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_import.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -421,7 +421,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_import.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_import.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
@@ -514,7 +514,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = spawn(__dirname + '/../../../bin/persdb.js', [__dirname + '/test_persdb_wss_import_export.hjson']);
+  var child = spawn(__dirname + '/../../../bin/persdb', [__dirname + '/test_persdb_wss_import_export.hjson']);
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
