@@ -302,19 +302,19 @@ tasks.push(function(done) {
   // then fork a vce
   var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
-  child.on('exit', function(code, sig) {
-    assert(/hook requested that is not loaded/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
 
   var stderr = '';
   child.stderr.setEncoding('utf8');
   child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    assert(/hook requested that is not loaded/.test(stderr));
+    assert.strictEqual(code, 1);
+    assert.strictEqual(sig, null);
+    done();
+  });
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
   child.on('message', function(msg) {
@@ -391,6 +391,8 @@ tasks.push(function(done) {
   var host = '127.0.0.1';
   var port = 1234;
 
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
   var server = net.createServer(function(conn) {
     conn.on('close', function() {
       server.close(function() {
@@ -399,8 +401,6 @@ tasks.push(function(done) {
     });
   });
   server.listen(port, host);
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -452,6 +452,8 @@ tasks.push(function(done) {
   var host = '127.0.0.1';
   var port = 1234;
 
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
   var server = net.createServer(function(conn) {
     // expect a data request that indicates no data is requested
     conn.on('data', function(data) {
@@ -467,8 +469,6 @@ tasks.push(function(done) {
     });
   });
   server.listen(port, host);
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
 
   //child.stdout.pipe(process.stdout);
   child.stderr.pipe(process.stderr);
