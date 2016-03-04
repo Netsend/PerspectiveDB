@@ -123,27 +123,6 @@ describe('MergeTree', function() {
     });
   });
 
-  describe('_ensureMergeHandler', function() {
-    it('should set default merge handler on construction', function() {
-      var opts = { vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
-
-      should.strictEqual(typeof mt._mergeHandler, 'function');
-    });
-
-    it('should set given merge handler', function() {
-      var opts = { vSize: 3, log: silence };
-      var mt = new MergeTree(db, opts);
-
-      var mh = function() {};
-
-      should.strictEqual(typeof mt._mergeHandler, 'function');
-      should.strictEqual(mt._mergeHandler === mh, false);
-      mt._ensureMergeHandler(mh);
-      should.strictEqual(mt._mergeHandler === mh, true);
-    });
-  });
-
   describe('_copyTo', function() {
     var sname = '_copyTo_foo';
     var dname = '_copyTo_bar';
@@ -1694,6 +1673,7 @@ describe('MergeTree', function() {
 
     it('should only add item3 to stage and merge both heads with local head (write first merge to local)', function(done) {
       var prevMerge;
+      var j = 0;
       var mergeHandler = function(merge, lhead, next) {
         j++;
         // the previously created merge in stage is used
@@ -1721,7 +1701,6 @@ describe('MergeTree', function() {
         log: silence,
         mergeHandler: mergeHandler
       });
-      var j = 0;
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
       var stage = mt._stage;
       mt.mergeWithLocal(stree, function(err) {
@@ -2144,6 +2123,27 @@ describe('MergeTree', function() {
           });
         });
       });
+    });
+  });
+
+  describe('ensureMergeHandler', function() {
+    it('should set default merge handler on construction', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      should.strictEqual(typeof mt._mergeHandler, 'function');
+    });
+
+    it('should set given merge handler', function() {
+      var opts = { vSize: 3, log: silence };
+      var mt = new MergeTree(db, opts);
+
+      var mh = function() {};
+
+      should.strictEqual(typeof mt._mergeHandler, 'function');
+      should.strictEqual(mt._mergeHandler === mh, false);
+      mt.ensureMergeHandler(mh);
+      should.strictEqual(mt._mergeHandler === mh, true);
     });
   });
 
