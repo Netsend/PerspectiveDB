@@ -373,6 +373,7 @@ tasks.push(function(done) {
     case 'listen':
       // send stripped auth request
       child.send({
+        type: 'remoteDataChannel',
         perspective: 'foo'
       });
       child.kill();
@@ -433,6 +434,7 @@ tasks.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: 'webclient'
         }, s);
       });
@@ -502,6 +504,7 @@ tasks.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: 'webclient'
         }, s);
       });
@@ -610,6 +613,7 @@ tasks.push(function(done) {
       // forward authorized connection with connection
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: pe
         }, s);
       });
@@ -732,6 +736,7 @@ tasks.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: pe
         }, s);
       });
@@ -837,6 +842,7 @@ tasks.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: pe
         }, s);
       });
@@ -968,6 +974,7 @@ tasks.push(function(done) {
       // send stripped auth request
       var s = net.createConnection(port, host, function() {
         child.send({
+          type: 'remoteDataChannel',
           perspective: pe
         }, s);
       });
