@@ -985,6 +985,242 @@ tasks.push(function(done) {
   });
 });
 
+// should accept a new local data channel request and write data to the local tree
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a dbe
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  // start server to check response from db_exec
+  var server = net.createServer(function(conn) {
+    conn.on('data', function() {
+      throw new Error('unexpected merge');
+    });
+
+    // send a new node
+    var obj = {
+      h: { id: 'abd', v: 'Aaaa' },
+      b: { some: true }
+    };
+    conn.write(BSON.serialize(obj));
+    conn.on('close', function() {
+      server.close(function() {
+        child.kill();
+      });
+    });
+    // give some time to start merge handler
+    setTimeout(conn.end.bind(conn), 110);
+  });
+  server.listen(port, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var vSize = 3;
+  var localName = 'testWithLocalDataChannel';
+
+  child.on('exit', function(code, sig) {
+    // open and search in database if item is written
+    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      if (err) { throw err; }
+
+      var mt = new MergeTree(db, {
+        local: localName,
+        vSize: vSize,
+        log: silence
+      });
+      var rs = mt.createReadStream();
+      var i = 0;
+      rs.on('data', function(item) {
+        i++;
+        assert.deepEqual(item, {
+          h: { id: 'abd', v: 'Aaaa', pa: [] },
+          b: { some: true }
+        });
+      });
+
+      rs.on('end', function() {
+        assert.strictEqual(stderr.length, 0);
+        assert.strictEqual(code, 0);
+        assert.strictEqual(sig, null);
+        assert.strictEqual(i, 1);
+        db.close(done);
+      });
+    });
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_dbe_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        mergeTree: {
+          local: localName,
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          type: 'localDataChannel'
+        }, s);
+
+        // and send a startMerge signal
+        child.send({
+          type: 'startMerge',
+          interval: 100
+        });
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should write merges with remotes back to the local data channel
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a dbe
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  // start an echo server for the local channel and one for the remote channel
+  var host = '127.0.0.1';
+  var port = 1234;
+  var port2 = 1235;
+
+  var i = 0;
+  // start server for local data channel
+  var server = net.createServer(function(conn) {
+    // expect a merge with the item sent by server2
+    conn.pipe(new BSONStream()).on('data', function(item) {
+      i++;
+      assert.deepEqual(item, {
+        n: {
+          h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'buzz', i: 1 },
+          b: { some: true }
+        },
+        o: null
+      });
+
+      conn.end();
+    });
+
+    conn.on('close', function() {
+      server.close(function() {
+        child.kill();
+      });
+    });
+  });
+  server.listen(port, host);
+
+  // start server for remote data channel
+  var server2 = net.createServer(function(conn) {
+    conn.on('data', function(data) {
+      assert.deepEqual(JSON.parse(data), {
+        start: true
+      });
+
+      // send a data request signalling no data is requested
+      conn.write(JSON.stringify({ start: false }) + '\n');
+
+      // send a root node in BSON
+      conn.write(BSON.serialize({
+        h: { id: 'abd', v: 'Aaaa', pa: [] },
+        b: { some: true }
+      }));
+
+      conn.on('close', function() {
+        server2.close();
+      });
+      conn.end();
+    });
+  });
+  server2.listen(port2, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var pe = 'buzz';
+  var perspectives = [{ name: pe, import: true }];
+  var localName = 'testWithLocalAndRemoteDataChannel';
+  var vSize = 3;
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    assert.strictEqual(i, 1);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_dbe_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        perspectives: perspectives,
+        mergeTree: {
+          local: localName,
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      // setup local data channel
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          type: 'localDataChannel'
+        }, s);
+
+        // and send a startMerge signal
+        child.send({
+          type: 'startMerge',
+          interval: 100
+        });
+      });
+
+      // setup remote data channel
+      var s2 = net.createConnection(port2, host, function() {
+        child.send({
+          type: 'remoteDataChannel',
+          perspective: pe
+        }, s2);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
 async.series(tasks, function(err) {
   if (err) {
     console.error(err);
