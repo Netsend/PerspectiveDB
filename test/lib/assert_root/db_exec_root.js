@@ -1221,6 +1221,198 @@ tasks.push(function(done) {
   });
 });
 
+// should accept and respond to a head lookup request for a non-existing id
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a dbe
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  // start an echo server for the head lookup channel
+  var host = '127.0.0.1';
+  var port = 1234;
+
+  var i = 0;
+  // start server for head lookup channel
+  var server = net.createServer(function(conn) {
+    // request a head lookup for non-existing "abd"
+    conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+
+    // expect the requested version
+    conn.pipe(new BSONStream()).on('data', function(item) {
+      i++;
+      assert.deepEqual(item, {});
+      conn.end();
+    });
+
+    conn.on('close', function() {
+      server.close(function() {
+        child.kill();
+      });
+    });
+  });
+  server.listen(port, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var localName = 'testHeadLookup';
+  var vSize = 3;
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    assert.strictEqual(i, 1);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_dbe_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        mergeTree: {
+          local: localName,
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      // setup head lookup channel
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          type: 'headLookup'
+        }, s);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
+// should accept and respond to a head lookup request (write a new object via a local data channel first)
+tasks.push(function(done) {
+  console.log('test #%d', lnr());
+
+  // then fork a dbe
+  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+  var port2 = 1235;
+
+  // start local data channel to send a new object that can later be looked up
+  var localDataServer = net.createServer(function(conn) {
+    conn.on('data', function() {
+      throw new Error('unexpected merge');
+    });
+
+    conn.on('close', function() {
+      localDataServer.close();
+    });
+    // send a new node
+    conn.write(BSON.serialize({
+      h: { id: 'abd', v: 'Aaaa' },
+      b: { some: true }
+    }));
+    conn.end();
+
+    // give it some time to write to the local tree, then setup connection to head lookup server
+    setTimeout(function() {
+      var s2 = net.createConnection(port2, host, function() {
+        child.send({
+          type: 'headLookup'
+        }, s2);
+      });
+    }, 100);
+  });
+  localDataServer.listen(port, host);
+
+  var i = 0;
+  // start server for head lookup channel
+  var headLookupServer = net.createServer(function(conn) {
+    // do a head lookup for "abd"
+    conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+
+    // expect the requested version
+    conn.pipe(new BSONStream()).on('data', function(item) {
+      i++;
+      assert.deepEqual(item, {
+        h: { id: 'abd', v: 'Aaaa', pa: [], i: 1 },
+        b: { some: true }
+      });
+      conn.end();
+    });
+
+    conn.on('close', function() {
+      headLookupServer.close(function() {
+        child.kill();
+      });
+    });
+  });
+  headLookupServer.listen(port2, host);
+
+  //child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  var stderr = '';
+  child.stderr.setEncoding('utf8');
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  var vSize = 3;
+  var localName = 'testWithLocalDataChannel';
+
+  child.on('exit', function(code, sig) {
+    assert.strictEqual(stderr.length, 0);
+    assert.strictEqual(code, 0);
+    assert.strictEqual(sig, null);
+    assert.strictEqual(i, 1);
+    done();
+  });
+
+  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
+  child.on('message', function(msg) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_dbe_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        mergeTree: {
+          local: localName,
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          type: 'localDataChannel'
+        }, s);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  });
+});
+
 async.series(tasks, function(err) {
   if (err) {
     console.error(err);

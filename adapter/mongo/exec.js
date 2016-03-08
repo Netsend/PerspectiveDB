@@ -85,7 +85,6 @@ var log; // used after receiving the log configuration
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} versionControl  version control channel
  * @param {Object} dataChannel  data channel
- * @param {Object} versionControl  version control channel
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   log.debug('start oplog transform...');
@@ -93,7 +92,17 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   ot.pipe(dataChannel);
   ot.startStream();
 
-  // TODO: handle new incoming objects
+  // TODO: handle new incoming objects, conditional copy to collection
+  var bs = new BSONStream();
+  /*
+  dataChannel.pipe(bs).on('readable', function() {
+    var obj = bs.read();
+    // expect new and old
+    {
+      n:
+      o:
+  });
+  */
 }
 
 /**
