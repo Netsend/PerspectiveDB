@@ -33,6 +33,7 @@ var async = require('async');
 var bson = require('bson');
 var BSON = new bson.BSONPure.BSON();
 var ws = require('nodejs-websocket');
+var xtend = require('xtend');
 
 var cert, key, dhparam;
 
@@ -47,12 +48,66 @@ var wsClientOpts = {
   ciphers: 'ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256'
 };
 
+var noop = function() {};
 var tasks  = [];
 var tasks2 = [];
 
-// print line number
-function lnr() {
-  return new Error().stack.split('\n')[2].match(/wss_server_root.js:([0-9]+):[0-9]+/)[1];
+function spawn(options, spawnOpts) {
+  var opts = xtend({
+    configBase: __dirname,
+    config: 'test_persdb.hjson',
+    echoOut: false,
+    echoErr: true,
+    onSpawn: noop,
+    onMessage: null,                                          // handle ipc messages
+    onExit: noop,
+    exitCode: 0,                                              // test if exit code is 0
+    exitSignal: null,                                         // test if exit signal is empty
+    testStdout: null,
+    testStderr: function(s) {                                 // test if stderr is empty
+      if (s.length) { throw new Error(s); }
+    }
+  }, options);
+
+  var sOpts = xtend({
+    args: [__dirname + '/../../../lib/wss_server'],
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+  }, spawnOpts);
+
+  // print line number
+  console.log('test #%d', new Error().stack.split('\n')[2].match(/wss_server_root.js:([0-9]+):[0-9]+/)[1]);
+
+  var extraArgs = [];
+  var child = childProcess.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
+
+  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
+  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    if (opts.testStdout) {
+      opts.testStdout(stdout);
+    }
+    if (opts.testStderr) {
+      opts.testStderr(stderr);
+    }
+    assert.strictEqual(code, opts.exitCode);
+    assert.strictEqual(sig, opts.exitSignal);
+    opts.onExit(null, code, sig, stdout, stderr);
+  });
+
+  if (opts.onMessage) {
+    child.on('message', function(msg) {
+      opts.onMessage(msg, child);
+    });
+  }
+  opts.onSpawn(child);
 }
 
 var logger = require('../../../lib/logger');
@@ -74,24 +129,7 @@ tasks.push(function(done) {
 
 // should require msg.log to be an object
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.log must be an object/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -101,29 +139,22 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/msg.log must be an object/.test(stderr));
+    }
   });
 });
 
 // should require msg.key to not be group or world readable or writable
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.key should not be group or world readable or writable/.test(stderr));
-    assert.strictEqual(code, 12);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -136,29 +167,22 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 12,
+    testStderr: function(stderr) {
+      assert(/msg.key should not be group or world readable or writable/.test(stderr));
+    }
   });
 });
 
 // should require msg.cert, key and dhparam to exist
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/Error: ENOENT: no such file or directory, open 'foo'/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -171,32 +195,22 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/Error: ENOENT: no such file or directory, open 'foo'/.test(stderr));
+    }
   });
 });
 
 // should chroot and listen
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -207,53 +221,41 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = net.createConnection(3344, function() {
         client.end(function() {
           child.kill();
         });
       });
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+    }
   });
 });
 
 // should chroot, connect and do websocket handshake and proxy to the proxyPort
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
   var tcpPort = 1234;
-  // start a tcp server that the websocket server should proxy to
-  var tcpServer = net.createServer(function(conn) {
-    // expect data that is fed to the wss server
-    conn.setEncoding('utf8');
-    conn.on('data', function(data) {
-      assert.strictEqual(data, 'some text text data');
-      tcpServer.close();
-      child.kill();
+  function onSpawn(child) {
+    // start a tcp server that the websocket server should proxy to
+    var tcpServer = net.createServer(function(conn) {
+      // expect data that is fed to the wss server
+      conn.setEncoding('utf8');
+      conn.on('data', function(data) {
+        assert.strictEqual(data, 'some text text data');
+        tcpServer.close();
+        child.kill();
+      });
     });
-  });
-  tcpServer.listen(tcpPort);
+    tcpServer.listen(tcpPort);
+  }
 
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -265,37 +267,24 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText('some text text data');
       });
+    }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
     }
   });
 });
 
 // should proxy data request back to websocket client
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
   var authReq = {
     username: 'foo',
     password: 'bar',
@@ -303,18 +292,20 @@ tasks.push(function(done) {
   };
 
   var tcpPort = 1234;
-  // start a tcp server that the websocket server should proxy to
-  var tcpServer = net.createServer(function(conn) {
-    // expect data that is fed to the wss server
-    conn.on('data', function(data) {
-      assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
-      conn.write(JSON.stringify({ start: true }) + '\n');
-      tcpServer.close();
+  function onSpawn() {
+    // start a tcp server that the websocket server should proxy to
+    var tcpServer = net.createServer(function(conn) {
+      // expect data that is fed to the wss server
+      conn.on('data', function(data) {
+        assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
+        conn.write(JSON.stringify({ start: true }) + '\n');
+        tcpServer.close();
+      });
     });
-  });
-  tcpServer.listen(tcpPort);
+    tcpServer.listen(tcpPort);
+  }
 
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -326,8 +317,6 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText(JSON.stringify(authReq) + '\n');
         // expect data request
@@ -342,33 +331,26 @@ tasks.push(function(done) {
         });
       });
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+    }
   });
 });
 
 // should proxy data request + BSON response back to websocket client in two separate writes
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
   var allDone;
 
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
+  function onExit() {
     assert.strictEqual(allDone, true);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
     done();
-  });
+  }
 
   var authReq = {
     username: 'foo',
@@ -384,18 +366,20 @@ tasks.push(function(done) {
 
   var tcpPort = 1234;
   // start a tcp server that the websocket server should proxy to
-  var tcpServer = net.createServer(function(conn) {
-    // expect data that is fed to the wss server
-    conn.on('data', function(data) {
-      assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
-      conn.write(JSON.stringify(dataReq) + '\n');
-      conn.write(BSON.serialize(bsonObj));
-      tcpServer.close();
+  function onSpawn() {
+    var tcpServer = net.createServer(function(conn) {
+      // expect data that is fed to the wss server
+      conn.on('data', function(data) {
+        assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
+        conn.write(JSON.stringify(dataReq) + '\n');
+        conn.write(BSON.serialize(bsonObj));
+        tcpServer.close();
+      });
     });
-  });
-  tcpServer.listen(tcpPort);
+    tcpServer.listen(tcpPort);
+  }
 
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -407,8 +391,6 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText(JSON.stringify(authReq) + '\n');
         // expect data request back
@@ -432,34 +414,27 @@ tasks.push(function(done) {
         });
       });
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+    }
   });
 });
 
 // should proxy data request + BSON response back to websocket client in one write (check pipe(ls) unpipe(ls))
 // TODO: fix ld-jsonstream
 tasks2.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/wss_server', { silent: true });
-
   var allDone;
 
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
+  function onExit() {
     assert.strictEqual(allDone, true);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
     done();
-  });
+  }
 
   var authReq = {
     username: 'foo',
@@ -475,17 +450,19 @@ tasks2.push(function(done) {
 
   var tcpPort = 1234;
   // start a tcp server that the websocket server should proxy to
-  var tcpServer = net.createServer(function(conn) {
-    // expect data that is fed to the wss server
-    conn.on('data', function(data) {
-      assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
-      conn.write(JSON.stringify(dataReq) + '\n' + BSON.serialize(bsonObj));
-      tcpServer.close();
+  function onSpawn() {
+    var tcpServer = net.createServer(function(conn) {
+      // expect data that is fed to the wss server
+      conn.on('data', function(data) {
+        assert.strictEqual(data.toString(), JSON.stringify(authReq) + '\n');
+        conn.write(JSON.stringify(dataReq) + '\n' + BSON.serialize(bsonObj));
+        tcpServer.close();
+      });
     });
-  });
-  tcpServer.listen(tcpPort);
+    tcpServer.listen(tcpPort);
+  }
 
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -497,8 +474,6 @@ tasks2.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText(JSON.stringify(authReq) + '\n');
         // expect data request back
@@ -521,6 +496,15 @@ tasks2.push(function(done) {
           });
         });
       });
+    }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
     }
   });
 });
