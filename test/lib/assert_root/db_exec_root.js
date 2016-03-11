@@ -34,18 +34,74 @@ var BSONStream = require('bson-stream');
 var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var bson = require('bson');
+var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
 
+var noop = function() {};
+
 var tasks = [];
 var tasks2 = [];
 
-// print line number
-function lnr() {
-  return new Error().stack.split('\n')[2].match(/db_exec_root.js:([0-9]+):[0-9]+/)[1];
+function spawn(options, spawnOpts) {
+  var opts = xtend({
+    configBase: __dirname,
+    config: 'test_persdb.hjson',
+    echoOut: false,
+    echoErr: true,
+    onSpawn: noop,
+    onMessage: null,                                          // handle ipc messages
+    onExit: noop,
+    exitCode: 0,                                              // test if exit code is 0
+    exitSignal: null,                                         // test if exit signal is empty
+    testStdout: null,
+    testStderr: function(s) {                               // test if stderr is empty
+      if (s.length) { throw new Error(s); }
+    }
+  }, options);
+
+  var sOpts = xtend({
+    args: [__dirname + '/../../../lib/db_exec'],
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+  }, spawnOpts);
+
+  // print line number
+  console.log('test #%d', new Error().stack.split('\n')[2].match(/db_exec_root.js:([0-9]+):[0-9]+/)[1]);
+
+  var extraArgs = [];
+  var child = childProcess.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
+
+  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
+  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    if (opts.testStdout) {
+      opts.testStdout(stdout);
+    }
+    if (opts.testStderr) {
+      opts.testStderr(stderr);
+    }
+    assert.strictEqual(code, opts.exitCode);
+    assert.strictEqual(sig, opts.exitSignal);
+    opts.onExit(null, code, sig, stdout, stderr);
+  });
+
+  if (opts.onMessage) {
+    child.on('message', function(msg) {
+      opts.onMessage(msg, child);
+    });
+  }
+  opts.onSpawn(child);
 }
 
 var logger = require('../../../lib/logger');
@@ -77,33 +133,10 @@ tasks.push(function(done) {
 
 // should accept writable stream for log files (regression)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
   var logFile = fs.createWriteStream(tmpdir() + 'dbe-test.log', { flags: 'a' });
 
   logFile.on('open', function() {
-    var child = childProcess.spawn(process.execPath, [__dirname + '/../../../lib/db_exec'], {
-      cwd: '/',
-      env: {},
-      stdio: ['pipe', 'pipe', 'pipe', 'ipc', logFile]
-    });
-
-    //child.stdout.pipe(process.stdout);
-    child.stderr.pipe(process.stderr);
-
-    var stderr = '';
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', function(data) { stderr += data; });
-
-    child.on('exit', function(code, sig) {
-      assert.strictEqual(stderr.length, 0);
-      assert.strictEqual(code, 0);
-      assert.strictEqual(sig, null);
-      done();
-    });
-
-    // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-    child.on('message', function(msg) {
+    function onMessage(msg, child) {
       switch(msg) {
       case 'init':
         child.send({
@@ -119,32 +152,26 @@ tasks.push(function(done) {
         console.error(msg);
         throw new Error('unknown state');
       }
-    });
+    }
+
+    var opts = {
+      onMessage: onMessage,
+      onExit: done
+    };
+
+    var spawnOpts = {
+      cwd: '/',
+      env: {},
+      stdio: ['pipe', 'pipe', 'pipe', 'ipc', logFile]
+    };
+
+    spawn(opts, spawnOpts);
   });
 });
 
 // should fail if hooks not found
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/error loading hooks: "foo,bar" /.test(stderr));
-    assert.strictEqual(code, 2);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -159,31 +186,22 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 2,
+    testStderr: function(stderr) {
+      assert(/error loading hooks: "foo,bar" /.test(stderr));
+    }
   });
 });
 
 // should fail with a valid configuration but non-existing hook paths
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/error loading hooks: "\/some"/.test(stderr));
-    assert.strictEqual(code, 2);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -201,31 +219,22 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 2,
+    testStderr: function(stderr) {
+      assert(/error loading hooks: "\/some"/.test(stderr));
+    }
   });
 });
 
 // should not fail with valid configurations (include existing hook paths)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -243,35 +252,17 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done
   });
 });
 
 // should show info on SIGUSR2
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert(/{"local":{"heads":{"count":0,"conflict":0,"deleted":0}},"stage":{"heads":{"count":0,"conflict":0,"deleted":0}/.test(stdout));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -292,32 +283,20 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/{"local":{"heads":{"count":0,"conflict":0,"deleted":0}},"stage":{"heads":{"count":0,"conflict":0,"deleted":0}/.test(stdout));
+    }
   });
 });
 
 // should fail if configured hook is not loaded
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/hook requested that is not loaded/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -335,31 +314,22 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/hook requested that is not loaded/.test(stderr));
+    }
   });
 });
 
 // should require a connection
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/connection missing/.test(stderr));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -381,44 +351,36 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    testStderr: function(stderr) {
+      assert(/connection missing/.test(stderr));
+    }
   });
 });
 
 // should require a valid remote identity
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
   // start an echo server that can receive auth responses
   var host = '127.0.0.1';
   var port = 1234;
 
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
-  var server = net.createServer(function(conn) {
-    conn.on('close', function() {
-      server.close(function() {
-        child.kill();
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.on('close', function() {
+        server.close(function() {
+          child.kill();
+        });
       });
     });
-  });
-  server.listen(port, host);
+    server.listen(port, host);
+  }
 
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/unknown perspective/.test(stderr));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -443,51 +405,44 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    testStderr: function(stderr) {
+      assert(/unknown perspective/.test(stderr));
+    }
   });
 });
 
 // should respond with a data request that indicates no data is requested
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
   // start an echo server that can receive data requests
   var host = '127.0.0.1';
   var port = 1234;
 
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      // expect a data request that indicates no data is requested
+      conn.on('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: false
+        });
 
-  var server = net.createServer(function(conn) {
-    // expect a data request that indicates no data is requested
-    conn.on('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: false
-      });
-
-      conn.end(function() {
-        server.close(function() {
-          child.kill();
+        conn.end(function() {
+          server.close(function() {
+            child.kill();
+          });
         });
       });
     });
-  });
-  server.listen(port, host);
+    server.listen(port, host);
+  }
 
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -512,54 +467,50 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: done
   });
 });
 
 // should accept a data request followed by BSON data if an import config is given
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
 
   // start server to check response from db_exec
-  var server = net.createServer(function(conn) {
-    conn.on('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: true
-      });
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.on('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: true
+        });
 
-      // send a data request signalling no data is requested
-      conn.write(JSON.stringify({ start: false }) + '\n');
+        // send a data request signalling no data is requested
+        conn.write(JSON.stringify({ start: false }) + '\n');
 
-      // follow up with a root node in BSON
-      var obj = { h: { id: 'abd', v: 'Aaaa', pa: [] }, b: { some: true } };
-      conn.end(BSON.serialize(obj));
-      conn.on('close', function() {
-        server.close(function() {
-          child.kill();
+        // follow up with a root node in BSON
+        var obj = { h: { id: 'abd', v: 'Aaaa', pa: [] }, b: { some: true } };
+        conn.end(BSON.serialize(obj));
+        conn.on('close', function() {
+          server.close(function() {
+            child.kill();
+          });
         });
       });
     });
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var pe = 'baz';
   var perspectives = [{ name: pe, import: true }];
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
+  function onExit() {
     // open and search in database if item is written
     level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
@@ -580,9 +531,6 @@ tasks.push(function(done) {
       });
 
       rs.on('end', function() {
-        assert.strictEqual(stderr.length, 0);
-        assert.strictEqual(code, 0);
-        assert.strictEqual(sig, null);
         assert.strictEqual(i, 1);
         mt.mergeWithLocal(mt._pe[pe], function(err) {
           if (err) { throw err; }
@@ -590,10 +538,9 @@ tasks.push(function(done) {
         });
       });
     });
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -621,60 +568,56 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should send back previously saved item (depends on previous test)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
 
   // start server to inspect response
-  var server = net.createServer(function(conn) {
-    conn.once('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: 'Aaaa'
-      });
-
-      // send a data request signalling data is requested from the start
-      conn.write(JSON.stringify({ start: true }) + '\n');
-
-      conn.on('data', function(data) {
-        assert.deepEqual(BSON.deserialize(data), {
-          h: { id: 'abd', v: 'Aaaa', pa: [] },
-          b: { some: true }
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.once('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: 'Aaaa'
         });
 
-        // now send a new child
-        var obj = { h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
-        conn.end(BSON.serialize(obj), function() {
-          server.close(function() {
-            child.kill();
+        // send a data request signalling data is requested from the start
+        conn.write(JSON.stringify({ start: true }) + '\n');
+
+        conn.on('data', function(data) {
+          assert.deepEqual(BSON.deserialize(data), {
+            h: { id: 'abd', v: 'Aaaa', pa: [] },
+            b: { some: true }
+          });
+
+          // now send a new child
+          var obj = { h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
+          conn.end(BSON.serialize(obj), function() {
+            server.close(function() {
+              child.kill();
+            });
           });
         });
       });
     });
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var pe = 'baz';
   var perspectives = [{ name: pe, import: true, export: true }];
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
+  function onExit() {
     // open and search in database if item is written
     level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
@@ -703,9 +646,6 @@ tasks.push(function(done) {
       });
 
       rs.on('end', function() {
-        assert.strictEqual(stderr.length, 0);
-        assert.strictEqual(code, 0);
-        assert.strictEqual(sig, null);
         assert.strictEqual(i, 2);
         mt.mergeWithLocal(mt._pe[pe], function(err) {
           if (err) { throw err; }
@@ -713,10 +653,9 @@ tasks.push(function(done) {
         });
       });
     });
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -744,64 +683,60 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should run export hooks and send back previously saved items (depends on two previous tests)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
 
   // start server to inspect response
-  var server = net.createServer(function(conn) {
-    conn.once('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: false
-      });
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.once('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: false
+        });
 
-      // send a data request signalling data is requested from the start
-      conn.write(JSON.stringify({ start: true }) + '\n');
+        // send a data request signalling data is requested from the start
+        conn.write(JSON.stringify({ start: true }) + '\n');
 
-      var i = 0;
-      conn.pipe(new BSONStream()).on('data', function(item) {
-        i++;
-        if (i === 1) {
-          assert.deepEqual(item, {
-            h: { id: 'abd', v: 'Aaaa', pa: [] },
-            b: { some: true }
+        var i = 0;
+        conn.pipe(new BSONStream()).on('data', function(item) {
+          i++;
+          if (i === 1) {
+            assert.deepEqual(item, {
+              h: { id: 'abd', v: 'Aaaa', pa: [] },
+              b: { some: true }
+            });
+          }
+          if (i > 1) {
+            assert.deepEqual(item, {
+              h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] },
+              b: { } // should have been stripped by export hook
+            });
+            conn.end();
+          }
+        });
+
+        conn.on('end', function() {
+          assert.strictEqual(i, 2);
+          server.close(function() {
+            child.kill();
           });
-        }
-        if (i > 1) {
-          assert.deepEqual(item, {
-            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] },
-            b: { } // should have been stripped by export hook
-          });
-          conn.end();
-        }
-      });
-
-      conn.on('end', function() {
-        assert.strictEqual(i, 2);
-        server.close(function() {
-          child.kill();
         });
       });
     });
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var pe = 'baz';
   var perspectives = [{ name: pe, export: {
@@ -813,15 +748,7 @@ tasks.push(function(done) {
   }}];
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -850,50 +777,46 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: done
   });
 });
 
 // should run import hooks
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
 
   // start server to inspect response
-  var server = net.createServer(function(conn) {
-    conn.once('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: 'Bbbb'
-      });
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.once('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: 'Bbbb'
+        });
 
-      // send a data request signalling data is requested from the start
-      conn.write(JSON.stringify({ start: true }) + '\n');
+        // send a data request signalling data is requested from the start
+        conn.write(JSON.stringify({ start: true }) + '\n');
 
-      conn.end(BSON.serialize({
-        h: { id: 'def', v: 'Dddd', pa: [] },
-        b: { some: true, other: false }
-      }));
+        conn.end(BSON.serialize({
+          h: { id: 'def', v: 'Dddd', pa: [] },
+          b: { some: true, other: false }
+        }));
 
-      conn.on('end', function() {
-        server.close(function() {
-          child.kill();
+        conn.on('end', function() {
+          server.close(function() {
+            child.kill();
+          });
         });
       });
     });
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var pe = 'baz';
   var perspectives = [{ name: pe, import: {
@@ -905,7 +828,7 @@ tasks.push(function(done) {
   }}];
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
+  function onExit() {
     // open and search in database if item is written
     level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
@@ -940,9 +863,6 @@ tasks.push(function(done) {
       });
 
       rs.on('end', function() {
-        assert.strictEqual(stderr.length, 0);
-        assert.strictEqual(code, 0);
-        assert.strictEqual(sig, null);
         assert.strictEqual(i, 3);
         mt.mergeWithLocal(mt._pe[pe], function(err) {
           if (err) { throw err; }
@@ -950,10 +870,9 @@ tasks.push(function(done) {
         });
       });
     });
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -982,53 +901,49 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should accept a new local data channel request and write data to the local tree
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
 
   // start server to check response from db_exec
-  var server = net.createServer(function(conn) {
-    conn.on('data', function() {
-      throw new Error('unexpected merge');
-    });
-
-    // send a new node
-    var obj = {
-      h: { id: 'abd', v: 'Aaaa' },
-      b: { some: true }
-    };
-    conn.write(BSON.serialize(obj));
-    conn.on('close', function() {
-      server.close(function() {
-        child.kill();
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      conn.on('data', function() {
+        throw new Error('unexpected merge');
       });
+
+      // send a new node
+      var obj = {
+        h: { id: 'abd', v: 'Aaaa' },
+        b: { some: true }
+      };
+      conn.write(BSON.serialize(obj));
+      conn.on('close', function() {
+        server.close(function() {
+          child.kill();
+        });
+      });
+      // give some time to start merge handler
+      setTimeout(conn.end.bind(conn), 110);
     });
-    // give some time to start merge handler
-    setTimeout(conn.end.bind(conn), 110);
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var vSize = 3;
   var localName = 'testWithLocalDataChannel';
 
-  child.on('exit', function(code, sig) {
+  function onExit() {
     // open and search in database if item is written
     level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
@@ -1049,17 +964,13 @@ tasks.push(function(done) {
       });
 
       rs.on('end', function() {
-        assert.strictEqual(stderr.length, 0);
-        assert.strictEqual(code, 0);
-        assert.strictEqual(sig, null);
         assert.strictEqual(i, 1);
         db.close(done);
       });
     });
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -1091,16 +1002,17 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should write merges with remotes back to the local data channel
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server for the local channel and one for the remote channel
   var host = '127.0.0.1';
   var port = 1234;
@@ -1108,75 +1020,66 @@ tasks.push(function(done) {
 
   var i = 0;
   // start server for local data channel
-  var server = net.createServer(function(conn) {
-    // expect a merge with the item sent by server2
-    conn.pipe(new BSONStream()).on('data', function(item) {
-      i++;
-      assert.deepEqual(item, {
-        n: {
-          h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'buzz', i: 1 },
-          b: { some: true }
-        },
-        o: null
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      // expect a merge with the item sent by server2
+      conn.pipe(new BSONStream()).on('data', function(item) {
+        i++;
+        assert.deepEqual(item, {
+          n: {
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'buzz', i: 1 },
+            b: { some: true }
+          },
+          o: null
+        });
+
+        conn.end();
       });
-
-      conn.end();
-    });
-
-    conn.on('close', function() {
-      server.close(function() {
-        child.kill();
-      });
-    });
-  });
-  server.listen(port, host);
-
-  // start server for remote data channel
-  var server2 = net.createServer(function(conn) {
-    conn.on('data', function(data) {
-      assert.deepEqual(JSON.parse(data), {
-        start: true
-      });
-
-      // send a data request signalling no data is requested
-      conn.write(JSON.stringify({ start: false }) + '\n');
-
-      // send a root node in BSON
-      conn.write(BSON.serialize({
-        h: { id: 'abd', v: 'Aaaa', pa: [] },
-        b: { some: true }
-      }));
 
       conn.on('close', function() {
-        server2.close();
+        server.close(function() {
+          child.kill();
+        });
       });
-      conn.end();
     });
-  });
-  server2.listen(port2, host);
+    server.listen(port, host);
 
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
+    // start server for remote data channel
+    var server2 = net.createServer(function(conn) {
+      conn.on('data', function(data) {
+        assert.deepEqual(JSON.parse(data), {
+          start: true
+        });
 
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+        // send a data request signalling no data is requested
+        conn.write(JSON.stringify({ start: false }) + '\n');
+
+        // send a root node in BSON
+        conn.write(BSON.serialize({
+          h: { id: 'abd', v: 'Aaaa', pa: [] },
+          b: { some: true }
+        }));
+
+        conn.on('close', function() {
+          server2.close();
+        });
+        conn.end();
+      });
+    });
+    server2.listen(port2, host);
+  }
 
   var pe = 'buzz';
   var perspectives = [{ name: pe, import: true }];
   var localName = 'testWithLocalAndRemoteDataChannel';
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
+  function onExit() {
     assert.strictEqual(i, 1);
     done();
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -1218,61 +1121,53 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should accept and respond to a head lookup request for a non-existing id
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server for the head lookup channel
   var host = '127.0.0.1';
   var port = 1234;
 
   var i = 0;
   // start server for head lookup channel
-  var server = net.createServer(function(conn) {
-    // request a head lookup for non-existing "abd"
-    conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+  function onSpawn(child) {
+    var server = net.createServer(function(conn) {
+      // request a head lookup for non-existing "abd"
+      conn.write(JSON.stringify({ id: 'abd'}) + '\n');
 
-    // expect the requested version
-    conn.pipe(new BSONStream()).on('data', function(item) {
-      i++;
-      assert.deepEqual(item, {});
-      conn.end();
-    });
+      // expect the requested version
+      conn.pipe(new BSONStream()).on('data', function(item) {
+        i++;
+        assert.deepEqual(item, {});
+        conn.end();
+      });
 
-    conn.on('close', function() {
-      server.close(function() {
-        child.kill();
+      conn.on('close', function() {
+        server.close(function() {
+          child.kill();
+        });
       });
     });
-  });
-  server.listen(port, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    server.listen(port, host);
+  }
 
   var localName = 'testHeadLookup';
   var vSize = 3;
 
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
+  function onExit() {
     assert.strictEqual(i, 1);
     done();
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -1299,92 +1194,84 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
 // should accept and respond to a head lookup request (write a new object via a local data channel first)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  // then fork a dbe
-  var child = childProcess.fork(__dirname + '/../../../lib/db_exec', { silent: true });
-
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
   var port2 = 1235;
 
-  // start local data channel to send a new object that can later be looked up
-  var localDataServer = net.createServer(function(conn) {
-    conn.on('data', function() {
-      throw new Error('unexpected merge');
-    });
-
-    conn.on('close', function() {
-      localDataServer.close();
-    });
-    // send a new node
-    conn.write(BSON.serialize({
-      h: { id: 'abd', v: 'Aaaa' },
-      b: { some: true }
-    }));
-    conn.end();
-
-    // give it some time to write to the local tree, then setup connection to head lookup server
-    setTimeout(function() {
-      var s2 = net.createConnection(port2, host, function() {
-        child.send({
-          type: 'headLookup'
-        }, s2);
-      });
-    }, 100);
-  });
-  localDataServer.listen(port, host);
-
   var i = 0;
-  // start server for head lookup channel
-  var headLookupServer = net.createServer(function(conn) {
-    // do a head lookup for "abd"
-    conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+  // start local data channel to send a new object that can later be looked up
+  function onSpawn(child) {
+    var localDataServer = net.createServer(function(conn) {
+      conn.on('data', function() {
+        throw new Error('unexpected merge');
+      });
 
-    // expect the requested version
-    conn.pipe(new BSONStream()).on('data', function(item) {
-      i++;
-      assert.deepEqual(item, {
-        h: { id: 'abd', v: 'Aaaa', pa: [], i: 1 },
+      conn.on('close', function() {
+        localDataServer.close();
+      });
+      // send a new node
+      conn.write(BSON.serialize({
+        h: { id: 'abd', v: 'Aaaa' },
         b: { some: true }
-      });
+      }));
       conn.end();
-    });
 
-    conn.on('close', function() {
-      headLookupServer.close(function() {
-        child.kill();
+      // give it some time to write to the local tree, then setup connection to head lookup server
+      setTimeout(function() {
+        var s2 = net.createConnection(port2, host, function() {
+          child.send({
+            type: 'headLookup'
+          }, s2);
+        });
+      }, 100);
+    });
+    localDataServer.listen(port, host);
+
+    // start server for head lookup channel
+    var headLookupServer = net.createServer(function(conn) {
+      // do a head lookup for "abd"
+      conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+
+      // expect the requested version
+      conn.pipe(new BSONStream()).on('data', function(item) {
+        i++;
+        assert.deepEqual(item, {
+          h: { id: 'abd', v: 'Aaaa', pa: [], i: 1 },
+          b: { some: true }
+        });
+        conn.end();
+      });
+
+      conn.on('close', function() {
+        headLookupServer.close(function() {
+          child.kill();
+        });
       });
     });
-  });
-  headLookupServer.listen(port2, host);
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
+    headLookupServer.listen(port2, host);
+  }
 
   var vSize = 3;
   var localName = 'testWithLocalDataChannel';
 
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
+  function onExit() {
     assert.strictEqual(i, 1);
     done();
-  });
+  }
 
-  // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -1410,6 +1297,12 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
+  }
+
+  spawn({
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
   });
 });
 
