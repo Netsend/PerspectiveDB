@@ -1,5 +1,5 @@
 /**
- * Copyright 2014 Netsend.
+ * Copyright 2014-2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -31,13 +31,68 @@ var c = require('constants');
 
 var async = require('async');
 var ws = require('nodejs-websocket');
+var xtend = require('xtend');
 
+var noop = function() {};
 var tasks = [];
 var tasks2 = [];
 
-// print line number
-function lnr() {
-  return new Error().stack.split('\n')[2].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1];
+function spawn(options, spawnOpts) {
+  var opts = xtend({
+    configBase: __dirname,
+    config: 'test_persdb.hjson',
+    echoOut: false,
+    echoErr: true,
+    onSpawn: noop,
+    onMessage: null,                                          // handle ipc messages
+    onExit: noop,
+    exitCode: 0,                                              // test if exit code is 0
+    exitSignal: null,                                         // test if exit signal is empty
+    testStdout: null,
+    testStderr: function(s) {                                 // test if stderr is empty
+      if (s.length) { throw new Error(s); }
+    }
+  }, options);
+
+  var sOpts = xtend({
+    args: [__dirname + '/../../../lib/preauth_exec'],
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
+  }, spawnOpts);
+
+  // print line number
+  console.log('test #%d', new Error().stack.split('\n')[2].match(/preauth_exec_root.js:([0-9]+):[0-9]+/)[1]);
+
+  var extraArgs = [];
+  var child = childProcess.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
+
+  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
+  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
+
+  var stdout = '';
+  var stderr = '';
+  child.stdout.setEncoding('utf8');
+  child.stderr.setEncoding('utf8');
+  child.stdout.on('data', function(data) { stdout += data; });
+  child.stderr.on('data', function(data) { stderr += data; });
+
+  child.on('exit', function(code, sig) {
+    if (opts.testStdout) {
+      opts.testStdout(stdout);
+    }
+    if (opts.testStderr) {
+      opts.testStderr(stderr);
+    }
+    assert.strictEqual(code, opts.exitCode);
+    assert.strictEqual(sig, opts.exitSignal);
+    opts.onExit(null, code, sig, stdout, stderr);
+  });
+
+  if (opts.onMessage) {
+    child.on('message', function(msg) {
+      opts.onMessage(msg, child);
+    });
+  }
+  opts.onSpawn(child);
 }
 
 var logger = require('../../../lib/logger');
@@ -59,24 +114,7 @@ tasks.push(function(done) {
 
 // should require msg.log to be an object
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.log must be an object/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -86,29 +124,22 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/msg.log must be an object/.test(stderr));
+    }
   });
 });
 
 // should require msg.port to be a number
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/msg.port must be a number/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -119,32 +150,22 @@ tasks.push(function(done) {
     case 'listen':
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/msg.port must be a number/.test(stderr));
+    }
   });
 });
 
 // should disconnect after receiving more than 1024 bytes of data without newlines
-tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/Error: more than maxBytes received/.test(stderr));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+tasks2.push(function(done) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -153,7 +174,7 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(child.stdout));
 
       var ms = net.createConnection(1234);
 
@@ -183,33 +204,22 @@ tasks.push(function(done) {
       });
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: true,
+    testStderr: function(stderr) {
+      assert(/Error: more than maxBytes received/.test(stderr));
+    }
   });
 });
 
 
 // should not parse objects larger than max length
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  //child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert(/Error: more than maxBytes received/.test(stderr));
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -218,8 +228,6 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var ms = net.createConnection(1234);
 
       var pattern = 'abcdefgh';
@@ -242,35 +250,30 @@ tasks.push(function(done) {
       */
       break;
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    testStdout: function(stdout) {
+      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+    },
+    testStderr: function(stderr) {
+      assert(/Error: more than maxBytes received/.test(stderr));
+    }
   });
 });
 
 // should pass auth request to parent
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
   var authReq = {
     username: 'foo',
     password: 'bar',
     db: 'qux'
   };
 
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -291,13 +294,16 @@ tasks.push(function(done) {
       });
       child.kill();
     }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done
   });
 });
 
 // should start a secure websocket server and pass auth request to parent
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
   var cert, key, dhparam;
 
   cert = __dirname + '/cert.pem';
@@ -317,25 +323,7 @@ tasks.push(function(done) {
     db: 'qux'
   };
 
-  var child = childProcess.fork(__dirname + '/../../../lib/preauth_exec', { silent: true });
-
-  child.stderr.pipe(process.stderr);
-  //child.stdout.pipe(process.stdout);
-
-  var stderr = '';
-  var stdout = '';
-  child.stderr.setEncoding('utf8');
-  child.stdout.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.on('close', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch (msg) {
     case 'init':
       child.send({
@@ -349,8 +337,6 @@ tasks.push(function(done) {
       break;
     case 'listen':
       // write auth request via a wss client
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
-
       var client = ws.connect('wss://localhost:3344', wsClientOpts, function() {
         client.sendText(JSON.stringify(authReq) + '\n');
         // expect auth response
@@ -372,6 +358,14 @@ tasks.push(function(done) {
         db: 'qux'
       });
       child.kill();
+    }
+  }
+
+  spawn({
+    onMessage: onMessage,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
     }
   });
 });
