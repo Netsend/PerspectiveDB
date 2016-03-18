@@ -33,6 +33,7 @@ if (typeof process.send !== 'function') {
 }
 
 var net = require('net');
+var url = require('url');
 
 var async = require('async');
 var chroot = require('chroot');
@@ -41,6 +42,7 @@ var posix = require('posix');
 
 var logger = require('../../lib/logger');
 var OplogTransform = require('./oplog_transform');
+var filterSecrets = require('../../lib/filter_secrets');
 
 /**
  * Instantiate a connection to a mongo database and read changes of a collection
@@ -73,7 +75,7 @@ var OplogTransform = require('./oplog_transform');
  */
 
 // globals
-var log; // used after receiving the log configuration
+var coll, db, log; // used after receiving the log configuration
 
 /**
  * Start oplog transformer:
@@ -92,8 +94,23 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   ot.pipe(dataChannel);
   ot.startStream();
 
+  // snoop on first version to check if there is any version at all in leveldb
+  ot.once('lastVersion', function(obj) {
+    if (Object.keys(obj).length) {
+      log.notice('leveldb is bootstrapped, last item %j', obj.h);
+    } else {
+      // no data in leveldb yet, send every object in the collection upstream
+      log.notice('bootstrapping leveldb with every object in the mongo collection');
+      var s = coll.find();
+      s.pipe(dataChannel);
+      s.on('end', function() {
+        log.notice('bootstrapping leveldb done');
+      });
+    }
+  });
+
   // TODO: handle new incoming objects, conditional copy to collection
-  var bs = new BSONStream();
+  //var bs = new BSONStream();
   /*
   dataChannel.pipe(bs).on('readable', function() {
     var obj = bs.read();
@@ -109,30 +126,33 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
  * Expect one init request (request that contains config)
  * {
  *   log:            {Object}      // log configuration
- *   db:             {String}      // database name
+ *   url:            {String}      // mongodb connection string
  *   coll:           {String}      // collection name
- *   [authorative]:  {Boolean}     // whether or not this collection should be
- *                                 // treated as an authorative source, defaults to
- *                                 // false. If true, an id/version request channel
- *                                 // is setup and sent back with the listen event
- *   [url]:          {String}      // mongodb connection string, defaults
- *                                 // to mongodb://127.0.0.1:27017/local
+ *   [dbUser]:       {String}      // user to read the collection
+ *   [oplogDbUser]:  {String}      // user to read the oplog database collection
+ *   [secrets]:      {Object}      // object containing the passwords for dbUser
+ *                                 // and oplogDbUser
+ *   [authDb]:      {String}       // authDb database, defaults to db from url
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [mongoOpts]:    {Object}      // any other mongodb driver options
  *   [chroot]:       {String}      // defaults to /var/empty
- *   [user]:         {String}      // defaults to "nobody"
- *   [group]:        {String}      // defaults to "nobody"
+ *   [user]:         {String}      // system user to run this process, defaults to
+ *                                 // "nobody"
+ *   [group]:        {String}      // system group to run this process, defaults to
+ *                                 // "nobody"
  * }
  */
 process.once('message', function(msg) {
   if (msg == null || typeof msg !== 'object') { throw new TypeError('msg must be an object'); }
   if (msg.log == null || typeof msg.log !== 'object') { throw new TypeError('msg.log must be an object'); }
-  if (!msg.db || typeof msg.db !== 'string') { throw new TypeError('msg.db must be a non-empty string'); }
+  if (!msg.url || typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
   if (!msg.coll || typeof msg.coll !== 'string') { throw new TypeError('msg.coll must be a non-empty string'); }
 
-  if (msg.authorative != null && typeof msg.authorative !== 'boolean') { throw new TypeError('msg.authorative must be a boolean'); }
-  if (msg.url != null && typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
+  if (msg.dbUser != null && typeof msg.dbUser !== 'string') { throw new TypeError('msg.dbUser must be a string'); }
+  if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
+  if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
+  if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.mongoOpts != null && typeof msg.mongoOpts !== 'object') { throw new TypeError('msg.mongoOpts must be an object'); }
@@ -140,12 +160,14 @@ process.once('message', function(msg) {
   if (msg.user != null && typeof msg.user !== 'string') { throw new TypeError('msg.user must be a string'); }
   if (msg.group != null && typeof msg.group !== 'string') { throw new TypeError('msg.group must be a string'); }
 
-  var dbName = msg.db;
-  var collName = msg.coll;
-  var authorative = !!msg.authorative;
-  var url = msg.url || 'mongodb://127.0.0.1:27017/local';
   var oplogDbName = msg.oplogDb || 'local';
   var oplogCollName = msg.oplogColl || 'oplog.$main';
+
+  var parsedUrl = url.parse(msg.url);
+  var dbName = parsedUrl.pathname.slice(1); // strip prefixed "/"
+  if (!dbName) { throw new Error('url must contain a database name'); }
+
+  var collName = msg.coll;
 
   programName = 'mongo';
 
@@ -158,15 +180,27 @@ process.once('message', function(msg) {
 
   msg.log.ident = programName;
 
-  var db, oplogDb; // handle to db and oplog db connection
+  var oplogDb; // handle to db and oplog db connection
   var dataChannel; // expect a data request/receive channel on fd 6
   var versionControl; // expect a version request/receive channel on fd 7
+
+  var dbPass, dbUser = msg.dbUser;
+  if (dbUser && msg.secrets) {
+    dbPass = msg.secrets[dbUser];
+  }
+
+  var oplogDbPass, oplogDbUser = msg.oplogDbUser;
+  if (oplogDbUser && msg.secrets) {
+    oplogDbPass = msg.secrets[oplogDbUser];
+  }
 
   // open log
   logger(msg.log, function(err, l) {
     if (err) { l.err(err); throw err; }
 
     log = l; // use this logger in the mt's as well
+
+    log.debug('%j', filterSecrets(msg));
 
     var uid, gid;
     try {
@@ -194,25 +228,40 @@ process.once('message', function(msg) {
       // connect to the database
       startupTasks.push(function(cb) {
         log.debug('connect to database...');
-        MongoClient.connect(url, function(err, dbc) {
+        MongoClient.connect(msg.url, function(err, dbc) {
           if (err) { log.err('connect error: %s', err); cb(err); return; }
+          if (dbc.databaseName !== dbName) { cb(new Error('connected to the wrong database')); return; }
 
-          log.notice('connected %s', url);
-
-          if (dbc.databaseName === dbName) {
-            db = dbc;
-          } else {
-            db = dbc.db(dbName);
-          }
-
-          if (dbc.databaseName === oplogDbName) {
-            oplogDb = dbc;
-          } else {
-            oplogDb = dbc.db(oplogDbName);
-          }
-
+          log.notice('connected %s', msg.url);
+          db = dbc;
           cb();
         });
+      });
+
+      // auth to db if necessary
+      startupTasks.push(function(cb) {
+        if (dbUser || dbPass) {
+          var authDb = db.db(msg.authDb || dbName);
+          authDb.authenticate(dbUser, dbPass, cb);
+        }
+        process.nextTick(cb);
+      });
+
+      // setup coll
+      startupTasks.push(function(cb) {
+        coll = db.collection(collName);
+        process.nextTick(cb);
+      });
+
+      // setup oplog db
+      startupTasks.push(function(cb) {
+        // auth to oplog db if necessary
+        if (oplogDbUser || oplogDbPass) {
+          var authDb = db.db(msg.authDb || oplogDbName);
+          authDb.authenticate(oplogDbUser, oplogDbPass, cb);
+        }
+        oplogDb = db.db(oplogDbName);
+        process.nextTick(cb);
       });
 
       // expect a data request/receive channel on fd 6
@@ -259,7 +308,7 @@ process.once('message', function(msg) {
 
       async.series(startupTasks, function(err) {
         if (err) {
-          log.crit('not all startup tasks are completed, exiting');
+          log.crit('not all startup tasks are completed %j, exiting', err);
           process.exit(6);
         }
 

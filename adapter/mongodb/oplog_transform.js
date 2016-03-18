@@ -109,17 +109,30 @@ module.exports = OplogTransform;
  * to new versions.
  *
  * Ask last version
- *  * open oplog after that item
- *  * for each oplog item
- *    * if insert, delete or update by full doc, emit
- *    * if update by update modifier:
- *    * ask last version for h.id
- *      * save in tmp collection
- *      * apply update doc
- *      * emit
+ *  * if no last version, sent the whole collection to upstream
+ *  * else open oplog after that item
+ *    * for each oplog item
+ *      * if insert, delete or update by full doc, emit
+ *      * if update by update modifier:
+ *      * ask last version for h.id
+ *        * save in tmp collection
+ *        * apply update doc
+ *        * emit
  */
 OplogTransform.prototype.startStream = function startStream() {
   var that = this;
+
+  // handle new oplog items via this._transform, use this._lastTs as offset
+  function openOplog(opts, reopen) {
+    that._log.notice('ot startStream opening tailable oplog cursor after %s', that._lastTs);
+    var or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
+    or.once('end', function() {
+      that._log.notice('ot startStream end of tailable oplog cursor');
+      or.unpipe(that);
+      if (reopen) { openOplog(opts, reopen); }
+    });
+    or.pipe(that);
+  }
 
   // listen for response, expect it to be the last stored version
   this._controlRead.once('readable', function() {
@@ -130,26 +143,50 @@ OplogTransform.prototype.startStream = function startStream() {
       return;
     }
 
-    // expect the last version in the DAG with an oplog offset
-    var offset;
-    try {
-      var err = new Error('unable to determine offset');
-      offset = obj.m._op;
-      if (!offset) {
-        throw err;
-      }
-    } catch(e) {
-      that._log.err('ot startStream %j %j', err, e);
-      that.emit('error', err);
-      return;
-    }
+    that.emit('lastVersion', obj);
 
-    // handle new oplog items via this._transform
-    var or = that._oplogReader(xtend(that._opts, { offset: offset, bson: false, tailable: true }));
-    or.on('end', function() {
-      that._log.notice('ot startStream unexpected end of tailable oplog cursor');
-    });
-    or.pipe(that);
+    // ensure this._lastTs
+    if (!Object.keys(obj).length) {
+      // no data in leveldb yet
+      // use current last offset and send every object in the collection upstream
+      that._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+        if (err) {
+          that.emit('error', err);
+          return;
+        }
+
+        if (!oplogItem) {
+          that.emit('error', new Error('no oplog item found'));
+          return;
+        }
+
+        that._log.notice('ot startStream bootstrap oplog after last item %s', oplogItem.ts);
+
+        that._lastTs = oplogItem.ts;
+
+        // handle new oplog items via this._transform
+        openOplog(xtend(that._opts, { bson: false, tailable: true }), true);
+      });
+    } else {
+      // expect the last version in the DAG with an oplog offset
+      var offset, err;
+      try {
+        err = new Error('unable to determine offset');
+        offset = obj.m._op;
+        if (!offset) {
+          throw err;
+        }
+      } catch(e) {
+        that._log.err('ot startStream %j %j', err, e);
+        that.emit('error', err);
+        return;
+      }
+
+      that._lastTs = offset;
+
+      // handle new oplog items via this._transform
+      openOplog(xtend(that._opts, { bson: false, tailable: true }), true);
+    }
   });
 
   // ask for last version (not id restricted)
@@ -229,6 +266,10 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     });
     return;
   }
+
+  this._log.debug('ot _transform oplog item: %j', oplogItem);
+
+  this._lastTs = oplogItem.ts;
 
   // determine the type of operator
   var operator = oplogItem.op;
@@ -399,7 +440,7 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
 };
 
 /**
- * Update an existing version of a document by applying an oplog update item.  
+ * Update an existing version of a document by applying an oplog update item.
  *
  * Request the current version on the control read stream. Insert it into a temporary
  * collection to update it and pass the result back on the data stream.
@@ -467,7 +508,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
 
 /**
  * Check if given oplog item has the following attributes:
- * - has "o", "ts", "ns" and "op" properties. 
+ * - has "o", "ts", "ns" and "op" properties.
  * - "op" is one of "i", "u" or "d".
  *
  * @param {Object} data  object that needs to be tested
