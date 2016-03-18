@@ -30,6 +30,7 @@
 'use strict';
 
 var path = require('path');
+
 var programName = path.basename(__filename, '.js');
 var dirname = path.dirname;
 
@@ -46,6 +47,7 @@ var program = require('commander');
 
 var logger = require('../lib/logger');
 var Master = require('../lib/master');
+var loadSecrets = require('../lib/load_secrets');
 
 program
   .version(require('../package.json').version)
@@ -64,16 +66,19 @@ if (!configFile) {
 
 var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
-// prepend the dirname of the config file to all relative path specifications in the config file
+// set config base
+config.configBase = dirname(configFile) + '/';
+
+// prepend the config base to all relative path specifications in the config file
 if (config.wss) {
   if (config.wss.cert && config.wss.cert[0] !== '/') {
-    config.wss.cert = dirname(configFile) + '/' + config.wss.cert;
+    config.wss.cert = config.configBase + config.wss.cert;
   }
   if (config.wss.key && config.wss.key[0] !== '/') {
-    config.wss.key = dirname(configFile) + '/' + config.wss.key;
+    config.wss.key = config.configBase + config.wss.key;
   }
   if (config.wss.dhparam && config.wss.dhparam[0] !== '/') {
-    config.wss.dhparam = dirname(configFile) + '/' + config.wss.dhparam;
+    config.wss.dhparam = config.configBase + config.wss.dhparam;
   }
 }
 
@@ -94,19 +99,18 @@ function start() {
         // support loading from a file
         if (password.indexOf('$2a$') !== 0) {
           var file = password;
-          // prepend the dirname of the config file to all relative path specifications in the config file
+          // prepend the config base to all relative path specifications in the config file
           if (file && file[0] !== '/') {
-            file = dirname(configFile) + '/' + file;
-          }
-          var stats = fs.statSync(file);
-          if ((stats.mode & 6) !== 0) {
-            error = new Error('should not be world readable or writable');
-            console.error('%s: %s: %s', programName, file, error);
-            cb(error);
-            return;
+            file = config.configBase + file;
           }
           if (!files[file]) {
-            files[file] = hjson.parse(fs.readFileSync(file, { encoding: 'utf8' }));
+            try {
+              files[file] = loadSecrets(file);
+            } catch(err) {
+              console.error('%s: %s: %s', programName, file, err);
+              cb(err);
+              return;
+            }
           }
           password = files[file][username] || '';
         }
