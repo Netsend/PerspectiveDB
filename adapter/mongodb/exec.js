@@ -75,7 +75,7 @@ var filterSecrets = require('../../lib/filter_secrets');
  */
 
 // globals
-var coll, db, log; // used after receiving the log configuration
+var ot, coll, db, log; // used after receiving the log configuration
 
 /**
  * Start oplog transformer:
@@ -90,7 +90,7 @@ var coll, db, log; // used after receiving the log configuration
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   log.debug('start oplog transform...');
-  var ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, { log: log, bson: true });
+  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, { log: log, bson: true });
   ot.pipe(dataChannel);
   ot.startStream();
 
@@ -102,7 +102,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
       // no data in leveldb yet, send every object in the collection upstream
       log.notice('bootstrapping leveldb with every object in the mongo collection');
       var s = coll.find();
-      s.pipe(dataChannel);
+      s.pipe(dataChannel, { end: false });
       s.on('end', function() {
         log.notice('bootstrapping leveldb done');
       });
@@ -278,14 +278,36 @@ process.once('message', function(msg) {
         cb();
       });
 
+      /////////// SHUTDOWN TASKS
+
+      shutdownTasks.push(function(cb) {
+        if (ot) {
+          log.notice('closing oplog transform...');
+          ot.close(cb);
+        } else {
+          log.notice('no oplog transform active');
+          cb();
+        }
+      });
+
       shutdownTasks.push(function(cb) {
         log.info('closing data channel...');
-        dataChannel.end(cb);
+        if (dataChannel.writable) {
+          dataChannel.end(cb);
+        } else {
+          dataChannel.destroy();
+          cb();
+        }
       });
 
       shutdownTasks.push(function(cb) {
         log.info('closing version control...');
-        versionControl.end(cb);
+        if (versionControl.writable) {
+          versionControl.end(cb);
+        } else {
+          versionControl.destroy();
+          cb();
+        }
       });
 
       shutdownTasks.push(function(cb) {

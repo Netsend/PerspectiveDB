@@ -125,13 +125,13 @@ OplogTransform.prototype.startStream = function startStream() {
   // handle new oplog items via this._transform, use this._lastTs as offset
   function openOplog(opts, reopen) {
     that._log.notice('ot startStream opening tailable oplog cursor after %s', that._lastTs);
-    var or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
-    or.once('end', function() {
+    that._or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
+    that._or.once('end', function() {
       that._log.notice('ot startStream end of tailable oplog cursor');
-      or.unpipe(that);
-      if (reopen) { openOplog(opts, reopen); }
+      that._or.unpipe(that);
+      if (reopen && !that._stop) { openOplog(opts, reopen); }
     });
-    or.pipe(that);
+    that._or.pipe(that, { end: false });
   }
 
   // listen for response, expect it to be the last stored version
@@ -192,6 +192,28 @@ OplogTransform.prototype.startStream = function startStream() {
   // ask for last version (not id restricted)
   // write version requests in ld-json
   this._controlWrite.write(JSON.stringify({ id: null }) + '\n');
+};
+
+/**
+ * Stop oplog reader and signal to stop reopening.
+ *
+ * @param {Function} cb  First parameter will be an error object or null.
+ */
+OplogTransform.prototype.close = function close(cb) {
+  this._log.info('ot oplogReader close');
+
+  this._stop = true;
+
+  var that = this;
+
+  if (this._or) {
+    this._or.close();
+    this._or.on('close', function() {
+      that.end(cb);
+    });
+  } else {
+    this.end(cb);
+  }
 };
 
 /**
