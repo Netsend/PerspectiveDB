@@ -291,20 +291,22 @@ process.once('message', function(msg) {
       });
 
       shutdownTasks.push(function(cb) {
-        log.info('closing data channel...');
         if (dataChannel.writable) {
+          log.info('closing data channel...');
           dataChannel.end(cb);
         } else {
+          log.info('data channel already closed');
           dataChannel.destroy();
           cb();
         }
       });
 
       shutdownTasks.push(function(cb) {
-        log.info('closing version control...');
         if (versionControl.writable) {
+          log.info('closing version control...');
           versionControl.end(cb);
         } else {
+          log.info('version control already closed');
           versionControl.destroy();
           cb();
         }

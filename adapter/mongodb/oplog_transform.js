@@ -206,9 +206,8 @@ OplogTransform.prototype.close = function close(cb) {
 
   var that = this;
 
-  if (this._or) {
-    this._or.close();
-    this._or.on('close', function() {
+  if (this._or && this._or.readable) {
+    this._or.close(function() {
       that.end(cb);
     });
   } else {
