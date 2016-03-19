@@ -1,0 +1,44 @@
+# PersDB settings.
+
+# make sure a test mongodb is running
+
+# Main
+
+#user: nobody
+#group: nobody
+#chroot: /var/empty
+
+log: {
+  console: true
+  level: debug
+}
+
+# DBs
+
+dbs: [{
+  name: someDb
+  chroot: /var/persdb
+  path: /test_persdb_mongo_root
+  mergeTree: {
+    vSize: 3
+    autoMergeInterval: 1000  # Milliseconds between auto processing items
+  },
+  source: {
+    url: mongodb://127.0.0.1:27019/pdb
+    coll: baz
+    #dbUser: bar
+    #oplogDbUser: bar
+    #secrets: "secrets.hjson"
+  },
+  perspectives: [
+    {
+      name: someClient
+      password: "$2a$10$4Po9aCT665J1luJOwSnTYez/PWO0mOjxOcVOOOF7f13IrW9Tl3nq2" # password is "somepass"
+      import: true
+      export: true
+      tailRetry: 400
+    }
+  ]
+}]
+
+localPort: 1234
