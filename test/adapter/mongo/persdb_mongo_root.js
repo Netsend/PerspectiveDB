@@ -124,35 +124,33 @@ tasks.push(function(done) {
             coll.insert({ _id: 'foo' });
             coll.insert({ _id: 'bar' });
             process.nextTick(function() {
-              //coll.update({ _id: 'foo' }, { $set: { test: true } });
+              coll.update({ _id: 'foo' }, { $set: { test: true } });
             });
 
             // expect data to echo back
             var i = 0;
+            var vs = [];
             client.on('readable', function() {
               var item = client.read();
               if (!item) { return; }
-              i++;
               item = BSON.deserialize(item);
-              var v = item.h.v;
-              if (i === 1) {
-                assert.deepEqual(item, { h: { id: 'foo', v: v, pa: [] }, b: { _id: 'foo' } });
+              vs.push(item.h.v);
+              if (i === 0) {
+                assert.deepEqual(item, { h: { id: 'foo', v: vs[i], pa: [] }, b: { _id: 'foo' } });
               }
-              if (i === 2) {
-                assert.deepEqual(item, { h: { id: 'bar', v: v, pa: [] }, b: { _id: 'bar' } });
+              if (i === 1) {
+                assert.deepEqual(item, { h: { id: 'bar', v: vs[i], pa: [] }, b: { _id: 'bar' } });
+              }
+              if (i > 1) {
+                assert.deepEqual(item, { h: { id: 'foo', v: vs[i], pa: [vs[i - 2]] }, b: { _id: 'foo', test: true } });
                 client.end();
               }
-              /*
-              if (i > 2) {
-                assert.deepEqual(item, { h: { id: 'foo', v: 'Cccc', pa: ['Bbbb'] }, b: { _id: 'foo', test: true } });
-                client.close(9823, 'test');
-              }
-              */
+              i++;
             });
 
             client.on('close', function(err) {
               assert(!err);
-              assert.strictEqual(i, 2);
+              assert.strictEqual(i, 3);
               child.kill();
             });
           });
