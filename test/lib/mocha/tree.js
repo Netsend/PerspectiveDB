@@ -2471,6 +2471,105 @@ describe('Tree', function() {
     });
   });
 
+  describe('inBufferById', function() {
+    var name = 'inBufferById';
+
+    var items = [
+      { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } },
+      { h: { id: 'XII', v: 'Cccc', i: 3, pa: [] } },
+      { h: { id: 'XII', v: 'Dddd', i: 4, pa: ['Cccc'] } },
+      { h: { id: 'XI', v: 'Eeee', i: 5, pa: ['Aaaa'] } },
+    ];
+
+    it('should return false on empty string', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferById(), false);
+    });
+
+    it('should return false on non-existing id', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferById('X'), false);
+    });
+
+    it('should return true if id is just written and still in buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[0]);
+      should.strictEqual(t.inBufferById('XI'), true);
+    });
+
+    it('should return false if id is already written and not in buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferById('XI'), false);
+    });
+
+    it('should return true if id is somewhere in the buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[1]);
+      t.write(items[2]);
+      t.write(items[3]);
+      should.strictEqual(t.inBufferById('XI'), true);
+      should.strictEqual(t.inBufferById('XII'), true);
+      should.strictEqual(t.inBufferById('X'), false);
+      should.strictEqual(t.inBufferById('XIII'), false);
+    });
+  });
+
+  describe('inBufferByVersion', function() {
+    var name = 'inBufferByVersion';
+
+    var items = [
+      { h: { id: 'XI', v: 'Aaaa', i: 1, pa: [] } },
+      { h: { id: 'XI', v: 'Bbbb', i: 2, pa: ['Aaaa'] } },
+      { h: { id: 'XI', v: 'Cccc', i: 3, pa: ['Bbbb'] } },
+      { h: { id: 'XI', v: 'Dddd', i: 4, pa: ['Cccc'] } },
+      { h: { id: 'XI', v: 'Eeee', i: 5, pa: ['Dddd'] } },
+    ];
+
+    it('should return false on empty string', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferByVersion(), false);
+    });
+
+    it('should return false on non-existing version', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferByVersion('Aaaa'), false);
+    });
+
+    it('should return true if version is just written and still in buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[0]);
+      should.strictEqual(t.inBufferByVersion('Aaaa'), true);
+    });
+
+    it('should return false if version is already written and not in buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      should.strictEqual(t.inBufferByVersion('Aaaa'), false);
+    });
+
+    it('should return true if version is somewhere in the buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[1]);
+      t.write(items[2]);
+      t.write(items[3]);
+      should.strictEqual(t.inBufferByVersion('Aaaa'), false);
+      should.strictEqual(t.inBufferByVersion('Bbbb'), true);
+      should.strictEqual(t.inBufferByVersion('Cccc'), true);
+      should.strictEqual(t.inBufferByVersion('Dddd'), true);
+      should.strictEqual(t.inBufferByVersion('Eeee'), false);
+      should.strictEqual(t.inBufferByVersion('Ffff'), false);
+    });
+  });
+
   describe('_getDsKeyByVersion', function() {
     var name = '_getDsKeyByVersion';
 
