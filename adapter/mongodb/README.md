@@ -8,15 +8,31 @@ Alpha status.
 
 # Configuration
 
-For a certain db add the `source` key:
+The oplog in MongoDB must be enabled. This can be done either by enabling a
+replica set or enabling master/slave mode. If you don't have this already set,
+add the following settings to your `/etc/mongodb.conf`:
 ```
-source: {
-    url: mongodb://127.0.0.1:27019/pdb
-    coll: test3
-    #dbUser: bar
-    #oplogDbUser: bar
-    #secrets: "secrets.hjson"
+master = true
+oplogSize = 2000
+```
+
+Then in your PersDB config file, add the `source` key to the database you want
+to connect with a mongodb collection. I.e. connect persdb foo with pdb.test3 in
+mongodb:
+```
+dbs: [
+  {
+    name: foo
+    ...
+    source: {
+      url: mongodb://127.0.0.1:27017/pdb
+      coll: test3
+      #dbUser: bar
+      #oplogDbUser: bar
+      #secrets: "secrets.hjson"
+    }
   }
+]
 ```
 
 A full example is given in config/example-with-mongo.hjson.
