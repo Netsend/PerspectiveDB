@@ -37,8 +37,10 @@ var url = require('url');
 
 var async = require('async');
 var chroot = require('chroot');
+var BSONStream = require('bson-stream');
 var MongoClient = require('mongodb').MongoClient;
 var posix = require('posix');
+var xtend = require('xtend');
 
 var logger = require('../../lib/logger');
 var OplogTransform = require('./oplog_transform');
@@ -87,24 +89,69 @@ var ot, coll, db, log; // used after receiving the log configuration
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} versionControl  version control channel
  * @param {Object} dataChannel  data channel
+ * @param {Object} [options]
+ *
+ * Options:
+ *   versionKey {String, defaults to "_v"} version key in document
  */
-function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
+function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, options) {
+  var opts = xtend({
+    versionKey: '_v'
+  }, options);
+
   log.debug('start oplog transform...');
   ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, { log: log, bson: true });
   ot.pipe(dataChannel);
   ot.startStream();
 
-  // TODO: handle new incoming objects, conditional copy to collection
-  //var bs = new BSONStream();
-  /*
+  var bs = new BSONStream();
   dataChannel.pipe(bs).on('readable', function() {
     var obj = bs.read();
-    // expect new and old
-    {
-      n:
-      o:
+
+    if (!obj) {
+      log.notice('local data channel closed, expecting shutdown');
+      return;
+    }
+
+    if (obj.o == null) { // insert
+      if (obj.n == null) { throw new Error('new object expected'); }
+      // set version on body
+      obj.n.b[opts.versionKey] = obj.n.h.v;
+      coll.insertOne(obj.n.b, function(err, r) {
+        if (err) { throw err; }
+        if (!r.insertedCount) {
+          log.notice('item not inserted %j', obj.n.h);
+        } else {
+          log.debug('item inserted %j', obj.n.h);
+        }
+      });
+    } else if (obj.n == null) { // delete
+      if (obj.o == null) { throw new Error('old object expected'); }
+      // set version on body
+      obj.o.b[opts.versionKey] = obj.o.h.v;
+      coll.deleteOne(obj.o.b, function(err, r) {
+        if (err) { throw err; }
+        if (!r.deletedCount) {
+          log.notice('item not deleted %j', obj.o.h);
+        } else {
+          log.debug('item deleted %j', obj.o.h);
+        }
+      });
+    } else { // update
+      // set versions on body
+      obj.o.b[opts.versionKey] = obj.o.h.v;
+      obj.n.b[opts.versionKey] = obj.n.h.v;
+
+      coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
+        if (err) { throw err; }
+        if (!r.lastErrorObject.n) {
+          log.notice('item not updated %j', obj.n.h);
+        } else {
+          log.debug('item updated %j', obj.n.h);
+        }
+      });
+    }
   });
-  */
 }
 
 /**
@@ -117,9 +164,10 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
  *   [oplogDbUser]:  {String}      // user to read the oplog database collection
  *   [secrets]:      {Object}      // object containing the passwords for dbUser
  *                                 // and oplogDbUser
- *   [authDb]:      {String}       // authDb database, defaults to db from url
+ *   [authDb]:       {String}       // authDb database, defaults to db from url
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
+ *   [versionKey]:   {String}      // version key in document, defaults to "_v"
  *   [mongoOpts]:    {Object}      // any other mongodb driver options
  *   [chroot]:       {String}      // defaults to /var/empty
  *   [user]:         {String}      // system user to run this process, defaults to
@@ -140,6 +188,7 @@ process.once('message', function(msg) {
   if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
+  if (msg.versionKey != null && typeof msg.versionKey !== 'string') { throw new TypeError('msg.versionKey must be a non-empty string'); }
   if (msg.mongoOpts != null && typeof msg.mongoOpts !== 'object') { throw new TypeError('msg.mongoOpts must be an object'); }
   if (msg.chroot != null && typeof msg.chroot !== 'string') { throw new TypeError('msg.chroot must be a string'); }
   if (msg.user != null && typeof msg.user !== 'string') { throw new TypeError('msg.user must be a string'); }

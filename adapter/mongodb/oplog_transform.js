@@ -40,44 +40,41 @@ var noop = function() {};
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
- * @param {Object} [opts]  object containing configurable parameters
+ * @param {Object} [options]  object containing configurable parameters
  *
- * opts:
+ * Options:
+ *   versionKey {String, defaults to "_v"} version key in document
  *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
  */
-function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, opts) {
+function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, options) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
 
-  if (opts == null) opts = opts || {};
-  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
-
   var nsParts = ns.split('.');
   if (nsParts.length < 2) { throw new TypeError('ns must contain at least two parts'); }
   if (!nsParts[0].length) { throw new TypeError('ns must contain a database name'); }
   if (!nsParts[1].length) { throw new TypeError('ns must contain a collection name'); }
 
-  Transform.call(this, xtend(opts, { objectMode: true }));
+  Transform.call(this, xtend(options, { objectMode: true }));
 
-  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
-  if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
+  if (options.bson != null && typeof options.bson !== 'boolean') { throw new TypeError('options.bson must be a boolean'); }
+  if (options.log != null && typeof options.log !== 'object') { throw new TypeError('options.log must be an object'); }
 
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
-  this._opts = opts;
+  this._opts = xtend({
+    bson: false,
+    versionKey: '_v'
+  }, options);
 
   this._coll = oplogDb.db(nsParts[0]).collection(nsParts.slice(1).join('.'));
-
-  // ensure bson option is set
-  this._bson = false;
-  if (opts.bson != null) { this._bson = opts.bson; }
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -87,7 +84,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
 
   this._tmpCollection = oplogDb.collection('_pdb.' + ns);
 
-  this._log = opts.log || {
+  this._log = options.log || {
     emerg:   console.error,
     alert:   console.error,
     crit:    console.error,
@@ -424,7 +421,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
   var that = this;
   var error;
 
-  var bson = this._bson;
+  var bson = this._opts.bson;
 
   var selector = { _id: dagItem.h.id };
 
@@ -498,14 +495,16 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     return;
   }
 
-  var bson = this._bson;
+  var opts = this._opts;
+
   process.nextTick(function() {
     var obj = {
-      h: { id: oplogItem.o._id },
+      h: { id: oplogItem.o._id, v: oplogItem.o[opts.versionKey] },
       m: { _op: oplogItem.ts },
       b: oplogItem.o
     };
-    cb(null, bson ? BSON.serialize(obj) : obj);
+    delete obj.b[opts.versionKey];
+    cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };
 
@@ -563,7 +562,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     return;
   }
 
-  var bson = this._bson;
+  var bson = this._opts.bson;
   process.nextTick(function() {
     var obj = {
       h: {
