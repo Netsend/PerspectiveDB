@@ -1,0 +1,32 @@
+log: {
+  console: true
+  level: debug
+  file: /var/log/persdb.log
+  error: /var/log/persdb-error.log
+}
+
+dbs: [
+  {
+    name: foo
+    user: pdblevel
+    group: pdblevel
+    chroot: /srv/persdb/foo
+    source: {
+      url: mongodb://127.0.0.1:27017/pdb
+      coll: test3
+      #dbUser: bar
+      #oplogDbUser: bar
+      #secrets: "secrets.hjson"
+    }
+    perspectives: [{
+      name: "john"
+      users: "passwd.hjson"
+      import: true
+      export: true
+    }]
+  }
+]
+
+user: _pdbnull
+group: _pdbnull
+#chroot: /var/empty
