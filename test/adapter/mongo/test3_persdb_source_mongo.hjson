@@ -18,14 +18,14 @@ log: {
 dbs: [{
   name: someDb
   chroot: /var/persdb
-  path: /test_persdb_mongo_root
+  path: /test3_persdb_mongo_root
   mergeTree: {
     vSize: 3
     autoMergeInterval: 1000  # Milliseconds between auto processing items
   },
   source: {
     url: mongodb://127.0.0.1:27019/pdb
-    coll: baz
+    coll: test3
     #dbUser: bar
     #oplogDbUser: bar
     #secrets: "secrets.hjson"

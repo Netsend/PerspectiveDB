@@ -44,15 +44,12 @@ var BSON = new bson.BSONPure.BSON();
 var tasks = [];
 var tasks2 = [];
 
-// print line number
-function lnr() {
-  return new Error().stack.split('\n')[2].match(/persdb_mongo_root.js:([0-9]+):[0-9]+/)[1];
-}
-
-var db, coll;
+var db, coll1, coll2, coll3;
 var cons, silence;
 var chroot = '/var/persdb';
-var dbPath = '/test_persdb_mongo_root';
+var dbPath1 = '/test1_persdb_mongo_root'; // match with config files
+var dbPath2 = '/test2_persdb_mongo_root'; // match with config files
+var dbPath3 = '/test3_persdb_mongo_root'; // match with config files
 
 // open loggers and setup db connection
 tasks.push(function(done) {
@@ -67,17 +64,35 @@ tasks.push(function(done) {
         if (err && err.code !== 'EEXIST') { throw err; }
 
         // remove any pre-existing dbPath
-        rimraf(chroot + dbPath, function(err) {
+        rimraf(chroot + dbPath1, function(err) {
           if (err) { throw err; }
-
-          MongoClient.connect('mongodb://127.0.0.1:27019/pdb', function(err, dbc) {
+          rimraf(chroot + dbPath2, function(err) {
             if (err) { throw err; }
+            rimraf(chroot + dbPath3, function(err) {
+              if (err) { throw err; }
 
-            db = dbc;
+              MongoClient.connect('mongodb://127.0.0.1:27019/pdb', function(err, dbc) {
+                if (err) { throw err; }
 
-            coll = db.collection('baz');
-            // ensure empty collection
-            coll.remove(done);
+                db = dbc;
+
+                coll1 = db.collection('test1');
+                coll2 = db.collection('test2');
+                coll3 = db.collection('test3');
+
+                // ensure empty collections
+                coll1.remove(function(err) {
+                  if (err) { throw err; }
+                  coll2.remove(function(err) {
+                    if (err) { throw err; }
+                    coll3.remove(function(err) {
+                      if (err) { throw err; }
+                      done();
+                    });
+                  });
+                });
+              });
+            });
           });
         });
       });
@@ -85,7 +100,7 @@ tasks.push(function(done) {
   });
 });
 
-// test with empty collection and empty leveldb. save new object in collection and update after spawned
+// test with empty collection and empty leveldb. after pdb is spawned, save new object in collection and update
 tasks.push(function(done) {
   var opts = {
     onSpawn: function(child) {
@@ -121,10 +136,10 @@ tasks.push(function(done) {
             }
 
             // do some inserts and an update in the mongo collection
-            coll.insert({ _id: 'foo' });
-            coll.insert({ _id: 'bar' });
+            coll1.insert({ _id: 'foo' });
+            coll1.insert({ _id: 'bar' });
             process.nextTick(function() {
-              coll.update({ _id: 'foo' }, { $set: { test: true } });
+              coll1.update({ _id: 'foo' }, { $set: { test: true } });
             });
 
             // expect data to echo back
@@ -133,6 +148,7 @@ tasks.push(function(done) {
             client.on('readable', function() {
               var item = client.read();
               if (!item) { return; }
+
               item = BSON.deserialize(item);
               vs.push(item.h.v);
               if (i === 0) {
@@ -164,7 +180,7 @@ tasks.push(function(done) {
       assert(/client connected 127.0.0.1-/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_source_mongo.hjson'], opts);
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test1_persdb_source_mongo.hjson'], opts);
 });
 
 /*
@@ -688,8 +704,15 @@ async.series(tasks, function(err) {
       if (err) { throw err; }
       db.close(function(err) {
         if (err) { throw err; }
-        rimraf(chroot + dbPath, function(err) {
-          if (err) { console.error(err); }
+        // remove any pre-existing dbPath
+        rimraf(chroot + dbPath1, function(err) {
+          if (err) { throw err; }
+          rimraf(chroot + dbPath2, function(err) {
+            if (err) { throw err; }
+            rimraf(chroot + dbPath3, function(err) {
+              if (err) { console.error(err); }
+            });
+          });
         });
       });
     });
