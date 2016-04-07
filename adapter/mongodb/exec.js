@@ -94,21 +94,6 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl) {
   ot.pipe(dataChannel);
   ot.startStream();
 
-  // snoop on first version to check if there is any version at all in leveldb
-  ot.once('lastVersion', function(obj) {
-    if (Object.keys(obj).length) {
-      log.notice('leveldb is bootstrapped, last item %j', obj.h);
-    } else {
-      // no data in leveldb yet, send every object in the collection upstream
-      log.notice('bootstrapping leveldb with every object in the mongo collection');
-      var s = coll.find();
-      s.pipe(dataChannel, { end: false });
-      s.on('end', function() {
-        log.notice('bootstrapping leveldb done');
-      });
-    }
-  });
-
   // TODO: handle new incoming objects, conditional copy to collection
   //var bs = new BSONStream();
   /*

@@ -73,6 +73,8 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
   this._ns = ns;
   this._opts = opts;
 
+  this._coll = oplogDb.db(nsParts[0]).collection(nsParts.slice(1).join('.'));
+
   // ensure bson option is set
   this._bson = false;
   if (opts.bson != null) { this._bson = opts.bson; }
@@ -148,21 +150,14 @@ OplogTransform.prototype.startStream = function startStream() {
     // ensure this._lastTs
     if (!Object.keys(obj).length) {
       // no data in leveldb yet
-      // use current last offset and send every object in the collection upstream
-      that._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+      that._log.notice('ot startStream bootstrap first');
+
+      that._bootstrap(function(err, offset) {
         if (err) {
           that.emit('error', err);
           return;
         }
-
-        if (!oplogItem) {
-          that.emit('error', new Error('no oplog item found'));
-          return;
-        }
-
-        that._log.notice('ot startStream bootstrap oplog after last item %s', oplogItem.ts);
-
-        that._lastTs = oplogItem.ts;
+        that._lastTs = offset;
 
         // handle new oplog items via this._transform
         openOplog(xtend(that._opts, { bson: false, tailable: true }), true);
@@ -213,6 +208,60 @@ OplogTransform.prototype.close = function close(cb) {
   } else {
     this.end(cb);
   }
+};
+
+/**
+ * Bootstrap, read all documents from the collection.
+ *
+ * @param {Function} cb  first item will be an error object, second item will be an
+ *                       oplog timestamp that must be used as offset.
+ */
+OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var that = this;
+
+  // use current last offset and send every object in the collection upstream
+  this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+    if (err) { cb(err); return; }
+    if (!oplogItem) { cb(new Error('no oplog item found')); return; }
+
+    that._log.notice('ot bootstrap collection');
+
+    var s = that._coll.find({}, {
+      comment: 'bootstrap_oplog_reader',
+      sort: { _id: true }
+    });
+
+    function reader() {
+      var item = s.read();
+
+      if (!item) { // end reached
+        that._log.notice('ot bootstrap done');
+        cb(null, oplogItem.ts);
+        return;
+      }
+
+      that._log.debug('ot bootstrap %j', item);
+
+      // enclose item in an oplog like item
+      var resume = that.write({
+        o: item,
+        ts: oplogItem.ts,
+        ns: that._ns,
+        op: 'i'
+      });
+      if (!resume) {
+        // wait for drain
+        s.removeListener('readable', reader);
+        that.once('drain', function() {
+          s.on('readable', reader);
+        });
+      }
+    }
+
+    s.on('readable', reader);
+  });
 };
 
 /**

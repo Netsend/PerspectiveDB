@@ -101,7 +101,7 @@ tasks.push(function(done) {
 });
 
 // test with empty collection and empty leveldb. after pdb is spawned, save new object in collection and update
-tasks.push(function(done) {
+tasks2.push(function(done) {
   var opts = {
     onSpawn: function(child) {
       // give some time to setup
@@ -181,6 +181,88 @@ tasks.push(function(done) {
     }
   };
   spawn([__dirname + '/../../../bin/persdb', __dirname + '/test1_persdb_source_mongo.hjson'], opts);
+});
+
+// test with non-empty collection and empty leveldb. save new object in collection, update and then spawn db
+tasks.push(function(done) {
+  var opts = {
+    onSpawn: function(child) {
+      // give some time to setup
+      setTimeout(function() {
+        var authReq = {
+          username: 'someClient',
+          password: 'somepass',
+          db: 'someDb'
+        };
+        var dataReq = {
+          start: true
+        };
+
+        var ls = new LDJSONStream({ flush: false, maxDocs: 1 });
+
+        var client = net.createConnection(1234, function() {
+          // send auth request
+          client.write(JSON.stringify(authReq) + '\n');
+
+          client.pipe(ls).once('data', function(data) {
+            // expect data request
+            assert.deepEqual(data, { start: true });
+
+            // send data request
+            client.write(JSON.stringify(dataReq) + '\n');
+
+            // expect BSON data
+            client.unpipe(ls);
+            // push back any data in ls
+            if (ls.buffer.length) {
+              client.unshift(ls.buffer);
+            }
+
+            // expect data to echo back
+            var i = 0;
+            client.on('readable', function() {
+              var item = client.read();
+              if (!item) { return; }
+
+              item = BSON.deserialize(item);
+              if (i === 0) {
+                assert.deepEqual(item, { h: { id: 'bar', v: item.h.v, pa: [] }, b: { _id: 'bar' } });
+              }
+              if (i > 0) {
+                assert.deepEqual(item, { h: { id: 'foo', v: item.h.v, pa: [] }, b: { _id: 'foo', test: true } });
+                client.end();
+              }
+              i++;
+            });
+
+            client.on('close', function(err) {
+              assert(!err);
+              assert.strictEqual(i, 2);
+              child.kill();
+            });
+          });
+        });
+      }, 1000);
+    },
+    onExit: done,
+    echoOut: true,
+    testStdout: function(stdout) {
+      assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
+      assert(/client connected 127.0.0.1-/.test(stdout));
+    }
+  };
+
+  // do some inserts and an update in the mongo collection
+  coll2.insert({ _id: 'foo' }, function(err) {
+    if (err) { throw err; }
+    coll2.insert({ _id: 'bar' }, function(err) {
+      if (err) { throw err; }
+      coll2.update({ _id: 'foo' }, { $set: { test: true } }, function(err) {
+        if (err) { throw err; }
+        spawn([__dirname + '/../../../bin/persdb', __dirname + '/test2_persdb_source_mongo.hjson'], opts);
+      });
+    });
+  });
 });
 
 /*
