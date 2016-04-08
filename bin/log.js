@@ -24,22 +24,22 @@ var fs = require('fs');
 
 var async = require('async');
 var hjson = require('hjson');
-var level = require('level');
+var level = require('level-packager')(require('leveldown'));
 var program = require('commander');
 
 var doDiff = require('../lib/diff');
 var MergeTree = require('../lib/merge_tree');
 
 program
-  .version('0.0.1')
+  .version('0.0.2')
   .usage('[-f config] [-n]')
-  .description('print graph of given database')
+  .description('print graph of the given database')
   .option('    --id <id>', 'show the log of one string based id')
   .option('-f, --config <config>', 'hjson config file with database path')
   .option('-s, --show', 'show complete objects')
   .option('-p, --patch', 'show patch compared to previous version')
-  .option('    --pe <perspective>', 'perspective')
-  .option('-a  --all', 'print the trees of all configured perspectives')
+  .option('    --pe <perspective>', 'print only this perspective')
+  .option('-a  --all', 'print all perspectives')
   .option('-n, --number <number>', 'number of latest versions to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
@@ -238,7 +238,7 @@ function run(db, cfg, cb) {
   });
 }
 
-if (config.dbs) {
+if (config.dbs && config.dbs.length) {
   async.eachSeries(config.dbs, function(dbCfg, cb) {
     var chroot = dbCfg.chroot || '/var/persdb';
     var data = dbCfg.data || 'data';
