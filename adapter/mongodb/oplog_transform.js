@@ -20,10 +20,12 @@
 
 'use strict';
 
-var bson = require('bson');
-var BSONStream = require('bson-stream');
 var Transform = require('stream').Transform;
 var util = require('util');
+
+var bson = require('bson');
+var BSONStream = require('bson-stream');
+var ObjectID = require('mongodb').ObjectID;
 var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
@@ -423,7 +425,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
 
   var bson = this._opts.bson;
 
-  var selector = { _id: dagItem.h.id };
+  var selector = { _id: oplogItem.o2._id };
 
   // save the previous head and apply the update modifiers to get the new version of the doc
   that._tmpCollection.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
@@ -466,6 +468,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
           m: { _op: oplogItem.ts },
           b: newObj
         };
+        if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; }
         cb(null, bson ? BSON.serialize(obj) : obj);
       });
     });
@@ -503,6 +506,7 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
       m: { _op: oplogItem.ts },
       b: oplogItem.o
     };
+    if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; } // convert ObjectID's to strings
     delete obj.b[opts.versionKey];
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
@@ -571,6 +575,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
       },
       m: { _op: oplogItem.ts }
     };
+    if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; } // convert ObjectID's to strings
     cb(null, bson ? BSON.serialize(obj) : obj);
   });
 };
