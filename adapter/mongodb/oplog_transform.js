@@ -25,7 +25,6 @@ var util = require('util');
 
 var bson = require('bson');
 var BSONStream = require('bson-stream');
-var ObjectID = require('mongodb').ObjectID;
 var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
@@ -468,7 +467,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
           m: { _op: oplogItem.ts },
           b: newObj
         };
-        if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; }
+        if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
         cb(null, bson ? BSON.serialize(obj) : obj);
       });
     });
@@ -506,7 +505,7 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
       m: { _op: oplogItem.ts },
       b: oplogItem.o
     };
-    if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; } // convert ObjectID's to strings
+    if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     delete obj.b[opts.versionKey];
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
@@ -575,7 +574,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
       },
       m: { _op: oplogItem.ts }
     };
-    if (obj.h.id instanceof ObjectID) { obj.h.id = '' + obj.h.id; } // convert ObjectID's to strings
+    if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     cb(null, bson ? BSON.serialize(obj) : obj);
   });
 };
