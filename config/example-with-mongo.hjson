@@ -7,10 +7,10 @@ log: {
 
 dbs: [
   {
-    name: foo
+    name: mydb
     user: pdblevel
     group: pdblevel
-    chroot: /srv/persdb/foo
+    chroot: /srv/persdb/mydb
     source: {
       url: mongodb://127.0.0.1:27017/pdb
       coll: test3

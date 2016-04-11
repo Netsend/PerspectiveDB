@@ -31,9 +31,9 @@ Ensure /var/empty exists for the chrooted processes:
 $ sudo mkdir /var/empty
 ```
 
-Ensure database directory exists, i.e. /srv/persdb/foo:
+Ensure database directory exists, i.e. /srv/persdb/mydb:
 ```
-$ sudo mkdir -m600 /srv/persdb/foo
+$ sudo mkdir -pm600 /srv/persdb/mydb
 ```
 
 Create a dedicated system user for the main process:
@@ -48,7 +48,7 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 
 Create a user account database:
 ```
-$ umask 077 && touch local/config/passwd.hjson
+$ omask=$(umask) umask 077 && touch local/config/passwd.hjson; umask $omask
 ```
 
 Grant access to a user for remote login, i.e. "john":
@@ -56,7 +56,7 @@ Grant access to a user for remote login, i.e. "john":
 $ ./bin/adduser john >> local/config/passwd.hjson
 ```
 
-Copy and edit a config file, i.e. example.hjson:
+Create a config file. I.e. copy and edit example.hjson:
 ```
 $ cp config/example.hjson local/config/pdb.hjson
 ```

@@ -7,10 +7,10 @@ log: {
 
 dbs: [
   {
-    name: foo
+    name: mydb
     user: pdblevel
     group: pdblevel
-    chroot: /srv/persdb/foo
+    chroot: /srv/persdb/mydb
     perspectives: [{
       name: "john"
       users: "passwd.hjson"
