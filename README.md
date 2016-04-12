@@ -33,7 +33,7 @@ $ sudo mkdir /var/empty
 
 Ensure database directory exists, i.e. /srv/persdb/mydb:
 ```
-$ sudo mkdir -pm600 /srv/persdb/mydb
+$ sudo mkdir -pm700 /srv/persdb/mydb
 ```
 
 Create a dedicated system user for the main process:
