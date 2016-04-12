@@ -47,8 +47,6 @@ function lnr() {
   return new Error().stack.split('\n')[2].match(/exec_root.js:([0-9]+):[0-9]+/)[1];
 }
 
-var logger = require('../../../lib/logger');
-
 var cons, silence, db;
 var databaseName = 'test_exec_root';
 var collectionName = 'test_exec_root';

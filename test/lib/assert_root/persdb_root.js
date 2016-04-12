@@ -42,11 +42,9 @@ var MergeTree = require('../../../lib/merge_tree');
 
 var noop = function() {};
 
-var cert, key, dhparam;
+var cert;
 
 cert = __dirname + '/cert.pem';
-key = __dirname + '/key.pem';
-dhparam = __dirname + '/dhparam.pem';
 
 var wsClientOpts = {
   ca: fs.readFileSync(cert),

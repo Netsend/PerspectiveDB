@@ -34,18 +34,18 @@ describe('ConcatReadStream', function() {
     var i = 0;
     s.on('data', function(item) {
       switch (i) {
-        case 0: should.strictEqual(item, 1); break;
-        case 1: should.strictEqual(item, 2); break;
-        case 2: should.strictEqual(item, 3); break;
-        case 3: should.strictEqual(item, 4); break;
-        case 4: should.strictEqual(item, 'a'); break;
-        case 5: should.strictEqual(item, 'b'); break;
-        case 6: should.strictEqual(item, 'c'); break;
-        case 7: should.strictEqual(item, 'd'); break;
-        case 8: should.strictEqual(item, 'I'); break;
-        case 9: should.strictEqual(item, 'II'); break;
-        case 10: should.strictEqual(item, 'III'); break;
-        case 11: should.strictEqual(item, 'IIII'); break;
+      case 0: should.strictEqual(item, 1); break;
+      case 1: should.strictEqual(item, 2); break;
+      case 2: should.strictEqual(item, 3); break;
+      case 3: should.strictEqual(item, 4); break;
+      case 4: should.strictEqual(item, 'a'); break;
+      case 5: should.strictEqual(item, 'b'); break;
+      case 6: should.strictEqual(item, 'c'); break;
+      case 7: should.strictEqual(item, 'd'); break;
+      case 8: should.strictEqual(item, 'I'); break;
+      case 9: should.strictEqual(item, 'II'); break;
+      case 10: should.strictEqual(item, 'III'); break;
+      case 11: should.strictEqual(item, 'IIII'); break;
       }
       i++;
     });
@@ -64,22 +64,22 @@ describe('ConcatReadStream', function() {
     var i = 0;
     s.on('data', function(item) {
       switch (i) {
-        case 0: should.strictEqual(item, 1); break;
-        case 1: should.strictEqual(item, 2); break;
-        case 2: should.strictEqual(item, 3); break;
-        case 3: should.strictEqual(item, 4); break;
-        case 4: should.strictEqual(item, 'a'); break;
-        case 5:
-          should.strictEqual(item, 'b');
-          s.pause();
+      case 0: should.strictEqual(item, 1); break;
+      case 1: should.strictEqual(item, 2); break;
+      case 2: should.strictEqual(item, 3); break;
+      case 3: should.strictEqual(item, 4); break;
+      case 4: should.strictEqual(item, 'a'); break;
+      case 5:
+        should.strictEqual(item, 'b');
+        s.pause();
           // test after 10ms
-          setTimeout(function() {
-            should.strictEqual(i, 6);
-            done();
-          }, 10);
-          break;
-        default:
-          throw new Error('should not happen');
+        setTimeout(function() {
+          should.strictEqual(i, 6);
+          done();
+        }, 10);
+        break;
+      default:
+        throw new Error('should not happen');
       }
       i++;
     });
@@ -94,22 +94,22 @@ describe('ConcatReadStream', function() {
     var i = 0;
     s.on('data', function(item) {
       switch (i) {
-        case 0: should.strictEqual(item, 1); break;
-        case 1: should.strictEqual(item, 2); break;
-        case 2: should.strictEqual(item, 3); break;
-        case 3: should.strictEqual(item, 4); break;
-        case 4: should.strictEqual(item, 'a'); break;
-        case 5:
-          should.strictEqual(item, 'b');
-          s.pause();
+      case 0: should.strictEqual(item, 1); break;
+      case 1: should.strictEqual(item, 2); break;
+      case 2: should.strictEqual(item, 3); break;
+      case 3: should.strictEqual(item, 4); break;
+      case 4: should.strictEqual(item, 'a'); break;
+      case 5:
+        should.strictEqual(item, 'b');
+        s.pause();
           // test after 10ms
-          setTimeout(function() {
-            should.strictEqual(i, 6);
-            s.resume();
-          }, 10);
-          break;
-        case 6: should.strictEqual(item, 'c'); break;
-        case 7: should.strictEqual(item, 'd'); break;
+        setTimeout(function() {
+          should.strictEqual(i, 6);
+          s.resume();
+        }, 10);
+        break;
+      case 6: should.strictEqual(item, 'c'); break;
+      case 7: should.strictEqual(item, 'd'); break;
       }
       i++;
     });
@@ -128,20 +128,20 @@ describe('ConcatReadStream', function() {
     var i = 0;
     s.on('data', function(item) {
       switch (i) {
-        case 0: should.strictEqual(item, 1); break;
-        case 1: should.strictEqual(item, 2); break;
-        case 2: should.strictEqual(item, 3); break;
-        case 3:
-          should.strictEqual(item, 4);
-          s.pause();
+      case 0: should.strictEqual(item, 1); break;
+      case 1: should.strictEqual(item, 2); break;
+      case 2: should.strictEqual(item, 3); break;
+      case 3:
+        should.strictEqual(item, 4);
+        s.pause();
           // test after 10ms
-          setTimeout(function() {
-            should.strictEqual(i, 4);
-            done();
-          }, 10);
-          break;
-        default:
-          throw new Error('should not happen');
+        setTimeout(function() {
+          should.strictEqual(i, 4);
+          done();
+        }, 10);
+        break;
+      default:
+        throw new Error('should not happen');
       }
       i++;
     });
@@ -156,24 +156,24 @@ describe('ConcatReadStream', function() {
     var i = 0;
     s.on('data', function(item) {
       switch (i) {
-        case 0: should.strictEqual(item, 1); break;
-        case 1: should.strictEqual(item, 2); break;
-        case 2: should.strictEqual(item, 3); break;
-        case 3: should.strictEqual(item, 4); break;
-        case 4: should.strictEqual(item, 'a'); break;
-        case 5: should.strictEqual(item, 'b'); break;
-        case 6: should.strictEqual(item, 'c'); break;
-        case 7:
-          should.strictEqual(item, 'd');
-          s.pause();
+      case 0: should.strictEqual(item, 1); break;
+      case 1: should.strictEqual(item, 2); break;
+      case 2: should.strictEqual(item, 3); break;
+      case 3: should.strictEqual(item, 4); break;
+      case 4: should.strictEqual(item, 'a'); break;
+      case 5: should.strictEqual(item, 'b'); break;
+      case 6: should.strictEqual(item, 'c'); break;
+      case 7:
+        should.strictEqual(item, 'd');
+        s.pause();
           // test after 10ms
-          setTimeout(function() {
-            should.strictEqual(i, 8);
-            done();
-          }, 10);
-          break;
-        default:
-          throw new Error('should not happen');
+        setTimeout(function() {
+          should.strictEqual(i, 8);
+          done();
+        }, 10);
+        break;
+      default:
+        throw new Error('should not happen');
       }
       i++;
     });
@@ -210,16 +210,16 @@ describe('ConcatReadStream', function() {
 
       u.on('data', function(item) {
         switch (i) {
-          case 8: should.strictEqual(item, 1); break;
-          case 9: should.strictEqual(item, 2); break;
-          case 10: should.strictEqual(item, 3); break;
-          case 11: should.strictEqual(item, 4); break;
-          case 12: should.strictEqual(item, 'a'); break;
-          case 13: should.strictEqual(item, 'b'); break;
-          case 14: should.strictEqual(item, 'c'); break;
-          case 15: should.strictEqual(item, 'd'); break;
-          default:
-            throw new Error('should not happen');
+        case 8: should.strictEqual(item, 1); break;
+        case 9: should.strictEqual(item, 2); break;
+        case 10: should.strictEqual(item, 3); break;
+        case 11: should.strictEqual(item, 4); break;
+        case 12: should.strictEqual(item, 'a'); break;
+        case 13: should.strictEqual(item, 'b'); break;
+        case 14: should.strictEqual(item, 'c'); break;
+        case 15: should.strictEqual(item, 'd'); break;
+        default:
+          throw new Error('should not happen');
         }
         i++;
       });

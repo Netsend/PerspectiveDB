@@ -67,7 +67,7 @@ after(function(done) {
 describe('StreamMergeTree', function() {
 
   describe('constructor', function() {
-    var mt, smt;
+    var mt;
 
     it('create MergeTree', function(done) {
       var path = dbPath + '/constructor';
@@ -82,47 +82,47 @@ describe('StreamMergeTree', function() {
     });
 
     it('should require mt to be an object', function() {
-      (function () { smt = new StreamMergeTree(); }).should.throw('mt must be an object');
+      (function () { new StreamMergeTree(); }).should.throw('mt must be an object');
     });
 
     it('should require opts.log to be an object', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { log: '' });
+        new StreamMergeTree(mt, { log: '' });
       }).should.throw('opts.log must be an object');
     });
 
     it('should require opts.bson to be a boolean', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { bson: {}, log: silence });
+        new StreamMergeTree(mt, { bson: {}, log: silence });
       }).should.throw('opts.bson must be a boolean');
     });
 
     it('should require opts.filter to be an object', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { filter: 'foo', log: silence });
+        new StreamMergeTree(mt, { filter: 'foo', log: silence });
       }).should.throw('opts.filter must be an object');
     });
 
     it('should require opts.first to be a base64 string or a number', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { first: {} });
+        new StreamMergeTree(mt, { first: {} });
       }).should.throw('opts.first must be a base64 string or a number');
     });
 
     it('should require opts.hooks to be an array', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { hooks: {}, log: silence  });
+        new StreamMergeTree(mt, { hooks: {}, log: silence  });
       }).should.throw('opts.hooks must be an array');
     });
 
     it('should require opts.hooksOpts to be an object', function() {
       (function() {
-        smt = new StreamMergeTree(mt, { hooksOpts: 'foo', log: silence  });
+        new StreamMergeTree(mt, { hooksOpts: 'foo', log: silence  });
       }).should.throw('opts.hooksOpts must be an object');
     });
 
     it('should construct', function() {
-      smt = new StreamMergeTree(mt, { log: silence });
+      new StreamMergeTree(mt, { log: silence });
     });
   });
 
@@ -152,7 +152,7 @@ describe('StreamMergeTree', function() {
     var D = {
       h: { id: 'foo', v: 'Dddd', pe: 'I', pa: ['Cccc'], i: 4 },
       b: {
-      baz : 'qux' }
+        baz : 'qux' }
     };
 
     var E = {
@@ -163,7 +163,7 @@ describe('StreamMergeTree', function() {
     var F = {
       h: { id: 'foo', v: 'Ffff', pe: 'I', pa: ['Eeee', 'Cccc'], i: 6 },
       b: {
-      foo: 'bar' }
+        foo: 'bar' }
     };
 
     var G = {

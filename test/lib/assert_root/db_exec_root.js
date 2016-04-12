@@ -104,8 +104,6 @@ function spawn(options, spawnOpts) {
   opts.onSpawn(child);
 }
 
-var logger = require('../../../lib/logger');
-
 var cons, silence;
 var chroot = '/var/persdb';
 var user = 'pdblevel';

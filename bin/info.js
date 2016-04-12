@@ -52,7 +52,7 @@ function start(db) {
   console.log('leveldb.num-files-at-level2: %s', db.db.getProperty('leveldb.num-files-at-level2'));
   console.log('leveldb.num-files-at-level3: %s', db.db.getProperty('leveldb.num-files-at-level3'));
 
-  if (!!program.extended) {
+  if (program.extended) {
     console.log('EXTENDED');
   }
 }

@@ -46,7 +46,7 @@ var config = program.config
 
 // if relative, prepend current working dir
 if (config[0] !== '/') {
-    config = process.cwd() + '/' + config;
+  config = process.cwd() + '/' + config;
 }
 
 config = properties.parse(fs.readFileSync(config, { encoding: 'utf8' }), { sections: true, namespaces: true });

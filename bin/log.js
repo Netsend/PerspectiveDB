@@ -34,7 +34,6 @@ program
   .version('0.0.2')
   .usage('[-f config] [-n]')
   .description('print graph of the given database')
-  .option('    --id <id>', 'show the log of one string based id')
   .option('-f, --config <config>', 'hjson config file with database path')
   .option('-s, --show', 'show complete objects')
   .option('-p, --patch', 'show patch compared to previous version')
@@ -56,10 +55,6 @@ if (program.number === '0') {
   program.number = Number(program.number) || 10;
 }
 
-var id;
-if (program.id) {
-  id = program.id;
-}
 // format merge tree stats
 function fmtStats(stats) {
   var result = '';

@@ -1621,39 +1621,39 @@ describe('merge', function() {
       var AI = {
         h: { id: id, v: 'Aaaa', pa: [] },
         b: {
-        foo: 'bar',
-        bar: 'baz',
-        qux: 'quux',
-        some: 'secret'
+          foo: 'bar',
+          bar: 'baz',
+          qux: 'quux',
+          some: 'secret'
         }
       };
 
       var BI = {
         h: { id: id, v: 'Bbbb', pa: ['Aaaa'] },
         b: {
-        foo: 'bar',
-        bar: 'baz',
-        some: 'secret'
+          foo: 'bar',
+          bar: 'baz',
+          some: 'secret'
         }
       };
 
       var CI = {
         h: { id: id, v: 'Cccc', pa: ['Bbbb'] },
         b: {
-        foo: 'bar',
-        bar: 'raboof',
-        c: true,
-        some: 'secret'
+          foo: 'bar',
+          bar: 'raboof',
+          c: true,
+          some: 'secret'
         }
       };
 
       var DI = {
         h: { id: id, v: 'Dddd', pa: ['Bbbb'] },
         b: {
-        foo: 'bar',
-        bar: 'raboof',
-        d: true,
-        some: 'secret'
+          foo: 'bar',
+          bar: 'raboof',
+          d: true,
+          some: 'secret'
         }
       };
 

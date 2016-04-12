@@ -64,34 +64,32 @@ after(function(done) {
 
 describe('MergeTree', function() {
   describe('constructor', function() {
-    var mtree;
-
     it('should require db to be an object', function() {
-      (function () { mtree = new MergeTree(); }).should.throwError('db must be an object');
+      (function () { new MergeTree(); }).should.throwError('db must be an object');
     });
 
     it('should require opts to be an object', function() {
-      (function() { mtree = new MergeTree(db, []); }).should.throw('opts must be an object');
+      (function() { new MergeTree(db, []); }).should.throw('opts must be an object');
     });
 
     it('should require opts.vSize to be a number', function() {
-      (function() { mtree = new MergeTree(db, { vSize: {} }); }).should.throw('opts.vSize must be a number');
+      (function() { new MergeTree(db, { vSize: {} }); }).should.throw('opts.vSize must be a number');
     });
 
     it('should require opts.iSize to be a number', function() {
-      (function() { mtree = new MergeTree(db, { iSize: {} }); }).should.throw('opts.iSize must be a number');
+      (function() { new MergeTree(db, { iSize: {} }); }).should.throw('opts.iSize must be a number');
     });
 
     it('should require opts.vSize to be between 0 and 6', function() {
-      (function() { mtree = new MergeTree(db, { vSize: 7 }); }).should.throw('opts.vSize must be between 0 and 6');
+      (function() { new MergeTree(db, { vSize: 7 }); }).should.throw('opts.vSize must be between 0 and 6');
     });
 
     it('should require opts.iSize to be between 0 and 6', function() {
-      (function() { mtree = new MergeTree(db, { iSize: 7 }); }).should.throw('opts.iSize must be between 0 and 6');
+      (function() { new MergeTree(db, { iSize: 7 }); }).should.throw('opts.iSize must be between 0 and 6');
     });
 
     it('should construct', function() {
-      (function() { mtree = new MergeTree(db); }).should.not.throwError();
+      (function() { new MergeTree(db); }).should.not.throwError();
     });
 
     it('should set updated flag for remotes on init', function() {

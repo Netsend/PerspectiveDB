@@ -32,7 +32,7 @@ var bson = require('bson');
 var LDJSONStream = require('ld-jsonstream');
 var through2 = require('through2');
 
-var OplogTransform = require('../../../adapter/mongo/oplog_transform');
+var OplogTransform = require('../../../adapter/mongodb/oplog_transform');
 var logger = require('../../../lib/logger');
 
 var config = require('./config.json');
@@ -114,7 +114,7 @@ describe('OplogTransform', function() {
     });
 
     it('should construct', function() {
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead);
+      new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead);
     });
   });
 
@@ -171,7 +171,7 @@ describe('OplogTransform', function() {
       var or = ot._oplogReader({ log: silence });
       // move to the end by repeatedly calling read
       or.on('readable', function() {
-        while (or.read()) {}
+        while (or.read());
       });
       or.on('end', done);
     });
