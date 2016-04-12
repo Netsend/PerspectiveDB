@@ -33,7 +33,9 @@ $ sudo mkdir /var/empty
 
 Ensure database directory exists, i.e. /srv/persdb/mydb:
 ```
-$ sudo mkdir -pm700 /srv/persdb/mydb
+$ sudo mkdir -p /srv/persdb/mydb
+$ sudo chown pdblevel:pdblevel /srv/persdb/mydb
+$ sudo chmod 700 /srv/persdb/mydb
 ```
 
 Create a dedicated system user for the main process:
@@ -48,7 +50,7 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 
 Create a user account database:
 ```
-$ omask=$(umask) umask 077 && touch local/config/passwd.hjson; umask $omask
+$ omask=$(umask); umask 077 && touch local/config/passwd.hjson; umask $omask
 ```
 
 Grant access to a user for remote login, i.e. "john":
