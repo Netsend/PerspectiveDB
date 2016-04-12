@@ -70,11 +70,11 @@ tasks.push(function(done) {
   });
 });
 
-// should require db string
+// should require url string
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = childProcess.fork(__dirname + '/../../../adapter/mongo/exec', { silent: true });
+  var child = childProcess.fork(__dirname + '/../../../adapter/mongodb/exec', { silent: true });
 
   //child.stdout.pipe(process.stdout);
   //child.stderr.pipe(process.stderr);
@@ -84,7 +84,7 @@ tasks.push(function(done) {
   child.stderr.on('data', function(data) { stderr += data; });
 
   child.on('exit', function(code, sig) {
-    assert(/msg.db must be a non-empty string/.test(stderr));
+    assert(/msg.url must be a non-empty string/.test(stderr));
     assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
@@ -107,7 +107,7 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongo/exec'], {
+  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongodb/exec'], {
     cwd: '/',
     env: {},
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
@@ -151,7 +151,6 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        db: databaseName,
         coll: collectionName,
         url: config.url
       });
@@ -171,7 +170,7 @@ tasks.push(function(done) {
 
   var offset = new Timestamp(0, (new Date()).getTime() / 1000);
 
-  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongo/exec'], {
+  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongodb/exec'], {
     cwd: '/',
     env: {},
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
@@ -188,7 +187,7 @@ tasks.push(function(done) {
     var ts = obj.m._op;
     assert.strictEqual(ts.greaterThan(offset), true);
     assert.deepEqual(obj, {
-      h: { id: 'foo' },
+      h: { id: 'foo', v: null },
       m: { _op: ts },
       b: { _id: 'foo', bar: 'baz' }
     });
@@ -212,7 +211,7 @@ tasks.push(function(done) {
 
       // send response with current timestamp in oplog
       versionControl.write(BSON.serialize({
-        h: { id: 'foo' },
+        h: { id: 'foo', v: null },
         m: { _op: offset }, 
         b: {}
       }));
@@ -261,7 +260,6 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        db: databaseName,
         coll: collectionName,
         url: config.url
       });

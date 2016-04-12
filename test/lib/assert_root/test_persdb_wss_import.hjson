@@ -6,8 +6,8 @@
 
 # Main
 
-#user: nobody
-#group: nobody
+#user: _pdbnull
+#group: _pdbnull
 #chroot: /var/empty
 
 log: {

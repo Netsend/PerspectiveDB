@@ -233,7 +233,7 @@ tasks.push(function(done) {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });
@@ -278,7 +278,7 @@ tasks.push(function(done) {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });
@@ -338,7 +338,7 @@ tasks.push(function(done) {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });
@@ -421,7 +421,7 @@ tasks.push(function(done) {
     onMessage: onMessage,
     onExit: onExit,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });
@@ -504,7 +504,7 @@ tasks2.push(function(done) {
     onMessage: onMessage,
     onExit: onExit,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });

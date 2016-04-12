@@ -66,8 +66,8 @@ var filterSecrets = require('../../lib/filter_secrets');
  *   [master]:       {Boolean}     // whether or not to enable writes
  *                                 // defaults to false
  *   [chroot]:       {String}      // defaults to /var/empty
- *   [user]:         {String}      // defaults to "nobody"
- *   [group]:        {String}      // defaults to "nobody"
+ *   [user]:         {String}      // defaults to "_pdbnull"
+ *   [group]:        {String}      // defaults to "_pdbnull"
  * }
  *
  * No other messages should be sent to this process.
@@ -171,9 +171,9 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, options)
  *   [mongoOpts]:    {Object}      // any other mongodb driver options
  *   [chroot]:       {String}      // defaults to /var/empty
  *   [user]:         {String}      // system user to run this process, defaults to
- *                                 // "nobody"
+ *                                 // "_pdbnull"
  *   [group]:        {String}      // system group to run this process, defaults to
- *                                 // "nobody"
+ *                                 // "_pdbnull"
  * }
  */
 process.once('message', function(msg) {
@@ -207,8 +207,8 @@ process.once('message', function(msg) {
 
   process.title = 'pdb/' + programName;
 
-  var user = msg.user || 'nobody';
-  var group = msg.group || 'nobody';
+  var user = msg.user || '_pdbnull';
+  var group = msg.group || '_pdbnull';
 
   var newRoot = msg.chroot || '/var/empty';
 

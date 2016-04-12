@@ -108,8 +108,8 @@ var logger = require('../../../lib/logger');
 
 var cons, silence;
 var chroot = '/var/persdb';
-var user = 'nobody';
-var group = 'nobody';
+var user = 'pdblevel';
+var group = 'pdblevel';
 var dbPath = '/test_db_exec_root';
 
 // open loggers

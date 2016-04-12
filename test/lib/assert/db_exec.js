@@ -233,7 +233,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true },
         path: '.',
-        user: 'nobody',
+        user: 'pdblevel',
         chroot: '/var/empty'
       });
       break;

@@ -174,7 +174,7 @@ tasks2.push(function(done) {
       });
       break;
     case 'listen':
-      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(child.stdout));
+      assert(/preauth changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(child.stdout));
 
       var ms = net.createConnection(1234);
 
@@ -257,7 +257,7 @@ tasks.push(function(done) {
     onExit: done,
     echoErr: false,
     testStdout: function(stdout) {
-      assert(/preauth changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/preauth changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     },
     testStderr: function(stderr) {
       assert(/Error: more than maxBytes received/.test(stderr));
@@ -365,7 +365,7 @@ tasks.push(function(done) {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
-      assert(/wss changed root to \/var\/empty and user:group to nobody:nobody/.test(stdout));
+      assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   });
 });
