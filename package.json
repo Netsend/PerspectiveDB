@@ -53,7 +53,7 @@
     "url": "git://github.com/Netsend/persdb.git"
   },
   "bugs": "https://github.com/Netsend/persdb/issues",
-  "bin" : { "persdb" : "./bin/server.js" },
+  "bin" : { "persdb" : "./bin/persdb" },
   "scripts": {
     "test": "mocha ./test"
   }
