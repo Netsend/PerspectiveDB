@@ -164,7 +164,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, options)
  *   [oplogDbUser]:  {String}      // user to read the oplog database collection
  *   [secrets]:      {Object}      // object containing the passwords for dbUser
  *                                 // and oplogDbUser
- *   [authDb]:       {String}       // authDb database, defaults to db from url
+ *   [authDb]:       {String}      // authDb database, defaults to db from url
+ *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [versionKey]:   {String}      // version key in document, defaults to "_v"
@@ -186,6 +187,7 @@ process.once('message', function(msg) {
   if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
   if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
   if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
+  if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.versionKey != null && typeof msg.versionKey !== 'string') { throw new TypeError('msg.versionKey must be a non-empty string'); }
@@ -275,8 +277,13 @@ process.once('message', function(msg) {
       // auth to db if necessary
       startupTasks.push(function(cb) {
         if (dbUser || dbPass) {
-          var authDb = db.db(msg.authDb || dbName);
-          authDb.authenticate(dbUser, dbPass, cb);
+          var authDbName = msg.authDb || dbName;
+          var authDb = db.db(authDbName);
+          log.debug('auth to %s as %s', authDbName, dbUser);
+          authDb.authenticate(dbUser, dbPass, function(err) {
+            if (err) { log.err('auth to %s as %s failed: %s', authDbName, dbUser, err); }
+            cb(err);
+          });
         }
         process.nextTick(cb);
       });
@@ -291,8 +298,13 @@ process.once('message', function(msg) {
       startupTasks.push(function(cb) {
         // auth to oplog db if necessary
         if (oplogDbUser || oplogDbPass) {
-          var authDb = db.db(msg.authDb || oplogDbName);
-          authDb.authenticate(oplogDbUser, oplogDbPass, cb);
+          var authDbName = msg.oplogAuthDb || 'admin';
+          log.debug('auth oplog to %s as %s', authDbName, oplogDbUser);
+          var authDb = db.db(authDbName);
+          authDb.authenticate(oplogDbUser, oplogDbPass, function(err) {
+            if (err) { log.err('auth to %s as %s failed: %s', authDbName, oplogDbUser, err); }
+            cb(err);
+          });
         }
         oplogDb = db.db(oplogDbName);
         process.nextTick(cb);
