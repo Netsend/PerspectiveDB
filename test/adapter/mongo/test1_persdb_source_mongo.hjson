@@ -28,12 +28,12 @@ dbs: [{
     coll: test1
     #dbUser: bar
     #oplogDbUser: bar
-    #secrets: "secrets.hjson"
+    #passdb: "secrets.hjson"
   },
   perspectives: [
     {
       name: someClient
-      password: "$2a$10$4Po9aCT665J1luJOwSnTYez/PWO0mOjxOcVOOOF7f13IrW9Tl3nq2" # password is "somepass"
+      passdb: secrets.hjson
       import: true
       export: true
       tailRetry: 400

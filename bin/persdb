@@ -94,16 +94,15 @@ function start() {
     config.dbs.forEach(function(dbCfg) {
       dbCfg.perspectives.forEach(function(persCfg) {
         var username = persCfg.username || persCfg.name;
-        var password = persCfg.password || persCfg.users;
+        var file = persCfg.passdb;
 
-        // support loading from a file
-        if (password.indexOf('$2a$') !== 0) {
-          var file = password;
+        if (file) {
+          // load passdb from a file
           // prepend the config base to all relative path specifications in the config file
-          if (file && file[0] !== '/') {
+          if (file[0] !== '/') {
             file = config.configBase + file;
           }
-          if (!files[file]) {
+          if (!files[file]) { // if not cached
             try {
               files[file] = loadSecrets(file);
             } catch(err) {
@@ -112,8 +111,8 @@ function start() {
               return;
             }
           }
-          password = files[file][username] || '';
         }
+        var password = files[file][username] || '';
 
         if (!username) {
           error = new Error('no name or username configured');

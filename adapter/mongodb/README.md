@@ -29,7 +29,7 @@ dbs: [
       coll: test3
       #dbUser: bar
       #oplogDbUser: bar
-      #secrets: "secrets.hjson"
+      #passdb: "secrets.hjson"
     }
   }
 ]
