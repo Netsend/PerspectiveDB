@@ -126,6 +126,11 @@ OplogTransform.prototype.startStream = function startStream() {
   function openOplog(opts, reopen) {
     that._log.notice('ot startStream opening tailable oplog cursor after %s', that._lastTs);
     that._or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
+    // proxy error
+    that._or.once('error', function(err) {
+      that.emit('error', err);
+      return;
+    });
     that._or.once('end', function() {
       that._log.notice('ot startStream end of tailable oplog cursor');
       that._or.unpipe(that);
