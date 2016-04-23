@@ -240,15 +240,8 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
       sort: { _id: true }
     });
 
-    function reader() {
-      var item = s.read();
-
-      if (!item) { // end reached
-        that._log.notice('ot bootstrap done');
-        cb(null, oplogItem.ts);
-        return;
-      }
-
+    // use data event since readable event is not stable
+    s.on('data', function reader(item) {
       that._log.debug('ot bootstrap %j', item);
 
       // enclose item in an oplog like item
@@ -260,15 +253,18 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
       });
       if (!resume) {
         that._log.debug('ot bootstrap wait for drain');
-        s.removeListener('readable', reader);
+        s.pause();
         that.once('drain', function() {
           that._log.debug('ot bootstrap drain, read again');
-          s.on('readable', reader);
+          s.resume();
         });
       }
-    }
+    });
 
-    s.on('readable', reader);
+    s.on('end', function() {
+      that._log.notice('ot bootstrap done');
+      cb(null, oplogItem.ts);
+    });
   });
 };
 
