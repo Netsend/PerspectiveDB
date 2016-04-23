@@ -259,9 +259,10 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
         op: 'i'
       });
       if (!resume) {
-        // wait for drain
+        that._log.debug('ot bootstrap wait for drain');
         s.removeListener('readable', reader);
         that.once('drain', function() {
+          that._log.debug('ot bootstrap drain, read again');
           s.on('readable', reader);
         });
       }
