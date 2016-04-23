@@ -241,9 +241,10 @@ process.once('message', function(msg) {
 
     log.debug('%j', filterSecrets(msg));
 
+    var uid, gid;
     try {
-      posix.getpwnam(user).uid;
-      posix.getgrnam(group).gid;
+      uid = posix.getpwnam(user).uid;
+      gid = posix.getgrnam(group).gid;
     } catch(err) {
       log.err('%s %s:%s', err, user, group);
       process.exit(3);
@@ -251,7 +252,7 @@ process.once('message', function(msg) {
 
     // chroot or exit
     try {
-      chroot(newRoot, user, group);
+      chroot(newRoot, uid, gid);
       log.info('changed root to %s and user:group to %s:%s', newRoot, user, group);
     } catch(err) {
       log.err('changing root or user failed %j %s', msg, err);
