@@ -112,7 +112,7 @@ function start() {
             }
           }
         }
-        var password = files[file][username] || '';
+        var password = files[file] && files[file][username] || '';
 
         if (!username) {
           error = new Error('no name or username configured');
