@@ -47,9 +47,11 @@ function lnr() {
   return new Error().stack.split('\n')[2].match(/exec_root.js:([0-9]+):[0-9]+/)[1];
 }
 
-var cons, silence, db;
+var cons, silence, db, oplogColl;
 var databaseName = 'test_exec_root';
 var collectionName = 'test_exec_root';
+var oplogDbName = 'local';
+var oplogCollName = 'oplog.$main';
 
 // open loggers and a connection to the database
 tasks.push(function(done) {
@@ -63,6 +65,7 @@ tasks.push(function(done) {
         if (err) { throw err; }
         db = dbc.db(databaseName);
         db.collection(collectionName).deleteMany({}, done);
+        oplogColl = dbc.db(oplogDbName).collection(oplogCollName);
       });
     });
   });
@@ -166,8 +169,6 @@ tasks.push(function(done) {
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
-  var offset = new Timestamp(0, (new Date()).getTime() / 1000);
-
   var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongodb/exec'], {
     cwd: '/',
     env: {},
@@ -183,7 +184,8 @@ tasks.push(function(done) {
     if (!obj) { return; }
 
     var ts = obj.m._op;
-    assert.strictEqual(ts.greaterThan(offset), true);
+    var now = new Timestamp(0, (new Date()).getTime() / 1000);
+    assert.strictEqual(ts.greaterThan(now), true);
     assert.deepEqual(obj, {
       h: { id: 'foo', v: null },
       m: { _op: ts },
@@ -205,19 +207,21 @@ tasks.push(function(done) {
     if (i === 1) {
       assert.deepEqual(data, { id: null });
 
-      var offset = new Timestamp(0, (new Date()).getTime() / 1000);
-
-      // send response with current timestamp in oplog
-      versionControl.write(BSON.serialize({
-        h: { id: 'foo', v: null },
-        m: { _op: offset }, 
-        b: {}
-      }));
-
-      // and insert an item into the collection
-      var coll = db.collection(collectionName);
-      coll.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
+      // send response with last timestamp in oplog
+      oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
         if (err) { throw err; }
+
+        versionControl.write(BSON.serialize({
+          h: { id: 'foo', v: null },
+          m: { _op: oplogItem.ts },
+          b: {}
+        }));
+
+        // and insert an item into the collection
+        var coll = db.collection(collectionName);
+        coll.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
+          if (err) { throw err; }
+        });
       });
     }
 

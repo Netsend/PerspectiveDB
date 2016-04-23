@@ -205,7 +205,7 @@ process.once('message', function(msg) {
 
   var collName = msg.coll;
 
-  programName = 'mongo';
+  programName = 'mongodb';
 
   process.title = 'pdb/' + programName;
 
@@ -230,6 +230,9 @@ process.once('message', function(msg) {
     oplogDbPass = msg.passdb[oplogDbUser];
   }
 
+  if (dbUser && !dbPass || !dbUser && dbPass) { throw new Error('provide both user and pass or none at all'); }
+  if (oplogDbUser && !oplogDbPass || !oplogDbUser && oplogDbPass) { throw new Error('provide both oplog user and pass or none at all'); }
+
   // open log
   logger(msg.log, function(err, l) {
     if (err) { l.err(err); throw err; }
@@ -238,10 +241,9 @@ process.once('message', function(msg) {
 
     log.debug('%j', filterSecrets(msg));
 
-    var uid, gid;
     try {
-      uid = posix.getpwnam(user).uid;
-      gid = posix.getgrnam(group).gid;
+      posix.getpwnam(user).uid;
+      posix.getgrnam(group).gid;
     } catch(err) {
       log.err('%s %s:%s', err, user, group);
       process.exit(3);
@@ -249,7 +251,7 @@ process.once('message', function(msg) {
 
     // chroot or exit
     try {
-      chroot(newRoot, user, gid);
+      chroot(newRoot, user, group);
       log.info('changed root to %s and user:group to %s:%s', newRoot, user, group);
     } catch(err) {
       log.err('changing root or user failed %j %s', msg, err);
@@ -270,43 +272,41 @@ process.once('message', function(msg) {
 
           log.notice('connected %s', msg.url);
           db = dbc;
+          // setup oplog db
+          oplogDb = db.db(oplogDbName);
           cb();
         });
       });
 
       // auth to db if necessary
-      startupTasks.push(function(cb) {
-        if (dbUser || dbPass) {
+      if (dbUser) {
+        startupTasks.push(function(cb) {
           var authDbName = msg.authDb || dbName;
           var authDb = db.db(authDbName);
           log.debug('auth to %s as %s', authDbName, dbUser);
           authDb.authenticate(dbUser, dbPass, function(err) {
-            if (err) { log.err('auth to %s as %s failed: %s', authDbName, dbUser, err); }
-            cb(err);
+            if (err) { log.err('auth to %s as %s failed: %s', authDbName, dbUser, err); cb(err); return; }
+            cb();
           });
-        }
-        process.nextTick(cb);
-      });
+        });
+      }
 
-      // setup coll
-      startupTasks.push(function(cb) {
-        coll = db.collection(collName);
-        process.nextTick(cb);
-      });
-
-      // setup oplog db
-      startupTasks.push(function(cb) {
-        // auth to oplog db if necessary
-        if (oplogDbUser || oplogDbPass) {
+      // auth to oplog db if necessary
+      if (oplogDbUser) {
+        startupTasks.push(function(cb) {
           var authDbName = msg.oplogAuthDb || 'admin';
           log.debug('auth oplog to %s as %s', authDbName, oplogDbUser);
           var authDb = db.db(authDbName);
           authDb.authenticate(oplogDbUser, oplogDbPass, function(err) {
-            if (err) { log.err('auth to %s as %s failed: %s', authDbName, oplogDbUser, err); }
-            cb(err);
+            if (err) { log.err('auth to %s as %s failed: %s', authDbName, oplogDbUser, err); cb(err); return; }
+            cb();
           });
-        }
-        oplogDb = db.db(oplogDbName);
+        });
+      }
+
+      // setup coll
+      startupTasks.push(function(cb) {
+        coll = db.collection(collName);
         process.nextTick(cb);
       });
 
@@ -332,7 +332,7 @@ process.once('message', function(msg) {
           ot.close(cb);
         } else {
           log.notice('no oplog transform active');
-          cb();
+          process.nextTick(cb);
         }
       });
 
@@ -343,7 +343,7 @@ process.once('message', function(msg) {
         } else {
           log.info('data channel already closed');
           dataChannel.destroy();
-          cb();
+          process.nextTick(cb);
         }
       });
 
@@ -354,13 +354,13 @@ process.once('message', function(msg) {
         } else {
           log.info('version control already closed');
           versionControl.destroy();
-          cb();
+          process.nextTick(cb);
         }
       });
 
       shutdownTasks.push(function(cb) {
         log.info('closing database connection...');
-        db.close(cb);
+        oplogDb.close(cb);
       });
 
       // handle shutdown

@@ -148,6 +148,8 @@ OplogTransform.prototype.startStream = function startStream() {
       return;
     }
 
+    that._log.debug('ot startStream last version %j', obj);
+
     that.emit('lastVersion', obj);
 
     // ensure this._lastTs
@@ -198,17 +200,19 @@ OplogTransform.prototype.startStream = function startStream() {
  * @param {Function} cb  First parameter will be an error object or null.
  */
 OplogTransform.prototype.close = function close(cb) {
-  this._log.info('ot oplogReader close');
-
   this._stop = true;
 
   var that = this;
 
-  if (this._or && this._or.readable) {
-    this._or.close(function() {
+  if (this._or && !this._or.isClosed()) {
+    this._log.info('ot oplogReader close cursor');
+    // wait for end so that the killed cursor is unregistered within the driver (prevents MongoError: server 127.0.0.1:27017 sockets closed)
+    this._or.once('end', function() {
       that.end(cb);
     });
+    this._or.close();
   } else {
+    this._log.info('ot oplogReader close');
     this.end(cb);
   }
 };
