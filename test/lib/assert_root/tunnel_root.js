@@ -60,7 +60,7 @@ tasks.push(function(done) {
           key: __dirname + '/tunnelkey',
           forward: '27017:127.0.0.1:27017',
           host: 'foo.example.net',
-          hostHash: 'ae5bd5f24c9cea6482a6d1ebdbac1bf007d58bfa8684747d8ddcbbd6ec25c86d'
+          fingerprint: '3Omnu+Vf28fJAwJyP4xt3J/6hmY7Q1m9otK2tLitHds'
         });
         break;
       case 'listen':
