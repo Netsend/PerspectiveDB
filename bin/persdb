@@ -44,6 +44,7 @@ var fs = require('fs');
 var async = require('async');
 var hjson = require('hjson');
 var program = require('commander');
+var xtend = require('xtend');
 
 var logger = require('../lib/logger');
 var Master = require('../lib/master');
@@ -136,6 +137,20 @@ function start() {
     // setup logging files
     tasks.push(function(cb2) {
       // ensure specific log configurations overrule the global log config
+      if (config.tunnels) {
+        config.tunnels.forEach(function(tunnelCfg) {
+          log.info('pre-loading tunnel config for: %s', tunnelCfg.connect);
+
+          tunnelCfg.log = tunnelCfg.log || {};
+
+          tunnelCfg.log = xtend(logCfg, {
+            file: log.getFileStream(),
+            error: log.getErrorStream(),
+            mask: logger.levelToPrio(tunnelCfg.log.level || logCfg.level)
+          }, tunnelCfg.log);
+        });
+      }
+
       async.eachSeries(config.dbs, function(dbCfg, cb3) {
         log.info('loading db: %s', dbCfg.name);
 
