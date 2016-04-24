@@ -75,7 +75,7 @@ tasks.push(function(done) {
       assert(/tunnel ready/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/tunnel'], opts);
+  spawn([__dirname + '/../../../lib/tunnel_exec'], opts);
 });
 
 async.series(tasks, function(err) {
