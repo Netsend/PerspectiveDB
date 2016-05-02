@@ -85,6 +85,43 @@ if (config.wss) {
 
 var logCfg = config.log || {};
 
+// load log configuration, initialize with default global log files
+// open log files if neccesary
+function loadLog(cfg, cb) {
+  cfg = cfg || {};
+
+  cfg = xtend(logCfg, {
+    file: log.getFileStream(),
+    error: log.getErrorStream(),
+    mask: logger.levelToPrio(cfg.level || logCfg.level)
+  }, cfg);
+
+  // ensure async even without any other tasks
+  var tasks = [function(cb2) { process.nextTick(cb2); }];
+
+  if (cfg.file) {
+    tasks.push(function(cb2) {
+      logger.openfile(cfg.file, function(err, f) {
+        if (err) { cb2(err); return; }
+        cfg.file = f;
+        cb2();
+      });
+    });
+  }
+
+  if (cfg.error) {
+    tasks.push(function(cb2) {
+      logger.openfile(cfg.error, function(err, f) {
+        if (err) { cb2(err); return; }
+        cfg.error = f;
+        cb2();
+      });
+    });
+  }
+
+  async.series(tasks, cb);
+}
+
 function start() {
   (function(cb) {
     var error;
@@ -134,79 +171,20 @@ function start() {
       });
     });
 
-    // setup logging files
+    // setup tunnel logging
     tasks.push(function(cb2) {
       // ensure specific log configurations overrule the global log config
-      if (config.tunnels) {
-        config.tunnels.forEach(function(tunnelCfg) {
-          log.info('pre-loading tunnel config for: %s', tunnelCfg.connect);
+      async.eachSeries(config.tunnels || [], function(tunnelCfg, cb3) {
+        log.info('loading tunnel: %s', tunnelCfg.connect);
+        loadLog(tunnelCfg.log, cb3);
+      }, cb2);
+    });
 
-          tunnelCfg.log = tunnelCfg.log || {};
-
-          tunnelCfg.log = xtend(logCfg, {
-            file: log.getFileStream(),
-            error: log.getErrorStream(),
-            mask: logger.levelToPrio(tunnelCfg.log.level || logCfg.level)
-          }, tunnelCfg.log);
-        });
-      }
-
+    // setup db logging
+    tasks.push(function(cb2) {
       async.eachSeries(config.dbs, function(dbCfg, cb3) {
         log.info('loading db: %s', dbCfg.name);
-
-        dbCfg.log = dbCfg.log || {};
-
-        var dbLog = {};
-
-        // copy global log config
-        Object.keys(logCfg).forEach(function(key) {
-          dbLog[key] = logCfg[key];
-        });
-
-        var gfile = log.getFileStream();
-        var gerror = log.getErrorStream();
-
-        if (gfile) { dbLog.file = gfile; }
-        if (gerror) { dbLog.error = gerror; }
-
-        // overrule with db specific log config
-        Object.keys(dbCfg.log).forEach(function(key) {
-          dbLog[key] = dbCfg.log[key];
-        });
-
-        if (dbCfg.log.level) {
-          dbLog.mask = logger.levelToPrio(dbCfg.log.level);
-        }
-
-        // ensure async even without any other tasks
-        var tasks2 = [function(cb4) { process.nextTick(cb4); }];
-
-        if (dbCfg.log.file) {
-          tasks2.push(function(cb4) {
-            logger.openfile(dbCfg.log.file, function(err, f) {
-              if (err) { cb4(err); return; }
-              dbLog.file = f;
-              cb4();
-            });
-          });
-        } else {
-          dbLog.file = log.getFileStream();
-        }
-
-        if (dbCfg.log.error) {
-          tasks2.push(function(cb4) {
-            logger.openfile(dbCfg.log.error, function(err, f) {
-              if (err) { cb4(err); return; }
-              dbLog.error = f;
-              cb4();
-            });
-          });
-        } else {
-          dbLog.error = log.getErrorStream();
-        }
-
-        dbCfg.log = dbLog;
-        async.series(tasks2, cb3);
+        loadLog(dbCfg.log, cb3);
       }, cb2);
     });
 
@@ -242,7 +220,8 @@ function start() {
 }
 
 logCfg.ident = programName;
-logCfg.mask = logger.levelToPrio(logCfg.level) || logger.NOTICE;
+logCfg.level = logCfg.level || 'NOTICE';
+logCfg.mask = logger.levelToPrio(logCfg.level);
 
 logger(logCfg, function(err, l) {
   if (err) { throw err; }
