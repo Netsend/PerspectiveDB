@@ -101,7 +101,7 @@ function loadLog(cfg, cb) {
 
   if (cfg.file) {
     tasks.push(function(cb2) {
-      logger.openfile(cfg.file, function(err, f) {
+      logger.openFile(cfg.file, function(err, f) {
         if (err) { cb2(err); return; }
         cfg.file = f;
         cb2();
@@ -111,7 +111,7 @@ function loadLog(cfg, cb) {
 
   if (cfg.error) {
     tasks.push(function(cb2) {
-      logger.openfile(cfg.error, function(err, f) {
+      logger.openFile(cfg.error, function(err, f) {
         if (err) { cb2(err); return; }
         cfg.error = f;
         cb2();
@@ -119,7 +119,9 @@ function loadLog(cfg, cb) {
     });
   }
 
-  async.series(tasks, cb);
+  async.series(tasks, function(err) {
+    cb(err, cfg);
+  });
 }
 
 function start() {
@@ -176,7 +178,11 @@ function start() {
       // ensure specific log configurations overrule the global log config
       async.eachSeries(config.tunnels || [], function(tunnelCfg, cb3) {
         log.info('loading tunnel: %s', tunnelCfg.connect);
-        loadLog(tunnelCfg.log, cb3);
+        loadLog(tunnelCfg.log, function(err, cfg) {
+          if (err) { cb3(err); return; }
+          tunnelCfg.log = cfg;
+          cb3();
+        });
       }, cb2);
     });
 
@@ -184,7 +190,11 @@ function start() {
     tasks.push(function(cb2) {
       async.eachSeries(config.dbs, function(dbCfg, cb3) {
         log.info('loading db: %s', dbCfg.name);
-        loadLog(dbCfg.log, cb3);
+        loadLog(dbCfg.log, function(err, cfg) {
+          if (err) { cb3(err); return; }
+          dbCfg.log = cfg;
+          cb3();
+        });
       }, cb2);
     });
 
