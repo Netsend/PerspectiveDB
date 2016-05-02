@@ -25,10 +25,8 @@ if (process.getuid() !== 0) {
   process.exit(1);
 }
 
-var assert = require('assert');
 var url = require('url');
 
-var async = require('async');
 var chroot = require('chroot');
 var posix = require('posix');
 var program = require('commander');
