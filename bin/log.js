@@ -256,7 +256,17 @@ if (config.dbs && config.dbs.length) {
   });
 } else {
   // open database
-  level('/var/persdb/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+  var newRoot = config.chroot || '/var/persdb';
+
+  var path = config.path || '/data';
+  // ensure leading slash
+  if (path[0] !== '/') {
+    path = '/' + path;
+  }
+
+  console.log(newRoot, path);
+
+  level(newRoot + path, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
     if (err) { throw err; }
     run(db, {}, function(err) {
       db.close();
