@@ -43,6 +43,7 @@ var posix = require('posix');
 var xtend = require('xtend');
 
 var logger = require('../../lib/logger');
+var noop = require('../../lib/noop');
 var OplogTransform = require('./oplog_transform');
 var filterSecrets = require('../../lib/filter_secrets');
 
@@ -393,9 +394,9 @@ process.once('message', function(msg) {
         start(oplogDb, oplogCollName, dbName + '.' + collName, dataChannel, versionControl);
       });
 
-      // listen to kill signals
-      process.once('SIGINT', shutdown);
-      process.once('SIGTERM', shutdown);
+      // ignore kill signals
+      process.once('SIGTERM', noop);
+      process.once('SIGINT', noop);
 
       process.once('message', shutdown); // expect msg.type == kill
     }
