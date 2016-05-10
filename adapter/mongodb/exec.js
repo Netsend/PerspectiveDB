@@ -70,7 +70,7 @@ var filterSecrets = require('../../lib/filter_secrets');
  *   [group]:        {String}      // defaults to "_pdbnull"
  * }
  *
- * No other messages should be sent to this process.
+ * Only a kill message can be sent to signal the end of the process.
  *
  * As soon as the connection to mongodb is setup, and version and data channels are
  * ready, a "listen" message is emitted.
@@ -365,14 +365,20 @@ process.once('message', function(msg) {
       });
 
       // handle shutdown
+      var shuttingDown = false;
       function shutdown() {
-        log.notice('shutting down');
+        if (shuttingDown) {
+          log.info('shutdown already in progress');
+          return;
+        }
+        shuttingDown = true;
+        log.info('shutting down...');
+
+        // disconnect from parent
+        process.disconnect();
+
         async.series(shutdownTasks, function(err) {
           if (err) { log.err('shutdown error', err); }
-          if (process.connected) {
-            log.info('disconnect from parent');
-            process.disconnect();
-          }
           log.info('shutdown complete');
         });
       }
@@ -390,6 +396,8 @@ process.once('message', function(msg) {
       // listen to kill signals
       process.once('SIGINT', shutdown);
       process.once('SIGTERM', shutdown);
+
+      process.once('message', shutdown); // expect msg.type == kill
     }
 
     openConnectionAndProceed();
