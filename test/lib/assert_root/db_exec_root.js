@@ -40,8 +40,7 @@ var BSON = new bson.BSONPure.BSON();
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
-
-var noop = function() {};
+var noop = require('../../../lib/noop');
 
 var tasks = [];
 var tasks2 = [];

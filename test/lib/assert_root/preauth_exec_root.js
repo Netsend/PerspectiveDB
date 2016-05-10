@@ -33,7 +33,8 @@ var async = require('async');
 var ws = require('nodejs-websocket');
 var xtend = require('xtend');
 
-var noop = function() {};
+var noop = require('../../../lib/noop');
+
 var tasks = [];
 var tasks2 = [];
 

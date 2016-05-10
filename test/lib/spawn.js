@@ -23,7 +23,7 @@ var cp = require('child_process');
 
 var xtend = require('xtend');
 
-function noop() {}
+var noop = require('../../lib/noop');
 
 function spawn(args, options, spawnOpts) {
   if (typeof args === 'string') { args = [args]; }

@@ -29,6 +29,7 @@ var program = require('commander');
 
 var doDiff = require('../lib/diff');
 var MergeTree = require('../lib/merge_tree');
+var noop = require('../lib/noop');
 
 program
   .version('0.0.2')
@@ -144,8 +145,6 @@ function fmtItem(item, parents) {
   }
   return out;
 }
-
-var noop = function() {};
 
 function printTree(mt, tree, cb) {
   var counter = 0;

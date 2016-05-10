@@ -39,8 +39,7 @@ var xtend = require('xtend');
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
-
-var noop = function() {};
+var noop = require('../../../lib/noop');
 
 var cert;
 

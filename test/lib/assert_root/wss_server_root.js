@@ -35,6 +35,8 @@ var BSON = new bson.BSONPure.BSON();
 var ws = require('nodejs-websocket');
 var xtend = require('xtend');
 
+var noop = require('../../../lib/noop');
+
 var cert, key, dhparam;
 
 cert = __dirname + '/cert.pem';
@@ -48,7 +50,6 @@ var wsClientOpts = {
   ciphers: 'ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES128-GCM-SHA256'
 };
 
-var noop = function() {};
 var tasks  = [];
 var tasks2 = [];
 
