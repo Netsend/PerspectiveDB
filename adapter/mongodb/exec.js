@@ -63,7 +63,7 @@ var filterSecrets = require('../../lib/filter_secrets');
  *   log:            {Object}      // log configuration
  *   [url]:          {String}      // connection string
  *                                 // defaults to 127.0.0.1:27017
- *   [mongoOpts]:    {Object}      // any mongodb driver options
+ *   [oplogTransformOpts]: {Object} // any oplog transform options
  *   [master]:       {Boolean}     // whether or not to enable writes
  *                                 // defaults to false
  *   [chroot]:       {String}      // defaults to /var/empty
@@ -90,25 +90,26 @@ var ot, coll, db, log; // used after receiving the log configuration
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} versionControl  version control channel
  * @param {Object} dataChannel  data channel
- * @param {Object} [options]
+ * @param {Object} [opts]
  *
  * Options:
  *   versionKey {String, defaults to "_v"} version key in document
+ *   any OplogTransform options
  */
-function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, options) {
-  var opts = xtend({
+function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
+  opts = xtend({
     versionKey: '_v'
-  }, options);
+  }, opts);
 
   // track newly written versions so that new items can be recognized correctly
   var expected = {};
 
   log.debug('start oplog transform...');
-  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, {
+  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, xtend(opts, {
     log: log,
     bson: true,
     expected: expected
-  });
+  }));
   ot.pipe(dataChannel);
   ot.startStream();
 
@@ -180,7 +181,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, options)
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [versionKey]:   {String}      // version key in document, defaults to "_v"
- *   [mongoOpts]:    {Object}      // any other mongodb driver options
+ *   [oplogTransformOpts]: {Object} // any oplog transform options
  *   [chroot]:       {String}      // defaults to /var/empty
  *   [user]:         {String}      // system user to run this process, defaults to
  *                                 // "_pdbnull"
@@ -202,7 +203,7 @@ process.once('message', function(msg) {
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.versionKey != null && typeof msg.versionKey !== 'string') { throw new TypeError('msg.versionKey must be a non-empty string'); }
-  if (msg.mongoOpts != null && typeof msg.mongoOpts !== 'object') { throw new TypeError('msg.mongoOpts must be an object'); }
+  if (msg.oplogTransformOpts != null && typeof msg.oplogTransformOpts !== 'object') { throw new TypeError('msg.oplogTransformOpts must be an object'); }
   if (msg.chroot != null && typeof msg.chroot !== 'string') { throw new TypeError('msg.chroot must be a string'); }
   if (msg.user != null && typeof msg.user !== 'string') { throw new TypeError('msg.user must be a string'); }
   if (msg.group != null && typeof msg.group !== 'string') { throw new TypeError('msg.group must be a string'); }
@@ -401,7 +402,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, dbName + '.' + collName, dataChannel, versionControl);
+        start(oplogDb, oplogCollName, dbName + '.' + collName, dataChannel, versionControl, msg.oplogTransformOpts);
       });
 
       // ignore kill signals

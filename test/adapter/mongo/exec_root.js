@@ -263,7 +263,10 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
         coll: collectionName,
-        url: config.url
+        url: config.url,
+        oplogTransformOpts: {
+          awaitData: false // speedup tests
+        }
       });
       break;
     case 'listen':
