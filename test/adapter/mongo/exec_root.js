@@ -128,7 +128,7 @@ tasks.push(function(done) {
     });
     validRequest = true;
 
-    child.kill();
+    child.send({ type: 'kill' });
   });
 
   //child.stdout.pipe(process.stdout);
@@ -191,7 +191,7 @@ tasks.push(function(done) {
       m: { _op: ts },
       b: { _id: 'foo', bar: 'baz' }
     });
-    child.kill();
+    child.send({ type: 'kill' });
   });
 
   // expect version requests in ld-json format
