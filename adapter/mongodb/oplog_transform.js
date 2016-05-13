@@ -41,7 +41,7 @@ var noop = function() {};
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
- * @param {Object} [options]  object containing configurable parameters
+ * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
  *   versionKey {String, defaults to "_v"} version key in document
@@ -51,29 +51,31 @@ var noop = function() {};
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
  */
-function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, options) {
+function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, opts) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
+  if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   var nsParts = ns.split('.');
   if (nsParts.length < 2) { throw new TypeError('ns must contain at least two parts'); }
   if (!nsParts[0].length) { throw new TypeError('ns must contain a database name'); }
   if (!nsParts[1].length) { throw new TypeError('ns must contain a collection name'); }
 
-  Transform.call(this, xtend(options, { objectMode: true }));
+  Transform.call(this, xtend(opts, { objectMode: true }));
 
-  if (options.bson != null && typeof options.bson !== 'boolean') { throw new TypeError('options.bson must be a boolean'); }
-  if (options.log != null && typeof options.log !== 'object') { throw new TypeError('options.log must be an object'); }
+  opts = opts || {};
+  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
+  if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
 
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
   this._opts = xtend({
     bson: false,
     versionKey: '_v'
-  }, options);
+  }, opts);
 
   this._coll = oplogDb.db(nsParts[0]).collection(nsParts.slice(1).join('.'));
 
@@ -85,7 +87,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
 
   this._tmpCollection = oplogDb.collection('_pdb.' + ns);
 
-  this._log = options.log || {
+  this._log = opts.log || {
     emerg:   console.error,
     alert:   console.error,
     crit:    console.error,
@@ -506,10 +508,14 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
 
   process.nextTick(function() {
     var obj = {
-      h: { id: oplogItem.o._id, v: oplogItem.o[opts.versionKey] },
+      h: { id: oplogItem.o._id },
       m: { _op: oplogItem.ts },
-      b: oplogItem.o
+      b: xtend(oplogItem.o)
     };
+    if (oplogItem.o.hasOwnProperty(opts.versionKey)) {
+      obj.h.v = oplogItem.o[opts.versionKey];
+    }
+
     if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     delete obj.b[opts.versionKey];
     cb(null, opts.bson ? BSON.serialize(obj) : obj);

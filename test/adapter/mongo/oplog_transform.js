@@ -68,7 +68,8 @@ before(function(done) {
 after(function(done) {
   silence.close(function(err) {
     if (err) { throw err; }
-    db.close(done);
+    //db.close(done); // not sure why the db already seems to be closed
+    done();
   });
 });
 
@@ -236,7 +237,7 @@ describe('OplogTransform', function() {
       var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
-      var or = ot._oplogReader({ offset: offset, tailable: true, tailableRetryInterval: 10 });
+      var or = ot._oplogReader({ offset: offset, tailable: true, awaitData: false });
 
       var closeCalled = false;
       or.on('end', function() {
@@ -367,11 +368,10 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: 'foo' },
+            h: { id: 'foo', v: 'A' },
             m: { _op: new Timestamp(1414516132, 1)  },
             b: {
               _id: 'foo',
-              _v: 'A',
               qux: 'quux'
             }
           });
@@ -552,8 +552,7 @@ describe('OplogTransform', function() {
     it('should process new oplog items on collection insert', function(done) {
       var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      this.timeout(10000);
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence, tailableRetryInterval: 10 });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence, awaitData: false });
       ot.startStream();
 
       // expect a request for the last item in the DAG
