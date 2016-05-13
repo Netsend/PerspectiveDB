@@ -47,6 +47,9 @@ var noop = function() {};
  *   versionKey {String, defaults to "_v"} version key in document
  *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
+ *   expected {Object}  object with ids as key and version as value that were
+ *                      updated by this adapter and are thus expected to echo back
+ *                      via the oplog
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
@@ -74,7 +77,8 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
   this._ns = ns;
   this._opts = xtend({
     bson: false,
-    versionKey: '_v'
+    versionKey: '_v',
+    expected: {}
   }, opts);
 
   this._coll = oplogDb.db(nsParts[0]).collection(nsParts.slice(1).join('.'));
@@ -512,10 +516,12 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
       m: { _op: oplogItem.ts },
       b: xtend(oplogItem.o)
     };
-    if (oplogItem.o.hasOwnProperty(opts.versionKey)) {
-      obj.h.v = oplogItem.o[opts.versionKey];
-    }
 
+    // set version if this is a confirmation
+    if (opts.expected[oplogItem.o._id] && opts.expected[oplogItem.o._id] === oplogItem.o[opts.versionKey]) {
+      obj.h.v = oplogItem.o[opts.versionKey];
+      delete opts.expected[oplogItem.o._id];
+    }
     if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     delete obj.b[opts.versionKey];
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
@@ -576,7 +582,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     return;
   }
 
-  var bson = this._opts.bson;
+  var opts = this._opts;
   process.nextTick(function() {
     var obj = {
       h: {
@@ -585,8 +591,13 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
       },
       m: { _op: oplogItem.ts }
     };
+    // set version if this is a confirmation
+    if (opts.expected[oplogItem.o._id]) { // oplog delete items don't contain the version
+      obj.h.v = opts.expected[oplogItem.o._id];
+      delete opts.expected[oplogItem.o._id];
+    }
     if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
-    cb(null, bson ? BSON.serialize(obj) : obj);
+    cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };
 

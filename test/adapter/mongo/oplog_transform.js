@@ -368,7 +368,7 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: 'foo', v: 'A' },
+            h: { id: 'foo' },
             m: { _op: new Timestamp(1414516132, 1)  },
             b: {
               _id: 'foo',
