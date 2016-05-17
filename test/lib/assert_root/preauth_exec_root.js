@@ -240,7 +240,7 @@ tasks.push(function(done) {
       ms.write(JSON.stringify(obj) + '\n');
 
       ms.on('close', function() {
-        child.kill();
+        child.send({ type: 'kill' });
       });
       /*
       ms.on('error', function(err) {
@@ -293,7 +293,7 @@ tasks.push(function(done) {
         password: 'bar',
         db: 'qux'
       });
-      child.kill();
+      child.send({ type: 'kill' });
     }
   }
 
@@ -346,7 +346,7 @@ tasks.push(function(done) {
           client.on('close', function(code, reason) {
             assert(code, 9823);
             assert(reason, 'test');
-            child.kill();
+            child.send({ type: 'kill' });
           });
           client.close(9823, 'test');
         });
@@ -358,7 +358,7 @@ tasks.push(function(done) {
         password: 'bar',
         db: 'qux'
       });
-      child.kill();
+      child.send({ type: 'kill' });
     }
   }
 
