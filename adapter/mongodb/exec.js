@@ -93,14 +93,9 @@ var ot, coll, db, log; // used after receiving the log configuration
  * @param {Object} [opts]
  *
  * Options:
- *   versionKey {String, defaults to "_v"} version key in document
  *   any OplogTransform options
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
-  opts = xtend({
-    versionKey: '_v'
-  }, opts);
-
   // track newly written versions so that new items can be recognized correctly
   var expected = {};
 
@@ -122,13 +117,15 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       return;
     }
 
+    // remove parent so that this item can be used later as a local confirmation
+    delete obj.n.h.pa;
+
+    expected[obj.n.h.id] = obj.n;
+
     if (obj.o == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
-      // set version on body
-      obj.n.b[opts.versionKey] = obj.n.h.v;
       coll.insertOne(obj.n.b, function(err, r) {
         if (err) { throw err; }
-        expected[obj.n.h.id] = obj.n.h.v;
         if (!r.insertedCount) {
           log.notice('item not inserted %j', obj.n.h);
         } else {
@@ -137,11 +134,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       });
     } else if (obj.n.h.d == null) { // delete
       if (obj.o == null) { throw new Error('old object expected'); }
-      // set version on body
-      obj.o.b[opts.versionKey] = obj.o.h.v;
       coll.deleteOne(obj.o.b, function(err, r) {
         if (err) { throw err; }
-        expected[obj.n.h.id] = obj.n.h.v;
         if (!r.deletedCount) {
           log.notice('item not deleted %j', obj.o.h);
         } else {
@@ -149,13 +143,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
         }
       });
     } else { // update
-      // set versions on body
-      obj.o.b[opts.versionKey] = obj.o.h.v;
-      obj.n.b[opts.versionKey] = obj.n.h.v;
-
       coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
         if (err) { throw err; }
-        expected[obj.n.h.id] = obj.n.h.v;
         if (!r.lastErrorObject.n) {
           log.notice('item not updated %j', obj.n.h);
         } else {
@@ -180,7 +169,6 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
  *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
- *   [versionKey]:   {String}      // version key in document, defaults to "_v"
  *   [oplogTransformOpts]: {Object} // any oplog transform options
  *   [chroot]:       {String}      // defaults to /var/empty
  *   [user]:         {String}      // system user to run this process, defaults to
@@ -202,7 +190,6 @@ process.once('message', function(msg) {
   if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
-  if (msg.versionKey != null && typeof msg.versionKey !== 'string') { throw new TypeError('msg.versionKey must be a non-empty string'); }
   if (msg.oplogTransformOpts != null && typeof msg.oplogTransformOpts !== 'object') { throw new TypeError('msg.oplogTransformOpts must be an object'); }
   if (msg.chroot != null && typeof msg.chroot !== 'string') { throw new TypeError('msg.chroot must be a string'); }
   if (msg.user != null && typeof msg.user !== 'string') { throw new TypeError('msg.user must be a string'); }

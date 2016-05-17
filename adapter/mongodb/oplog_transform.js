@@ -25,6 +25,7 @@ var util = require('util');
 
 var bson = require('bson');
 var BSONStream = require('bson-stream');
+var isEqual = require('is-equal');
 var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
@@ -44,7 +45,6 @@ var noop = function() {};
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
- *   versionKey {String, defaults to "_v"} version key in document
  *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   expected {Object}  object with ids as key and version as value that were
@@ -77,7 +77,6 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
   this._ns = ns;
   this._opts = xtend({
     bson: false,
-    versionKey: '_v',
     expected: {}
   }, opts);
 
@@ -511,19 +510,22 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
   var opts = this._opts;
 
   process.nextTick(function() {
-    var obj = {
-      h: { id: oplogItem.o._id },
-      m: { _op: oplogItem.ts },
-      b: xtend(oplogItem.o)
-    };
+    var obj;
 
-    // set version if this is a confirmation
-    if (opts.expected[oplogItem.o._id] && opts.expected[oplogItem.o._id] === oplogItem.o[opts.versionKey]) {
-      obj.h.v = oplogItem.o[opts.versionKey];
+    // check if this is a confirmation by the adapter or a third party update
+    if (opts.expected[oplogItem.o._id] && isEqual(oplogItem.o, opts.expected[oplogItem.o._id].b)) {
+      obj = opts.expected[oplogItem.o._id];
+      obj.m = { _op: oplogItem.ts },
       delete opts.expected[oplogItem.o._id];
+    } else {
+      obj = {
+        h: { id: oplogItem.o._id },
+        m: { _op: oplogItem.ts },
+        b: xtend(oplogItem.o)
+      };
     }
+
     if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
-    delete obj.b[opts.versionKey];
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };
@@ -584,18 +586,23 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
 
   var opts = this._opts;
   process.nextTick(function() {
-    var obj = {
-      h: {
-        id: oplogItem.o._id,
-        d: true,
-      },
-      m: { _op: oplogItem.ts }
-    };
-    // set version if this is a confirmation
-    if (opts.expected[oplogItem.o._id]) { // oplog delete items don't contain the version
-      obj.h.v = opts.expected[oplogItem.o._id];
+    var obj;
+
+    // check if this is a confirmation by the adapter or a third party update
+    if (opts.expected[oplogItem.o._id] && opts.expected[oplogItem.o._id].h.d) {
+      obj = opts.expected[oplogItem.o._id];
+      obj.m = { _op: oplogItem.ts },
       delete opts.expected[oplogItem.o._id];
+    } else {
+      obj = {
+        h: {
+          id: oplogItem.o._id,
+          d: true,
+        },
+        m: { _op: oplogItem.ts }
+      };
     }
+
     if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });

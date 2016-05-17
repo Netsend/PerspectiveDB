@@ -308,8 +308,8 @@ tasks.push(function(done) {
                 if (err) { throw err; }
 
                 assert.strictEqual(items.length, 2);
-                assert.deepEqual(items[0], { _id: 'bar', _v: 'Xxxx' });
-                assert.deepEqual(items[1], { _id: 'foo', test: true, _v: 'Bbbb' });
+                assert.deepEqual(items[0], { _id: 'bar' });
+                assert.deepEqual(items[1], { _id: 'foo', test: true });
                 child.kill();
               });
             }, 800);
