@@ -495,7 +495,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
  *                       be the new version of the document.
  */
 OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogItem, cb) {
-  this._log.info('ot _applyOplogFullDoc', JSON.stringify(oplogItem));
+  this._log.debug('ot _applyOplogFullDoc', JSON.stringify(oplogItem)); // debug level to prevent flooding while bootstrapping
 
   try {
     if (oplogItem.op !== 'u' && oplogItem.op !== 'i') { throw new Error('oplogItem.op must be "u" or "i"'); }
