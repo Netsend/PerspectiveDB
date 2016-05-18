@@ -5,6 +5,16 @@ log: {
   error: /var/log/persdb-error.log
 }
 
+#tunnels: [
+#  {
+#    connect: ssh://mongodb.example.com:22
+#    fingerprint: DR5pI2uaxhQDyem9Cf0tQQ3RivlbC7jmJn5kkWpiY2g
+#    key: /home/john/.ssh/myidentity.key
+#    sshUser: john
+#    forward: 1337:127.0.0.1:27017
+#  }
+#]
+
 dbs: [
   {
     name: mydb
