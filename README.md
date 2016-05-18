@@ -140,6 +140,11 @@ dbs: [
 ]
 ```
 
+# Connecting with MongoDB
+
+A special mongodb adapter is included that can be used to track changes in a
+collection. See adapter/mongodb/README.md for further instructions.
+
 # License
 
 Copyright 2012-2016 Netsend.
