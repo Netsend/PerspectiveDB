@@ -138,7 +138,7 @@ function start() {
         var file = persCfg.passdb;
 
         if (file) {
-          // load passdb from a file
+          // load passdb hashes from a file
           // prepend the config base to all relative path specifications in the config file
           if (file[0] !== '/') {
             file = config.configBase + file;
@@ -153,7 +153,7 @@ function start() {
             }
           }
         }
-        var password = files[file] && files[file][username] || '';
+        var hash = files[file] && files[file][username] || '';
 
         if (!username) {
           error = new Error('no name or username configured');
@@ -161,15 +161,10 @@ function start() {
           cb(error);
           return;
         }
-        if (password.indexOf('$2a$') !== 0) {
-          error = new Error('no password configured');
-          console.error('%s: %s %s: %s', programName, dbCfg.name, persCfg.name, error);
-          cb(error);
-          return;
+        // if it's a hash, set one user account
+        if (hash.indexOf('$2a$') === 0) {
+          persCfg.passdb = [{ username: username, password: hash, realm: dbCfg.name }];
         }
-
-        // set one user account
-        persCfg.passdb = [{ username: username, password: password, realm: dbCfg.name }];
       });
     });
 
@@ -193,7 +188,16 @@ function start() {
         loadLog(dbCfg.log, function(err, cfg) {
           if (err) { cb3(err); return; }
           dbCfg.log = cfg;
-          cb3();
+
+          // setup db perspective client logging
+          async.eachSeries(dbCfg.perspectives, function(peCfg, cb4) {
+            log.info('loading pe: %s', peCfg.name);
+            loadLog(peCfg.log, function(err, cfg) {
+              if (err) { cb4(err); return; }
+              peCfg.log = cfg;
+              cb4();
+            });
+          }, cb3);
         });
       }, cb2);
     });
