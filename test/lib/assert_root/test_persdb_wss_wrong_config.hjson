@@ -27,7 +27,7 @@ dbs: [{
   perspectives: [
     {
       name: someClient
-      passdb: secrets.hjson
+      passdb: passdb.hjson
       export: {
         hide: ["someOtherKey"]
         filter: { someKey: "someVal" }

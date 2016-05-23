@@ -24,23 +24,27 @@ dbs: [{
   name: someDb
   chroot: /var/persdb
   path: /test_persdb_root
-  mergeTree: {
-    vSize: 3,
-  },
   perspectives: [
     {
-      name: someClient
+      name: joe
       passdb: passdb.hjson
+      export: true
+    }
+  ]
+}, {
+  name: otherDb
+  chroot: /var/persdb
+  path: /test_persdb_root2
+  perspectives: [
+    {
+      name: otherClient
+      username: joe
+      database: someDb
+      secrets: secrets.hjson
+      port: 1234
       import: true
     }
   ]
 }]
 
 localPort: 1234
-
-wss: {
-  cert: cert.pem
-  key: key.pem
-  dhparam: dhparam.pem
-  port: 1235
-}

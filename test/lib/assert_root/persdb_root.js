@@ -503,6 +503,26 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import_export.hjson'], opts);
 });
 
+// test native client via TCP server, loop perspectives and see if merge procedures fire off
+tasks.push(function(done) {
+  // give the children some time
+  function onSpawn(child) {
+    setTimeout(function() {
+      child.kill();
+    }, 5000);
+  }
+
+  var opts = {
+    onSpawn: onSpawn,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/someDb.* signal that no data is expected/.test(stdout));
+      assert(/otherDb.* req received {"start":false}/.test(stdout));
+    }
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_with_client.hjson'], opts);
+});
+
 async.series(tasks, function(err) {
   if (err) {
     console.error(err);
