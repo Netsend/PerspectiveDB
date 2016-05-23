@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -27,7 +27,6 @@ var c = require('constants');
 var assert = require('assert');
 var fs = require('fs');
 var net = require('net');
-var cp = require('child_process');
 
 var async = require('async');
 var bson = require('bson');
@@ -35,11 +34,10 @@ var BSON = new bson.BSONPure.BSON();
 var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var ws = require('nodejs-websocket');
-var xtend = require('xtend');
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
-var noop = require('../../../lib/noop');
+var spawn = require('../../lib/spawn');
 
 var cert;
 
@@ -58,64 +56,6 @@ var tasks2 = [];
 var cons, silence;
 var chroot = '/var/persdb';
 var dbPath = '/test_persdb_root';
-
-function spawn(options, spawnOpts) {
-  var opts = xtend({
-    configBase: __dirname,
-    config: 'test_persdb.hjson',
-    echoOut: false,
-    echoErr: true,
-    onSpawn: noop,
-    onMessage: null,                                          // handle ipc messages
-    onExit: noop,
-    exitCode: 0,                                              // test if exit code is 0
-    exitSignal: null,                                         // test if exit signal is empty
-    testStdout: null,
-    testStderr: function(s) {                               // test if stderr is empty
-      if (s.length) { throw new Error(s); }
-    }
-  }, options);
-
-  var sOpts = xtend({
-    args: [__dirname + '/../../../bin/persdb'],
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-  }, spawnOpts);
-
-  // print line number
-  console.log('test #%d', new Error().stack.split('\n')[2].match(/persdb_root.js:([0-9]+):[0-9]+/)[1]);
-
-  var extraArgs = [opts.configBase + '/' + opts.config];
-  var child = cp.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
-
-  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
-  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    if (opts.testStdout) {
-      opts.testStdout(stdout);
-    }
-    if (opts.testStderr) {
-      opts.testStderr(stderr);
-    }
-    assert.strictEqual(code, opts.exitCode);
-    assert.strictEqual(sig, opts.exitSignal);
-    opts.onExit(null, code, sig, stdout, stderr);
-  });
-
-  if (opts.onMessage) {
-    child.on('message', function(msg) {
-      opts.onMessage(msg, child);
-    });
-  }
-  opts.onSpawn(child);
-}
 
 // open loggers
 tasks.push(function(done) {
@@ -146,26 +86,27 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
       assert(/client connected 127.0.0.1-/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should try to start a WSS server and if this fails because of missing attributes (key, cert, dhparam) automatically shutdown
 tasks.push(function(done) {
-  spawn({
-    config: 'test_persdb_wss_wrong_config.hjson',
+  var opts = {
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
       assert(/msg.key must be a non-empty string/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_wrong_config.hjson'], opts);
 });
 
 // should start a WSS server, test by connecting with wss client
@@ -178,14 +119,14 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
       assert(/-127.0.0.1-1235: end \(no binary data received\)/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because of empty data request
@@ -203,15 +144,15 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
       assert(/-127.0.0.1-1234 invalid auth request/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because db name does not exist in config
@@ -233,15 +174,15 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
       assert(/_verifyAuthRequest no config found for db: baz invalid credentials/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because username does not exist in config
@@ -263,15 +204,15 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
       assert(/_verifyAuthRequest no users or import \/ export config found someDb invalid credentials/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because password is incorrect
@@ -293,15 +234,15 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
       assert(/_verifyAuthRequest someDb someClient invalid credentials/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and send a data request that signals no data is expected (no import key in config)
@@ -330,14 +271,14 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
-    config: 'test_persdb_wss_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
       assert(/successfully authenticated "someClient"/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and send a data request that signals data is expected (import true)
@@ -366,14 +307,15 @@ tasks.push(function(done) {
     }, 1000);
   }
 
-  spawn({
+  var opts = {
     config: 'test_persdb_wss_import.hjson',
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
       assert(/successfully authenticated "someClient"/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + two BSON items
@@ -453,11 +395,11 @@ tasks.push(function(done) {
     });
   }
 
-  spawn({
-    config: 'test_persdb_wss_import.hjson',
+  var opts = {
     onSpawn: onSpawn,
     onExit: onExit,
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + one BSON item, and send previously saved items (depends on previous test)
@@ -554,11 +496,11 @@ tasks.push(function(done) {
     });
   }
 
-  spawn({
-    config: 'test_persdb_wss_import_export.hjson',
+  var opts = {
     onSpawn: onSpawn,
     onExit: onExit,
-  });
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import_export.hjson'], opts);
 });
 
 async.series(tasks, function(err) {
