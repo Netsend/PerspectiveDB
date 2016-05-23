@@ -78,8 +78,8 @@ function spawn(args, options, spawnOpts) {
   });
 
   if (opts.onMessage) {
-    child.on('message', function(msg) {
-      opts.onMessage(msg, child);
+    child.on('message', function(msg, handle) {
+      opts.onMessage(msg, child, handle);
     });
   }
   opts.onSpawn(child);
