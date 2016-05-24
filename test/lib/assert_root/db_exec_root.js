@@ -27,81 +27,21 @@ var assert = require('assert');
 var net = require('net');
 var fs = require('fs');
 var tmpdir = require('os').tmpdir;
-var childProcess = require('child_process');
 
 var async = require('async');
 var BSONStream = require('bson-stream');
 var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var bson = require('bson');
-var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
 
 var logger = require('../../../lib/logger');
 var MergeTree = require('../../../lib/merge_tree');
-var noop = require('../../../lib/noop');
+var spawn = require('../../lib/spawn');
 
 var tasks = [];
 var tasks2 = [];
-
-function spawn(options, spawnOpts) {
-  var opts = xtend({
-    configBase: __dirname,
-    config: 'test_persdb.hjson',
-    echoOut: false,
-    echoErr: true,
-    onSpawn: noop,
-    onMessage: null,                                          // handle ipc messages
-    onExit: noop,
-    exitCode: 0,                                              // test if exit code is 0
-    exitSignal: null,                                         // test if exit signal is empty
-    testStdout: null,
-    testStderr: function(s) {                               // test if stderr is empty
-      if (s.length) { throw new Error(s); }
-    }
-  }, options);
-
-  var sOpts = xtend({
-    args: [__dirname + '/../../../lib/db_exec'],
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-  }, spawnOpts);
-
-  // print line number
-  console.log('test #%d', new Error().stack.split('\n')[2].match(/db_exec_root.js:([0-9]+):[0-9]+/)[1]);
-
-  var extraArgs = [];
-  var child = childProcess.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
-
-  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
-  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    if (opts.testStdout) {
-      opts.testStdout(stdout);
-    }
-    if (opts.testStderr) {
-      opts.testStderr(stderr);
-    }
-    assert.strictEqual(code, opts.exitCode);
-    assert.strictEqual(sig, opts.exitSignal);
-    opts.onExit(null, code, sig, stdout, stderr);
-  });
-
-  if (opts.onMessage) {
-    child.on('message', function(msg) {
-      opts.onMessage(msg, child);
-    });
-  }
-  opts.onSpawn(child);
-}
 
 var cons, silence;
 var chroot = '/var/persdb';
@@ -143,7 +83,7 @@ tasks.push(function(done) {
         });
         break;
       case 'listen':
-        child.kill();
+        child.send({ type: 'kill' });
         break;
       default:
         console.error(msg);
@@ -162,7 +102,7 @@ tasks.push(function(done) {
       stdio: ['pipe', 'pipe', 'pipe', 'ipc', logFile]
     };
 
-    spawn(opts, spawnOpts);
+    spawn([__dirname + '/../../../lib/db_exec'], opts, spawnOpts);
   });
 });
 
@@ -185,7 +125,7 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -193,7 +133,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/error loading hooks: "foo,bar" /.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should fail with a valid configuration but non-existing hook paths
@@ -211,14 +152,14 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      child.kill();
+      child.send({ type: 'kill' });
       break;
     default:
       throw new Error('unknown state');
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -226,7 +167,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/error loading hooks: "\/some"/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should not fail with valid configurations (include existing hook paths)
@@ -244,17 +186,18 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      child.kill();
+      child.send({ type: 'kill' });
       break;
     default:
       throw new Error('unknown state');
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should show info on SIGUSR2
@@ -274,7 +217,7 @@ tasks.push(function(done) {
     case 'listen':
       child.kill('SIGUSR2');
       process.nextTick(function() {
-        child.kill();
+        child.send({ type: 'kill' });
       });
       break;
     default:
@@ -282,13 +225,14 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
       assert(/{"local":{"heads":{"count":0,"conflict":0,"deleted":0}},"stage":{"heads":{"count":0,"conflict":0,"deleted":0}/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should fail if configured hook is not loaded
@@ -306,14 +250,14 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      child.kill();
+      child.send({ type: 'kill' });
       break;
     default:
       throw new Error('unknown state');
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -321,7 +265,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/hook requested that is not loaded/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should require a connection
@@ -343,21 +288,22 @@ tasks.push(function(done) {
         type: 'remoteDataChannel',
         perspective: 'foo'
       });
-      child.kill();
+      child.send({ type: 'kill' });
       break;
     default:
       throw new Error('unknown state');
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
     testStderr: function(stderr) {
       assert(/connection missing/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should require a valid remote identity
@@ -370,7 +316,7 @@ tasks.push(function(done) {
     var server = net.createServer(function(conn) {
       conn.on('close', function() {
         server.close(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
     });
@@ -404,7 +350,7 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: done,
@@ -412,7 +358,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/unknown perspective/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should respond with a data request that indicates no data is requested
@@ -431,7 +378,7 @@ tasks.push(function(done) {
 
         conn.end(function() {
           server.close(function() {
-            child.kill();
+            child.send({ type: 'kill' });
           });
         });
       });
@@ -466,11 +413,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: done
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should accept a data request followed by BSON data if an import config is given
@@ -495,7 +443,7 @@ tasks.push(function(done) {
         conn.end(BSON.serialize(obj));
         conn.on('close', function() {
           server.close(function() {
-            child.kill();
+            child.send({ type: 'kill' });
           });
         });
       });
@@ -567,11 +515,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should send back previously saved item (depends on previous test)
@@ -601,7 +550,7 @@ tasks.push(function(done) {
           var obj = { h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
           conn.end(BSON.serialize(obj), function() {
             server.close(function() {
-              child.kill();
+              child.send({ type: 'kill' });
             });
           });
         });
@@ -682,11 +631,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should run export hooks and send back previously saved items (depends on two previous tests)
@@ -727,7 +677,7 @@ tasks.push(function(done) {
         conn.on('end', function() {
           assert.strictEqual(i, 2);
           server.close(function() {
-            child.kill();
+            child.send({ type: 'kill' });
           });
         });
       });
@@ -776,11 +726,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: done
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should run import hooks
@@ -807,7 +758,7 @@ tasks.push(function(done) {
 
         conn.on('end', function() {
           server.close(function() {
-            child.kill();
+            child.send({ type: 'kill' });
           });
         });
       });
@@ -900,11 +851,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should accept a new local data channel request and write data to the local tree
@@ -928,7 +880,7 @@ tasks.push(function(done) {
       conn.write(BSON.serialize(obj));
       conn.on('close', function() {
         server.close(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
       // give some time to start merge handler
@@ -1001,11 +953,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should write merges with remotes back to the local data channel
@@ -1035,7 +988,7 @@ tasks.push(function(done) {
 
       conn.on('close', function() {
         server.close(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
     });
@@ -1120,11 +1073,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should accept and respond to a head lookup request for a non-existing id
@@ -1149,7 +1103,7 @@ tasks.push(function(done) {
 
       conn.on('close', function() {
         server.close(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
     });
@@ -1193,11 +1147,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 // should accept and respond to a head lookup request (write a new object via a local data channel first)
@@ -1253,7 +1208,7 @@ tasks.push(function(done) {
 
       conn.on('close', function() {
         headLookupServer.close(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
     });
@@ -1296,11 +1251,12 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit
-  });
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
 async.series(tasks, function(err) {
