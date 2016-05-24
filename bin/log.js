@@ -195,6 +195,9 @@ function run(db, cfg, cb) {
 
   mt.stats(function(err, stats) {
     if (err) { cb(err); return; }
+    console.log('#######################');
+    console.log(cfg.name);
+    console.log('#######################');
     console.log(fmtStats(stats));
 
     var remoteTrees = mt.getRemoteTrees();
@@ -246,8 +249,9 @@ if (config.dbs && config.dbs.length) {
     level(chroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { cb(err); return; }
       run(db, dbCfg, function(err) {
+        console.log(); // newline
         db.close();
-        if (err) { cb(err); return; }
+        cb(err);
       });
     });
   }, function(err) {
