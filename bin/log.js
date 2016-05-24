@@ -40,7 +40,7 @@ program
   .option('-p, --patch', 'show patch compared to previous version')
   .option('    --pe <perspective>', 'print only this perspective')
   .option('-a  --all', 'print all perspectives')
-  .option('-n, --number <number>', 'number of latest versions to show, defaults to 10, 0 means unlimited')
+  .option('-n, --number <number>', 'number of heads to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
 var config = {};
