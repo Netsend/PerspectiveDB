@@ -163,7 +163,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
  *   coll:           {String}      // collection name
  *   [dbUser]:       {String}      // user to read the collection
  *   [oplogDbUser]:  {String}      // user to read the oplog database collection
- *   [passdb]:       {Object}      // object containing the passwords for dbUser
+ *   [secrets]:      {Object}      // object containing the passwords for dbUser
  *                                 // and oplogDbUser
  *   [authDb]:       {String}      // authDb database, defaults to db from url
  *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
@@ -185,7 +185,7 @@ process.once('message', function(msg) {
 
   if (msg.dbUser != null && typeof msg.dbUser !== 'string') { throw new TypeError('msg.dbUser must be a string'); }
   if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
-  if (msg.passdb != null && typeof msg.passdb !== 'object') { throw new TypeError('msg.passdb must be an object'); }
+  if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
   if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
   if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
@@ -220,13 +220,13 @@ process.once('message', function(msg) {
   var versionControl; // expect a version request/receive channel on fd 7
 
   var dbPass, dbUser = msg.dbUser;
-  if (dbUser && msg.passdb) {
-    dbPass = msg.passdb[dbUser];
+  if (dbUser && msg.secrets) {
+    dbPass = msg.secrets[dbUser];
   }
 
   var oplogDbPass, oplogDbUser = msg.oplogDbUser;
-  if (oplogDbUser && msg.passdb) {
-    oplogDbPass = msg.passdb[oplogDbUser];
+  if (oplogDbUser && msg.secrets) {
+    oplogDbPass = msg.secrets[oplogDbUser];
   }
 
   if (dbUser && !dbPass || !dbUser && dbPass) { throw new Error('provide both user and pass or none at all'); }
