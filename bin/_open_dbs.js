@@ -19,49 +19,47 @@
 'use strict';
 
 var async = require('async');
-var level = require('level-packager')(require('leveldown'));
 
-// config should contain a dbs key
-// iterator will be called with db, dbCfg and next for each db
-function openDbs(config, iterator, cb) {
-  if (config.dbs && config.dbs.length) {
-    async.eachSeries(config.dbs, function(dbCfg, cb2) {
-      var chroot = dbCfg.chroot || '/var/persdb';
-      var data = dbCfg.data || 'data';
+var openDb = require('./_open_db');
 
-      if (dbCfg.perspectives) {
-        dbCfg.perspectives = dbCfg.perspectives.map(function(peCfg) {
-          return peCfg.name;
-        });
-      }
-      // open database
-      level(chroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
-        if (err) { cb2(err); return; }
-        iterator(db, dbCfg, function(err) {
-          db.close();
-          cb2(err);
-        });
-      });
-    }, cb);
-  } else {
-    // open database
-    var newRoot = config.chroot || '/var/persdb';
-
-    var path = config.path || '/data';
-    // ensure leading slash
-    if (path[0] !== '/') {
-      path = '/' + path;
-    }
-
-    console.log(newRoot, path);
-
-    level(newRoot + path, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
-      if (err) { cb(err); return; }
-      iterator(db, {}, function(err) {
-        db.close();
-        cb(err);
-      });
-    });
+/**
+ * Open one or more databases.
+ *
+ * @param {Object} config  database configuration, should contain a dbs key
+ * @param {Object} [opts]  options
+ * @param {Function} iterator  signature: db, dbCfg, next
+ * @param {Function} cb  called when all dbs are iterated
+ *
+ * Options:
+ *  - keepOpen {Boolean, default: false}  don't close the database
+ */
+function openDbs(config, opts, iterator, cb) {
+  if (config == null || typeof config !== 'object') { throw new TypeError('config must be an object'); }
+  if (typeof opts === 'function') {
+    cb = iterator;
+    iterator = opts;
+    opts = {}
   }
+  opts = opts || {};
+  if (opts == null || typeof config !== 'object') { throw new TypeError('config must be an object'); }
+  if (typeof iterator !== 'function') { throw new TypeError('config must be an object'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be an object'); }
+
+  if (!Array.isArray(config.dbs)) { throw new Error('expected dbs to be an array'); }
+
+  async.eachSeries(config.dbs, function(dbCfg, cb2) {
+    // map perspective names
+    if (dbCfg.perspectives) {
+      dbCfg.perspectives = dbCfg.perspectives.map(function(peCfg) {
+        return peCfg.name;
+      });
+    }
+    // open database
+    var db = openDb(dbCfg);
+    iterator(db, dbCfg, function(err) {
+      db.close();
+      cb2(err);
+    });
+  }, cb);
 }
 module.exports = openDbs;
