@@ -1296,6 +1296,26 @@ describe('Tree', function() {
       });
     });
 
+    it('should iterate and wait with next item until next is called', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var i = 0;
+      var waiting;
+      t.getHeads(function(item, next) {
+        if (waiting) { throw new Error('next should wait'); }
+        i++;
+        if (i === 1) { should.deepEqual(item, item2); }
+        if (i > 1) { should.deepEqual(item, item3); }
+        waiting = true;
+        setTimeout(function() {
+          waiting = false;
+          next();
+        }, 100);
+      }, function() {
+        should.strictEqual(i, 2);
+        done();
+      });
+    });
+
     it('needs item4, ff', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       t.end(item4, done);
