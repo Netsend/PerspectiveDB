@@ -44,7 +44,7 @@ program
   .option('-n, --number <number>', 'number of heads to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
-var configFile = program.argv[0] || '../local/config/pdb.hjson';
+var configFile = program.args[0] || __dirname + '/../local/config/pdb.hjson';
 var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
 if (program.number === '0') {
@@ -232,6 +232,6 @@ function run(db, cfg, cb) {
   });
 }
 
-openDbs(config.dbs, run, function(err) {
+openDbs(config, run, function(err) {
   if (err) { console.error(err); process.exit(2); }
 });
