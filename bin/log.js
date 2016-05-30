@@ -24,12 +24,13 @@ var fs = require('fs');
 
 var async = require('async');
 var hjson = require('hjson');
-var level = require('level-packager')(require('leveldown'));
 var program = require('commander');
 
 var doDiff = require('../lib/diff');
 var MergeTree = require('../lib/merge_tree');
 var noop = require('../lib/noop');
+
+var openDbs = require('./_open_dbs');
 
 program
   .version('0.0.2')
@@ -235,45 +236,6 @@ function run(db, cfg, cb) {
   });
 }
 
-if (config.dbs && config.dbs.length) {
-  async.eachSeries(config.dbs, function(dbCfg, cb) {
-    var chroot = dbCfg.chroot || '/var/persdb';
-    var data = dbCfg.data || 'data';
-
-    if (dbCfg.perspectives) {
-      dbCfg.perspectives = dbCfg.perspectives.map(function(peCfg) {
-        return peCfg.name;
-      });
-    }
-    // open database
-    level(chroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
-      if (err) { cb(err); return; }
-      run(db, dbCfg, function(err) {
-        console.log(); // newline
-        db.close();
-        cb(err);
-      });
-    });
-  }, function(err) {
-    if (err) { console.error(err); process.exit(2); }
-  });
-} else {
-  // open database
-  var newRoot = config.chroot || '/var/persdb';
-
-  var path = config.path || '/data';
-  // ensure leading slash
-  if (path[0] !== '/') {
-    path = '/' + path;
-  }
-
-  console.log(newRoot, path);
-
-  level(newRoot + path, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
-    if (err) { throw err; }
-    run(db, {}, function(err) {
-      db.close();
-      if (err) { console.error(err); process.exit(2); }
-    });
-  });
-}
+openDbs(config.dbs, run, function(err) {
+  if (err) { console.error(err); process.exit(2); }
+});
