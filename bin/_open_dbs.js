@@ -19,6 +19,7 @@
 'use strict';
 
 var async = require('async');
+var xtend = require('xtend');
 
 var openDb = require('./_open_db');
 
@@ -47,6 +48,10 @@ function openDbs(config, opts, iterator, cb) {
 
   if (!Array.isArray(config.dbs)) { throw new Error('expected dbs to be an array'); }
 
+  opts = xtend({
+    keepOpen: false
+  }, opts);
+
   async.eachSeries(config.dbs, function(dbCfg, cb2) {
     // map perspective names
     if (dbCfg.perspectives) {
@@ -57,7 +62,9 @@ function openDbs(config, opts, iterator, cb) {
     // open database
     var db = openDb(dbCfg);
     iterator(db, dbCfg, function(err) {
-      db.close();
+      if (!opts.keepOpen) {
+        db.close();
+      }
       cb2(err);
     });
   }, cb);
