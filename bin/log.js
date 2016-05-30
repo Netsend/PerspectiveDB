@@ -33,10 +33,10 @@ var noop = require('../lib/noop');
 var openDbs = require('./_open_dbs');
 
 program
-  .version('0.0.2')
-  .usage('[-f config] [-n]')
+  .version('0.1.0')
+  .usage('[-span] <config>')
   .description('print graph of the given database')
-  .option('-f, --config <config>', 'hjson config file with database path')
+  .option('config defaults to ../local/config/pdb.hjson')
   .option('-s, --show', 'show complete objects')
   .option('-p, --patch', 'show patch compared to previous version')
   .option('    --pe <perspective>', 'print only this perspective')
@@ -44,12 +44,8 @@ program
   .option('-n, --number <number>', 'number of heads to show, defaults to 10, 0 means unlimited')
   .parse(process.argv);
 
-var config = {};
-var configFile = program.config;
-
-if (configFile) {
-  config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
-}
+var configFile = program.argv[0] || '../local/config/pdb.hjson';
+var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
 if (program.number === '0') {
   program.number = Infinity;
