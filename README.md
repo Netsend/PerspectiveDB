@@ -3,13 +3,17 @@
 *multi-master replication with transformations*
 
 Features:
-* built on the principles of owning your own data
+* built on the principle of owning your own data:
+  * you decide what you want to share, with who and how
+  * don't rely on a third party (i.e. a cloud service)
+  * privacy and [security](https://github.com/Netsend/persdb/wiki/privilege-separation) by design
 * multi-master replication with transformations
 * support for browsers via IndexedDB and WebSockets
-* support systems that are built with privacy by design
-* [security by design](https://github.com/Netsend/persdb/wiki/privilege-separation)
+* support for MongoDB
 
-Alpha status. Currently working on a MongoDB adapter.
+Status: beta
+
+Currently deploying the software into a controlled production environment.
 
 # Installation
 
@@ -66,17 +70,19 @@ Start the server:
 $ sudo bin/persdb local/config/pdb.hjson
 ```
 
-# Adding a WebSocket server
+By default a tcp server is started on 127.0.0.1 port 2344. Communication between
+different servers should be done over an ssh tunnel.
 
-By default only a tcp server is started on 127.0.0.1 port 2344. Communication
-between different servers should be done over an ssh tunnel.
+# Communicate with browsers: add a WebSocket server
 
-Communication with browsers can be done by using WebSockets. It is required to
-start the WebSocket server over TLS with forward secrecy so a private key,
-certificate and Diffie-Hellman parameters file must exist for this to work.
+Communication with browsers can be done using a WebSocket. It is required to
+start the WebSocket server over a modern TLS connection with forward secrecy.
 
-Generate DH parameters, a private key, a temporary csr and a self signed
-certificate (or use a certificate signed by one of the major CAs):
+Generate the following files:
+* DH parameters
+* private key
+* temporary CSR
+* self signed certificate (or use a certificate signed by one of the major CAs)
 ```
 $ umask 077
 $ openssl dhparam -outform PEM -out config/dhparam.pem 2048
@@ -88,8 +94,11 @@ $ rm config/csr.pem
 ```
 
 Edit your config to enable the WebSocket server and include these three files.
-Relative paths are relative to the directory of the config file that specifies
-them. An example is given in config/example-with-websocket.hjson.
+Relative paths are relative to the directory of the config file. An example is
+given in config/example-with-websocket.hjson.
+
+A web client is included in the browser directory. An online example of this
+code is available at [netsend.nl/persbd](https://netsend.nl/persdb/).
 
 # SSH tunnels
 
