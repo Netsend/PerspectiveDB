@@ -31,9 +31,9 @@ var level = require('level-packager')(require('level-js'));
 var websocket = require('websocket-stream');
 
 var proxy = require('./proxy');
-var dataRequest = require('../lib/data_request');
-var MergeTree = require('../lib/merge_tree');
-var parsePersConfigs = require('../lib/parse_pers_configs');
+var dataRequest = require('../../lib/data_request');
+var MergeTree = require('../../lib/merge_tree');
+var parsePersConfigs = require('../../lib/parse_pers_configs');
 
 var noop = function() {};
 
@@ -228,12 +228,28 @@ module.exports = global.PersDB = PersDB;
 
 PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
   this._log.err('dbe connection error: %s %s', err, connId);
-  conn.close();
+  conn && conn.close();
 };
 
 PersDB.prototype.createReadStream = function createReadStream(opts) {
   if (this._mt == null || typeof this._mt !== 'object') { throw new TypeError('mt must be instantiated'); }
   return this._mt.createReadStream(opts);
+};
+
+/**
+ * Add a new perspective.
+ *
+ * @param {String} name  name of the perspective
+ * @param {Object} cfg  the perspective configuration
+ */
+PersDB.prototype.addPerspective = function addPerspective(name, cfg) {
+  if (!name || typeof name !== 'string') { throw new TypeError('name must be a string'); }
+  if (cfg == null || typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
+  if (this._persCfg.pers[name]) { throw new Error('perspective already exists'); }
+
+  this._persCfg.connect.push(name);
+  this._persCfg.pers[name] = parsePersConfigs([cfg]).pers[name];
+  this._mt.addPerspective(name);
 };
 
 /**
