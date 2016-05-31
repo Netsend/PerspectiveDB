@@ -12,7 +12,7 @@ browser.
 $ git clone https://github.com/Netsend/persdb.git
 $ cd persdb
 $ npm install
-$ browserify browser/example.js > browser/build/build.js
+$ browserify browser/example/example.js > browser/build/build.js
 ```
 
 See config.json and example.html for a working example.
