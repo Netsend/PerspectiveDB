@@ -52,7 +52,75 @@ function createCustomerTableRow(item) {
   return tr;
 }
 
-function reloadList(db, osName, el, cb) {
+function createServerLi(name, stat) {
+  console.log(name, stat);
+
+  var li     = document.createElement('li');
+  var button = document.createElement('button');
+  var span   = document.createElement('span');
+
+  li.classList.add(name);
+  li.classList.add('disconnected');
+
+  li.textContent = stat.name;
+  li.title = stat.uri;
+
+  button.textContent = (stat.status === 'connected') ? 'disconnect' : 'connect';
+
+  li.appendChild(button);
+  li.appendChild(span);
+
+  button.onclick = function(ev) {
+    span.textContent = '';
+
+    if (li.classList.contains('connected')) {
+      li.classList.remove('connected');
+      li.classList.add('disconnecting');
+      button.disabled = true;
+      button.textContent = 'disconnecting';
+
+      pdb.disconnect(function(err) {
+        li.classList.remove('disconnecting');
+        button.disabled = false;
+
+        if (err) {
+          li.classList.add('connected');
+          button.textContent = 'disconnect';
+
+          span.textContent = 'error disconnecting';
+          return;
+        }
+        li.classList.remove('connected');
+        li.classList.add('disconnected');
+        button.textContent = 'connect';
+      });
+    } else {
+      li.classList.remove('disconnected');
+      li.classList.add('connecting');
+      button.disabled = true;
+      button.textContent = 'connecting';
+
+      pdb.connect(stat.name, function(err) {
+        li.classList.remove('connecting');
+        button.disabled = false;
+
+        if (err) {
+          li.classList.add('disconnected');
+          button.textContent = 'connect';
+
+          span.textContent = 'error connecting';
+          return;
+        }
+        li.classList.remove('disconnected');
+        li.classList.add('connected');
+        button.textContent = 'disconnect';
+      });
+    }
+  };
+  return li;
+}
+
+function reloadCustomerList(db, osName, el, cb) {
   el.innerHTML = '';
   list(db, osName, function(item, next) {
     el.appendChild(createCustomerTableRow(item));
@@ -89,72 +157,7 @@ function connectionManager(pdb) {
   });
 
   Object.keys(conns).forEach(function(name) {
-    var stat = conns[name];
-
-    var li     = document.createElement('li');
-    var button = document.createElement('button');
-    var span   = document.createElement('span');
-
-    li.classList.add(name);
-    li.classList.add('disconnected');
-
-    li.textContent = stat.name;
-    li.title = stat.uri;
-
-    button.textContent = (stat.status === 'connected') ? 'disconnect' : 'connect';
-
-
-    li.appendChild(button);
-    li.appendChild(span);
-    ul.appendChild(li);
-
-    button.onclick = function(ev) {
-      span.textContent = '';
-
-      if (li.classList.contains('connected')) {
-        li.classList.remove('connected');
-        li.classList.add('disconnecting');
-        button.disabled = true;
-        button.textContent = 'disconnecting';
-
-        pdb.disconnect(function(err) {
-          li.classList.remove('disconnecting');
-          button.disabled = false;
-
-          if (err) {
-            li.classList.add('connected');
-            button.textContent = 'disconnect';
-
-            span.textContent = 'error disconnecting';
-            return;
-          }
-          li.classList.remove('connected');
-          li.classList.add('disconnected');
-          button.textContent = 'connect';
-        });
-      } else {
-        li.classList.remove('disconnected');
-        li.classList.add('connecting');
-        button.disabled = true;
-        button.textContent = 'connecting';
-
-        pdb.connect(stat.name, function(err) {
-          li.classList.remove('connecting');
-          button.disabled = false;
-
-          if (err) {
-            li.classList.add('disconnected');
-            button.textContent = 'connect';
-
-            span.textContent = 'error connecting';
-            return;
-          }
-          li.classList.remove('disconnected');
-          li.classList.add('connected');
-          button.textContent = 'disconnect';
-        });
-      }
-    };
+    ul.appendChild(createServerLi(name, conns[name]));
   });
 }
 
@@ -232,7 +235,12 @@ function main(db, pdb) {
   var idbTable = document.querySelector('table#idb tbody');
   var pdbDiv   = document.querySelector('div#persdb');
 
-  var form     = document.querySelector('form');
+  var serverForm = document.querySelector('form#addServer');
+  var username = document.querySelector('#addServerUsername');
+  var password = document.querySelector('#addServerPassword');
+  var host     = document.querySelector('#addServerHost');
+
+  var crudForm = document.querySelector('form#addCustomerForm');
 
   var ssn      = document.querySelector('#addCustomerSsn');
   var name     = document.querySelector('#addCustomerName');
@@ -279,8 +287,30 @@ function main(db, pdb) {
   // setup connection manager
   connectionManager(pdb);
 
-  // handle form
-  form.onsubmit = function(ev) {
+  // handle serverForm
+  var i = 0;
+  serverForm.onsubmit = function(ev) {
+    i++;
+    var obj = {
+      name:     'server-' + i,
+      username: username.value.trim(),
+      password: password.value.trim(),
+      connect:  host.value.trim(),
+      import: true,
+      export: true
+    };
+    pdb.addPerspective(obj.name, obj);
+
+    pdb.connect(obj.name, function(err) {
+      console.log('connected', obj.name, err);
+    });
+
+    ev.stopPropagation();
+    return false;
+  };
+
+  // handle crudForm
+  crudForm.onsubmit = function(ev) {
     // clear messages
     msg.textContent = '';
 
@@ -344,7 +374,7 @@ function main(db, pdb) {
   // show list entries
   function reloadCustomersList() {
     // refill
-    reloadList(db, 'customers', idbTable, function(err) {
+    reloadCustomerList(db, 'customers', idbTable, function(err) {
       if (err) {
         console.error(err);
         msg.textContent = err.message;
@@ -356,7 +386,7 @@ function main(db, pdb) {
   reloadCustomersList();
 }
 
-if (typeof config !== 'object') { throw new Error('make sure config is set'); }
+//if (typeof config !== 'object') { throw new Error('make sure config is set'); }
 if (typeof PersDB !== 'function') { throw new Error('make sure PersDB is loaded'); }
 
 // open db and write an object
@@ -367,8 +397,7 @@ req.onsuccess = function(ev) {
 
   // start PersDB
   var opts = {
-    name: 'demo',
-    perspectives: [config],
+    name: 'demo'
   };
   var pdb = new PersDB(db, opts);
   main(db, pdb);

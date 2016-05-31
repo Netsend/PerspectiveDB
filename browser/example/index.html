@@ -7,6 +7,16 @@
 </head>
 <body>
 
+<form id="addServer">
+<legend>Server</legend>
+<input id="addServerUsername" type="text" placeholder="username" required>
+<input id="addServerPassword" type="password" placeholder="password" required>
+<input id="addServerHost" type="url" placeholder="wss://example.com/mydb" required>
+<!--input id="port" type="number" value="3344"-->
+
+<input type="submit" value="Connect">
+</form>
+
 <ul id="connections">
 </ul>
 
@@ -33,7 +43,6 @@
 
 <div id="persdb"></div>
 
-<script type="text/javascript" src="config.js"></script>
 <script type="text/javascript" src="../build/persdb.js"></script>
 <script type="text/javascript" src="example.js"></script>
 </body>
