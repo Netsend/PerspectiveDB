@@ -50,6 +50,7 @@ program
   .option('-p, --patch', 'show a patch with differences between unequal items (contains output of -s)')
   .option('               diff: "-" is not in a, "+" is not in b, "~" both differ')
   .option('-v, --verbose', 'verbose (contains output of -p)')
+  .option('    --debug', 'show debug output')
   .option('    --attrstats', 'add per attribute statistics')
   .parse(process.argv);
 
@@ -83,10 +84,8 @@ var includeAttrs = {};
   includeAttrs[attr] = true;
 });
 
-var debug = !!program.verbose;
-
-if (debug && Object.keys(includeAttrs).length) { console.log('include:', program.include); }
-if (debug && Object.keys(excludeAttrs).length) { console.log('exclude:', program.exclude); }
+if (program.verbose && Object.keys(includeAttrs).length) { console.log('include:', program.include); }
+if (program.verbose && Object.keys(excludeAttrs).length) { console.log('exclude:', program.exclude); }
 
 // group patch by type
 function groupPatch(patch) {
@@ -99,15 +98,15 @@ function groupPatch(patch) {
 
 // count attrs
 function diffColumnCount(item1, item2, diffColumns) {
-  var diff = doDiff(item1, item2);
+  var diff = doDiff(item1.b, item2.b);
   Object.keys(diff).forEach(function(key) {
     diffColumns[key] = diffColumns[key] || [];
     if (diff[key] === '~') {
-      diffColumns[key].push([item1._id, diff[key], item1[key], item2[key]]);
+      diffColumns[key].push([item1.h.id, diff[key], item1.b[key], item2.b[key]]);
     } else if (diff[key] === '-') {
-      diffColumns[key].push([item1._id, diff[key], item2[key]]);
+      diffColumns[key].push([item1.h.id, diff[key], item2.b[key]]);
     } else if (diff[key] === '+') {
-      diffColumns[key].push([item1._id, diff[key], item1[key]]);
+      diffColumns[key].push([item1.h.id, diff[key], item1.b[key]]);
     } else {
       console.error(diff, key);
       throw new Error('unknown diff format');
@@ -179,7 +178,7 @@ function run(db, dbCfg, cb) {
   var opts = {
     includeAttrs: includeAttrs,
     excludeAttrs: excludeAttrs,
-    debug: debug
+    debug: program.debug
   };
 
   compare(tree1, tree2, opts, function(err, stats) {
@@ -190,32 +189,32 @@ function run(db, dbCfg, cb) {
     if (program.showid) {
       console.log('missing');
       stats.missing.forEach(function(item) {
-        console.log(item._id);
+        console.log(item.h.id);
       });
       console.log('end of missing');
 
       console.log('unequal');
       stats.inequal.forEach(function(item) {
-        console.log(item.item1._id);
+        console.log(item.item1.h.id);
       });
       console.log('end of unequal');
 
       console.log('multiple');
       stats.multiple.forEach(function(item) {
-        console.log(item.item1._id);
+        console.log(item.item1.h.id);
       });
       console.log('end of multiple');
     } else if (program.patch) {
       console.log('missing');
       stats.missing.forEach(function(item) {
-        console.log(item._id);
+        console.log(item.h.id);
       });
       console.log('end of missing');
 
       console.log('unequal');
       stats.inequal.forEach(function(item) {
         var diff = diffColumnCount(item.item1, item.item2, diffColumns);
-        console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
+        console.log(item.item1.h.id, JSON.stringify(groupPatch(diff)));
       });
       console.log('end of unequal');
 
@@ -223,7 +222,7 @@ function run(db, dbCfg, cb) {
       stats.multiple.forEach(function(item) {
         item.items2.forEach(function(subItem) {
           var diff = diffColumnCount(item.item1, subItem, diffColumns);
-          console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
+          console.log(item.item1.h.id, JSON.stringify(groupPatch(diff)));
         });
       });
       console.log('end of multiple');
@@ -237,7 +236,7 @@ function run(db, dbCfg, cb) {
       console.log('unequal');
       stats.inequal.forEach(function(item) {
         var diff = diffColumnCount(item.item1, item.item2, diffColumns);
-        console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
+        console.log(item.item1.h.id, JSON.stringify(groupPatch(diff)));
         console.log(1, item.item1);
         console.log(2, item.item2);
       });
@@ -247,7 +246,7 @@ function run(db, dbCfg, cb) {
       stats.multiple.forEach(function(item) {
         item.items2.forEach(function(subItem) {
           var diff = diffColumnCount(item.item1, subItem, diffColumns);
-          console.log(item.item1._id, JSON.stringify(groupPatch(diff)));
+          console.log(item.item1.h.id, JSON.stringify(groupPatch(diff)));
         });
         console.log(1, item.item1);
         console.log(2, JSON.stringify(item.items2));
