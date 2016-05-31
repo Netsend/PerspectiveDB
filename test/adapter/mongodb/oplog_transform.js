@@ -355,7 +355,7 @@ describe('OplogTransform', function() {
         ts: new Timestamp(1414516132, 1),
         ns: ns,
         op: 'u',
-        o: { _id: 'foo', _v: 'A', qux: 'quux' },
+        o: { _id: 'foo', qux: 'quux' },
         o2: { _id: 'foo' }
       };
 
@@ -384,7 +384,7 @@ describe('OplogTransform', function() {
           ts: new Timestamp(1414516132, 1),
           ns: ns,
           op: 'u',
-          o: { _id: 'foo', _v: 'A', qux: 'quux' },
+          o: { _id: 'foo', qux: 'quux' },
           o2: { _id: 'foo' }
         });
       });
@@ -396,7 +396,7 @@ describe('OplogTransform', function() {
         ns: ns,
         o: { $set: { bar: 'baz' } },
         op: 'u',
-        o2: { _id: 'foo', _v: 'A' }
+        o2: { _id: 'foo' }
       };
 
       var dagItem = {
@@ -447,7 +447,7 @@ describe('OplogTransform', function() {
           ns: ns,
           o: { $set: { bar: 'baz' } },
           op: 'u',
-          o2: { _id: 'foo', _v: 'A' }
+          o2: { _id: 'foo' }
         });
       });
     });
@@ -644,7 +644,7 @@ describe('OplogTransform', function() {
       }
     };
     var mod = { $set: { bar: 'baz' } };
-    var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
+    var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo' } };
 
     it('should require op to be "u"', function(done) {
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
@@ -712,7 +712,7 @@ describe('OplogTransform', function() {
         ts: new Timestamp(5709483428, 1),
         o: { $set: { bar: 'baz' } },
         op: 'u',
-        o2: { _id: 'foo', _v: 'A' }
+        o2: { _id: 'foo' }
       });
     });
 
@@ -838,7 +838,7 @@ describe('OplogTransform', function() {
     var ns = databaseName + '.' + collectionName;
 
     var mod = { $set: { bar: 'baz' } };
-    var oplogItem = { ts: new Timestamp(999, 1), o: mod, op: 'u', o2: { _id: 'foo', _v: 'A' } };
+    var oplogItem = { ts: new Timestamp(999, 1), o: mod, op: 'u', o2: { _id: 'foo' } };
 
     it('should complain about missing parent and don\'t add to the DAG', function(done) {
       var versionRequested = false;
@@ -908,7 +908,7 @@ describe('OplogTransform', function() {
         ts: new Timestamp(999, 1),
         o: { $set: { bar: 'baz' } },
         op: 'u',
-        o2: { _id: 'foo', _v: 'A' }
+        o2: { _id: 'foo' }
       });
     });
   });
