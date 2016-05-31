@@ -38,6 +38,11 @@ var logger = require('../../../lib/logger');
 
 var BSON = new bson.BSONPure.BSON();
 
+// must match with the hjson config files
+var collectionName1 = 'test1';
+var collectionName2 = 'test2';
+var collectionName3 = 'test3';
+
 var tasks = [];
 var tasks2 = [];
 
@@ -149,13 +154,13 @@ tasks.push(function(done) {
               item = BSON.deserialize(item);
               vs.push(item.h.v);
               if (i === 0) {
-                assert.deepEqual(item, { h: { id: 'foo', v: vs[i], pa: [] }, b: { _id: 'foo' } });
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: vs[i], pa: [] }, b: { _id: 'foo' } });
               }
               if (i === 1) {
-                assert.deepEqual(item, { h: { id: 'bar', v: vs[i], pa: [] }, b: { _id: 'bar' } });
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01bar', v: vs[i], pa: [] }, b: { _id: 'bar' } });
               }
               if (i > 1) {
-                assert.deepEqual(item, { h: { id: 'foo', v: vs[i], pa: [vs[i - 2]] }, b: { _id: 'foo', test: true } });
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: vs[i], pa: [vs[i - 2]] }, b: { _id: 'foo', test: true } });
                 client.end();
               }
               i++;
@@ -223,10 +228,10 @@ tasks.push(function(done) {
 
               item = BSON.deserialize(item);
               if (i === 0) {
-                assert.deepEqual(item, { h: { id: 'bar', v: item.h.v, pa: [] }, b: { _id: 'bar' } });
+                assert.deepEqual(item, { h: { id: collectionName2 + '\x01bar', v: item.h.v, pa: [] }, b: { _id: 'bar' } });
               }
               if (i > 0) {
-                assert.deepEqual(item, { h: { id: 'foo', v: item.h.v, pa: [] }, b: { _id: 'foo', test: true } });
+                assert.deepEqual(item, { h: { id: collectionName2 + '\x01foo', v: item.h.v, pa: [] }, b: { _id: 'foo', test: true } });
                 client.end();
               }
               i++;
@@ -298,9 +303,9 @@ tasks.push(function(done) {
             }
 
             // write some objects
-            client.write(BSON.serialize({ h: { id: 'foo', v: 'Aaaa', pa: [] },       b: { _id: 'foo' } }));
-            client.write(BSON.serialize({ h: { id: 'bar', v: 'Xxxx', pa: [] },       b: { _id: 'bar' } }));
-            client.write(BSON.serialize({ h: { id: 'foo', v: 'Bbbb', pa: ['Aaaa'] }, b: { _id: 'foo', test: true } }));
+            client.write(BSON.serialize({ h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [] },       b: { _id: 'foo' } }));
+            client.write(BSON.serialize({ h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [] },       b: { _id: 'bar' } }));
+            client.write(BSON.serialize({ h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'] }, b: { _id: 'foo', test: true } }));
 
             // wait some time and inspect database
             setTimeout(function() {

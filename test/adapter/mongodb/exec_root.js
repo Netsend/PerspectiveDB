@@ -187,7 +187,7 @@ tasks.push(function(done) {
     var now = new Timestamp(0, (new Date()).getTime() / 1000);
     assert.strictEqual(ts.greaterThan(now), true);
     assert.deepEqual(obj, {
-      h: { id: 'foo' },
+      h: { id: collectionName + '\x01foo' },
       m: { _op: ts },
       b: { _id: 'foo', bar: 'baz' }
     });
@@ -212,7 +212,7 @@ tasks.push(function(done) {
         if (err) { throw err; }
 
         versionControl.write(BSON.serialize({
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: oplogItem.ts },
           b: {}
         }));
@@ -231,7 +231,7 @@ tasks.push(function(done) {
 
       // send response with a fake version
       versionControl.write(BSON.serialize({
-        h: { id: 'foo', v: 'Aaaaaa' },
+        h: { id: collectionName + '\x01foo', v: 'Aaaaaa' },
         b: {
           some: 'data'
         }

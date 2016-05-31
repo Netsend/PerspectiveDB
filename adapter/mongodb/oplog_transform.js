@@ -73,6 +73,9 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
 
+  this._databaseName = nsParts[0];
+  this._collectionName = nsParts.slice(1).join('.');
+
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
   this._opts = xtend({
@@ -80,7 +83,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
     expected: {}
   }, opts);
 
-  this._coll = oplogDb.db(nsParts[0]).collection(nsParts.slice(1).join('.'));
+  this._coll = oplogDb.db(this._databaseName).collection(this._collectionName);
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -221,6 +224,16 @@ OplogTransform.prototype.close = function close(cb) {
     this.end(cb);
   }
 };
+
+/**
+ * Create an id for upstream based on the collection name and id.
+ *
+ * @param {mixed} id  the id to use, must contain a toString method if not a string
+ */
+OplogTransform.prototype._createUpstreamId = function _createUpstreamId(id) {
+  if (Object.prototype.toString(id) === '[object Object]') { id = id.toString(); } // convert ObjectIDs and other objects to strings
+  return this._collectionName + '\x01' + id;
+}
 
 /**
  * Bootstrap, read all documents from the collection.
@@ -477,7 +490,6 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
           m: { _op: oplogItem.ts },
           b: newObj
         };
-        if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
         cb(null, bson ? BSON.serialize(obj) : obj);
       });
     });
@@ -507,25 +519,27 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     return;
   }
 
+  var that = this;
   var opts = this._opts;
 
   process.nextTick(function() {
     var obj;
 
+    var upstreamId = that._createUpstreamId(oplogItem.o._id);
+
     // check if this is a confirmation by the adapter or a third party update
-    if (opts.expected[oplogItem.o._id] && isEqual(oplogItem.o, opts.expected[oplogItem.o._id].b)) {
-      obj = opts.expected[oplogItem.o._id];
+    if (opts.expected[upstreamId] && isEqual(oplogItem.o, opts.expected[upstreamId].b)) {
+      obj = opts.expected[upstreamId];
       obj.m = { _op: oplogItem.ts },
-      delete opts.expected[oplogItem.o._id];
+      delete opts.expected[upstreamId];
     } else {
       obj = {
-        h: { id: oplogItem.o._id },
+        h: { id: upstreamId },
         m: { _op: oplogItem.ts },
         b: xtend(oplogItem.o)
       };
     }
 
-    if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };
@@ -559,7 +573,8 @@ OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateM
   });
 
   // ask for last version of this id
-  this._controlWrite.write(JSON.stringify({ id: oplogItem.o2._id }) + '\n');
+  var upstreamId = this._createUpstreamId(oplogItem.o2._id);
+  this._controlWrite.write(JSON.stringify({ id: upstreamId }) + '\n');
 };
 
 /**
@@ -584,26 +599,28 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     return;
   }
 
+  var that = this;
   var opts = this._opts;
   process.nextTick(function() {
     var obj;
 
+    var upstreamId = that._createUpstreamId(oplogItem.o._id);
+
     // check if this is a confirmation by the adapter or a third party update
-    if (opts.expected[oplogItem.o._id] && opts.expected[oplogItem.o._id].h.d) {
-      obj = opts.expected[oplogItem.o._id];
+    if (opts.expected[upstreamId] && opts.expected[upstreamId].h.d) {
+      obj = opts.expected[upstreamId];
       obj.m = { _op: oplogItem.ts },
-      delete opts.expected[oplogItem.o._id];
+      delete opts.expected[upstreamId];
     } else {
       obj = {
         h: {
-          id: oplogItem.o._id,
+          id: upstreamId,
           d: true,
         },
         m: { _op: oplogItem.ts }
       };
     }
 
-    if (Object.prototype.toString(obj.h.id) === '[object Object]') { obj.h.id = obj.h.id.toString(); } // convert ObjectIDs to strings
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };

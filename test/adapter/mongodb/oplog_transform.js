@@ -326,7 +326,7 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: 'bar' },
+            h: { id: collectionName + '\x01bar' },
             m: { _op: new Timestamp(9, 1) },
             b: {
               _id: 'bar',
@@ -368,7 +368,7 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: 'foo' },
+            h: { id: collectionName + '\x01foo' },
             m: { _op: new Timestamp(1414516132, 1)  },
             b: {
               _id: 'foo',
@@ -400,7 +400,7 @@ describe('OplogTransform', function() {
       };
 
       var dagItem = {
-        h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
+        h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
         m: { _op: new Timestamp(1414516132, 1) },
         b: {
           _id: 'foo',
@@ -418,7 +418,7 @@ describe('OplogTransform', function() {
           if (!obj) { throw new Error('expected version request'); } // end reached
 
           // expect a request for id "foo" in ld-json
-          should.strictEqual(obj.id, 'foo');
+          should.strictEqual(obj.id, collectionName + '\x01foo');
 
           // send back the DAG item
           controlRead.write(BSON.serialize(dagItem));
@@ -429,7 +429,7 @@ describe('OplogTransform', function() {
         ot.on('readable', function() {
           var newVersion = ot.read();
           should.deepEqual(newVersion, {
-            h: { id: 'foo' },
+            h: { id: collectionName + '\x01foo' },
             m: { _op: new Timestamp(1414516132, 1) },
             b: {
               _id: 'foo',
@@ -469,7 +469,7 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: 'foo', d: true },
+            h: { id: collectionName + '\x01foo', d: true },
             m: { _op: new Timestamp(9, 1) },
           });
           done();
@@ -533,7 +533,7 @@ describe('OplogTransform', function() {
 
         // send back a fake DAG item without a timestamp
         var dagItem = {
-          h: { id: 'foo', v: 'Aaaaaa', pa: [] },
+          h: { id: collectionName + '\x01foo', v: 'Aaaaaa', pa: [] },
           b: { foo: 'bar' }
         };
         controlRead.write(BSON.serialize(dagItem));
@@ -568,7 +568,7 @@ describe('OplogTransform', function() {
 
           // send back a fake DAG item with the timestamp of the last oplog item
           var dagItem = {
-            h: { id: 'some', v: 'Aaaaaa', pa: [] },
+            h: { id: collectionName + '\x01some', v: 'Aaaaaa', pa: [] },
             m: { _op: lastOplogTs },
             b: { foo: 'bar' }
           };
@@ -590,7 +590,7 @@ describe('OplogTransform', function() {
         var ts = obj.m._op;
         should.strictEqual(lastOplogTs.lessThan(ts), true);
         should.deepEqual(obj, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: ts },
           b: {
             _id: 'foo',
@@ -637,7 +637,7 @@ describe('OplogTransform', function() {
     var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
 
     var dagItem = {
-      h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
+      h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
       b: {
         _id: 'foo',
         bar: 'qux'
@@ -696,7 +696,7 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: new Timestamp(1414516132, 1) },
           b: {
             _id: 'foo',
@@ -718,7 +718,7 @@ describe('OplogTransform', function() {
 
     it('should create a new version even when the update modifier leads to the same result', function(done) {
       var item = {
-        h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
+        h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
         b: {
           _id: 'foo',
           bar: 'qux'
@@ -729,7 +729,7 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(newVersion, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: new Timestamp(1414516132, 1) },
           b: {
             _id: 'foo',
@@ -786,7 +786,7 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: new Timestamp(1414516124, 1) },
           b: {
             _id : 'foo',
@@ -803,7 +803,7 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: new Timestamp(1414516190, 1) },
           b: {
             _id: 'foo',
@@ -852,7 +852,7 @@ describe('OplogTransform', function() {
         if (!obj) { throw new Error('expected version request'); } // end reached
 
         // expect a request for id "foo" in ld-json
-        should.strictEqual(obj.id, 'foo');
+        should.strictEqual(obj.id, collectionName + '\x01foo');
         versionRequested = true;
 
         // send back an empty response as if this version does not exist yet
@@ -874,7 +874,7 @@ describe('OplogTransform', function() {
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
 
       var head = {
-        h: { id: 'foo', v: 'A', pe: '_local', pa: [] },
+        h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
         b: {
           _id: 'foo',
           bar: 'qux'
@@ -885,14 +885,14 @@ describe('OplogTransform', function() {
       var ls = new LDJSONStream();
       controlWrite.pipe(ls).on('readable', function() {
         var obj = ls.read();
-        should.strictEqual(obj.id, 'foo');
+        should.strictEqual(obj.id, collectionName + '\x01foo');
         controlRead.write(BSON.serialize(head));
       });
 
       ot._applyOplogUpdateModifier(oplogItem, function(err, newVersion) {
         if (err) { throw err; }
         should.deepEqual(newVersion, {
-          h: { id: 'foo' },
+          h: { id: collectionName + '\x01foo' },
           m: { _op: oplogItem.ts },
           b: {
             _id: 'foo',
@@ -951,7 +951,7 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(newVersion, {
-          h: { id: 'foo', d: true },
+          h: { id: collectionName + '\x01foo', d: true },
           m: { _op: new Timestamp(1234, 1) }
         });
 
