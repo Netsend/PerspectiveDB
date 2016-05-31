@@ -24,6 +24,9 @@ dbs: [{
   name: someDb
   chroot: /var/persdb
   path: /test_persdb_root
+  mergeTree: {
+    vSize: 3,
+  },
   perspectives: [
     {
       name: someClient
