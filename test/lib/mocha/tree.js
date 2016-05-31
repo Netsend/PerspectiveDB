@@ -1207,6 +1207,26 @@ describe('Tree', function() {
     });
   });
 
+  describe('createHeadReadStream', function() {
+    var name = 'createHeadReadStream';
+
+    it('should require opts to be an object', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createHeadReadStream(0); }).should.throw('opts must be an object');
+    });
+
+    it('should require opts.skipConflicts to be a boolean', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.createHeadReadStream({ skipConflicts: {} }); }).should.throw('opts.skipConflicts must be a boolean');
+    });
+
+    it('should return a readable stream', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createHeadReadStream();
+      should.ok(s.readable);
+    });
+  });
+
   describe('getHeads', function() {
     // simple test, test further after write tests are done
     var name = 'getHeads';
@@ -1219,11 +1239,6 @@ describe('Tree', function() {
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       (function() { t.getHeads(0); }).should.throw('opts must be an object');
-    });
-
-    it('should require opts.skipConflicts to be a boolean', function() {
-      var t = new Tree(db, name, { vSize: 3, log: silence });
-      (function() { t.getHeads({ skipConflicts: {} }); }).should.throw('opts.skipConflicts must be a boolean');
     });
 
     it('should require iterator to be a function', function() {
