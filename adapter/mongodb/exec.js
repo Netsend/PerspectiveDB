@@ -38,7 +38,7 @@ var url = require('url');
 var async = require('async');
 var chroot = require('chroot');
 var BSONStream = require('bson-stream');
-var MongoClient = require('mongodb').MongoClient;
+var mongodb = require('mongodb');
 var posix = require('posix');
 var xtend = require('xtend');
 
@@ -46,6 +46,9 @@ var logger = require('../../lib/logger');
 var noop = require('../../lib/noop');
 var OplogTransform = require('./oplog_transform');
 var filterSecrets = require('../../lib/filter_secrets');
+
+var ObjectID = mongodb.ObjectID;
+var MongoClient = mongodb.MongoClient;
 
 /**
  * Instantiate a connection to a mongo database and read changes of a collection
@@ -79,6 +82,22 @@ var filterSecrets = require('../../lib/filter_secrets');
 
 // globals
 var ot, coll, db, log; // used after receiving the log configuration
+
+/**
+ * Create an id for downstream based on the upstream id.
+ *
+ * @param {String} id  the id to use, converted to ObjectId if length is 24
+ */
+function createDownstreamId(id) {
+  if (typeof id !== 'string') { throw new TypeError('id must be a string'); }
+  // expect only one 0x01
+  id = id.split('\x01', 2)[1];
+  if (!id.length) { throw new Error('could not determine id'); }
+  if (id.length === 24) {
+    id = new ObjectID(id);
+  }
+  return id;
+}
 
 /**
  * Start oplog transformer:
@@ -124,6 +143,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
 
     if (obj.o == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
+      // ensure id matches the one in the header
+      obj.n.b._id = createDownstreamId(obj.n.h.id);
       coll.insertOne(obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.insertedCount) {
@@ -134,6 +155,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       });
     } else if (obj.n.h.d == null) { // delete
       if (obj.o == null) { throw new Error('old object expected'); }
+      // ensure id matches the one in the header
+      obj.o.b._id = createDownstreamId(obj.o.h.id);
       coll.deleteOne(obj.o.b, function(err, r) {
         if (err) { throw err; }
         if (!r.deletedCount) {
@@ -143,6 +166,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
         }
       });
     } else { // update
+      // ensure id matches the one in the header
+      obj.n.b._id = createDownstreamId(obj.n.h.id);
       coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.lastErrorObject.n) {
