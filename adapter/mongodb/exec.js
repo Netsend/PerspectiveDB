@@ -47,7 +47,6 @@ var noop = require('../../lib/noop');
 var OplogTransform = require('./oplog_transform');
 var filterSecrets = require('../../lib/filter_secrets');
 
-var ObjectID = mongodb.ObjectID;
 var MongoClient = mongodb.MongoClient;
 
 /**
@@ -82,22 +81,6 @@ var MongoClient = mongodb.MongoClient;
 
 // globals
 var ot, coll, db, log; // used after receiving the log configuration
-
-/**
- * Create an id for downstream based on the upstream id.
- *
- * @param {String} id  the id to use, converted to ObjectId if length is 24
- */
-function createDownstreamId(id) {
-  if (typeof id !== 'string') { throw new TypeError('id must be a string'); }
-  // expect only one 0x01
-  id = id.split('\x01', 2)[1];
-  if (!id.length) { throw new Error('could not determine id'); }
-  if (id.length === 24) {
-    id = new ObjectID(id);
-  }
-  return id;
-}
 
 /**
  * Start oplog transformer:
@@ -143,8 +126,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
 
     if (obj.o == null || obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
-      // ensure id matches the one in the header
-      obj.n.b._id = createDownstreamId(obj.n.h.id);
+      // put either mongo id or h.id back on the document
+      obj.n.b._id = obj.n.m && obj.n.m._id || obj.n.h.id;
       coll.insertOne(obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.insertedCount) {
@@ -164,8 +147,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
         }
       });
     } else { // update
-      // ensure id matches the one in the header
-      obj.n.b._id = createDownstreamId(obj.n.h.id);
+      // put mongo id back on the document
+      obj.n.b._id = obj.n.m && obj.n.m._id || obj.n.h.id;
       coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.lastErrorObject.n) {

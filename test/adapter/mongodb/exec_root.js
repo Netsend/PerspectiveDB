@@ -188,8 +188,8 @@ tasks.push(function(done) {
     assert.strictEqual(ts.greaterThan(now), true);
     assert.deepEqual(obj, {
       h: { id: collectionName + '\x01foo' },
-      m: { _op: ts },
-      b: { _id: 'foo', bar: 'baz' }
+      m: { _op: ts, _id: 'foo' },
+      b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
     });
     child.send({ type: 'kill' });
   });
@@ -213,7 +213,7 @@ tasks.push(function(done) {
 
         versionControl.write(BSON.serialize({
           h: { id: collectionName + '\x01foo' },
-          m: { _op: oplogItem.ts },
+          m: { _op: oplogItem.ts, _id: 'foo' },
           b: {}
         }));
 

@@ -327,11 +327,8 @@ describe('OplogTransform', function() {
 
           should.deepEqual(newVersion, {
             h: { id: collectionName + '\x01bar' },
-            m: { _op: new Timestamp(9, 1) },
-            b: {
-              _id: 'bar',
-              baz: 'foobar'
-            }
+            m: { _op: new Timestamp(9, 1), _id: 'bar' },
+            b: { baz: 'foobar' }
           });
           done();
         });
@@ -369,11 +366,8 @@ describe('OplogTransform', function() {
 
           should.deepEqual(newVersion, {
             h: { id: collectionName + '\x01foo' },
-            m: { _op: new Timestamp(1414516132, 1)  },
-            b: {
-              _id: 'foo',
-              qux: 'quux'
-            }
+            m: { _op: new Timestamp(1414516132, 1) ,_id: 'foo' },
+            b: { qux: 'quux' }
           });
           done();
         });
@@ -401,11 +395,8 @@ describe('OplogTransform', function() {
 
       var dagItem = {
         h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
-        m: { _op: new Timestamp(1414516132, 1) },
-        b: {
-          _id: 'foo',
-          qux: 'quux',
-        }
+        m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+        b: { qux: 'quux' }
       };
 
       it('should handle an oplog update by modifier item (request last version)', function(done) {
@@ -430,9 +421,8 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
           should.deepEqual(newVersion, {
             h: { id: collectionName + '\x01foo' },
-            m: { _op: new Timestamp(1414516132, 1) },
+            m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
             b: {
-              _id: 'foo',
               bar: 'baz',
               qux: 'quux'
             }
@@ -470,7 +460,7 @@ describe('OplogTransform', function() {
 
           should.deepEqual(newVersion, {
             h: { id: collectionName + '\x01foo', d: true },
-            m: { _op: new Timestamp(9, 1) },
+            m: { _op: new Timestamp(9, 1), _id: 'foo' },
           });
           done();
         });
@@ -591,11 +581,8 @@ describe('OplogTransform', function() {
         should.strictEqual(lastOplogTs.lessThan(ts), true);
         should.deepEqual(obj, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: ts },
-          b: {
-            _id: 'foo',
-            foo: 'buz'
-          }
+          m: { _op: ts, _id: 'foo' },
+          b: { foo: 'buz' }
         });
         done();
       });
@@ -638,10 +625,8 @@ describe('OplogTransform', function() {
 
     var dagItem = {
       h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
-      b: {
-        _id: 'foo',
-        bar: 'qux'
-      }
+      m: { _op: null, _id: 'foo' },
+      b: { bar: 'qux' }
     };
     var mod = { $set: { bar: 'baz' } };
     var oplogItem = { ts: new Timestamp(1414516132, 1), o: mod, op: 'u', o2: { _id: 'foo' } };
@@ -697,11 +682,8 @@ describe('OplogTransform', function() {
 
         should.deepEqual(item, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516132, 1) },
-          b: {
-            _id: 'foo',
-            bar: 'baz'
-          }
+          m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+          b: { bar: 'baz' }
         });
         done();
       });
@@ -719,10 +701,8 @@ describe('OplogTransform', function() {
     it('should create a new version even when the update modifier leads to the same result', function(done) {
       var item = {
         h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
-        b: {
-          _id: 'foo',
-          bar: 'qux'
-        }
+        m: { _id: 'foo' },
+        b: { bar: 'qux' }
       };
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, { log: silence });
       ot._createNewVersionByUpdateDoc(item, oplogItem, function(err, newVersion) {
@@ -730,11 +710,8 @@ describe('OplogTransform', function() {
 
         should.deepEqual(newVersion, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516132, 1) },
-          b: {
-            _id: 'foo',
-            bar: 'baz'
-          }
+          m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+          b: { bar: 'baz' }
         });
         done();
       });
@@ -787,11 +764,8 @@ describe('OplogTransform', function() {
 
         should.deepEqual(item, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516124, 1) },
-          b: {
-            _id : 'foo',
-            baz: 'raboof'
-          }
+          m: { _op: new Timestamp(1414516124, 1), _id: 'foo' },
+          b: { baz: 'raboof' }
         });
 
         done();
@@ -804,9 +778,8 @@ describe('OplogTransform', function() {
 
         should.deepEqual(item, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516190, 1) },
+          m: { _op: new Timestamp(1414516190, 1), _id: 'foo' },
           b: {
-            _id: 'foo',
             qux: 'quux',
             foo: time
           }
@@ -875,10 +848,8 @@ describe('OplogTransform', function() {
 
       var head = {
         h: { id: collectionName + '\x01foo', v: 'A', pe: '_local', pa: [] },
-        b: {
-          _id: 'foo',
-          bar: 'qux'
-        }
+        m: { _id: 'foo' },
+        b: { bar: 'qux' }
       };
 
       // expect ld-json on the request stream and send back the head
@@ -893,11 +864,8 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
         should.deepEqual(newVersion, {
           h: { id: collectionName + '\x01foo' },
-          m: { _op: oplogItem.ts },
-          b: {
-            _id: 'foo',
-            bar: 'baz'
-          }
+          m: { _op: oplogItem.ts, _id: 'foo' },
+          b: { bar: 'baz' }
         });
         done();
       });
@@ -952,7 +920,7 @@ describe('OplogTransform', function() {
 
         should.deepEqual(newVersion, {
           h: { id: collectionName + '\x01foo', d: true },
-          m: { _op: new Timestamp(1234, 1) }
+          m: { _op: new Timestamp(1234, 1), _id: 'foo' }
         });
 
         done();

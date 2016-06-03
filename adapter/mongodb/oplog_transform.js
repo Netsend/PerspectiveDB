@@ -449,6 +449,9 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
 
   var selector = { _id: oplogItem.o2._id };
 
+  // restore id
+  dagItem.b._id = dagItem.m._id;
+
   // save the previous head and apply the update modifiers to get the new version of the doc
   that._tmpCollection.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
     if (err) { cb(err); return; }
@@ -485,9 +488,11 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
           return;
         }
 
+        // put id in meta info and remove it from the body
+        delete newObj._id;
         var obj = {
           h: { id: dagItem.h.id },
-          m: { _op: oplogItem.ts },
+          m: { _op: oplogItem.ts, _id: oplogItem.o2._id },
           b: newObj
         };
         cb(null, bson ? BSON.serialize(obj) : obj);
@@ -530,14 +535,15 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     // check if this is a confirmation by the adapter or a third party update
     if (opts.expected[upstreamId] && isEqual(oplogItem.o, opts.expected[upstreamId].b)) {
       obj = opts.expected[upstreamId];
-      obj.m = { _op: oplogItem.ts },
+      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
       delete opts.expected[upstreamId];
     } else {
       obj = {
         h: { id: upstreamId },
-        m: { _op: oplogItem.ts },
+        m: { _op: oplogItem.ts, _id: oplogItem.o._id },
         b: xtend(oplogItem.o)
       };
+      delete obj.b._id;
     }
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
@@ -609,7 +615,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     // check if this is a confirmation by the adapter or a third party update
     if (opts.expected[upstreamId] && opts.expected[upstreamId].h.d) {
       obj = opts.expected[upstreamId];
-      obj.m = { _op: oplogItem.ts },
+      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
       delete opts.expected[upstreamId];
     } else {
       obj = {
@@ -617,7 +623,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
           id: upstreamId,
           d: true,
         },
-        m: { _op: oplogItem.ts }
+        m: { _op: oplogItem.ts, _id: oplogItem.o._id }
       };
     }
 
