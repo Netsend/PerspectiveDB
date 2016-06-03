@@ -141,7 +141,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
 
     expected[obj.n.h.id] = obj.n;
 
-    if (obj.o.b == null) { // insert
+    if (obj.o == null || obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
       // ensure id matches the one in the header
       obj.n.b._id = createDownstreamId(obj.n.h.id);
