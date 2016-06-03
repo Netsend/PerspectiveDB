@@ -574,6 +574,8 @@ module.exports = function(idb, writer) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
   if (writer == null || typeof writer !== 'function') { throw new TypeError('writer must be a function'); }
 
+  const keyPaths = {};
+
   function _generateId(ev, key) {
     return ev.target.source.name + '\x01' + key;
   }
@@ -803,6 +805,19 @@ module.exports = function(idb, writer) {
     // open a rw transaction on the object store
     var tr = origTransaction([osName], 'readwrite');
     var os = tr.objectStore(osName);
+
+    // make sure the keypath is known
+    if (!keyPaths.hasOwnProperty(osName)) {
+      keyPaths[osName] = os.keyPath;
+      if (typeof keyPaths[osName] !== 'string') {
+        console.error('warning: keypath is not a string, converting: %s', keyPaths[osName], osName);
+        keyPaths[osName] = Object.prototype.toString(keyPaths[osName]);
+      }
+    }
+
+    if (!newVersion.b[keyPaths[osName]]) {
+      newVersion.b[keyPaths[osName]] = id;
+    }
 
     tr.oncomplete = function(ev) {
       // success
