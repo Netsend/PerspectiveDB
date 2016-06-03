@@ -200,13 +200,15 @@ function run(db, cfg, cb) {
     var remoteTrees = mt.getRemoteTrees();
 
     if (program.all) {
-      async.eachSeries(Object.keys(remoteTrees), function(name, cb2) {
-        printTree(mt, remoteTrees[name], cb2);
-      }, function(err) {
+      printTree(mt, mt.getLocalTree(), function(err) {
         if (err) { cb(err); return; }
+        console.log(); // newline
         printTree(mt, mt.getStageTree(), function(err) {
           if (err) { cb(err); return; }
-          printTree(mt, mt.getLocalTree(), function(err) {
+          console.log(); // newline
+          async.eachSeries(Object.keys(remoteTrees), function(name, cb2) {
+            printTree(mt, remoteTrees[name], cb2);
+          }, function(err) {
             if (err) { cb(err); return; }
             cb();
           });
