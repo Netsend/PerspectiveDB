@@ -141,7 +141,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
 
     expected[obj.n.h.id] = obj.n;
 
-    if (obj.o == null) { // insert
+    if (obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
       // ensure id matches the one in the header
       obj.n.b._id = createDownstreamId(obj.n.h.id);
@@ -153,11 +153,9 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
           log.debug('item inserted %j', obj.n.h);
         }
       });
-    } else if (obj.n.h.d == null) { // delete
+    } else if (obj.n.h.d === true) { // delete
       if (obj.o == null) { throw new Error('old object expected'); }
-      // ensure id matches the one in the header
-      obj.o.b._id = createDownstreamId(obj.o.h.id);
-      coll.deleteOne(obj.o.b, function(err, r) {
+      coll.deleteOne({ _id: obj.n.h.id }, function(err, r) {
         if (err) { throw err; }
         if (!r.deletedCount) {
           log.notice('item not deleted %j', obj.o.h);
