@@ -48,6 +48,43 @@ var OplogTransform = require('./oplog_transform');
 var filterSecrets = require('../../lib/filter_secrets');
 
 var MongoClient = mongodb.MongoClient;
+var ObjectID = mongodb.ObjectID;
+
+/**
+ * Determine id for mongodb. Try to get m._id, split h.id on 0x01 or just get h.id
+ * without processing as a last resort.
+ *
+ * @param {Object} dagItem  item from the pdb DAG
+ * @return {mixed} id for use in a mongodb collection
+ */
+function getMongoId(obj) {
+  var id;
+  try {
+    id = obj.n.m._id;
+  } catch (err) {
+    // fallback
+    id = obj.n.h.id;
+  }
+
+  if (typeof id === 'string') {
+    // expect zero or one 0x01 byte
+    var nid = id.split('\x01', 2)[1];
+    if (!nid || !nid.length) {
+      nid = id;
+    }
+    if (!nid.length) { throw new Error('could not determine id'); }
+
+    // auto convert 24 character strings to ObjectIDs
+    if (nid.length === 24) {
+      try {
+        nid = new ObjectID(nid);
+      } catch(err) {
+        log.err('could not convert id to object id %s %s', id, err);
+      }
+    }
+  }
+  return nid;
+}
 
 /**
  * Instantiate a connection to a mongo database and read changes of a collection
@@ -124,10 +161,11 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
 
     expected[obj.n.h.id] = obj.n;
 
+    var mongoId = getMongoId(obj);
     if (obj.o == null || obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
       // put either mongo id or h.id back on the document
-      obj.n.b._id = obj.n.m && obj.n.m._id || obj.n.h.id;
+      obj.n.b._id = mongoId;
       coll.insertOne(obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.insertedCount) {
@@ -138,7 +176,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       });
     } else if (obj.n.h.d === true) { // delete
       if (obj.o == null) { throw new Error('old object expected'); }
-      coll.deleteOne({ _id: obj.n.h.id }, function(err, r) {
+      coll.deleteOne({ _id: mongoId }, function(err, r) {
         if (err) { throw err; }
         if (!r.deletedCount) {
           log.notice('item not deleted %j', obj.o.h);
@@ -148,7 +186,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       });
     } else { // update
       // put mongo id back on the document
-      obj.n.b._id = obj.n.m && obj.n.m._id || obj.n.h.id;
+      obj.n.b._id = mongoId;
       coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
         if (err) { throw err; }
         if (!r.lastErrorObject.n) {
