@@ -29,6 +29,7 @@
     "level-packager": "^1.2.0",
     "leveldown": "^1.4.4",
     "match-object": "^0.0.1",
+    "mkdirp": "^0.5.1",
     "mongodb": "^2.1.16",
     "nest-namespace": "^0.0.2",
     "nodejs-websocket": "^1.4.1",
