@@ -260,7 +260,7 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
 
     // use data event since readable event is not stable
     s.on('data', function reader(item) {
-      that._log.debug('ot bootstrap %j', item);
+      that._log.debug('ot bootstrap %s', item._id);
 
       // enclose item in an oplog like item
       var resume = that.write({
@@ -512,8 +512,6 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
  *                       be the new version of the document.
  */
 OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogItem, cb) {
-  this._log.debug('ot _applyOplogFullDoc', JSON.stringify(oplogItem)); // debug level to prevent flooding while bootstrapping
-
   try {
     if (oplogItem.op !== 'u' && oplogItem.op !== 'i') { throw new Error('oplogItem.op must be "u" or "i"'); }
     if (!oplogItem.o._id) { throw new Error('missing oplogItem.o._id'); }
