@@ -358,8 +358,6 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     return;
   }
 
-  this._log.debug('ot _transform oplog item: %j', oplogItem);
-
   this._lastTs = oplogItem.ts;
 
   // determine the type of operator
@@ -379,6 +377,8 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     oplogItem.o._id = oplogItem.o2._id;
     operator = 'uf';
   }
+
+  this._log.debug('ot _transform oplog item: %s, %s, %s', oplogItem.ts, oplogItem.op, oplogItem.o._id);
 
   switch (operator) {
   case 'i':
