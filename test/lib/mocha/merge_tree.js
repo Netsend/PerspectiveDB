@@ -121,130 +121,6 @@ describe('MergeTree', function() {
     });
   });
 
-  describe('_iterateMissing', function() {
-    var sname = '_iterateMissing_foo';
-    var dname = '_iterateMissing_bar';
-
-    // use 24-bit version numbers (base 64)
-    var item1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] }, b: { some: 'body' } };
-    var item2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } };
-    var item3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
-
-    it('should require stree to be an object', function() {
-      (function() { MergeTree._iterateMissing(); }).should.throw('stree must be an object');
-    });
-
-    it('should require dtree to be an object', function() {
-      (function() { MergeTree._iterateMissing({}); }).should.throw('dtree must be an object');
-    });
-
-    it('should require iterator to be a function', function() {
-      (function() { MergeTree._iterateMissing({}, {}, {}); }).should.throw('iterator must be a function');
-    });
-
-    it('should require cb to be a function', function() {
-      (function() { MergeTree._iterateMissing({}, {}, function() {}); }).should.throw('cb must be a function');
-    });
-
-    it('should iterate over an empty database', function(done) {
-      var stree = new Tree(db, sname, { log: silence });
-      var dtree = new Tree(db, dname, { log: silence });
-      var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function() {
-        i++;
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 0);
-        done();
-      });
-    });
-
-    it('needs item1 in stree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item1, done);
-    });
-
-    it('should iterate over item1 because it misses in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
-        i++;
-        should.deepEqual(item, item1);
-        next();
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 1);
-        done();
-      });
-    });
-
-    it('needs item1 in dtree', function(done) {
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      dtree.end(item1, done);
-    });
-
-    it('should not iterate over item1 because it is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-      var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function() {
-        i++;
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 0);
-        done();
-      });
-    });
-
-    it('needs item2 in stree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item2, done);
-    });
-
-    it('should iterate over item2 in stree since item1 is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
-      var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
-        should.deepEqual(item, item2);
-        i++;
-        next();
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 1);
-        done();
-      });
-    });
-
-    it('needs item3 in stree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.end(item3, done);
-    });
-
-    it('should iterate over item2 and item3 in stree since item1 is already in dtree', function(done) {
-      var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      var dtree = new Tree(db, dname, { vSize: 3, log: silence });
-
-      var i = 0;
-      MergeTree._iterateMissing(stree, dtree, function(item, next) {
-        if (i === 0) {
-          should.deepEqual(item, item2);
-        }
-        if (i === 1) {
-          should.deepEqual(item, item3);
-        }
-        i++;
-        next();
-      }, function(err) {
-        if (err) { throw err; }
-        should.strictEqual(i, 2);
-        done();
-      });
-    });
-  });
-
   describe('_copyMissingToStage', function() {
     var sname = '_copyMissingToStage_foo';
     var dname = '_copyMissingToStage_bar';
@@ -366,7 +242,8 @@ describe('MergeTree', function() {
       var i = 0;
       mt._copyMissingToStage(stree, dtree, function(err) {
         if (err) { throw err; }
-        mt._stage.iterateInsertionOrder(function(item, next) {
+        var r = mt._stage.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, pe: sname }, b: { some: 'body' } });
@@ -377,9 +254,8 @@ describe('MergeTree', function() {
           if (i > 2) {
             should.deepEqual(item, { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 3, pe: sname }, b: { more2: 'body' } });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 3);
           done();
         });
@@ -406,7 +282,8 @@ describe('MergeTree', function() {
       var i = 0;
       mt._copyMissingToStage(stree, dtree, function(err) {
         if (err) { throw err; }
-        mt._stage.iterateInsertionOrder(function(item, next) {
+        var r = mt._stage.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1, pe: sname }, b: { some: 'body' } });
@@ -420,9 +297,8 @@ describe('MergeTree', function() {
           if (i > 3) {
             should.deepEqual(item, { h: { id: 'XI', v: 'Dddd', pa: ['Cccc'], i: 4, pe: sname }, b: { more3: 'body', transformed: true } });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 4);
           done();
         });
@@ -1224,11 +1100,11 @@ describe('MergeTree', function() {
       var i = 0;
       mt.mergeWithLocal(stree, function(err) {
         if (err) { throw err; }
-        stree.iterateInsertionOrder(function(item, next) {
+        var r = stree.insertionOrderStream();
+        r.on('data', function() {
           i++;
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 0);
           done();
         });
@@ -1264,12 +1140,12 @@ describe('MergeTree', function() {
 
         // inspect staging
         var j = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           j++;
           should.deepEqual(item, item1);
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 1);
           should.strictEqual(j, 1);
           done();
@@ -1301,12 +1177,12 @@ describe('MergeTree', function() {
 
         // inspect staging
         var j = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           j++;
           should.deepEqual(item, item1);
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(j, 1);
           done();
         });
@@ -1341,7 +1217,8 @@ describe('MergeTree', function() {
         should.strictEqual(i, 1);
         // inspect staging
         var j = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           j++;
           if (j === 1) {
             should.deepEqual(item, item1);
@@ -1349,9 +1226,8 @@ describe('MergeTree', function() {
           if (j > 1) {
             should.deepEqual(item, item2);
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(j, 2);
           done();
         });
@@ -1381,7 +1257,8 @@ describe('MergeTree', function() {
         should.strictEqual(i, 1);
         // inspect staging
         var j = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           j++;
           if (j === 1) {
             should.deepEqual(item, item1);
@@ -1389,9 +1266,8 @@ describe('MergeTree', function() {
           if (j > 1) {
             should.deepEqual(item, item2);
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(j, 2);
           done();
         });
@@ -1444,7 +1320,8 @@ describe('MergeTree', function() {
         if (err) { throw err; }
         // inspect staging
         var i = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, item1);
@@ -1455,9 +1332,8 @@ describe('MergeTree', function() {
           if (i > 2) {
             should.deepEqual(item, item3);
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 3);
           should.strictEqual(j, 2);
           done();
@@ -1490,7 +1366,8 @@ describe('MergeTree', function() {
         if (err) { throw err; }
         // inspect staging
         var i = 0;
-        stage.iterateInsertionOrder(function(item, next) {
+        var r = stage.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, item1);
@@ -1504,9 +1381,8 @@ describe('MergeTree', function() {
           if (i > 3) {
             should.deepEqual(item, { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more: 'body', more2: 'body' } });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 4);
           should.strictEqual(j, 1);
           mt.stats(function(err, stats) {
@@ -1655,16 +1531,16 @@ describe('MergeTree', function() {
 
       var i = 0;
       lws.end(function() {
-        mt._local.iterateInsertionOrder(function(item, next) {
+        var r = mt._local.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           v1 = item.h.v;
           should.deepEqual(item, {
             h: { id: 'XI', v: v1, pa: [], i: 1 },
             b: { some: 'body' }
           });
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 1);
           done();
         });
@@ -1678,7 +1554,8 @@ describe('MergeTree', function() {
 
       var i = 0;
       lws.end(function() {
-        mt._local.iterateInsertionOrder(function(item, next) {
+        var r = mt._local.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i > 1) {
             should.deepEqual(item, {
@@ -1686,9 +1563,8 @@ describe('MergeTree', function() {
               b: { more: 'body' }
             });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 2);
           done();
         });
@@ -1710,7 +1586,8 @@ describe('MergeTree', function() {
       lws.write(item3);
       lws.end(function() {
         var i = 0;
-        mt._local.iterateInsertionOrder(function(item, next) {
+        var r = mt._local.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, {
@@ -1730,9 +1607,8 @@ describe('MergeTree', function() {
               b: { more2: 'body' }
             });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 3);
           done();
         });
@@ -1753,7 +1629,8 @@ describe('MergeTree', function() {
       lws.write(item4);
       lws.end(function() {
         var i = 0;
-        mt._local.iterateInsertionOrder(function(item, next) {
+        var r = mt._local.insertionOrderStream();
+        r.on('data', function(item) {
           i++;
           if (i === 1) {
             should.deepEqual(item, {
@@ -1779,9 +1656,8 @@ describe('MergeTree', function() {
               b: { more3: 'b' }
             });
           }
-          next();
-        }, function(err) {
-          if (err) { throw err; }
+        });
+        r.on('end', function() {
           should.strictEqual(i, 4);
           // stage should be empty, since item4 is copied to local
           mt.stats(function(err, stats) {
@@ -1825,7 +1701,8 @@ describe('MergeTree', function() {
         lws.write(item3);
         lws.end(function() {
           var i = 0;
-          mt._local.iterateInsertionOrder(function(item, next) {
+          var r = mt._local.insertionOrderStream();
+          r.on('data', function(item) {
             i++;
             if (i === 1) {
               should.deepEqual(item, {
@@ -1844,9 +1721,8 @@ describe('MergeTree', function() {
                 b: { more3: 'b' }
               });
             }
-            next();
-          }, function(err) {
-            if (err) { throw err; }
+          });
+          r.on('end', function() {
             should.strictEqual(i, 3);
             // stage should be empty, since item4 is copied to local
             mt.stats(function(err, stats) {
