@@ -156,7 +156,7 @@ OplogTransform.prototype.startStream = function startStream() {
       return;
     }
 
-    that._log.debug('ot startStream last version %j', obj);
+    that._log.debug('ot startStream last version %j', obj.h);
 
     that.emit('lastVersion', obj);
 
