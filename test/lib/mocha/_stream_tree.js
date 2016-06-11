@@ -283,6 +283,7 @@ describe('StreamTree', function() {
     });
   });
 
+  // depends on all 4 previous inserts
   it('should drain if reading more items than fit in the buffer', function(done) {
     var t = new Tree(db, name, { vSize: 3, log: silence });
 
@@ -293,23 +294,16 @@ describe('StreamTree', function() {
 
     s.on('drain', function() {
       drains++;
-      while (s.read()) {
-        reads++;
-      }
     });
 
     // slow reader
-    function scheduleReader() {
+    s.on('readable', function() {
       setTimeout(function() {
-        s.once('readable', function() {
-          if (s.read()) {
-            reads++;
-          }
-        });
-        scheduleReader();
+        while (s.read()) {
+          reads++;
+        }
       }, 10);
-    }
-    scheduleReader();
+    });
 
     s.on('end', function(err) {
       if (err) { throw err; }
