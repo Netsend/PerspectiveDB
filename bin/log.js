@@ -21,6 +21,7 @@
 'use strict';
 
 var fs = require('fs');
+var stream = require('stream');
 
 var async = require('async');
 var hjson = require('hjson');
@@ -31,6 +32,8 @@ var MergeTree = require('../lib/merge_tree');
 var noop = require('../lib/noop');
 
 var openDbs = require('./_open_dbs');
+
+var Writable = stream.Writable;
 
 program
   .version('0.1.0')
@@ -146,37 +149,50 @@ function fmtItem(item, parents) {
 function printTree(mt, tree, cb) {
   var counter = 0;
   console.log('%s:', tree.name);
-  tree.iterateInsertionOrder({ reverse: true }, function(item, cb2) {
-    counter++;
+  var r = tree.insertionOrderStream({ reverse: true });
+  var writable = new Writable({
+    objectMode: true,
+    write: function(item, enc, cb2) {
+      counter++;
 
-    if (!program.patch || !item.h.pa.length) {
-      console.log(fmtItem(item));
+      if (!program.patch || !item.h.pa.length) {
+        console.log(fmtItem(item));
 
-      cb2(null, counter < program.number);
-      return;
-    }
-
-    var parents = [];
-    async.eachSeries(item.h.pa, function(pa, cb3) {
-      mt.getByVersion(pa, function(err, p) {
-        if (err) { cb3(err); return; }
-        if (!p) {
-          var error = new Error('parent not found');
-          cb3(error);
-          return;
+        if (counter >= program.number) {
+          r.unpipe(writable);
+          writable.end();
         }
+        cb2();
+        return;
+      }
 
-        parents.push(p);
-        cb3();
+      var parents = [];
+      async.eachSeries(item.h.pa, function(pa, cb3) {
+        mt.getByVersion(pa, function(err, p) {
+          if (err) { cb3(err); return; }
+          if (!p) {
+            var error = new Error('parent not found');
+            cb3(error);
+            return;
+          }
+
+          parents.push(p);
+          cb3();
+        });
+      }, function(err) {
+        if (err) { cb2(err); return; }
+
+        console.log(fmtItem(item, parents));
+
+        if (counter >= program.number) {
+          r.unpipe(writable);
+          writable.end();
+        }
+        cb2();
       });
-    }, function(err) {
-      if (err) { cb2(err); return; }
-
-      console.log(fmtItem(item, parents));
-
-      cb2(null, counter < program.number);
-    });
-  }, cb);
+    }
+  });
+  r.pipe(writable).on('finish', cb);
 }
 
 function run(db, cfg, cb) {
