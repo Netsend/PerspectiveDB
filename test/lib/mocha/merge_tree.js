@@ -1491,17 +1491,9 @@ describe('MergeTree', function() {
     var item4 = { h: { id: 'XI', v: 'Dddd' }, b: { more3: 'b' } };
     var item5 = { h: { id: 'XI', v: 'Eeee', d: true } };
 
-    it('should require item to be an object', function(done) {
-      var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
-      mt.createLocalWriteStream().write(1, function(err) {
-        should.strictEqual(err.message, 'item must be an object');
-        done();
-      });
-    });
-
     it('should require item.h to be an object', function(done) {
       var mt = new MergeTree(db, { stage: stageName, vSize: 3, log: silence });
-      mt.createLocalWriteStream().write({}, function(err) {
+      mt.createLocalWriteStream().write(1, function(err) {
         should.strictEqual(err.message, 'item.h must be an object');
         done();
       });
