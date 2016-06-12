@@ -136,7 +136,7 @@ var ot, coll, db, log; // used after receiving the log configuration
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
   // track newly written versions so that new oplog items can be recognized correctly as a confirmation
-  var expected = {};
+  var expected = [];
 
   log.debug('start oplog transform...');
   ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, expected, xtend(opts, {
@@ -158,7 +158,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
     // remove parent so that this item can be used later as a local confirmation
     delete obj.n.h.pa;
 
-    expected[obj.n.h.id] = obj.n;
+    expected.push(obj.n);
 
     var mongoId = getMongoId(obj);
     if (obj.o == null || obj.o.b == null) { // insert

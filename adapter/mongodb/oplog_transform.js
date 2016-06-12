@@ -42,9 +42,9 @@ var noop = function() {};
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
- * @param {Object} expected  object, with ids as key and the new object as value,
- *                           that were updated by this adapter and are thus
- *                           expected to echo back via the oplog
+ * @param {Object} expected  Array with new objects that were updated by this
+ *                           adapter and are thus expected to echo back via the
+ *                           oplog
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
@@ -60,7 +60,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, e
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
-  if (expected == null || typeof expected !== 'object') { throw new TypeError('expected must be an object'); }
+  if (!Array.isArray(expected)) { throw new TypeError('expected must be an array'); }
   if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   var nsParts = ns.split('.');
@@ -532,10 +532,9 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (that._expected[upstreamId] && isEqual(oplogItem.o, that._expected[upstreamId].b)) {
-      obj = that._expected[upstreamId];
-      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
-      delete that._expected[upstreamId];
+    if (that._expected[0] && that._expected[0].h.id === upstreamId && isEqual(oplogItem.o, that._expected[0].b)) {
+      obj = that._expected.shift();
+      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
     } else {
       obj = {
         h: { id: upstreamId },
@@ -612,10 +611,9 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (that._expected[upstreamId] && that._expected[upstreamId].h.d) {
-      obj = that._expected[upstreamId];
-      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
-      delete that._expected[upstreamId];
+    if (that._expected[0] && that._expected[0].h.id === upstreamId && that._expected[0].h.d) {
+      obj = that._expected.shift();
+      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
     } else {
       obj = {
         h: {
