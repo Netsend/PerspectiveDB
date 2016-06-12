@@ -149,7 +149,7 @@ function fmtItem(item, parents) {
 function printTree(mt, tree, cb) {
   var counter = 0;
   console.log('%s:', tree.name);
-  var r = tree.insertionOrderStream({ reverse: true });
+  var rw = tree.insertionOrderStream({ reverse: true });
   var writable = new Writable({
     objectMode: true,
     write: function(item, enc, cb2) {
@@ -159,8 +159,7 @@ function printTree(mt, tree, cb) {
         console.log(fmtItem(item));
 
         if (counter >= program.number) {
-          r.unpipe(writable);
-          writable.end();
+          rw.end();
         }
         cb2();
         return;
@@ -185,14 +184,13 @@ function printTree(mt, tree, cb) {
         console.log(fmtItem(item, parents));
 
         if (counter >= program.number) {
-          r.unpipe(writable);
-          writable.end();
+          rw.end();
         }
         cb2();
       });
     }
   });
-  r.pipe(writable).on('finish', cb);
+  rw.pipe(writable).on('finish', cb);
 }
 
 function run(db, cfg, cb) {
