@@ -2076,7 +2076,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         tail: true,
         tailRetry: 10
       });
@@ -2104,7 +2103,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         bson: true
       });
       var docs = [];
@@ -2124,7 +2122,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: G.h.v
       });
       var docs = [];
@@ -2144,7 +2141,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: E.h.v
       });
       var docs = [];
@@ -2166,7 +2162,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: C.h.v
       });
       var docs = [];
@@ -2190,7 +2185,6 @@ describe('MergeTree', function() {
       // use tailable is false to stop emitting documents after the last found doc
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v
       });
       var docs = [];
@@ -2216,7 +2210,6 @@ describe('MergeTree', function() {
       // should not find A twice for merge F
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         filter: { baz: 'qux' }
       });
@@ -2239,7 +2232,6 @@ describe('MergeTree', function() {
       // should not find A twice for merge F
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         filter: { baz: 'mux' }
       });
@@ -2260,7 +2252,6 @@ describe('MergeTree', function() {
       // should not find A twice for merge F
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         filter: { foo: 'bar' }
       });
@@ -2283,7 +2274,6 @@ describe('MergeTree', function() {
       // should not find A twice for merge F
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         filter: { some: 'none' }
       });
@@ -2324,7 +2314,6 @@ describe('MergeTree', function() {
 
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         filter: { baz: 'qux' },
         hooks: [transform, hook1, hook2]
@@ -2368,7 +2357,6 @@ describe('MergeTree', function() {
 
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: E.h.v,
         hooks: [transform, hook1, hook2]
       });
@@ -2397,7 +2385,6 @@ describe('MergeTree', function() {
 
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: A.h.v,
         hooks: [hook]
       });
@@ -2426,7 +2413,6 @@ describe('MergeTree', function() {
 
       var smt = mt.createReadStream({
         local: perspective,
-        log: silence,
         first: B.h.v,
         hooks: [hook]
       });
