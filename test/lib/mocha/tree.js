@@ -1520,9 +1520,11 @@ describe('Tree', function() {
       (function() { t.insertionOrderStream({ bson: 'a' }, function() { }, function() { }); }).should.throw('opts.bson must be a boolean');
     });
 
-    xit('should end directly with an empty database', function(done) {
+    it('should end directly with an empty database', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t.insertionOrderStream().on('end', done);
+      var s = t.insertionOrderStream()
+      s.on('end', done);
+      s.resume(); // get the stream in flowing mode
     });
 
     it('needs item1', function(done) {
