@@ -2074,23 +2074,28 @@ describe('MergeTree', function() {
 
     it('should tail and not close', function(done) {
       // use tailable is false to stop emitting documents after the last found doc
-      var smt = mt.createReadStream({ local: perspective, log: silence, tail: true, tailRetry: 1 });
+      var smt = mt.createReadStream({
+        local: perspective,
+        log: silence,
+        tail: true,
+        tailRetry: 10
+      });
       var docs = [];
 
       smt.on('data', function(doc) {
         docs.push(doc);
       });
 
-      var closeCalled;
+      var endCalled = false;
       setTimeout(function() {
         smt.end();
-        closeCalled = true;
+        endCalled = true;
       }, 50);
 
       smt.on('end', function() {
         should.equal(docs.length, 7);
         should.deepEqual(docs, [rA, rB, rC, rD, rE, rF, rG]);
-        should.strictEqual(closeCalled, true);
+        should.ok(endCalled);
         done();
       });
     });

@@ -2006,7 +2006,7 @@ describe('Tree', function() {
           should.deepEqual({ h: { id: 'foo', v: 'Ffff', i: 5, pa: ['Eeee'] }, b: { som3: 'mooore' } }, obj);
           // stop soon
           setTimeout(function() {
-            s.close();
+            s.end();
           }, 3);
         }
       });
