@@ -62,7 +62,7 @@ function getMongoId(obj) {
   try {
     id = obj.n.m._id;
   } catch (err) {
-    // fallback
+    // if from a non-mongo perspective, fallback
     id = obj.n.h.id;
   }
 
@@ -164,8 +164,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
     if (obj.o == null || obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
       // put either mongo id or h.id back on the document
-      obj.n.b._id = mongoId;
-      coll.insertOne(obj.n.b, function(err, r) {
+      coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
         if (err) { throw err; }
         if (!r.insertedCount) {
           log.notice('item not inserted %j', obj.n.h);
@@ -185,8 +184,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       });
     } else { // update
       // put mongo id back on the document
-      obj.n.b._id = mongoId;
-      coll.findOneAndReplace(obj.o.b, obj.n.b, function(err, r) {
+      coll.findOneAndReplace(obj.o.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
         if (err) { throw err; }
         if (!r.lastErrorObject.n) {
           log.notice('item not updated %j', obj.n.h);

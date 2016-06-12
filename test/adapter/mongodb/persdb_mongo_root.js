@@ -30,11 +30,13 @@ var net = require('net');
 var async = require('async');
 var bson = require('bson');
 var LDJSONStream = require('ld-jsonstream');
+var level = require('level-packager')(require('leveldown'));
 var MongoClient = require('mongodb').MongoClient;
 var rimraf = require('rimraf');
 
-var spawn = require('../../lib/spawn');
+var MergeTree = require('../../../lib/merge_tree');
 var logger = require('../../../lib/logger');
+var spawn = require('../../lib/spawn');
 
 var BSON = new bson.BSONPure.BSON();
 
@@ -307,22 +309,106 @@ tasks.push(function(done) {
             client.write(BSON.serialize({ h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [] },       b: { } }));
             client.write(BSON.serialize({ h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'] }, b: { test: true } }));
 
-            // wait some time and inspect database
+            // give the process some time
             setTimeout(function() {
+              child.kill();
+            }, 800);
+          });
+        });
+      }, 1000);
+    },
+    onExit: function(err) {
+      if (err) { throw err; }
+
+      // inspect leveldb
+      // open and search in database if items are written, stage is cleared, versions are correct etc.
+      level(chroot + dbPath3, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+        if (err) { throw err; }
+
+        var pe = 'someClient'; // from config file
+        var mt = new MergeTree(db, {
+          perspectives: [pe],
+          vSize: 3,
+          log: silence
+        });
+
+        // inspect perspective tree
+        var rs = mt._pe[pe].createReadStream();
+        var i = 0;
+        rs.on('data', function(item) {
+          i++;
+          switch (i) {
+          case 1:
+            assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe , i: 1 }, b: { } });
+            break;
+          case 2:
+            assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe , i: 2 }, b: { } });
+            break;
+          case 3:
+            assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
+            break;
+          }
+        });
+
+        rs.on('end', function() {
+          assert.strictEqual(i, 3);
+
+          // inspect stage tree, should be empty
+          rs = mt.getStageTree().createReadStream();
+          i = 0;
+          rs.on('data', function() {
+            i++;
+          });
+
+          rs.on('end', function() {
+            assert.strictEqual(i, 0);
+
+            // inspect local tree
+            rs = mt.getLocalTree().createReadStream();
+            i = 0;
+            rs.on('data', function(item) {
+              i++;
+
+              // merged in order of heads (bar, then foo)
+              switch (i) {
+              case 1:
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'bar');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 1 }, b: { } });
+                break;
+              case 2:
+                // don't expect meta info since it should be copied from the stage because of Bbbb
+                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe, i: 2 }, b: { } });
+                break;
+              case 3:
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'foo');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
+                break;
+              }
+            });
+
+            rs.on('end', function() {
+              assert.strictEqual(i, 3);
+
+              db.close();
+
+              // inspect the mongodb collection
               coll3.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
                 if (err) { throw err; }
 
                 assert.strictEqual(items.length, 2);
                 assert.deepEqual(items[0], { _id: 'bar' });
                 assert.deepEqual(items[1], { _id: 'foo', test: true });
-                child.kill();
+                done();
               });
-            }, 800);
+            });
           });
         });
-      }, 1000);
+      });
     },
-    onExit: done,
     echoOut: false,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));

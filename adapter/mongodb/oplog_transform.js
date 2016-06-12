@@ -529,16 +529,18 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (that._expected[0] && that._expected[0].h.id === upstreamId && isEqual(oplogItem.o, that._expected[0].b)) {
+    // copy without b._id (not saved in level)
+    var copy = xtend(oplogItem.o);
+    delete copy._id;
+    if (that._expected[0] && that._expected[0].h.id === upstreamId && isEqual(copy, that._expected[0].b)) {
       obj = that._expected.shift();
       obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
     } else {
       obj = {
         h: { id: upstreamId },
         m: { _op: oplogItem.ts, _id: oplogItem.o._id },
-        b: xtend(oplogItem.o)
+        b: copy
       };
-      delete obj.b._id;
     }
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
