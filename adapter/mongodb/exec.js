@@ -135,14 +135,13 @@ var ot, coll, db, log; // used after receiving the log configuration
  *   any OplogTransform options
  */
 function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
-  // track newly written versions so that new items can be recognized correctly
+  // track newly written versions so that new oplog items can be recognized correctly as a confirmation
   var expected = {};
 
   log.debug('start oplog transform...');
-  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, xtend(opts, {
+  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, expected, xtend(opts, {
     log: log,
-    bson: true,
-    expected: expected
+    bson: true
   }));
   ot.pipe(dataChannel);
   ot.startStream();

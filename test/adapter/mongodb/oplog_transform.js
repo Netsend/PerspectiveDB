@@ -98,24 +98,28 @@ describe('OplogTransform', function() {
       (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite); }).should.throw('controlRead must be an object');
     });
 
+    it('should require expected to be an object', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite, controlRead); }).should.throw('expected must be an object');
+    });
+
     it('should require ns to contain a dot', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite, controlRead); }).should.throw('ns must contain at least two parts');
+      (function() { new OplogTransform(oplogDb, oplogCollName, ' ', controlWrite, controlRead, {}); }).should.throw('ns must contain at least two parts');
     });
 
     it('should require ns to contain a database name', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, '.', controlWrite, controlRead); }).should.throw('ns must contain a database name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, '.', controlWrite, controlRead, {}); }).should.throw('ns must contain a database name');
     });
 
     it('should require ns to contain a collection name', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.', controlWrite, controlRead); }).should.throw('ns must contain a collection name');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.', controlWrite, controlRead, {}); }).should.throw('ns must contain a collection name');
     });
 
     it('should require opts to be an object', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, 1); }).should.throw('opts must be an object');
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, {}, 1); }).should.throw('opts must be an object');
     });
 
     it('should construct', function() {
-      new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead);
+      new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, {});
     });
   });
 

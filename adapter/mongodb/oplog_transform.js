@@ -42,24 +42,25 @@ var noop = function() {};
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
+ * @param {Object} expected  object, with ids as key and the new object as value,
+ *                           that were updated by this adapter and are thus
+ *                           expected to echo back via the oplog
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
  *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
- *   expected {Object}  object with ids as key and version as value that were
- *                      updated by this adapter and are thus expected to echo back
- *                      via the oplog
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
  */
-function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, opts) {
+function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, expected, opts) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
+  if (expected == null || typeof expected !== 'object') { throw new TypeError('expected must be an object'); }
   if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   var nsParts = ns.split('.');
@@ -78,9 +79,9 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, o
 
   this._oplogColl = oplogDb.collection(oplogCollName);
   this._ns = ns;
+  this._expected = expected;
   this._opts = xtend({
     bson: false,
-    expected: {}
   }, opts);
 
   this._coll = oplogDb.db(this._databaseName).collection(this._collectionName);
@@ -531,10 +532,10 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (opts.expected[upstreamId] && isEqual(oplogItem.o, opts.expected[upstreamId].b)) {
-      obj = opts.expected[upstreamId];
+    if (that._expected[upstreamId] && isEqual(oplogItem.o, that._expected[upstreamId].b)) {
+      obj = that._expected[upstreamId];
       obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
-      delete opts.expected[upstreamId];
+      delete that._expected[upstreamId];
     } else {
       obj = {
         h: { id: upstreamId },
@@ -611,10 +612,10 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (opts.expected[upstreamId] && opts.expected[upstreamId].h.d) {
-      obj = opts.expected[upstreamId];
+    if (that._expected[upstreamId] && that._expected[upstreamId].h.d) {
+      obj = that._expected[upstreamId];
       obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id },
-      delete opts.expected[upstreamId];
+      delete that._expected[upstreamId];
     } else {
       obj = {
         h: {
