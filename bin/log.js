@@ -45,6 +45,7 @@ program
   .option('    --pe <perspective>', 'print only this perspective')
   .option('-a  --all', 'print all perspectives')
   .option('-n, --number <number>', 'number of heads to show, defaults to 10, 0 means unlimited')
+  .option('-i, --id <id>', 'show the log of one string based id')
   .parse(process.argv);
 
 var configFile = program.args[0] || __dirname + '/../local/config/pdb.hjson';
@@ -149,7 +150,7 @@ function fmtItem(item, parents) {
 function printTree(mt, tree, cb) {
   var counter = 0;
   console.log('%s:', tree.name);
-  var rw = tree.insertionOrderStream({ reverse: true });
+  var rw = tree.insertionOrderStream({ id: program.id, reverse: true });
   var writable = new Writable({
     objectMode: true,
     write: function(item, enc, cb2) {
