@@ -313,8 +313,8 @@ tasks.push(function(done) {
                 if (err) { throw err; }
 
                 assert.strictEqual(items.length, 2);
-                assert.deepEqual(items[0], { _id: collectionName3 + '\x01bar' });
-                assert.deepEqual(items[1], { _id: collectionName3 + '\x01foo', test: true });
+                assert.deepEqual(items[0], { _id: 'bar' });
+                assert.deepEqual(items[1], { _id: 'foo', test: true });
                 child.kill();
               });
             }, 800);
