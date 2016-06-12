@@ -20,7 +20,7 @@
 
 'use strict';
 
-var Transform = require('stream').Transform;
+var stream = require('stream');
 var util = require('util');
 
 var bson = require('bson');
@@ -29,6 +29,7 @@ var isEqual = require('is-equal');
 var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
+var Transform = stream.Transform;
 
 var noop = function() {};
 
@@ -259,29 +260,25 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
       sort: { _id: true }
     });
 
-    // use data event since readable event is not stable
-    s.on('data', function reader(item) {
-      that._log.debug('ot bootstrap %s', item._id);
+    var i = 0;
+    var transformer = new Transform({
+      objectMode: true,
+      transform: function(item, enc, cb2) {
+        i++;
 
-      // enclose item in an oplog like item
-      var resume = that.write({
-        o: item,
-        ts: oplogItem.ts,
-        ns: that._ns,
-        op: 'i'
-      });
-      if (!resume) {
-        that._log.debug('ot bootstrap wait for drain');
-        s.pause();
-        that.once('drain', function() {
-          that._log.debug('ot bootstrap drain, read again');
-          s.resume();
+        // enclose item in an oplog like item
+        cb2(null, {
+          o: item,
+          ts: oplogItem.ts,
+          ns: that._ns,
+          op: 'i'
         });
       }
     });
+    s.pipe(transformer).pipe(that, { end: false });
 
-    s.on('end', function() {
-      that._log.notice('ot bootstrap done');
+    transformer.on('end', function() {
+      that._log.notice('ot bootstrapped %d items', i);
       cb(null, oplogItem.ts);
     });
   });
