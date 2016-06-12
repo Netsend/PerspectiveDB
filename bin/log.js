@@ -37,13 +37,13 @@ var Writable = stream.Writable;
 
 program
   .version('0.1.0')
-  .usage('[-span] <config>')
+  .usage('[-sdrani] <config>')
   .description('print graph of the given database')
   .option('config defaults to ../local/config/pdb.hjson')
   .option('-s, --show', 'show complete objects')
-  .option('-p, --patch', 'show patch compared to previous version')
-  .option('    --pe <perspective>', 'print only this perspective')
-  .option('-a  --all', 'print all perspectives')
+  .option('-d, --diff', 'show differences with previous version')
+  .option('-r, --pe <perspective>', 'print only this perspective')
+  .option('-a, --all', 'print all perspectives')
   .option('-n, --number <number>', 'number of heads to show, defaults to 10, 0 means unlimited')
   .option('-i, --id <id>', 'show the log of one string based id')
   .parse(process.argv);
@@ -134,7 +134,7 @@ function fmtItem(item, parents) {
       out += ' (' + item.h.i + ')';
     }
     out += ' ' + JSON.stringify(item.h.pa);
-    if (program.patch && parents.length) {
+    if (program.diff && parents.length) {
       parents.forEach(function(p) {
         var diff = doDiff(item.b || {}, p.b || {});
         if (parents.length > 1) {
@@ -156,7 +156,7 @@ function printTree(mt, tree, cb) {
     write: function(item, enc, cb2) {
       counter++;
 
-      if (!program.patch || !item.h.pa.length) {
+      if (!program.diff || !item.h.pa.length) {
         console.log(fmtItem(item));
 
         if (counter >= program.number) {
