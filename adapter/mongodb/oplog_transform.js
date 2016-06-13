@@ -532,16 +532,21 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     // copy without b._id (not saved in level)
     var copy = xtend(oplogItem.o);
     delete copy._id;
-    if (that._expected[0] && that._expected[0].h.id === upstreamId && isEqual(copy, that._expected[0].b)) {
-      obj = that._expected.shift();
-      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
-    } else {
+    if (!that._expected.some(function(item, i) {
+      if (item.h.id === upstreamId && isEqual(copy, item.b)) {
+        that._log.debug('ot _applyOplogFullDoc ACK %j %d (%d)', item.h, i, that._expected.length);
+        obj = that._expected.splice(i, 1)[0];
+        return true;
+      }
+      return false;
+    })) {
+      that._log.debug('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         h: { id: upstreamId },
-        m: { _op: oplogItem.ts, _id: oplogItem.o._id },
         b: copy
       };
     }
+    obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
@@ -610,18 +615,23 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (that._expected[0] && that._expected[0].h.id === upstreamId && that._expected[0].h.d) {
-      obj = that._expected.shift();
-      obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
-    } else {
+    if (!that._expected.some(function(item, i) {
+      if (item.h.id === upstreamId && item.h.d) {
+        that._log.debug('ot _applyOplogDeleteItem ACK %j %d (%d)', item.h, i, that._expected.length);
+        obj = that._expected.splice(i, 1)[0];
+        return true;
+      }
+      return false;
+    })) {
+      that._log.debug('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         h: {
           id: upstreamId,
           d: true,
         },
-        m: { _op: oplogItem.ts, _id: oplogItem.o._id }
       };
     }
+    obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });

@@ -31,6 +31,7 @@ var BSONStream = require('bson-stream');
 var bson = require('bson');
 var LDJSONStream = require('ld-jsonstream');
 var through2 = require('through2');
+var xtend = require('xtend');
 
 var OplogTransform = require('../../../adapter/mongodb/oplog_transform');
 var logger = require('../../../lib/logger');
@@ -775,6 +776,7 @@ describe('OplogTransform', function() {
         done();
       });
     });
+
     it('should create a new version of an update by full doc oplog item', function(done) {
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, [], { log: silence });
       ot._applyOplogFullDoc(oplogItemUpdate, function(err, item) {
@@ -789,6 +791,30 @@ describe('OplogTransform', function() {
           }
         });
 
+        done();
+      });
+    });
+
+    it('should delete expected item from the expected array', function(done) {
+      var obj = {
+        h: { id: collectionName + '\x01foo', v: 'Aaaaaa', pa: [] },
+        b: { baz: 'raboof' }
+      };
+      var expected = [
+        { h: {}, b: {} },
+        xtend(obj), // create a copy
+        { h: {}, b: {} },
+      ];
+
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, expected, { log: silence });
+      ot._applyOplogFullDoc(oplogItemInsert, function(err, item) {
+        if (err) { throw err; }
+
+        should.equal(expected.length, 2);
+        // expect meta info with _id and _op is copied from oplog item
+        should.deepEqual(item.m, { _op: oplogItemInsert.ts, _id: oplogItemInsert.o._id });
+        delete item.m;
+        should.deepEqual(item, obj);
         done();
       });
     });
