@@ -534,13 +534,13 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     delete copy._id;
     if (!that._expected.some(function(item, i) {
       if (item.h.id === upstreamId && isEqual(copy, item.b)) {
-        that._log.debug('ot _applyOplogFullDoc ACK %j %d (%d)', item.h, i, that._expected.length);
+        that._log.debug2('ot _applyOplogFullDoc ACK %j %d (%d)', item.h, i, that._expected.length);
         obj = that._expected.splice(i, 1)[0];
         return true;
       }
       return false;
     })) {
-      that._log.debug('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
+      that._log.debug2('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         h: { id: upstreamId },
         b: copy
@@ -617,13 +617,13 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     // check if this is a confirmation by the adapter or a third party update
     if (!that._expected.some(function(item, i) {
       if (item.h.id === upstreamId && item.h.d) {
-        that._log.debug('ot _applyOplogDeleteItem ACK %j %d (%d)', item.h, i, that._expected.length);
+        that._log.debug2('ot _applyOplogDeleteItem ACK %j %d (%d)', item.h, i, that._expected.length);
         obj = that._expected.splice(i, 1)[0];
         return true;
       }
       return false;
     })) {
-      that._log.debug('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
+      that._log.debug2('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         h: {
           id: upstreamId,
