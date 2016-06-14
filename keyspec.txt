@@ -44,6 +44,7 @@ string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
 opts    ::=  byte                   option bits, single byte:
                                       0x01 = conflict, when a merge with this
                                       item failed
+                                      0x02 = delete, if the head is deleted
 
 
 The values for the given keys are as follows:
