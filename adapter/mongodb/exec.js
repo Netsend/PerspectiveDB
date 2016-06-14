@@ -167,9 +167,9 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
         if (err) { throw err; }
         if (!r.insertedCount) {
-          log.notice('item not inserted %j', obj.n.h);
+          log.notice('NO insert %j', obj.n.h);
         } else {
-          log.debug('item inserted %j', obj.n.h);
+          log.debug('insert %j', obj.n.h);
         }
       });
     } else if (obj.n.h.d === true) { // delete
@@ -177,9 +177,9 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       coll.deleteOne({ _id: mongoId }, function(err, r) {
         if (err) { throw err; }
         if (!r.deletedCount) {
-          log.notice('item not deleted %j', obj.o.h);
+          log.notice('NO delete %j', obj.o.h);
         } else {
-          log.debug('item deleted %j', obj.o.h);
+          log.debug('delete %j', obj.o.h);
         }
       });
     } else { // update
@@ -187,9 +187,9 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       coll.findOneAndReplace(obj.o.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
         if (err) { throw err; }
         if (!r.lastErrorObject.n) {
-          log.notice('item not updated %j', obj.n.h);
+          log.notice('NO update %j', obj.n.h);
         } else {
-          log.debug('item updated %j', obj.n.h);
+          log.debug('update %j', obj.n.h);
         }
       });
     }
@@ -244,8 +244,9 @@ process.once('message', function(msg) {
   if (!dbName) { throw new Error('url must contain a database name'); }
 
   var collName = msg.coll;
+  var ns = dbName + '.' + collName;
 
-  programName = 'mongodb';
+  programName = 'mongodb ' + ns;
 
   process.title = 'pdb/' + programName;
 
@@ -430,7 +431,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, dbName + '.' + collName, dataChannel, versionControl, msg.oplogTransformOpts);
+        start(oplogDb, oplogCollName, ns, dataChannel, versionControl, msg.oplogTransformOpts);
       });
 
       // ignore kill signals
