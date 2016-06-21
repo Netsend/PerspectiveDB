@@ -309,7 +309,541 @@ describe('MergeTree', function() {
     });
   });
 
-  describe('_mergeStageWithLocal', function() {
+  describe('_createMergeStream', function() {
+    var sname = '_createMergeStream_foo';
+    var localName = '_local_createMergeStream';
+    var stageName = '_stage_createMergeStream';
+
+    describe('empty databases and root merge', function() {
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { some: 'body' } };
+
+      it('should return and do nothing if both local and stage are empty', function(done) {
+        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+        ms.on('data', function() {}); // get stream in flowing mode so that end is emitted
+        ms.end();
+        ms.on('end', function() {
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStream_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+
+      it('should merge sitem1 (fast-forward) because it misses in local', function(done) {
+        var opts = { local: localName + '2', stage: stageName + '2', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+        ms.end(sitem1);
+
+        var i = 0;
+        ms.on('readable', function() {
+          var obj = this.read();
+
+          if (!obj) { // end of stream
+            return;
+          }
+
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [], i: 1 }, b: { some: 'body' } },
+            o: null,
+            c: null
+          });
+          i++;
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_createMergeStream_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+          return;
+        });
+      });
+
+      it('should not merge sitem1 if litem1 is already in local (although perspective is not written to local)', function(done) {
+        // this happens when a new remote is added that is a subset of the existing items
+        var opts = { local: localName + '3', stage: stageName + '3', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        var i = 0;
+        ms.on('data', function() {
+          i++;
+        });
+
+        mt.getLocalTree().write(litem1, function(err) {
+          if (err) { throw err; }
+          ms.end(sitem1);
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 0);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_createMergeStream_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
+    describe('merge one and two heads in stree', function() {
+      var sname = '_createMergeStreamOneTwoHeads_foo';
+      var localName = '_local_oneTwoHeadsMergeStageWithLocal';
+      var stageName = '_stage_oneTwoHeadsMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { more1: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more3: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { more1: 'body' } };
+
+      it('should merge sitem2 with local (fast-forward)', function(done) {
+        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write sitem1 to ltree to update perspective
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1, function(err) {
+          if (err) { throw err; }
+          local.write(sitem1, function(err) {
+            if (err) { throw err; }
+            ms.write(sitem1);
+            ms.write(sitem2);
+            ms.end();
+          });
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
+            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+            c: null
+          });
+          i++;
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+
+      it('should merge sitem2 with litem2 (ff), sitem3 litem2 (merge)', function(done) {
+        var opts = { local: localName + '2', stage: stageName + '2', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write sitem1 to ltree to update perspective
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        // write sitem3 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1, function(err) {
+          if (err) { throw err; }
+          local.write(sitem1, function(err) {
+            if (err) { throw err; }
+            ms.write(sitem1);
+            ms.write(sitem2);
+            ms.write(sitem3);
+            ms.end();
+          });
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          i++;
+          if (i === 1) {
+            should.deepEqual(obj, {
+              n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
+              o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              c: null
+            });
+          }
+          if (i === 2) {
+            should.deepEqual(obj, {
+              n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 3 }, b: { more3: 'body' } },
+              o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              c: null
+            });
+            /* TODO: subsequent merges should be based on all non-conflicting heads in the stage
+            // this iteration should start after _mergeStageWithLocal is invoked again
+            // should merge and use a content based version number (parents must be sorted)
+            should.deepEqual(merge, { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more2: 'body', more3: 'body' } });
+            should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
+            next();
+            */
+          }
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 2);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 2, conflict: 0, deleted: 0 } },
+              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
+    describe('merge two heads one deleted', function() {
+      var sname = '_createMergeStreamTwoHeadsOneDelete_foo';
+      var localName = '_local_twoHeadsOneDeleteMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneDeleteMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },                b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] },          b: { more3: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('should merge sitem2 with litem1 (merge ff in ltree)', function(done) {
+        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write sitem1 to ltree to update perspective
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1, function(err) {
+          if (err) { throw err; }
+          local.write(sitem1, function(err) {
+            if (err) { throw err; }
+            ms.write(sitem1);
+            ms.write(sitem2);
+            ms.end();
+          });
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          i++;
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } },
+            c: null
+          });
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+
+
+      it('should merge sitem3 with litem2 (merge, no deleted flag)', function(done) {
+        var opts = { local: localName + '2', stage: stageName + '2', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write litem2 to ltree
+        // write sitem1 to ltree to update perspective
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        // write sitem3 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1);
+        local.write(litem2, function(err) {
+          if (err) { throw err; }
+          local.write(sitem1, function(err) {
+            if (err) { throw err; }
+            ms.write(sitem1);
+            ms.write(sitem2);
+            ms.write(sitem3);
+            ms.end();
+          });
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          i++;
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more2: 'body', more3: 'body' } },
+            o: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            c: null
+          });
+        });
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
+    describe('merge new connecting root after delete', function() {
+      var sname = '_createMergeStreamNewRootAfterDelete_foo';
+      var localName = '_local_newRootAfterDeleteMergeStageWithLocal';
+      var stageName = '_stage_newRootAfterDeleteMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },                b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+      var sitem3 = { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'] },          b: { more3: 'body' } }; // the "root"
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('should have one deleted head in local and one head in stage, merge sitem3 (new root)', function(done) {
+        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write litem2 to ltree
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        // write sitem3 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1);
+        local.write(litem2, function(err) {
+          if (err) { throw err; }
+          ms.write(sitem1);
+          ms.write(sitem2);
+          ms.write(sitem3);
+          ms.end();
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'], i: 3 }, b: { more3: 'body' } },
+            o: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            c: null
+          });
+          i++;
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 1 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              _createMergeStreamNewRootAfterDelete_foo: { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
+    describe('merge with conflict (unresolved)', function() {
+      var sname = '_createMergeStreamTwoHeadsOneConflict_foo';
+      var localName = '_local_twoHeadsOneConflictMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneConflictMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                  b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] },            b: { more2: 'other' } };
+
+      it('should merge sitem2 with litem2, conflict on "more2"', function(done) {
+        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var ms = mt._createMergeStream();
+        ms.on('error', done);
+
+        // write litem1 to ltree
+        // write litem2 to ltree
+        // write sitem1 to merge stream
+        // write sitem2 to merge stream
+        var local = mt.getLocalTree();
+        local.write(litem1);
+        local.write(litem2, function(err) {
+          if (err) { throw err; }
+          ms.write(sitem1);
+          ms.write(sitem2);
+          ms.end();
+        });
+
+        var i = 0;
+        ms.on('data', function(obj) {
+          should.deepEqual(obj, {
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], c: true, i: 2 }, b: { more2: 'body' } },
+            o: { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 2 },            b: { more2: 'other' } },
+            c: ['more2']
+          });
+          i++;
+        });
+
+        ms.on('end', function() {
+          should.strictEqual(i, 1);
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 1, deleted: 0 } }, // should have marked in conflict
+              '_createMergeStreamTwoHeadsOneConflict_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+            done();
+          });
+        });
+      });
+    });
+
+    // TODO: resolve via local write stream
+    xdescribe('merge with conflict (resolved)', function() {
+      var sname = '_createMergeStreamTwoHeadsOneConflictResolved_foo';
+      var localName = '_local_twoHeadsOneConflictResolvedMergeStageWithLocal';
+      var stageName = '_stage_twoHeadsOneConflictResolvedMergeStageWithLocal';
+
+      // use 24-bit version numbers (base 64)
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem2 = { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } };
+
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                  b: { some: 'body' } };
+      var litem2 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] },            b: { more2: 'other' } };
+
+      it('write sitem1, sitem2', function(done) {
+        var tree = new Tree(db, stageName, { vSize: 3, log: silence });
+        tree.write(sitem1);
+        tree.write(sitem2);
+        tree.end(done);
+      });
+
+      it('write litem1, litem2, sitem1 to local', function(done) {
+        var tree = new Tree(db, localName, { vSize: 3, log: silence });
+        tree.write(litem1);
+        tree.write(litem2);
+        tree.write(sitem1);
+        tree.end(done);
+      });
+
+      it('should merge sitem2 with litem2, conflict on "more2" (resolved)', function(done) {
+        var i = 0;
+        var j = 0;
+        var conflictHandler = function(attrs, shead, lhead, next) {
+          i++;
+          should.deepEqual(attrs, ['more2']);
+          should.deepEqual(shead, { more2: 'body' });
+          should.deepEqual(lhead, { more2: 'other' });
+          next({ mergedManually: true });
+        };
+        // should be called with new resolved conflict if _createMergeStream is invoked twice
+        var mergeHandler = function(merge, lhead, next) {
+          j++;
+          should.deepEqual(merge, { h: { id: 'XI', v: 'f1l4', pa: ['Bbbb', 'Cccc'], i: 3 }, b: { mergedManually: true} });
+          next();
+        };
+        var opts = {
+          local: localName,
+          stage: stageName,
+          perspectives: [ sname ],
+          vSize: 3,
+          log: silence,
+          conflictHandler: conflictHandler,
+          mergeHandler: mergeHandler
+        };
+        var mt = new MergeTree(db, opts);
+        mt._mergeStageWithLocal(function(err) {
+          if (err) { throw err; }
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.strictEqual(i, 1); // expect one call to conflict handler
+            should.strictEqual(j, 0); // expect no merge handler
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 1, conflict: 0, deleted: 0 } }, // should have marked in conflict
+              '_mergeStageWithLocalTwoHeadsOneConflictResolved_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+            });
+
+            // invoke twice to process resolved merge conflict
+            mt._mergeStageWithLocal(function(err) {
+              if (err) { throw err; }
+              mt.stats(function(err, stats) {
+                if (err) { throw err; }
+                should.strictEqual(i, 1); // expect no extra calls to conflict handler
+                should.strictEqual(j, 1); // expect no one call to merge handler
+                should.deepEqual(stats, {
+                  local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+                  stage: { heads: { count: 1, conflict: 0, deleted: 0 } }, // should have marked in conflict
+                  '_mergeStageWithLocalTwoHeadsOneConflictResolved_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+                });
+                done();
+              });
+            });
+          });
+        });
+      });
+    });
+  });
+
+  xdescribe('_mergeStageWithLocal', function() {
     var sname = '_mergeStageWithLocal_foo';
     var localName = '_local_mergeStageWithLocal';
     var stageName = '_stage_mergeStageWithLocal';
