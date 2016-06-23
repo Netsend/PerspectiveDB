@@ -1,5 +1,5 @@
 /**
- * Copyright 2014-2016 Netsend.
+ * Copyright 2014, 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -33,6 +33,7 @@ var BSONStream = require('bson-stream');
 var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var bson = require('bson');
+var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
 
@@ -216,9 +217,9 @@ tasks.push(function(done) {
       break;
     case 'listen':
       child.kill('SIGUSR2');
-      process.nextTick(function() {
+      setTimeout(function() {
         child.send({ type: 'kill' });
-      });
+      }, 10);
       break;
     default:
       throw new Error('unknown state');
@@ -421,14 +422,16 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
-// should accept a data request followed by BSON data if an import config is given
+// should accept a data request followed by BSON data if import is true
 tasks.push(function(done) {
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
+  var port2 = 1235;
 
-  // start server to check response from db_exec
+  // start servers to check responses from db_exec
   function onSpawn(child) {
+    // server that resembles a remote data handler
     var server = net.createServer(function(conn) {
       conn.on('data', function(data) {
         assert.deepEqual(JSON.parse(data), {
@@ -441,14 +444,35 @@ tasks.push(function(done) {
         // follow up with a root node in BSON
         var obj = { h: { id: 'abd', v: 'Aaaa', pa: [] }, b: { some: true } };
         conn.end(BSON.serialize(obj));
-        conn.on('close', function() {
+      });
+    }).listen(port, host);
+
+    // server that resembles a local data handler
+    var server2 = net.createServer(function(conn) {
+      conn.on('data', function(data) {
+        // expect a merge
+        var obj = BSON.deserialize(data);
+        assert.deepEqual(obj, {
+          n: {
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            b: { some: true }
+          },
+          o: null,
+          c: null
+        });
+
+        // confirm merge
+        var confirm = xtend(obj.n);
+        delete confirm.h.pa;
+        conn.end(BSON.serialize(obj.n), function() {
           server.close(function() {
-            child.send({ type: 'kill' });
+            server2.close(function() {
+              child.send({ type: 'kill' });
+            });
           });
         });
       });
-    });
-    server.listen(port, host);
+    }).listen(port2, host);
   }
 
   var pe = 'baz';
@@ -477,8 +501,11 @@ tasks.push(function(done) {
 
       rs.on('end', function() {
         assert.strictEqual(i, 1);
-        mt.mergeWithLocal(mt._pe[pe], function(err) {
+
+        // should have updated last by perspective of local tree
+        mt._local.lastByPerspective(pe, 'base64', function(err, v) {
           if (err) { throw err; }
+          assert.strictEqual(v, 'Aaaa');
           db.close(done);
         });
       });
@@ -502,12 +529,18 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      // forward authorized connection with connection
+      // forward authorized remote connection with connection
       var s = net.createConnection(port, host, function() {
         child.send({
           type: 'remoteDataChannel',
           perspective: pe
         }, s);
+      });
+      // forward authorized local connection with connection
+      var s2 = net.createConnection(port2, host, function() {
+        child.send({
+          type: 'localDataChannel',
+        }, s2);
       });
       break;
     default:
@@ -528,9 +561,11 @@ tasks.push(function(done) {
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
+  var port2 = 1235;
 
   // start server to inspect response
   function onSpawn(child) {
+    // server that resembles a remote data handler
     var server = net.createServer(function(conn) {
       conn.once('data', function(data) {
         assert.deepEqual(JSON.parse(data), {
@@ -548,15 +583,40 @@ tasks.push(function(done) {
 
           // now send a new child
           var obj = { h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'] }, b: { some: 'other' } };
-          conn.end(BSON.serialize(obj), function() {
-            server.close(function() {
+          conn.end(BSON.serialize(obj));
+        });
+      });
+    }).listen(port, host);
+
+    // server that resembles a local data handler
+    var server2 = net.createServer(function(conn) {
+      conn.on('data', function(data) {
+        // expect a merge
+        var obj = BSON.deserialize(data);
+        assert.deepEqual(obj, {
+          n: {
+            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 1 },
+            b: { some: 'other' }
+          },
+          o: {
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            b: { some: true }
+          },
+          c: null
+        });
+
+        // confirm merge
+        var confirm = xtend(obj.n);
+        delete confirm.h.pa;
+        conn.end(BSON.serialize(obj.n), function() {
+          server.close(function() {
+            server2.close(function() {
               child.send({ type: 'kill' });
             });
           });
         });
       });
-    });
-    server.listen(port, host);
+    }).listen(port2, host);
   }
 
   var pe = 'baz';
@@ -593,10 +653,7 @@ tasks.push(function(done) {
 
       rs.on('end', function() {
         assert.strictEqual(i, 2);
-        mt.mergeWithLocal(mt._pe[pe], function(err) {
-          if (err) { throw err; }
-          db.close(done);
-        });
+        db.close(done);
       });
     });
   }
@@ -618,12 +675,18 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      // send stripped auth request
+      // forward authorized remote connection with connection
       var s = net.createConnection(port, host, function() {
         child.send({
           type: 'remoteDataChannel',
           perspective: pe
         }, s);
+      });
+      // forward authorized local connection with connection
+      var s2 = net.createConnection(port2, host, function() {
+        child.send({
+          type: 'localDataChannel',
+        }, s2);
       });
       break;
     default:
@@ -734,36 +797,59 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
-// should run import hooks
+// should run import hooks (depends on previous 3 tests);
 tasks.push(function(done) {
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
+  var port2 = 1235;
 
   // start server to inspect response
   function onSpawn(child) {
+    // server that resembles a remote data handler
     var server = net.createServer(function(conn) {
       conn.once('data', function(data) {
         assert.deepEqual(JSON.parse(data), {
           start: 'Bbbb'
         });
 
-        // send a data request signalling data is requested from the start
-        conn.write(JSON.stringify({ start: true }) + '\n');
+        // send a data request signalling data is not requested
+        conn.write(JSON.stringify({ start: false }) + '\n');
 
         conn.end(BSON.serialize({
           h: { id: 'def', v: 'Dddd', pa: [] },
           b: { some: true, other: false }
         }));
 
-        conn.on('end', function() {
+      });
+    }).listen(port, host);
+
+    // server that resembles a local data handler
+    var server2 = net.createServer(function(conn) {
+      conn.on('data', function(data) {
+        // expect a merge
+        var obj = BSON.deserialize(data);
+        assert.deepEqual(obj, {
+          n: {
+            h: { id: 'def', v: 'Dddd', pa: [], pe: 'baz', i: 1 },
+            b: { other: false } // should have stripped "some"
+          },
+          o: null,
+          c: null
+        });
+
+        // confirm merge
+        var confirm = xtend(obj.n);
+        delete confirm.h.pa;
+        conn.end(BSON.serialize(obj.n), function() {
           server.close(function() {
-            child.send({ type: 'kill' });
+            server2.close(function() {
+              child.send({ type: 'kill' });
+            });
           });
         });
       });
-    });
-    server.listen(port, host);
+    }).listen(port2, host);
   }
 
   var pe = 'baz';
@@ -812,8 +898,11 @@ tasks.push(function(done) {
 
       rs.on('end', function() {
         assert.strictEqual(i, 3);
-        mt.mergeWithLocal(mt._pe[pe], function(err) {
+
+        // should have updated last by perspective of local tree
+        mt._local.lastByPerspective(pe, 'base64', function(err, v) {
           if (err) { throw err; }
+          assert.strictEqual(v, 'Dddd');
           db.close(done);
         });
       });
@@ -838,12 +927,18 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      // send stripped auth request
+      // forward authorized remote connection with connection
       var s = net.createConnection(port, host, function() {
         child.send({
           type: 'remoteDataChannel',
           perspective: pe
         }, s);
+      });
+      // forward authorized local connection with connection
+      var s2 = net.createConnection(port2, host, function() {
+        child.send({
+          type: 'localDataChannel',
+        }, s2);
       });
       break;
     default:
@@ -877,14 +972,11 @@ tasks.push(function(done) {
         h: { id: 'abd', v: 'Aaaa' },
         b: { some: true }
       };
-      conn.write(BSON.serialize(obj));
-      conn.on('close', function() {
+      conn.end(BSON.serialize(obj), function() {
         server.close(function() {
           child.send({ type: 'kill' });
         });
       });
-      // give some time to start merge handler
-      setTimeout(conn.end.bind(conn), 110);
     });
     server.listen(port, host);
   }
@@ -940,12 +1032,6 @@ tasks.push(function(done) {
         child.send({
           type: 'localDataChannel'
         }, s);
-
-        // and send a startMerge signal
-        child.send({
-          type: 'startMerge',
-          interval: 100
-        });
       });
       break;
     default:
@@ -961,68 +1047,40 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
-// should write merges with remotes back to the local data channel
+// should accept and respond to a head lookup request (depends on successful write in previous test)
 tasks.push(function(done) {
-  // start an echo server for the local channel and one for the remote channel
+  // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
   var port = 1234;
-  var port2 = 1235;
 
   var i = 0;
-  // start server for local data channel
+  // lookup the item from the previous test
   function onSpawn(child) {
-    var server = net.createServer(function(conn) {
-      // expect a merge with the item sent by server2
+    // start server for head lookup channel
+    var headLookupServer = net.createServer(function(conn) {
+      // do a head lookup for "abd"
+      conn.write(JSON.stringify({ id: 'abd'}) + '\n');
+
+      // expect the requested version
       conn.pipe(new BSONStream()).on('data', function(item) {
         i++;
         assert.deepEqual(item, {
-          n: {
-            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'buzz', i: 1 },
-            b: { some: true }
-          },
-          o: null
+          h: { id: 'abd', v: 'Aaaa', pa: [], i: 1 },
+          b: { some: true }
         });
-
         conn.end();
       });
 
       conn.on('close', function() {
-        server.close(function() {
+        headLookupServer.close(function() {
           child.send({ type: 'kill' });
         });
       });
-    });
-    server.listen(port, host);
-
-    // start server for remote data channel
-    var server2 = net.createServer(function(conn) {
-      conn.on('data', function(data) {
-        assert.deepEqual(JSON.parse(data), {
-          start: true
-        });
-
-        // send a data request signalling no data is requested
-        conn.write(JSON.stringify({ start: false }) + '\n');
-
-        // send a root node in BSON
-        conn.write(BSON.serialize({
-          h: { id: 'abd', v: 'Aaaa', pa: [] },
-          b: { some: true }
-        }));
-
-        conn.on('close', function() {
-          server2.close();
-        });
-        conn.end();
-      });
-    });
-    server2.listen(port2, host);
+    }).listen(port, host);
   }
 
-  var pe = 'buzz';
-  var perspectives = [{ name: pe, import: true }];
-  var localName = 'testWithLocalAndRemoteDataChannel';
   var vSize = 3;
+  var localName = 'testWithLocalDataChannel';
 
   function onExit() {
     assert.strictEqual(i, 1);
@@ -1039,7 +1097,6 @@ tasks.push(function(done) {
         user: user,
         group: group,
         chroot: chroot,
-        perspectives: perspectives,
         mergeTree: {
           local: localName,
           vSize: vSize
@@ -1047,25 +1104,11 @@ tasks.push(function(done) {
       });
       break;
     case 'listen':
-      // setup local data channel
+      // setup head lookup channel
       var s = net.createConnection(port, host, function() {
         child.send({
-          type: 'localDataChannel'
+          type: 'headLookup'
         }, s);
-
-        // and send a startMerge signal
-        child.send({
-          type: 'startMerge',
-          interval: 100
-        });
-      });
-
-      // setup remote data channel
-      var s2 = net.createConnection(port2, host, function() {
-        child.send({
-          type: 'remoteDataChannel',
-          perspective: pe
-        }, s2);
       });
       break;
     default:
@@ -1080,6 +1123,7 @@ tasks.push(function(done) {
   };
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
+
 
 // should accept and respond to a head lookup request for a non-existing id
 tasks.push(function(done) {
@@ -1139,110 +1183,6 @@ tasks.push(function(done) {
       var s = net.createConnection(port, host, function() {
         child.send({
           type: 'headLookup'
-        }, s);
-      });
-      break;
-    default:
-      throw new Error('unknown state');
-    }
-  }
-
-  var opts = {
-    onSpawn: onSpawn,
-    onMessage: onMessage,
-    onExit: onExit
-  };
-  spawn([__dirname + '/../../../lib/db_exec'], opts);
-});
-
-// should accept and respond to a head lookup request (write a new object via a local data channel first)
-tasks.push(function(done) {
-  // start an echo server that can receive auth requests and sends some BSON data
-  var host = '127.0.0.1';
-  var port = 1234;
-  var port2 = 1235;
-
-  var i = 0;
-  // start local data channel to send a new object that can later be looked up
-  function onSpawn(child) {
-    var localDataServer = net.createServer(function(conn) {
-      conn.on('data', function() {
-        throw new Error('unexpected merge');
-      });
-
-      conn.on('close', function() {
-        localDataServer.close();
-      });
-      // send a new node
-      conn.write(BSON.serialize({
-        h: { id: 'abd', v: 'Aaaa' },
-        b: { some: true }
-      }));
-      conn.end();
-
-      // give it some time to write to the local tree, then setup connection to head lookup server
-      setTimeout(function() {
-        var s2 = net.createConnection(port2, host, function() {
-          child.send({
-            type: 'headLookup'
-          }, s2);
-        });
-      }, 100);
-    });
-    localDataServer.listen(port, host);
-
-    // start server for head lookup channel
-    var headLookupServer = net.createServer(function(conn) {
-      // do a head lookup for "abd"
-      conn.write(JSON.stringify({ id: 'abd'}) + '\n');
-
-      // expect the requested version
-      conn.pipe(new BSONStream()).on('data', function(item) {
-        i++;
-        assert.deepEqual(item, {
-          h: { id: 'abd', v: 'Aaaa', pa: [], i: 1 },
-          b: { some: true }
-        });
-        conn.end();
-      });
-
-      conn.on('close', function() {
-        headLookupServer.close(function() {
-          child.send({ type: 'kill' });
-        });
-      });
-    });
-    headLookupServer.listen(port2, host);
-  }
-
-  var vSize = 3;
-  var localName = 'testWithLocalDataChannel';
-
-  function onExit() {
-    assert.strictEqual(i, 1);
-    done();
-  }
-
-  function onMessage(msg, child) {
-    switch(msg) {
-    case 'init':
-      child.send({
-        log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
-        user: user,
-        group: group,
-        chroot: chroot,
-        mergeTree: {
-          local: localName,
-          vSize: vSize
-        }
-      });
-      break;
-    case 'listen':
-      var s = net.createConnection(port, host, function() {
-        child.send({
-          type: 'localDataChannel'
         }, s);
       });
       break;
