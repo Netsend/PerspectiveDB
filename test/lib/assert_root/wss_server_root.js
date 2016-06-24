@@ -1,5 +1,5 @@
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -25,7 +25,6 @@ if (process.getuid() !== 0) {
 
 var assert = require('assert');
 var net = require('net');
-var childProcess = require('child_process');
 var c = require('constants');
 var fs = require('fs');
 
@@ -33,9 +32,8 @@ var async = require('async');
 var bson = require('bson');
 var BSON = new bson.BSONPure.BSON();
 var ws = require('nodejs-websocket');
-var xtend = require('xtend');
 
-var noop = require('../../../lib/noop');
+var spawn = require('../../lib/spawn');
 
 var cert, key, dhparam;
 
@@ -52,64 +50,6 @@ var wsClientOpts = {
 
 var tasks  = [];
 var tasks2 = [];
-
-function spawn(options, spawnOpts) {
-  var opts = xtend({
-    configBase: __dirname,
-    config: 'test_persdb.hjson',
-    echoOut: false,
-    echoErr: true,
-    onSpawn: noop,
-    onMessage: null,                                          // handle ipc messages
-    onExit: noop,
-    exitCode: 0,                                              // test if exit code is 0
-    exitSignal: null,                                         // test if exit signal is empty
-    testStdout: null,
-    testStderr: function(s) {                                 // test if stderr is empty
-      if (s.length) { throw new Error(s); }
-    }
-  }, options);
-
-  var sOpts = xtend({
-    args: [__dirname + '/../../../lib/wss_server'],
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc']
-  }, spawnOpts);
-
-  // print line number
-  console.log('test #%d', new Error().stack.split('\n')[2].match(/wss_server_root.js:([0-9]+):[0-9]+/)[1]);
-
-  var extraArgs = [];
-  var child = childProcess.spawn(process.execPath, sOpts.args.concat(extraArgs), sOpts);
-
-  if (opts.echoOut) { child.stdout.pipe(process.stdout); }
-  if (opts.echoErr) { child.stderr.pipe(process.stderr); }
-
-  var stdout = '';
-  var stderr = '';
-  child.stdout.setEncoding('utf8');
-  child.stderr.setEncoding('utf8');
-  child.stdout.on('data', function(data) { stdout += data; });
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    if (opts.testStdout) {
-      opts.testStdout(stdout);
-    }
-    if (opts.testStderr) {
-      opts.testStderr(stderr);
-    }
-    assert.strictEqual(code, opts.exitCode);
-    assert.strictEqual(sig, opts.exitSignal);
-    opts.onExit(null, code, sig, stdout, stderr);
-  });
-
-  if (opts.onMessage) {
-    child.on('message', function(msg) {
-      opts.onMessage(msg, child);
-    });
-  }
-  opts.onSpawn(child);
-}
 
 var logger = require('../../../lib/logger');
 
@@ -142,7 +82,7 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -150,7 +90,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/msg.log must be an object/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should require msg.key to not be group or world readable or writable
@@ -170,7 +111,7 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -178,7 +119,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/msg.key should not be group or world readable or writable/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should require msg.cert, key and dhparam to exist
@@ -198,7 +140,7 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     echoErr: false,
@@ -206,7 +148,8 @@ tasks.push(function(done) {
     testStderr: function(stderr) {
       assert(/Error: ENOENT: no such file or directory, open 'foo'/.test(stderr));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should chroot and listen
@@ -224,19 +167,20 @@ tasks.push(function(done) {
     case 'listen':
       var client = net.createConnection(3344, function() {
         client.end(function() {
-          child.kill();
+          child.send({ type: 'kill' });
         });
       });
     }
   }
 
-  spawn({
+  var opts = {
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should chroot, connect and do websocket handshake and proxy to the proxyPort
@@ -250,7 +194,7 @@ tasks.push(function(done) {
       conn.on('data', function(data) {
         assert.strictEqual(data, 'some text text data');
         tcpServer.close();
-        child.kill();
+        child.send({ type: 'kill' });
       });
     });
     tcpServer.listen(tcpPort);
@@ -274,14 +218,15 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should proxy data request back to websocket client
@@ -326,7 +271,7 @@ tasks.push(function(done) {
           client.on('close', function(code, reason) {
             assert.strictEqual(code, 9823);
             assert.strictEqual(reason, 'test');
-            child.kill();
+            child.send({ type: 'kill' });
           });
           client.close(9823, 'test');
         });
@@ -334,14 +279,15 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: done,
     testStdout: function(stdout) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should proxy data request + BSON response back to websocket client in two separate writes
@@ -407,7 +353,7 @@ tasks.push(function(done) {
                 assert.strictEqual(code, 9823);
                 assert.strictEqual(reason, 'test');
                 allDone = true;
-                child.kill();
+                child.send({ type: 'kill' });
               });
               client.close(9823, 'test');
             });
@@ -417,14 +363,15 @@ tasks.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit,
     testStdout: function(stdout) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 // should proxy data request + BSON response back to websocket client in one write (check pipe(ls) unpipe(ls))
@@ -490,7 +437,7 @@ tasks2.push(function(done) {
                 assert.strictEqual(code, 9823);
                 assert.strictEqual(reason, 'test');
                 allDone = true;
-                child.kill();
+                child.send({ type: 'kill' });
               });
               client.close(9823, 'test');
             });
@@ -500,14 +447,15 @@ tasks2.push(function(done) {
     }
   }
 
-  spawn({
+  var opts = {
     onSpawn: onSpawn,
     onMessage: onMessage,
     onExit: onExit,
     testStdout: function(stdout) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
-  });
+  };
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
 });
 
 async.series(tasks, function(err) {
