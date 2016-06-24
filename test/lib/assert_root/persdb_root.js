@@ -384,11 +384,9 @@ tasks.push(function(done) {
           assert.deepEqual(item, { h: { id: 'abc', v: 'Bbbb', pe: pe, i: 2, pa: ['Aaaa'] }, b: { some: 'other' } });
         }
       });
-
       rs.on('end', function() {
         assert.strictEqual(i, 2);
-        mt.mergeWithLocal(mt._pe[pe], function(err) {
-          if (err) { throw err; }
+        mt.startMerge({ tail: false }).on('finish', function() {
           db.close(done);
         });
       });
@@ -488,8 +486,7 @@ tasks.push(function(done) {
 
       rs.on('end', function() {
         assert.strictEqual(i, 3);
-        mt.mergeWithLocal(mt._pe[pe], function(err) {
-          if (err) { throw err; }
+        mt.startMerge({ tail: false }).on('finish', function() {
           db.close(done);
         });
       });
