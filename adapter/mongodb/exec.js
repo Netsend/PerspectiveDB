@@ -129,12 +129,13 @@ var ot, coll, db, log; // used after receiving the log configuration
  * @param {String} ns  namespace of the database.collection to follow
  * @param {Object} versionControl  version control channel
  * @param {Object} dataChannel  data channel
+ * @param {String} conflictColl  conflict collection
  * @param {Object} [opts]
  *
  * Options:
  *   any OplogTransform options
  */
-function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
+function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflictColl, opts) {
   // track newly written versions so that new oplog items can be recognized correctly as a confirmation
   var expected = [];
 
@@ -146,6 +147,21 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
   ot.pipe(dataChannel);
   ot.startStream();
 
+  // obj {Object} object to save in conflict collection
+  // cb {Function}  first parameter will be an error or null
+  function saveConflict(obj, cb) {
+    conflictColl.insert(obj, function(err, r) {
+      if (err) { cb(err); return; }
+      if (!r.insertedCount) {
+        cb(new Error('could not save conflict'));
+        return;
+      }
+
+      log.debug('conflict saved %j', obj.n.h);
+      cb();
+    });
+  }
+
   var bs = new BSONStream();
   dataChannel.pipe(bs).on('readable', function() {
     var obj = bs.read();
@@ -155,41 +171,84 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
       return;
     }
 
-    // remove parent so that this item can be used later as a local confirmation
-    delete obj.n.h.pa;
+    if (obj.c) {
+      saveConflict(obj, function(err2) {
+        if (err2) {
+          log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, obj.c);
+          throw err2;
+        }
+      });
+      return;
+    }
 
-    expected.push(obj.n);
+    log.debug('new item %j', obj.n.h);
 
     var mongoId = getMongoId(obj);
     if (obj.o == null || obj.o.b == null) { // insert
       if (obj.n == null) { throw new Error('new object expected'); }
       // put either mongo id or h.id back on the document
       coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-        if (err) { throw err; }
+        if (err) {
+          obj.err = err.message;
+          saveConflict(obj, function(err2) {
+            if (err2) {
+              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+              throw err2;
+            }
+          });
+          return;
+        }
         if (!r.insertedCount) {
           log.notice('NO insert %j', obj.n.h);
         } else {
           log.debug('insert %j', obj.n.h);
+          // remove parent so that this item can be used later as a local confirmation
+          delete obj.n.h.pa;
+          expected.push(obj.n);
         }
       });
     } else if (obj.n.h.d === true) { // delete
       if (obj.o == null) { throw new Error('old object expected'); }
       coll.deleteOne({ _id: mongoId }, function(err, r) {
-        if (err) { throw err; }
+        if (err) {
+          obj.err = err.message;
+          saveConflict(obj, function(err2) {
+            if (err2) {
+              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+              throw err2;
+            }
+          });
+          return;
+        }
         if (!r.deletedCount) {
           log.notice('NO delete %j', obj.o.h);
         } else {
           log.debug('delete %j', obj.o.h);
+          // remove parent so that this item can be used later as a local confirmation
+          delete obj.n.h.pa;
+          expected.push(obj.n);
         }
       });
     } else { // update
       // put mongo id back on the document
       coll.findOneAndReplace(obj.o.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-        if (err) { throw err; }
+        if (err) {
+          obj.err = err.message;
+          saveConflict(obj, function(err2) {
+            if (err2) {
+              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+              throw err2;
+            }
+          });
+          return;
+        }
         if (!r.lastErrorObject.n) {
           log.notice('NO update %j', obj.n.h);
         } else {
           log.debug('update %j', obj.n.h);
+          // remove parent so that this item can be used later as a local confirmation
+          delete obj.n.h.pa;
+          expected.push(obj.n);
         }
       });
     }
@@ -208,6 +267,8 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, opts) {
  *                                 // and oplogDbUser
  *   [authDb]:       {String}      // authDb database, defaults to db from url
  *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
+ *   [conflictDb]:   {String}      // conflict database, defaults to db from url
+ *   [conflictColl]: {String}      // conflict collection, defaults to "conflicts"
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [oplogTransformOpts]: {Object} // any oplog transform options
@@ -229,6 +290,8 @@ process.once('message', function(msg) {
   if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
   if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
   if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
+  if (msg.conflictDb != null && typeof msg.conflictDb !== 'string') { throw new TypeError('msg.conflictDb must be a non-empty string'); }
+  if (msg.conflictColl != null && typeof msg.conflictColl !== 'string') { throw new TypeError('msg.conflictColl must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.oplogTransformOpts != null && typeof msg.oplogTransformOpts !== 'object') { throw new TypeError('msg.oplogTransformOpts must be an object'); }
@@ -245,6 +308,9 @@ process.once('message', function(msg) {
 
   var collName = msg.coll;
   var ns = dbName + '.' + collName;
+
+  var conflictDb = msg.conflictDb || dbName;
+  var conflictColl = msg.conflictColl || 'conflicts';
 
   programName = 'mongodb ' + ns;
 
@@ -352,6 +418,12 @@ process.once('message', function(msg) {
         process.nextTick(cb);
       });
 
+      // setup conflict coll
+      startupTasks.push(function(cb) {
+        conflictColl = db.db(conflictDb).collection(conflictColl);
+        process.nextTick(cb);
+      });
+
       // expect a data request/receive channel on fd 6
       startupTasks.push(function(cb) {
         log.debug('setup data channel...');
@@ -431,7 +503,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, ns, dataChannel, versionControl, msg.oplogTransformOpts);
+        start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflictColl, msg.oplogTransformOpts);
       });
 
       // ignore kill signals

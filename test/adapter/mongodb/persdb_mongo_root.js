@@ -48,7 +48,7 @@ var collectionName3 = 'test3';
 var tasks = [];
 var tasks2 = [];
 
-var db, coll1, coll2, coll3;
+var db, coll1, coll2, coll3, conflictColl;
 var cons, silence;
 var chroot = '/var/persdb';
 var dbPath1 = '/test1_persdb_mongo_root'; // match with config files
@@ -83,6 +83,7 @@ tasks.push(function(done) {
                 coll1 = db.collection('test1');
                 coll2 = db.collection('test2');
                 coll3 = db.collection('test3');
+                conflictColl = db.collection('conflicts'); // default conflict collection
 
                 // ensure empty collections
                 coll1.remove(function(err) {
@@ -91,7 +92,10 @@ tasks.push(function(done) {
                     if (err) { throw err; }
                     coll3.remove(function(err) {
                       if (err) { throw err; }
-                      done();
+                      conflictColl.remove(function(err) {
+                        if (err) { throw err; }
+                        done();
+                      });
                     });
                   });
                 });
@@ -270,6 +274,8 @@ tasks.push(function(done) {
 });
 
 // test with empty collection and empty leveldb. spawn db, then save new objects in level via remote
+// because the merge handler only passes old confirmed objects, the fast-forward from foo Aaaa to Bbbb
+// should be saved in conflicts.
 tasks.push(function(done) {
   var opts = {
     onSpawn: function(child) {
@@ -321,7 +327,7 @@ tasks.push(function(done) {
       if (err) { throw err; }
 
       // inspect leveldb
-      // open and search in database if items are written, stage is cleared, versions are correct etc.
+      // open and search in database if items are written, stage is cleared up to Bbbb, versions are correct etc.
       level(chroot + dbPath3, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
         if (err) { throw err; }
 
@@ -353,15 +359,16 @@ tasks.push(function(done) {
         rs.on('end', function() {
           assert.strictEqual(i, 3);
 
-          // inspect stage tree, should be empty
+          // inspect stage tree, should only contain Bbbb (since the mongo adapter got that before confirming Aaaa so the merge handler sent { n: Bbbb, o: null }
           rs = mt.getStageTree().createReadStream();
           i = 0;
-          rs.on('data', function() {
+          rs.on('data', function(item) {
+            assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
             i++;
           });
 
           rs.on('end', function() {
-            assert.strictEqual(i, 0);
+            assert.strictEqual(i, 1);
 
             // inspect local tree
             rs = mt.getLocalTree().createReadStream();
@@ -369,29 +376,24 @@ tasks.push(function(done) {
             rs.on('data', function(item) {
               i++;
 
-              // merged in order of heads (bar, then foo)
               switch (i) {
               case 1:
                 assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
-                assert.equal(item.m._id, 'bar');
-                delete item.m;
-                assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 1 }, b: { } });
-                break;
-              case 2:
-                // don't expect meta info since it should be copied from the stage because of Bbbb
-                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe, i: 2 }, b: { } });
-                break;
-              case 3:
-                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
                 assert.equal(item.m._id, 'foo');
                 delete item.m;
-                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
+                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe, i: 1 }, b: { } });
+                break;
+              case 2:
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'bar');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 2 }, b: { } });
                 break;
               }
             });
 
             rs.on('end', function() {
-              assert.strictEqual(i, 3);
+              assert.strictEqual(i, 2);
 
               db.close();
 
@@ -401,15 +403,28 @@ tasks.push(function(done) {
 
                 assert.strictEqual(items.length, 2);
                 assert.deepEqual(items[0], { _id: 'bar' });
-                assert.deepEqual(items[1], { _id: 'foo', test: true });
-                done();
+                assert.deepEqual(items[1], { _id: 'foo' });
+
+                // inspect the conflict collection
+                conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+                  if (err) { throw err; }
+
+                  assert.strictEqual(items.length, 1);
+                  delete items[0]._id; // delete object id
+                  assert.deepEqual(items, [{
+                    n: { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } },
+                    o: null,
+                    c: null,
+                    err: 'E11000 duplicate key error index: pdb.test3.$_id_  dup key: { : "foo" }'
+                  }]);
+                  done();
+                });
               });
             });
           });
         });
       });
     },
-    echoOut: false,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
       assert(/client connected 127.0.0.1-/.test(stdout));
