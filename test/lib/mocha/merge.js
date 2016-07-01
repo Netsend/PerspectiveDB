@@ -530,6 +530,35 @@ describe('merge', function() {
           done();
         });
       });
+
+      it('should return lcas, even if there was a merge conflict', function(done) {
+        var vm1 = {
+          h: { id: id, v: 'x', pa: ['Aaaa'] },
+          b: {
+            foo: 'bar',
+            v: true
+          }
+        };
+        var vm2 = {
+          h: { id: id, v: 'y', pa: ['Aaaa'] },
+          b: {
+            foo: 'bar',
+            v: false
+          }
+        };
+
+        var x = streamifier([vm1].concat(dF));
+        var y = streamifier([vm2].concat(dF));
+
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY, lcas) {
+          should.equal(err.message, 'merge conflict');
+          should.deepEqual(err.conflict, ['v']);
+          should.equal(mergeX, null);
+          should.equal(mergeY, null);
+          should.deepEqual(lcas, ['Aaaa']);
+          done();
+        });
+      });
     });
 
     describe('delete one', function() {
