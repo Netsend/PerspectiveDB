@@ -2396,6 +2396,12 @@ describe('Tree', function() {
       { h: { id: 'XII', v: 'Cccc', i: 3, pa: [] } },
       { h: { id: 'XII', v: 'Dddd', i: 4, pa: ['Cccc'] } },
       { h: { id: 'XI', v: 'Eeee', i: 5, pa: ['Aaaa'] } },
+      { h: { id: 'XIII', v: 'Ffff', i: 6, pa: [] } },
+      [
+        { h: { id: 'YII', v: 'Xxxx', i: 47, pa: [] } },
+        { h: { id: 'YIII', v: 'Yyyy', i: 48, pa: [] } },
+        { h: { id: 'YIIII', v: 'Zzzz', i: 49, pa: [] } }
+      ],
     ];
 
     it('should return false on empty string', function() {
@@ -2410,20 +2416,22 @@ describe('Tree', function() {
       should.strictEqual(t.inBufferById('X'), false);
     });
 
-    it('should return true if id is just written and still in buffer', function() {
+    it('should return true if id is just written and still in buffer', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       t.write(items[0]);
       should.strictEqual(t.inBufferById('XI'), true);
+      t.end(done);
     });
 
-    it('should return false if id is already written and not in buffer', function() {
+    it('should return false if id is already written and not in buffer', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       should.strictEqual(t.inBufferById('XI'), false);
+      t.end(done);
     });
 
-    it('should return true if id is somewhere in the buffer', function() {
+    it('should return true if id is somewhere in the buffer', function(done) {
       var t = new Tree(db, name, { vSize: 3, log: silence });
 
       t.write(items[1]);
@@ -2433,6 +2441,25 @@ describe('Tree', function() {
       should.strictEqual(t.inBufferById('XII'), true);
       should.strictEqual(t.inBufferById('X'), false);
       should.strictEqual(t.inBufferById('XIII'), false);
+      t.end(done);
+    });
+
+    it('should return true if id is somewhere in an array item in the buffer', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[4]);
+      t.write(items[5]);
+      should.strictEqual(t.inBufferById('XI'), false);    // all flushed
+      should.strictEqual(t.inBufferById('XII'), false);
+      should.strictEqual(t.inBufferById('X'), false);
+      should.strictEqual(t.inBufferById('XIII'), true);
+
+      should.strictEqual(t.inBufferById('XIIII'), false);
+      should.strictEqual(t.inBufferById('YI'), false);
+      should.strictEqual(t.inBufferById('YIIII'), true);
+      should.strictEqual(t.inBufferById('YII'), true);
+      should.strictEqual(t.inBufferById('YIII'), true);
+      t.end(done);
     });
   });
 
@@ -2445,6 +2472,12 @@ describe('Tree', function() {
       { h: { id: 'XI', v: 'Cccc', i: 3, pa: ['Bbbb'] } },
       { h: { id: 'XI', v: 'Dddd', i: 4, pa: ['Cccc'] } },
       { h: { id: 'XI', v: 'Eeee', i: 5, pa: ['Dddd'] } },
+      { h: { id: 'XI', v: 'Ffff', i: 6, pa: ['Dddd'] } },
+      [
+        { h: { id: 'YI', v: 'Xxxx', i: 47, pa: [] } },
+        { h: { id: 'YI', v: 'Yyyy', i: 48, pa: ['Xxxx'] } },
+        { h: { id: 'YI', v: 'Zzzz', i: 49, pa: ['Xxxx'] } }
+      ],
     ];
 
     it('should return false on empty string', function() {
@@ -2484,6 +2517,28 @@ describe('Tree', function() {
       should.strictEqual(t.inBufferByVersion('Dddd'), true);
       should.strictEqual(t.inBufferByVersion('Eeee'), false);
       should.strictEqual(t.inBufferByVersion('Ffff'), false);
+      should.strictEqual(t.inBufferByVersion('Oooo'), false);
+      should.strictEqual(t.inBufferByVersion('Xxxx'), false);
+      should.strictEqual(t.inBufferByVersion('Yyyy'), false);
+      should.strictEqual(t.inBufferByVersion('Zzzz'), false);
+    });
+
+    it('should return true if version is somewhere in an array in the buffer', function() {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+
+      t.write(items[4]);
+      t.write(items[5]);
+      t.write(items[6]);
+      should.strictEqual(t.inBufferByVersion('Aaaa'), false);
+      should.strictEqual(t.inBufferByVersion('Bbbb'), false);
+      should.strictEqual(t.inBufferByVersion('Cccc'), false);
+      should.strictEqual(t.inBufferByVersion('Dddd'), false);
+      should.strictEqual(t.inBufferByVersion('Eeee'), true);
+      should.strictEqual(t.inBufferByVersion('Ffff'), true);
+      should.strictEqual(t.inBufferByVersion('Oooo'), false);
+      should.strictEqual(t.inBufferByVersion('Xxxx'), true);
+      should.strictEqual(t.inBufferByVersion('Yyyy'), true);
+      should.strictEqual(t.inBufferByVersion('Zzzz'), true);
     });
   });
 
