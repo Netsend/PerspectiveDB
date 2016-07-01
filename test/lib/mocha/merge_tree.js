@@ -100,16 +100,15 @@ describe('MergeTree', function() {
   describe('_createMergeStream', function() {
     var sname = '_createMergeStream_foo';
     var localName = '_local_createMergeStream';
-    var stageName = '_stage_createMergeStream';
 
     describe('empty databases and root merge', function() {
       // use 24-bit version numbers (base 64)
-      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { some: 'body' } };
+      var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [], i: 1 },       b: { some: 'body' } };
 
-      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { some: 'body' } };
+      var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },       b: { some: 'body' } };
 
-      it('should return and do nothing if both local and stage are empty', function(done) {
-        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+      it('should return and do nothing if local and remote are empty', function(done) {
+        var opts = { local: localName + '1', perspectives: [ sname ], vSize: 3, log: silence };
         var mt = new MergeTree(db, opts);
         var ms = mt._createMergeStream();
         ms.on('error', done);
@@ -128,8 +127,15 @@ describe('MergeTree', function() {
         });
       });
 
+      it('should save remote items in remote tree', function(done) {
+        var opts = { perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var stree = mt._pe[sname];
+        stree.write(sitem1, done);
+      });
+
       it('should merge sitem1 (fast-forward) because it misses in local', function(done) {
-        var opts = { local: localName + '2', stage: stageName + '2', perspectives: [ sname ], vSize: 3, log: silence };
+        var opts = { local: localName + '2', perspectives: [ sname ], vSize: 3, log: silence };
         var mt = new MergeTree(db, opts);
         var ms = mt._createMergeStream();
         ms.on('error', done);
@@ -145,7 +151,8 @@ describe('MergeTree', function() {
 
           should.deepEqual(obj, {
             n: { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [], i: 1 }, b: { some: 'body' } },
-            o: null,
+            l: null,
+            lcas: [],
             c: null
           });
           i++;
@@ -157,8 +164,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 0, conflict: 0, deleted: 0 } },
-              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              '_createMergeStream_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStream_foo': { heads: { count: 1, conflict: 0, deleted: 0 } }
             });
             done();
           });
@@ -168,7 +175,7 @@ describe('MergeTree', function() {
 
       it('should update last version in local to sitem1 if litem1 is already in local', function(done) {
         // this happens when a new remote is added that is a subset of the existing items
-        var opts = { local: localName + '3', stage: stageName + '3', perspectives: [ sname ], vSize: 3, log: silence };
+        var opts = { local: localName + '3', perspectives: [ sname ], vSize: 3, log: silence };
         var mt = new MergeTree(db, opts);
 
         var ms = mt._createMergeStream();
@@ -193,7 +200,7 @@ describe('MergeTree', function() {
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 0 } },
               stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
-              '_createMergeStream_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              '_createMergeStream_foo': { heads: { count: 1, conflict: 0, deleted: 0 } }
             });
             done();
           });
@@ -204,7 +211,6 @@ describe('MergeTree', function() {
     describe('merge one and two heads in stree', function() {
       var sname = '_createMergeStreamOneTwoHeads_foo';
       var localName = '_local_oneTwoHeadsMergeStageWithLocal';
-      var stageName = '_stage_oneTwoHeadsMergeStageWithLocal';
 
       // use 24-bit version numbers (base 64)
       var sitem1 = { h: { id: 'XI', v: 'Aaaa', pe: sname, pa: [] },       b: { more1: 'body' } };
@@ -213,13 +219,21 @@ describe('MergeTree', function() {
 
       var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },       b: { more1: 'body' } };
 
+      it('should save remote items in remote tree', function(done) {
+        var opts = { perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var stree = mt._pe[sname];
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.write(sitem3, done);
+      });
+
       it('should merge sitem2 with local (fast-forward)', function(done) {
-        var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
+        var opts = { local: localName + '1', perspectives: [ sname ], vSize: 3, log: silence };
         var mt = new MergeTree(db, opts);
         var ms = mt._createMergeStream();
         ms.on('error', done);
 
-        // write litem1 to ltree
         // write sitem1 to ltree to update perspective
         // write sitem1 to merge stream
         // write sitem2 to merge stream
@@ -237,8 +251,9 @@ describe('MergeTree', function() {
         var i = 0;
         ms.on('data', function(obj) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 1 }, b: { more2: 'body' } }, // h.i is from stage
-            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } }, // h.i is from stage
+            l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+            lcas: ['Aaaa'],
             c: null
           });
           i++;
@@ -250,8 +265,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 2, conflict: 0, deleted: 0 } }
             });
             done();
           });
@@ -259,7 +274,7 @@ describe('MergeTree', function() {
       });
 
       it('should merge sitem2 with litem2 (ff), sitem3 litem2 (merge)', function(done) {
-        var opts = { local: localName + '2', stage: stageName + '2', perspectives: [ sname ], vSize: 3, log: silence };
+        var opts = { local: localName + '2', perspectives: [ sname ], vSize: 3, log: silence };
         var mt = new MergeTree(db, opts);
 
         var ms = mt._createMergeStream();
@@ -287,15 +302,17 @@ describe('MergeTree', function() {
           i++;
           if (i === 1) {
             should.deepEqual(obj, {
-              n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 1 }, b: { more2: 'body' } },
-              o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
+              l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              lcas: ['Aaaa'],
               c: null
             });
           }
           if (i === 2) {
             should.deepEqual(obj, {
-              n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more3: 'body' } },
-              o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 3 }, b: { more3: 'body' } },
+              l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              lcas: ['Aaaa'],
               c: null
             });
             /* TODO: subsequent merges should be based on all non-conflicting heads in the stage
@@ -314,8 +331,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              stage: { heads: { count: 2, conflict: 0, deleted: 0 } },
-              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStreamOneTwoHeads_foo': { heads: { count: 2, conflict: 0, deleted: 0 } }
             });
             done();
           });
@@ -335,6 +352,15 @@ describe('MergeTree', function() {
 
       var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
       var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('should save remote items in remote tree', function(done) {
+        var opts = { perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var stree = mt._pe[sname];
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.write(sitem3, done);
+      });
 
       it('should merge sitem2 with litem1 (merge ff in ltree)', function(done) {
         var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
@@ -361,8 +387,9 @@ describe('MergeTree', function() {
         ms.on('data', function(obj) {
           i++;
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 1 }, b: { more2: 'body' } },
-            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } },
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { some: 'body' } },
+            lcas: ['Aaaa'],
             c: null
           });
         });
@@ -373,8 +400,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              stage: { heads: { count: 1, conflict: 0, deleted: 1 } },
-              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 2, conflict: 0, deleted: 1 } }
             });
             done();
           });
@@ -411,8 +438,9 @@ describe('MergeTree', function() {
         ms.on('data', function(obj) {
           i++;
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 2 }, b: { more2: 'body', more3: 'body' } },
-            o: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            n: { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'] }, b: { more2: 'body', more3: 'body' } },
+            l: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            lcas: ['Aaaa'], // XXX: shouldn't this be Bbbb?
             c: null
           });
         });
@@ -422,8 +450,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 1 } },
-              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              '_createMergeStreamTwoHeadsOneDelete_foo': { heads: { count: 2, conflict: 0, deleted: 1 } }
             });
             done();
           });
@@ -443,6 +471,15 @@ describe('MergeTree', function() {
 
       var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                b: { some: 'body' } };
       var litem2 = { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true }, b: { more2: 'body' } };
+
+      it('should save remote items in remote tree', function(done) {
+        var opts = { perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var stree = mt._pe[sname];
+        stree.write(sitem1);
+        stree.write(sitem2);
+        stree.write(sitem3, done);
+      });
 
       it('should have one deleted head in local and one head in stage, merge sitem3 (new root)', function(done) {
         var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
@@ -468,8 +505,9 @@ describe('MergeTree', function() {
         var i = 0;
         ms.on('data', function(obj) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'], i: 1 }, b: { more3: 'body' } },
-            o: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Bbbb'], i: 3 }, b: { more3: 'body' } },
+            l: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], d: true, i: 2 }, b: { more2: 'body' } },
+            lcas: ['Bbbb'],
             c: null
           });
           i++;
@@ -481,8 +519,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 1 } },
-              stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              _createMergeStreamNewRootAfterDelete_foo: { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              _createMergeStreamNewRootAfterDelete_foo: { heads: { count: 1, conflict: 0, deleted: 0 } }
             });
             done();
           });
@@ -501,6 +539,14 @@ describe('MergeTree', function() {
 
       var litem1 = { h: { id: 'XI', v: 'Aaaa', pa: [] },                  b: { some: 'body' } };
       var litem2 = { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'] },            b: { more2: 'other' } };
+
+      it('should save remote items in remote tree', function(done) {
+        var opts = { perspectives: [ sname ], vSize: 3, log: silence };
+        var mt = new MergeTree(db, opts);
+        var stree = mt._pe[sname];
+        stree.write(sitem1);
+        stree.write(sitem2, done);
+      });
 
       it('should merge sitem2 with litem2, conflict on "more2"', function(done) {
         var opts = { local: localName + '1', stage: stageName + '1', perspectives: [ sname ], vSize: 3, log: silence };
@@ -524,8 +570,9 @@ describe('MergeTree', function() {
         var i = 0;
         ms.on('data', function(obj) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], c: true, i: 1 }, b: { more2: 'body' } },
-            o: { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 2 },            b: { more2: 'other' } },
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
+            l: { h: { id: 'XI', v: 'Cccc', pa: ['Aaaa'], i: 2 },            b: { more2: 'other' } },
+            lcas: ['Aaaa'],
             c: ['more2']
           });
           i++;
@@ -537,8 +584,8 @@ describe('MergeTree', function() {
             if (err) { throw err; }
             should.deepEqual(stats, {
               local: { heads: { count: 1, conflict: 0, deleted: 0 } },
-              stage: { heads: { count: 1, conflict: 1, deleted: 0 } }, // should have marked in conflict
-              '_createMergeStreamTwoHeadsOneConflict_foo': { heads: { count: 0, conflict: 0, deleted: 0 } }
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } }, // should have marked in conflict
+              '_createMergeStreamTwoHeadsOneConflict_foo': { heads: { count: 1, conflict: 0, deleted: 0 } }
             });
             done();
           });
