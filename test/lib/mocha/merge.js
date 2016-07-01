@@ -485,6 +485,26 @@ describe('merge', function() {
         });
       });
 
+      it('should return the lca(s) as well', function(done) {
+        var vm1 = {
+          h: { id: id, v: 'x', pa: ['Aaaa'] },
+          b: { a: true }
+        };
+        var vm2 = {
+          h: { id: id, v: 'y', pa: ['Aaaa'] },
+          b: { b: true }
+        };
+
+        var x = streamifier([vm1].concat(dF));
+        var y = streamifier([vm2].concat(dF));
+
+        merge(x, y, { log: silence }, function(err, mergeX, mergeY, lcas) {
+          if (err) { throw err; }
+          should.deepEqual(lcas, ['Aaaa']);
+          done();
+        });
+      });
+
       it('should not merge conflicting virtual merges', function(done) {
         var vm1 = {
           h: { id: id, v: 'x', pa: ['Aaaa'] },
