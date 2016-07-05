@@ -33,7 +33,6 @@ var BSONStream = require('bson-stream');
 var level = require('level-packager')(require('leveldown'));
 var rimraf = require('rimraf');
 var bson = require('bson');
-var xtend = require('xtend');
 
 var BSON = new bson.BSONPure.BSON();
 
@@ -454,17 +453,17 @@ tasks.push(function(done) {
         var obj = BSON.deserialize(data);
         assert.deepEqual(obj, {
           n: {
-            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
+            h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz' },
             b: { some: true }
           },
-          o: null,
+          l: null,
+          lcas: [],
+          pe: 'baz',
           c: null
         });
 
         // confirm merge
-        var confirm = xtend(obj.n);
-        delete confirm.h.pa;
-        conn.end(BSON.serialize(obj.n), function() {
+        conn.end(data, function() {
           server.close(function() {
             server2.close(function() {
               child.send({ type: 'kill' });
@@ -595,20 +594,21 @@ tasks.push(function(done) {
         var obj = BSON.deserialize(data);
         assert.deepEqual(obj, {
           n: {
-            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz', i: 1 },
+            h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: 'baz' },
             b: { some: 'other' }
           },
-          o: {
+          l: {
             h: { id: 'abd', v: 'Aaaa', pa: [], pe: 'baz', i: 1 },
             b: { some: true }
           },
+          lcas: ['Aaaa'],
+          pe: 'baz',
           c: null
         });
 
+
         // confirm merge
-        var confirm = xtend(obj.n);
-        delete confirm.h.pa;
-        conn.end(BSON.serialize(obj.n), function() {
+        conn.end(data, function() {
           server.close(function() {
             server2.close(function() {
               child.send({ type: 'kill' });
@@ -831,17 +831,17 @@ tasks.push(function(done) {
         var obj = BSON.deserialize(data);
         assert.deepEqual(obj, {
           n: {
-            h: { id: 'def', v: 'Dddd', pa: [], pe: 'baz', i: 1 },
+            h: { id: 'def', v: 'Dddd', pa: [], pe: 'baz' },
             b: { other: false } // should have stripped "some"
           },
-          o: null,
+          l: null,
+          lcas: [],
+          pe: 'baz',
           c: null
         });
 
         // confirm merge
-        var confirm = xtend(obj.n);
-        delete confirm.h.pa;
-        conn.end(BSON.serialize(obj.n), function() {
+        conn.end(data, function() {
           server.close(function() {
             server2.close(function() {
               child.send({ type: 'kill' });
@@ -972,7 +972,7 @@ tasks.push(function(done) {
         h: { id: 'abd', v: 'Aaaa' },
         b: { some: true }
       };
-      conn.end(BSON.serialize(obj), function() {
+      conn.end(BSON.serialize({ n: obj }), function() {
         server.close(function() {
           child.send({ type: 'kill' });
         });
