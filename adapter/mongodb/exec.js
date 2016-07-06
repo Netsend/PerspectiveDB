@@ -157,7 +157,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
         return;
       }
 
-      log.debug('conflict saved %j', obj.n.h);
+      log.debug('conflict saved %j, op: %s', obj.n.h, r.result.opTime);
       cb();
     });
   }
@@ -201,7 +201,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
         if (!r.insertedCount) {
           log.notice('NO insert %j', obj.n.h);
         } else {
-          log.debug('insert %j', obj.n.h);
+          log.debug('insert %j, op: %s', obj.n.h, r.result.lastOp);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
           expected.push(obj);
@@ -223,7 +223,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
         if (!r.deletedCount) {
           log.notice('NO delete %j', obj.o.h);
         } else {
-          log.debug('delete %j', obj.o.h);
+          log.debug('delete %j, op: %s', obj.o.h, r.result.lastOp);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
           expected.push(obj);
@@ -245,7 +245,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
         if (!r.lastErrorObject.n) {
           log.notice('NO update %j', obj.n.h);
         } else {
-          log.debug('update %j', obj.n.h);
+          log.debug('update %j, op: %s', obj.n.h, r.result.lastOp);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
           expected.push(obj);
