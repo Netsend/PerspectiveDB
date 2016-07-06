@@ -183,13 +183,15 @@ tasks.push(function(done) {
     var obj = bs.read();
     if (!obj) { return; }
 
-    var ts = obj.m._op;
+    var ts = obj.n.m._op;
     var now = new Timestamp(0, (new Date()).getTime() / 1000);
     assert.strictEqual(ts.greaterThan(now), true);
     assert.deepEqual(obj, {
-      h: { id: collectionName + '\x01foo' },
-      m: { _op: ts, _id: 'foo' },
-      b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
+      n: {
+        h: { id: collectionName + '\x01foo' },
+        m: { _op: ts, _id: 'foo' },
+        b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
+      }
     });
     child.send({ type: 'kill' });
   });

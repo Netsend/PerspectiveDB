@@ -489,9 +489,11 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
         // put id in meta info and remove it from the body
         delete newObj._id;
         var obj = {
-          h: { id: dagItem.h.id },
-          m: { _op: oplogItem.ts, _id: oplogItem.o2._id },
-          b: newObj
+          n: {
+            h: { id: dagItem.h.id },
+            m: { _op: oplogItem.ts, _id: oplogItem.o2._id },
+            b: newObj
+          }
         };
         cb(null, bson ? BSON.serialize(obj) : obj);
       });
@@ -533,8 +535,8 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     var copy = xtend(oplogItem.o);
     delete copy._id;
     if (!that._expected.some(function(item, i) {
-      if (item.h.id === upstreamId && isEqual(copy, item.b)) {
-        that._log.debug2('ot _applyOplogFullDoc ACK %j %d (%d)', item.h, i, that._expected.length);
+      if (item.n.h.id === upstreamId && isEqual(copy, item.n.b)) {
+        that._log.debug2('ot _applyOplogFullDoc ACK %j %d (%d)', item.n.h, i, that._expected.length);
         obj = that._expected.splice(i, 1)[0];
         return true;
       }
@@ -542,11 +544,13 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
     })) {
       that._log.debug2('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
-        h: { id: upstreamId },
-        b: copy
+        n: {
+          h: { id: upstreamId },
+          b: copy
+        }
       };
     }
-    obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
+    obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
@@ -616,8 +620,8 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
 
     // check if this is a confirmation by the adapter or a third party update
     if (!that._expected.some(function(item, i) {
-      if (item.h.id === upstreamId && item.h.d) {
-        that._log.debug2('ot _applyOplogDeleteItem ACK %j %d (%d)', item.h, i, that._expected.length);
+      if (item.n.h.id === upstreamId && item.n.h.d) {
+        that._log.debug2('ot _applyOplogDeleteItem ACK %j %d (%d)', item.n.h, i, that._expected.length);
         obj = that._expected.splice(i, 1)[0];
         return true;
       }
@@ -625,13 +629,15 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
     })) {
       that._log.debug2('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
-        h: {
-          id: upstreamId,
-          d: true,
-        },
+        n: {
+          h: {
+            id: upstreamId,
+            d: true,
+          },
+        }
       };
     }
-    obj.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
+    obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
 
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });

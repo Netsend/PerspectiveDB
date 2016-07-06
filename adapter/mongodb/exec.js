@@ -204,7 +204,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
           log.debug('insert %j', obj.n.h);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
-          expected.push(obj.n);
+          expected.push(obj);
         }
       });
     } else if (obj.n.h.d === true) { // delete
@@ -226,7 +226,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
           log.debug('delete %j', obj.o.h);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
-          expected.push(obj.n);
+          expected.push(obj);
         }
       });
     } else { // update
@@ -248,7 +248,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
           log.debug('update %j', obj.n.h);
           // remove parent so that this item can be used later as a local confirmation
           delete obj.n.h.pa;
-          expected.push(obj.n);
+          expected.push(obj);
         }
       });
     }

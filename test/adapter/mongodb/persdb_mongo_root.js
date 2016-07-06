@@ -339,9 +339,8 @@ tasks.push(function(done) {
         });
 
         // inspect perspective tree
-        var rs = mt._pe[pe].createReadStream();
         var i = 0;
-        rs.on('data', function(item) {
+        mt._pe[pe].createReadStream().on('data', function(item) {
           i++;
           switch (i) {
           case 1:
@@ -354,71 +353,56 @@ tasks.push(function(done) {
             assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
             break;
           }
-        });
-
-        rs.on('end', function() {
+        }).on('end', function() {
           assert.strictEqual(i, 3);
 
-          // inspect stage tree, should only contain Bbbb (since the mongo adapter got that before confirming Aaaa so the merge handler sent { n: Bbbb, o: null }
-          rs = mt.getStageTree().createReadStream();
+          // inspect local tree
           i = 0;
-          rs.on('data', function(item) {
-            assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
+          mt.getLocalTree().createReadStream().on('data', function(item) {
             i++;
-          });
 
-          rs.on('end', function() {
-            assert.strictEqual(i, 1);
+            switch (i) {
+            case 1:
+              assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+              assert.equal(item.m._id, 'foo');
+              delete item.m;
+              assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe, i: 1 }, b: { } });
+              break;
+            case 2:
+              assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+              assert.equal(item.m._id, 'bar');
+              delete item.m;
+              assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 2 }, b: { } });
+              break;
+            }
+          }).on('end', function() {
+            assert.strictEqual(i, 2);
 
-            // inspect local tree
-            rs = mt.getLocalTree().createReadStream();
-            i = 0;
-            rs.on('data', function(item) {
-              i++;
+            db.close();
 
-              switch (i) {
-              case 1:
-                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
-                assert.equal(item.m._id, 'foo');
-                delete item.m;
-                assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Aaaa', pa: [], pe: pe, i: 1 }, b: { } });
-                break;
-              case 2:
-                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
-                assert.equal(item.m._id, 'bar');
-                delete item.m;
-                assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 2 }, b: { } });
-                break;
-              }
-            });
+            // inspect the mongodb collection
+            coll3.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+              if (err) { throw err; }
 
-            rs.on('end', function() {
-              assert.strictEqual(i, 2);
+              assert.strictEqual(items.length, 2);
+              assert.deepEqual(items[0], { _id: 'bar' });
+              assert.deepEqual(items[1], { _id: 'foo' });
 
-              db.close();
-
-              // inspect the mongodb collection
-              coll3.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+              // inspect the conflict collection, should only contain Bbbb (since the mongo adapter got that before confirming Aaaa so the merge handler sent { n: Bbbb, l: null }
+              conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
                 if (err) { throw err; }
 
-                assert.strictEqual(items.length, 2);
-                assert.deepEqual(items[0], { _id: 'bar' });
-                assert.deepEqual(items[1], { _id: 'foo' });
-
-                // inspect the conflict collection
-                conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
-                  if (err) { throw err; }
-
-                  assert.strictEqual(items.length, 1);
-                  delete items[0]._id; // delete object id
-                  assert.deepEqual(items, [{
-                    n: { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } },
-                    o: null,
-                    c: null,
-                    err: 'E11000 duplicate key error index: pdb.test3.$_id_  dup key: { : "foo" }'
-                  }]);
-                  done();
-                });
+                assert.strictEqual(items.length, 1);
+                delete items[0]._id; // delete object id
+                assert.deepEqual(items, [{
+                  n: { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe }, b: { test: true } },
+                  l: null,
+                  lcas: [],
+                  pe: pe,
+                  c: null,
+                  err: 'E11000 duplicate key error index: pdb.test3.$_id_  dup key: { : "foo" }'
+                }]);
+                done();
               });
             });
           });
