@@ -189,10 +189,11 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
         if (obj.l == null) { throw new Error('local head expected'); }
         // put mongo id back on the document
         coll.findOneAndDelete(xtend(obj.l.b, { _id: mongoId }), function(err, r) {
-          if (err) {
+          if (err || !r.ok) {
+            log.notice('NO delete %j, err: %s', obj.l.h, err);
             // remove from expected
             findAndDelete(expected, item => { item === obj; });
-            obj.err = err.message;
+            obj.err = err ? err.message : new Error('delete failed');
             saveConflict(obj, function(err2) {
               if (err2) {
                 log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
@@ -203,23 +204,18 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
             });
             return;
           }
-          if (!r.ok) {
-            log.notice('NO delete %j', obj.l.h);
-            // remove from expected
-            findAndDelete(expected, item => { item === obj; });
-          } else {
-            log.debug('delete %j', obj.l.h);
-          }
+          log.debug('delete %j', obj.l.h);
           cb();
         });
       } else if (obj.l == null || obj.l.b == null) { // insert
         if (obj.n == null) { throw new Error('new object expected'); }
         // put either mongo id or h.id back on the document
         coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-          if (err) {
+          if (err || !r.insertedCount) {
+            log.notice('NO insert %j', obj.n.h);
             // remove from expected
             findAndDelete(expected, item => { item === obj; });
-            obj.err = err.message;
+            obj.err = err ? err.message : new Error('insert failed');
             saveConflict(obj, function(err2) {
               if (err2) {
                 log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
@@ -230,22 +226,17 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
             });
             return;
           }
-          if (!r.insertedCount) {
-            log.notice('NO insert %j', obj.n.h);
-            // remove from expected
-            findAndDelete(expected, item => { item === obj; });
-          } else {
-            log.debug('insert %j', obj.n.h);
-          }
+          log.debug('insert %j', obj.n.h);
           cb();
         });
       } else { // update
         // put mongo id back on the document
         coll.findOneAndReplace(obj.l.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-          if (err) {
+          if (err || !r.ok) {
+            log.notice('NO update %j', obj.n.h);
             // remove from expected
             findAndDelete(expected, item => { item === obj; });
-            obj.err = err.message;
+            obj.err = err ? err.message : new Error('update failed');
             saveConflict(obj, function(err2) {
               if (err2) {
                 log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
@@ -256,13 +247,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
             });
             return;
           }
-          if (!r.ok) {
-            log.notice('NO update %j', obj.n.h);
-            // remove from expected
-            findAndDelete(expected, item => { item === obj; });
-          } else {
-            log.debug('update %j', obj.n.h);
-          }
+          log.debug('update %j', obj.n.h);
           cb();
         });
       }
