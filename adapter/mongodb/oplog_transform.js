@@ -28,6 +28,8 @@ var BSONStream = require('bson-stream');
 var isEqual = require('is-equal');
 var xtend = require('xtend');
 
+var findAndDelete = require('./find_and_delete');
+
 var BSON = new bson.BSONPure.BSON();
 var Transform = stream.Transform;
 
@@ -526,22 +528,20 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
   var opts = this._opts;
 
   process.nextTick(function() {
-    var obj;
-
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
     // copy without b._id (not saved in level)
     var copy = xtend(oplogItem.o);
     delete copy._id;
-    if (!that._expected.some(function(item, i) {
-      if (item.n.h.id === upstreamId && isEqual(copy, item.n.b)) {
-        that._log.debug2('ot _applyOplogFullDoc ACK %j %d (%d)', item.n.h, i, that._expected.length);
-        obj = that._expected.splice(i, 1)[0];
-        return true;
-      }
-      return false;
-    })) {
+
+    var obj = findAndDelete(that._expected, function(item) {
+      return item.n.h.id === upstreamId && isEqual(copy, item.n.b);
+    });
+
+    if (obj) {
+      that._log.debug2('ot _applyOplogFullDoc ACK %j (%d)', obj.n.h, that._expected.length);
+    } else {
       that._log.debug2('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         n: {
@@ -614,19 +614,16 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
   var that = this;
   var opts = this._opts;
   process.nextTick(function() {
-    var obj;
-
     var upstreamId = that._createUpstreamId(oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
-    if (!that._expected.some(function(item, i) {
-      if (item.n.h.id === upstreamId && item.n.h.d) {
-        that._log.debug2('ot _applyOplogDeleteItem ACK %j %d (%d)', item.n.h, i, that._expected.length);
-        obj = that._expected.splice(i, 1)[0];
-        return true;
-      }
-      return false;
-    })) {
+    var obj = findAndDelete(that._expected, function(item) {
+      return item.n.h.id === upstreamId && item.n.h.d;
+    });
+
+    if (obj) {
+      that._log.debug2('ot _applyOplogDeleteItem ACK %j (%d)', obj.n.h, that._expected.length);
+    } else {
       that._log.debug2('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
       obj = {
         n: {
