@@ -34,6 +34,7 @@ var mongodb = require('mongodb');
 
 var config = require('./config.json');
 var logger = require('../../../lib/logger');
+var spawn = require('../../lib/spawn');
 
 var BSON = new bson.BSONPure.BSON();
 var MongoClient = mongodb.MongoClient;
@@ -50,8 +51,10 @@ function lnr() {
 var cons, silence, db, oplogColl;
 var databaseName = 'test_exec_root';
 var collectionName = 'test_exec_root';
+var collectionName2 = 'test_exec_root2';
 var oplogDbName = 'local';
 var oplogCollName = 'oplog.$main';
+var coll1, coll2, conflictColl;
 
 // open loggers and a connection to the database
 tasks.push(function(done) {
@@ -64,8 +67,22 @@ tasks.push(function(done) {
       MongoClient.connect(config.url, function(err, dbc) {
         if (err) { throw err; }
         db = dbc.db(databaseName);
-        db.collection(collectionName).deleteMany({}, done);
+        coll1 = db.collection(collectionName);
+        coll2 = db.collection(collectionName2);
         oplogColl = dbc.db(oplogDbName).collection(oplogCollName);
+        conflictColl = db.collection('conflicts'); // default conflict collection
+
+        // ensure empty collections
+        coll1.remove(function(err) {
+          if (err) { throw err; }
+          coll2.remove(function(err) {
+            if (err) { throw err; }
+            conflictColl.remove(function(err) {
+              if (err) { throw err; }
+              done();
+            });
+          });
+        });
       });
     });
   });
@@ -220,8 +237,7 @@ tasks.push(function(done) {
         }));
 
         // and insert an item into the collection
-        var coll = db.collection(collectionName);
-        coll.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
+        coll1.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
           if (err) { throw err; }
         });
       });
@@ -278,6 +294,108 @@ tasks.push(function(done) {
       throw new Error('unknown state');
     }
   });
+});
+
+// should save a merge in the conflict collection if the local head does not match the item in the collection
+// conflict = delete merge item with nothing in the collection
+tasks.push(function(done) {
+  function onMessage(msg, child) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: logger.DEBUG2 },
+        coll: collectionName2,
+        url: config.url,
+        oplogTransformOpts: {
+          awaitData: false // speedup tests
+        }
+      });
+      break;
+    case 'listen':
+      var dataChannel = child.stdio[6];
+      var versionControl = child.stdio[7];
+      var pe = 'baz';
+
+      // expect one version request (for the last version in the DAG)
+      var i = 0;
+      versionControl.pipe(new LDJSONStream()).on('data', function(data) {
+        i++;
+        assert.equal(i, 1);
+        assert.deepEqual(data, { id: null });
+
+        // send something to prevent bootstrapping an empty tree
+        var future = new Timestamp(0, (new Date()).getTime() / 1000 + 1); // in the future so no oplog items exist yet
+        versionControl.write(BSON.serialize({
+          h: { id: collectionName2 + '\x01qux' },
+          m: { _op: future, _id: 'qux' },
+          b: {}
+        }), function(err) {
+          if (err) { throw err; }
+
+          // real test starts here
+          // the presumed merge/delete item
+          dataChannel.write(BSON.serialize({
+            n: {
+              h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
+              b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
+            },
+            l: null,
+            lcas: [],
+            pe: pe,
+            c: null
+          }), function(err) {
+            // wait a while and inspect collections
+            setTimeout(function() {
+              if (err) { throw err; }
+
+              // collection itself should be empty
+              coll2.find({}).toArray(function(err, items) {
+                if (err) { throw err; }
+                assert.strictEqual(items.length, 0);
+
+                // conflict collection should contain the just sent item with a delete error
+                conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+                  if (err) { throw err; }
+
+                  assert.strictEqual(items.length, 1);
+                  delete items[0]._id; // delete object id
+                  assert.deepEqual(items, [{
+                    n: {
+                      h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
+                      b: { bar: 'baz' }
+                    },
+                    l: null,
+                    lcas: [],
+                    pe: pe,
+                    c: null,
+                    err: 'local head expected' // delete error
+                  }]);
+                  child.send({ type: 'kill' });
+                });
+              });
+            }, 100);
+          });
+        });
+      });
+      break;
+    default:
+      console.error(msg);
+      throw new Error('unknown state');
+    }
+  }
+
+  var opts = {
+    onMessage: onMessage,
+    onExit: done
+  };
+
+  var spawnOpts = {
+    cwd: '/',
+    env: {},
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
+  };
+
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 async.series(tasks, function(err) {
