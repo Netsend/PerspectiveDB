@@ -33,6 +33,7 @@ if (typeof process.send !== 'function') {
 }
 
 var net = require('net');
+var stream = require('stream');
 var url = require('url');
 
 var async = require('async');
@@ -42,6 +43,7 @@ var mongodb = require('mongodb');
 var posix = require('posix');
 var xtend = require('xtend');
 
+var findAndDelete = require('./find_and_delete');
 var logger = require('../../lib/logger');
 var noop = require('../../lib/noop');
 var OplogTransform = require('./oplog_transform');
@@ -162,96 +164,110 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
     });
   }
 
-  var bs = new BSONStream();
-  dataChannel.pipe(bs).on('readable', function() {
-    var obj = bs.read();
+  dataChannel.pipe(new BSONStream()).pipe(new stream.Writable({
+    objectMode: true,
+    write: function(obj, enc, cb) {
+      if (obj.c) {
+        saveConflict(obj, function(err2) {
+          if (err2) {
+            log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, obj.c);
+            cb(err2);
+            return;
+          }
+          cb();
+        });
+        return;
+      }
 
-    if (!obj) {
-      log.notice('local data channel closed, expecting shutdown');
-      return;
+      log.debug('new item %j', obj.n.h);
+
+      // expect this item back via the oplog if all goes well
+      expected.push(obj);
+
+      var mongoId = getMongoId(obj);
+      if (obj.o == null || obj.o.b == null) { // insert
+        if (obj.n == null) { throw new Error('new object expected'); }
+        // put either mongo id or h.id back on the document
+        coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
+          if (err) {
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+            obj.err = err.message;
+            saveConflict(obj, function(err2) {
+              if (err2) {
+                log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+                cb(err2);
+                return;
+              }
+              cb();
+            });
+            return;
+          }
+          if (!r.insertedCount) {
+            log.notice('NO insert %j', obj.n.h);
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+          } else {
+            log.debug('insert %j, op: %s', obj.n.h, r.result.lastOp);
+          }
+          cb();
+        });
+      } else if (obj.n.h.d === true) { // delete
+        if (obj.o == null) { throw new Error('old object expected'); }
+        coll.deleteOne({ _id: mongoId }, function(err, r) {
+          if (err) {
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+            obj.err = err.message;
+            saveConflict(obj, function(err2) {
+              if (err2) {
+                log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+                cb(err2);
+                return;
+              }
+              cb();
+            });
+            return;
+          }
+          if (!r.deletedCount) {
+            log.notice('NO delete %j', obj.o.h);
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+          } else {
+            log.debug('delete %j, op: %s', obj.o.h, r.result.lastOp);
+          }
+          cb();
+        });
+      } else { // update
+        // put mongo id back on the document
+        coll.findOneAndReplace(obj.o.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
+          if (err) {
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+            obj.err = err.message;
+            saveConflict(obj, function(err2) {
+              if (err2) {
+                log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
+                cb(err2);
+                return;
+              }
+              cb();
+            });
+            return;
+          }
+          if (!r.lastErrorObject.n) {
+            log.notice('NO update %j', obj.n.h);
+            // remove from expected
+            findAndDelete(expected, item => { item === obj; });
+          } else {
+            log.debug('update %j, op: %s', obj.n.h, r.result.lastOp);
+          }
+          cb();
+        });
+      }
     }
-
-    if (obj.c) {
-      saveConflict(obj, function(err2) {
-        if (err2) {
-          log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, obj.c);
-          throw err2;
-        }
-      });
-      return;
-    }
-
-    log.debug('new item %j', obj.n.h);
-
-    var mongoId = getMongoId(obj);
-    if (obj.o == null || obj.o.b == null) { // insert
-      if (obj.n == null) { throw new Error('new object expected'); }
-      // put either mongo id or h.id back on the document
-      coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-        if (err) {
-          obj.err = err.message;
-          saveConflict(obj, function(err2) {
-            if (err2) {
-              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
-              throw err2;
-            }
-          });
-          return;
-        }
-        if (!r.insertedCount) {
-          log.notice('NO insert %j', obj.n.h);
-        } else {
-          log.debug('insert %j, op: %s', obj.n.h, r.result.lastOp);
-          // remove parent so that this item can be used later as a local confirmation
-          delete obj.n.h.pa;
-          expected.push(obj);
-        }
-      });
-    } else if (obj.n.h.d === true) { // delete
-      if (obj.o == null) { throw new Error('old object expected'); }
-      coll.deleteOne({ _id: mongoId }, function(err, r) {
-        if (err) {
-          obj.err = err.message;
-          saveConflict(obj, function(err2) {
-            if (err2) {
-              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
-              throw err2;
-            }
-          });
-          return;
-        }
-        if (!r.deletedCount) {
-          log.notice('NO delete %j', obj.o.h);
-        } else {
-          log.debug('delete %j, op: %s', obj.o.h, r.result.lastOp);
-          // remove parent so that this item can be used later as a local confirmation
-          delete obj.n.h.pa;
-          expected.push(obj);
-        }
-      });
-    } else { // update
-      // put mongo id back on the document
-      coll.findOneAndReplace(obj.o.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-        if (err) {
-          obj.err = err.message;
-          saveConflict(obj, function(err2) {
-            if (err2) {
-              log.err('could not save conflicting object %s %j, original error %s', err2, obj.n.h, err);
-              throw err2;
-            }
-          });
-          return;
-        }
-        if (!r.lastErrorObject.n) {
-          log.notice('NO update %j', obj.n.h);
-        } else {
-          log.debug('update %j, op: %s', obj.n.h, r.result.lastOp);
-          // remove parent so that this item can be used later as a local confirmation
-          delete obj.n.h.pa;
-          expected.push(obj);
-        }
-      });
-    }
+  })).on('end', function() {
+    log.notice('local data channel closed, expecting shutdown');
   });
 }
 
