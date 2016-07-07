@@ -331,9 +331,11 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: collectionName + '\x01bar' },
-            m: { _op: new Timestamp(9, 1), _id: 'bar' },
-            b: { baz: 'foobar' }
+            n: {
+              h: { id: collectionName + '\x01bar' },
+              m: { _op: new Timestamp(9, 1), _id: 'bar' },
+              b: { baz: 'foobar' }
+            }
           });
           done();
         });
@@ -370,9 +372,11 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: collectionName + '\x01foo' },
-            m: { _op: new Timestamp(1414516132, 1) ,_id: 'foo' },
-            b: { qux: 'quux' }
+            n: {
+              h: { id: collectionName + '\x01foo' },
+              m: { _op: new Timestamp(1414516132, 1) ,_id: 'foo' },
+              b: { qux: 'quux' }
+            }
           });
           done();
         });
@@ -425,11 +429,13 @@ describe('OplogTransform', function() {
         ot.on('readable', function() {
           var newVersion = ot.read();
           should.deepEqual(newVersion, {
-            h: { id: collectionName + '\x01foo' },
-            m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
-            b: {
-              bar: 'baz',
-              qux: 'quux'
+            n :{
+              h: { id: collectionName + '\x01foo' },
+              m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+              b: {
+                bar: 'baz',
+                qux: 'quux'
+              }
             }
           });
           done();
@@ -464,8 +470,10 @@ describe('OplogTransform', function() {
           var newVersion = ot.read();
 
           should.deepEqual(newVersion, {
-            h: { id: collectionName + '\x01foo', d: true },
-            m: { _op: new Timestamp(9, 1), _id: 'foo' },
+            n: {
+              h: { id: collectionName + '\x01foo', d: true },
+              m: { _op: new Timestamp(9, 1), _id: 'foo' },
+            }
           });
           done();
         });
@@ -582,12 +590,14 @@ describe('OplogTransform', function() {
         var obj = ot.read();
         if (!obj) { return; }
 
-        var ts = obj.m._op;
+        var ts = obj.n.m._op;
         should.strictEqual(lastOplogTs.lessThan(ts), true);
         should.deepEqual(obj, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: ts, _id: 'foo' },
-          b: { foo: 'buz' }
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: ts, _id: 'foo' },
+            b: { foo: 'buz' }
+          }
         });
         done();
       });
@@ -686,9 +696,11 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
-          b: { bar: 'baz' }
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+            b: { bar: 'baz' }
+          }
         });
         done();
       });
@@ -714,9 +726,11 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(newVersion, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
-          b: { bar: 'baz' }
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: new Timestamp(1414516132, 1), _id: 'foo' },
+            b: { bar: 'baz' }
+          }
         });
         done();
       });
@@ -768,9 +782,11 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516124, 1), _id: 'foo' },
-          b: { baz: 'raboof' }
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: new Timestamp(1414516124, 1), _id: 'foo' },
+            b: { baz: 'raboof' }
+          }
         });
 
         done();
@@ -783,11 +799,13 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(item, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: new Timestamp(1414516190, 1), _id: 'foo' },
-          b: {
-            qux: 'quux',
-            foo: time
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: new Timestamp(1414516190, 1), _id: 'foo' },
+            b: {
+              qux: 'quux',
+              foo: time
+            }
           }
         });
 
@@ -801,9 +819,9 @@ describe('OplogTransform', function() {
         b: { baz: 'raboof' }
       };
       var expected = [
-        { h: {}, b: {} },
-        xtend(obj), // create a copy
-        { h: {}, b: {} },
+        { n: { h: {}, b: {} } },
+        { n: xtend(obj) }, // create a copy
+        { n: { h: {}, b: {} } },
       ];
 
       var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, expected, { log: silence });
@@ -812,9 +830,9 @@ describe('OplogTransform', function() {
 
         should.equal(expected.length, 2);
         // expect meta info with _id and _op is copied from oplog item
-        should.deepEqual(item.m, { _op: oplogItemInsert.ts, _id: oplogItemInsert.o._id });
-        delete item.m;
-        should.deepEqual(item, obj);
+        should.deepEqual(item.n.m, { _op: oplogItemInsert.ts, _id: oplogItemInsert.o._id });
+        delete item.n.m;
+        should.deepEqual(item.n, obj);
         done();
       });
     });
@@ -893,9 +911,11 @@ describe('OplogTransform', function() {
       ot._applyOplogUpdateModifier(oplogItem, function(err, newVersion) {
         if (err) { throw err; }
         should.deepEqual(newVersion, {
-          h: { id: collectionName + '\x01foo' },
-          m: { _op: oplogItem.ts, _id: 'foo' },
-          b: { bar: 'baz' }
+          n: {
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: oplogItem.ts, _id: 'foo' },
+            b: { bar: 'baz' }
+          }
         });
         done();
       });
@@ -949,8 +969,10 @@ describe('OplogTransform', function() {
         if (err) { throw err; }
 
         should.deepEqual(newVersion, {
-          h: { id: collectionName + '\x01foo', d: true },
-          m: { _op: new Timestamp(1234, 1), _id: 'foo' }
+          n: {
+            h: { id: collectionName + '\x01foo', d: true },
+            m: { _op: new Timestamp(1234, 1), _id: 'foo' }
+          }
         });
 
         done();
