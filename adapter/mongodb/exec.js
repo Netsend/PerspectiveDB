@@ -366,6 +366,10 @@ process.once('message', function(msg) {
       process.exit(8);
     }
 
+    // set core limit to maximum allowed size
+    posix.setrlimit('core', { soft: posix.getrlimit('core').hard });
+    log.info('core limit: %j, fsize limit: %j', posix.getrlimit('core'), posix.getrlimit('fsize'));
+
     // open connection
     function openConnectionAndProceed() {
       var startupTasks = [];
