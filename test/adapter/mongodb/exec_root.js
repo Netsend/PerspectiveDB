@@ -24,7 +24,6 @@ if (process.getuid() !== 0) {
 }
 
 var assert = require('assert');
-var childProcess = require('child_process');
 
 var async = require('async');
 var bson = require('bson');
@@ -42,11 +41,6 @@ var Timestamp = mongodb.Timestamp;
 
 var tasks = [];
 var tasks2 = [];
-
-// print line number
-function lnr() {
-  return new Error().stack.split('\n')[2].match(/exec_root.js:([0-9]+):[0-9]+/)[1];
-}
 
 var cons, silence, db, oplogColl;
 var databaseName = 'test_exec_root';
@@ -90,25 +84,7 @@ tasks.push(function(done) {
 
 // should require url string
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.fork(__dirname + '/../../../adapter/mongodb/exec', { silent: true });
-
-  //child.stdout.pipe(process.stdout);
-  //child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert(/msg.url must be a non-empty string/.test(stderr));
-    assert.strictEqual(code, 1);
-    assert.strictEqual(sig, null);
-    done();
-  });
-
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -118,53 +94,45 @@ tasks.push(function(done) {
     default:
       throw new Error('unknown state');
     }
-  });
+  }
+
+  var opts = {
+    onMessage: onMessage,
+    onExit: done,
+    echoErr: false,
+    exitCode: 1,
+    testStderr: function(stderr) {
+      assert(/msg.url must be a non-empty string/.test(stderr));
+    }
+  };
+
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts);
 });
 
 // should ask for last version over version control channel (fd 7)
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongodb/exec'], {
-    cwd: '/',
-    env: {},
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
-  });
-
-  var versionControl = child.stdio[7];
-
-  // expect version requests in ld-json format
-  var ls = new LDJSONStream();
-
-  versionControl.pipe(ls);
-
   var validRequest = false;
-  ls.on('data', function(data) {
-    assert.deepEqual(data, {
-      id: null
+
+  function onSpawn(child) {
+    var versionControl = child.stdio[7];
+
+    // expect version requests in ld-json format
+    var ls = new LDJSONStream();
+
+    versionControl.pipe(ls);
+
+    ls.on('data', function(data) {
+      assert.deepEqual(data, {
+        id: null
+      });
+      validRequest = true;
+
+      child.send({ type: 'kill' });
     });
-    validRequest = true;
-
-    child.send({ type: 'kill' });
-  });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
-    assert.strictEqual(validRequest, true);
-    done();
-  });
+  }
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -179,51 +147,57 @@ tasks.push(function(done) {
       console.error(msg);
       throw new Error('unknown state');
     }
-  });
+  }
+
+  function onExit() {
+    assert.strictEqual(validRequest, true);
+    done();
+  }
+
+  var opts = {
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
+  };
+
+  var spawnOpts = {
+    cwd: '/',
+    env: {},
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
+  };
+
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 // should send a new version based on an oplog update
 tasks.push(function(done) {
-  console.log('test #%d', lnr());
-
-  var child = childProcess.spawn(process.execPath, [__dirname + '/../../../adapter/mongodb/exec'], {
-    cwd: '/',
-    env: {},
-    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
-  });
-
-  var dataChannel = child.stdio[6];
-  var versionControl = child.stdio[7];
-
-  var bs = new BSONStream();
-  dataChannel.pipe(bs).on('readable', function() {
-    var obj = bs.read();
-    if (!obj) { return; }
-
-    var ts = obj.n.m._op;
-    var now = new Timestamp(0, (new Date()).getTime() / 1000);
-    assert.strictEqual(ts.greaterThan(now), true);
-    assert.deepEqual(obj, {
-      n: {
-        h: { id: collectionName + '\x01foo' },
-        m: { _op: ts, _id: 'foo' },
-        b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
-      }
-    });
-    child.send({ type: 'kill' });
-  });
-
-  // expect version requests in ld-json format
-  var ls = new LDJSONStream();
-
-  versionControl.pipe(ls);
-
   var i = 0;
-  ls.on('data', function(data) {
-    i++;
+  function onSpawn(child) {
+    var dataChannel = child.stdio[6];
+    var versionControl = child.stdio[7];
 
-    // expect a request for the last version in the DAG
-    if (i === 1) {
+    var bs = new BSONStream();
+    dataChannel.pipe(bs).on('readable', function() {
+      var obj = bs.read();
+      if (!obj) { return; }
+
+      var ts = obj.n.m._op;
+      var now = new Timestamp(0, (new Date()).getTime() / 1000);
+      assert.strictEqual(ts.greaterThan(now), true);
+      assert.deepEqual(obj, {
+        n: {
+          h: { id: collectionName + '\x01foo' },
+          m: { _op: ts, _id: 'foo' },
+          b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
+        }
+      });
+      i++;
+      child.send({ type: 'kill' });
+    });
+
+    // expect version requests in ld-json format
+    versionControl.pipe(new LDJSONStream()).on('data', function(data) {
+      // expect a request for the last version in the DAG
       assert.deepEqual(data, { id: null });
 
       // send response with last timestamp in oplog
@@ -237,45 +211,21 @@ tasks.push(function(done) {
         }));
 
         // and insert an item into the collection
+        // this should make the process emit a new version on the data channel
         coll1.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
           if (err) { throw err; }
         });
       });
-    }
+    });
+  }
 
-    // expect a request for the last version of the inserted item
-    if (i === 2) {
-      assert.deepEqual(data, { id: 'foo' });
-
-      // send response with a fake version
-      versionControl.write(BSON.serialize({
-        h: { id: collectionName + '\x01foo', v: 'Aaaaaa' },
-        b: {
-          some: 'data'
-        }
-      }));
-
-      // this should make the process emit a new version on the data channel
-    }
-  });
-
-  //child.stdout.pipe(process.stdout);
-  child.stderr.pipe(process.stderr);
-
-  var stderr = '';
-  child.stderr.setEncoding('utf8');
-  child.stderr.on('data', function(data) { stderr += data; });
-
-  child.on('exit', function(code, sig) {
-    assert.strictEqual(stderr.length, 0);
-    assert.strictEqual(code, 0);
-    assert.strictEqual(sig, null);
+  function onExit() {
     assert.strictEqual(i, 1);
     done();
-  });
+  }
 
   // give the child some time to setup it's handlers https://github.com/joyent/node/issues/8667#issuecomment-61566101
-  child.on('message', function(msg) {
+  function onMessage(msg, child) {
     switch(msg) {
     case 'init':
       child.send({
@@ -293,7 +243,21 @@ tasks.push(function(done) {
       console.error(msg);
       throw new Error('unknown state');
     }
-  });
+  }
+
+  var opts = {
+    onSpawn: onSpawn,
+    onMessage: onMessage,
+    onExit: onExit
+  };
+
+  var spawnOpts = {
+    cwd: '/',
+    env: {},
+    stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
+  };
+
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 // should save a merge in the conflict collection if the local head does not match the item in the collection
