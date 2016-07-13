@@ -39,6 +39,7 @@ var url = require('url');
 var async = require('async');
 var chroot = require('chroot');
 var BSONStream = require('bson-stream');
+var isEqual = require('is-equal');
 var mongodb = require('mongodb');
 var posix = require('posix');
 var xtend = require('xtend');
@@ -182,50 +183,82 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
       // expect this item back via the oplog if all goes well
       expected.push(obj);
 
+      // compare collection with local head on non-existing keys (mongo query can only filter on existing keys)
+      // TODO: protect against race conditions in combination with bad power loss timings.
+      // Currently if there is a race condition and an item is updated by a third party right after the following check and
+      // furthermore the system exits for whatever reason right after the update and before checking for a race condition, then
+      // data is unconditionally and undetectably lost.
+      // Because the find queries are done using all attributes, this only happens if the third party added a key, not when
+      // an existing key is updated or deleted.
+      // This can only be solved if the update query somehow can specify that no other keys must exist in the document.
       var mongoId = getMongoId(obj);
-      if (obj.n.h.d === true) { // delete
-        if (obj.l == null) {
-          handleConflict(new Error('local head expected'), obj, cb);
-          return;
+      coll.findOne({ _id: mongoId }, function(err, r) {
+        if (err) { handleConflict(err, obj, cb); return; }
+        var collItem = r && r.result;
+        var lhead;
+
+        if (obj.n.h.d === true) { // delete
+          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, cb); return; }
+          if (!collItem) { handleConflict(new Error('item in collection expected'), obj, cb); return; }
+
+          // ensure a current version with id based on the given local head
+          lhead = xtend(obj.l.b, { _id: mongoId });
+          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, cb); return; }
+
+          coll.findOneAndDelete(lhead, function(err, r) {
+            if (err || !r.ok) {
+              log.notice('NO delete %j, err: %s', obj.n.h, err);
+              handleConflict(err || new Error('delete failed'), obj, cb);
+              return;
+            }
+            if (!isEqual(r.value, lhead)) {
+              obj.expected = collItem;
+              obj.replaced = r.value;
+              handleConflict(new Error('race condition on delete'), obj, cb);
+              return;
+            }
+            log.debug('delete %j', obj.n.h);
+            cb();
+          });
+        } else if (obj.l == null || obj.l.b == null) { // insert
+          if (obj.n == null) { handleConflict(new Error('new object expected'), obj, cb); return; }
+          if (collItem) { handleConflict(new Error('no item in collection expected'), obj, cb); return; }
+
+          // put mongo id on the document
+          coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
+            if (err || !r.insertedCount) {
+              log.notice('NO insert %j', obj.n.h);
+              handleConflict(err || new Error('insert failed'), obj, cb);
+              return;
+            }
+            log.debug('insert %j', obj.n.h);
+            cb();
+          });
+        } else { // update
+          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, cb); return; }
+          if (!collItem) { handleConflict(new Error('item in collection expected'), obj, cb); return; }
+
+          // put mongo id back on the document
+          lhead = xtend(obj.l.b, { _id: mongoId });
+          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, cb); return; }
+
+          coll.findOneAndReplace(lhead, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
+            if (err || !r.ok) {
+              log.notice('NO update %j', obj.n.h);
+              handleConflict(err || new Error('update failed'), obj, cb);
+              return;
+            }
+            if (!isEqual(r.value, lhead)) {
+              obj.expected = collItem;
+              obj.replaced = r.value;
+              handleConflict(new Error('race condition on update'), obj, cb);
+              return;
+            }
+            log.debug('update %j', obj.n.h);
+            cb();
+          });
         }
-        // ensure a current version with id based on the given local head
-        var lhead = xtend(obj.l.b, { _id: mongoId });
-        coll.findOneAndDelete(lhead, function(err, r) {
-          if (err || !r.ok) {
-            log.notice('NO delete %j, err: %s', obj.n.h, err);
-            handleConflict(err || new Error('delete failed'), obj, cb);
-            return;
-          }
-          log.debug('delete %j', obj.n.h);
-          cb();
-        });
-      } else if (obj.l == null || obj.l.b == null) { // insert
-        if (obj.n == null) {
-          handleConflict(new Error('new object expected'), obj, cb);
-          return;
-        }
-        // put either mongo id or h.id back on the document
-        coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-          if (err || !r.insertedCount) {
-            log.notice('NO insert %j', obj.n.h);
-            handleConflict(err || new Error('insert failed'), obj, cb);
-            return;
-          }
-          log.debug('insert %j', obj.n.h);
-          cb();
-        });
-      } else { // update
-        // put mongo id back on the document
-        coll.findOneAndReplace(obj.l.b, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
-          if (err || !r.ok) {
-            log.notice('NO update %j', obj.n.h);
-            handleConflict(err || new Error('update failed'), obj, cb);
-            return;
-          }
-          log.debug('update %j', obj.n.h);
-          cb();
-        });
-      }
+      });
     }
   })).on('end', function() {
     log.notice('local data channel closed, expecting shutdown');
