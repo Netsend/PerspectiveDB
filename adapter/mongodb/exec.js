@@ -142,7 +142,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
   // track newly written versions so that new oplog items can be recognized correctly as a confirmation
   var expected = [];
 
-  log.debug('start oplog transform...');
+  log.debug2('start oplog transform...');
   ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, expected, xtend(opts, {
     log: log,
     bson: true
@@ -374,7 +374,7 @@ process.once('message', function(msg) {
     // chroot or exit
     try {
       chroot(newRoot, uid, gid);
-      log.info('changed root to %s and user:group to %s:%s', newRoot, user, group);
+      log.debug2('changed root to %s and user:group to %s:%s', newRoot, user, group);
     } catch(err) {
       log.err('changing root or user failed %j %s', msg, err);
       process.exit(8);
@@ -382,7 +382,7 @@ process.once('message', function(msg) {
 
     // set core limit to maximum allowed size
     posix.setrlimit('core', { soft: posix.getrlimit('core').hard });
-    log.info('core limit: %j, fsize limit: %j', posix.getrlimit('core'), posix.getrlimit('fsize'));
+    log.debug2('core limit: %j, fsize limit: %j', posix.getrlimit('core'), posix.getrlimit('fsize'));
 
     // open connection
     function openConnectionAndProceed() {
@@ -391,12 +391,12 @@ process.once('message', function(msg) {
 
       // connect to the database
       startupTasks.push(function(cb) {
-        log.debug('connect to database...');
+        log.debug2('connect to database...');
         MongoClient.connect(msg.url, function(err, dbc) {
           if (err) { log.err('connect error: %s', err); cb(err); return; }
           if (dbc.databaseName !== dbName) { cb(new Error('connected to the wrong database')); return; }
 
-          log.notice('connected %s', msg.url);
+          log.debug2('connected %s', msg.url);
           db = dbc;
           // setup oplog db
           oplogDb = db.db(oplogDbName);
@@ -444,14 +444,14 @@ process.once('message', function(msg) {
 
       // expect a data request/receive channel on fd 6
       startupTasks.push(function(cb) {
-        log.debug('setup data channel...');
+        log.debug2('setup data channel...');
         dataChannel = new net.Socket({ fd: 6, readable: true, writable: true });
         cb();
       });
 
       // expect a version request/receive channel on fd 7
       startupTasks.push(function(cb) {
-        log.debug('setup version control...');
+        log.debug2('setup version control...');
         versionControl = new net.Socket({ fd: 7, readable: true, writable: true });
         cb();
       });
@@ -460,20 +460,20 @@ process.once('message', function(msg) {
 
       shutdownTasks.push(function(cb) {
         if (ot) {
-          log.notice('closing oplog transform...');
+          log.debug2('closing oplog transform...');
           ot.close(cb);
         } else {
-          log.notice('no oplog transform active');
+          log.debug('no oplog transform active');
           process.nextTick(cb);
         }
       });
 
       shutdownTasks.push(function(cb) {
         if (dataChannel.writable) {
-          log.info('closing data channel...');
+          log.debug2('closing data channel...');
           dataChannel.end(cb);
         } else {
-          log.info('data channel already closed');
+          log.debug('data channel already closed');
           dataChannel.destroy();
           process.nextTick(cb);
         }
@@ -481,17 +481,17 @@ process.once('message', function(msg) {
 
       shutdownTasks.push(function(cb) {
         if (versionControl.writable) {
-          log.info('closing version control...');
+          log.debug2('closing version control...');
           versionControl.end(cb);
         } else {
-          log.info('version control already closed');
+          log.debug('version control already closed');
           versionControl.destroy();
           process.nextTick(cb);
         }
       });
 
       shutdownTasks.push(function(cb) {
-        log.info('closing database connection...');
+        log.debug2('closing database connection...');
         oplogDb.close(cb);
       });
 
@@ -499,18 +499,18 @@ process.once('message', function(msg) {
       var shuttingDown = false;
       function shutdown() {
         if (shuttingDown) {
-          log.info('shutdown already in progress');
+          log.notice('shutdown already in progress');
           return;
         }
         shuttingDown = true;
-        log.info('shutting down...');
+        log.debug('shutting down...');
 
         // disconnect from parent
         process.disconnect();
 
         async.series(shutdownTasks, function(err) {
           if (err) { log.err('shutdown error', err); }
-          log.info('shutdown complete');
+          log.debug('shutdown complete');
         });
       }
 

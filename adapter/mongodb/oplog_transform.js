@@ -136,7 +136,7 @@ OplogTransform.prototype.startStream = function startStream() {
 
   // handle new oplog items via this._transform, use this._lastTs as offset
   function openOplog(opts, reopen) {
-    that._log.notice('ot startStream opening tailable oplog cursor after %s', that._lastTs);
+    that._log.debug2('ot startStream opening tailable oplog cursor after %s', that._lastTs);
     that._or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
     // proxy error
     that._or.once('error', function(err) {
