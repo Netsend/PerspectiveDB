@@ -192,14 +192,18 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
       // an existing key is updated or deleted.
       // This can only be solved if the update query somehow can specify that no other keys must exist in the document.
       var mongoId = getMongoId(obj);
-      coll.findOne({ _id: mongoId }, function(err, r) {
+      coll.find({ _id: mongoId }).limit(1).next(function(err, doc) {
         if (err) { handleConflict(err, obj, cb); return; }
-        var collItem = r && r.result;
+        var collItem = doc;
         var lhead;
 
         if (obj.n.h.d === true) { // delete
           if (obj.l == null) { handleConflict(new Error('local head expected'), obj, cb); return; }
-          if (!collItem) { handleConflict(new Error('item in collection expected'), obj, cb); return; }
+          if (!collItem) {
+            log.debug('nothing in collection by %s', mongoId);
+            handleConflict(new Error('item in collection expected'), obj, cb);
+            return;
+          }
 
           // ensure a current version with id based on the given local head
           lhead = xtend(obj.l.b, { _id: mongoId });
