@@ -51,7 +51,7 @@ var noop = function() {};
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
- *   tmpCollName {String, default _pdb._tmp.[ns]}  temporary collection
+ *   tmpCollName {String, default _pdbtmp.[ns]}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
@@ -87,7 +87,8 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, e
     bson: false,
   }, opts);
 
-  this._coll = oplogDb.db(this._databaseName).collection(this._collectionName);
+  this._db = oplogDb.db(this._databaseName);
+  this._coll = this._db.collection(this._collectionName);
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -95,7 +96,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, e
   // expect bson on the response stream
   this._controlRead = controlRead.pipe(new BSONStream());
 
-  this._tmpCollection = oplogDb.collection('_pdb.' + ns);
+  this._tmpCollection = this._db.collection('_pdbtmp.' + ns);
 
   this._log = opts.log || {
     emerg:   console.error,
