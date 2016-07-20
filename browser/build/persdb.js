@@ -526,7 +526,7 @@ PersDB.prototype._connHandler = function _connHandler(conn, pers) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../lib/data_request":6,"../../lib/merge_tree":13,"../../lib/parse_pers_configs":15,"./proxy":2,"async":19,"bson-stream":20,"events":324,"ld-jsonstream":55,"level-js":56,"level-packager":64,"object-key-filter":95,"util":352,"websocket-stream":125}],2:[function(require,module,exports){
+},{"../../lib/data_request":4,"../../lib/merge_tree":11,"../../lib/parse_pers_configs":13,"./proxy":2,"async":17,"bson-stream":18,"events":324,"ld-jsonstream":53,"level-js":54,"level-packager":62,"object-key-filter":93,"util":352,"websocket-stream":125}],2:[function(require,module,exports){
 /**
  * Copyright 2015, 2016 Netsend.
  *
@@ -806,16 +806,17 @@ module.exports = function(idb, writer) {
     var tr = origTransaction([osName], 'readwrite');
     var os = tr.objectStore(osName);
 
-    // make sure the keypath is known
+    // make sure the keypath of this object store is known
     if (!keyPaths.hasOwnProperty(osName)) {
       keyPaths[osName] = os.keyPath;
       if (typeof keyPaths[osName] !== 'string') {
-        console.error('warning: keypath is not a string, converting: %s', keyPaths[osName], osName);
+        console.error('warning: keypath is not a string, converting: %s, store: %s', keyPaths[osName], osName);
         keyPaths[osName] = Object.prototype.toString(keyPaths[osName]);
       }
     }
 
-    if (!newVersion.b[keyPaths[osName]]) {
+    // ensure keypath is set if the store has a keypath
+    if (keyPaths[osName] && !newVersion.b[keyPaths[osName]]) {
       newVersion.b[keyPaths[osName]] = id;
     }
 
@@ -856,7 +857,7 @@ module.exports = function(idb, writer) {
 },{}],3:[function(require,module,exports){
 (function (process,Buffer){
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -873,314 +874,23 @@ module.exports = function(idb, writer) {
  * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* jshint -W116 */
-
 'use strict';
 
-var Readable = require('stream').Readable;
 var util = require('util');
+var stream = require('stream');
 
 var async = require('async');
-var BSON, bson = require('bson');
+var bson = require('bson');
+var xtend = require('xtend');
+
+var BSON;
 if (process.browser) {
   BSON = new bson();
 } else {
   BSON = new bson.BSONPure.BSON();
 }
-var match = require('match-object');
 
-var noop = require('./noop');
-var runHooks = require('./run_hooks');
-
-/**
- * StreamMergeTree
- *
- * Create readable streams on a merge tree.
- *
- * @param {Object} mt  merge tree
- * @param {Object} [opts]  object containing configurable parameters
- *
- * opts:
- *   bson {Boolean, default false}  whether to return a BSON serialized or
- *                                  deserialized object (false).
- *   filter {Object}  conditions a document should hold
- *   first {base64 String}  first version, offset
- *   last {base64 String}  last version
- *   excludeFirst {Boolean, default false}  whether or not first should be
- *                                          excluded
- *   excludeLast {Boolean, default false}  whether or not last should be
- *                                         excluded
- *   reverse {Boolean, default false}  if true, starts with last version
- *   hooks {Array}  array of asynchronous functions to execute, each hook has the following signature: db, object, options,
- *                  callback and should callback with an error object, the new item and possibly extra data.
- *   hooksOpts {Object}  options to pass to a hook
- *   tail {Boolean, default false}  if true, keeps the stream open
- *   tailRetry {Number, default 1000}  reopen readers every tailRetry ms
- *   log {Object, default console}  log object that contains debug2, debug, info,
- *       notice, warning, err, crit and emerg functions. Uses console.log and
- *       console.error by default.
- *
- * @event "data" {Object}  emits one object at a time
- * @event "end"  emitted once the underlying cursor is closed
- *
- * @class represents a StreamMergeTree for a certain database.collection
- */
-function StreamMergeTree(mt, opts) {
-  if (typeof mt !== 'object') { throw new TypeError('mt must be an object'); }
-
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object' || Array.isArray(opts)) { throw new TypeError('opts must be an object'); }
-  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
-  if (opts.filter != null && typeof opts.filter !== 'object') { throw new TypeError('opts.filter must be an object'); }
-  if (opts.first != null) {
-    if (typeof opts.first !== 'number' && typeof opts.first !== 'string') { throw new TypeError('opts.first must be a base64 string or a number'); }
-    if (typeof opts.first === 'string' && Buffer.byteLength(opts.first, 'base64') !== mt._vSize) { throw new Error('opts.first must be the same size as the configured vSize'); }
-  }
-  if (opts.excludeFirst != null && typeof opts.excludeFirst !== 'boolean') { throw new TypeError('opts.excludeFirst must be a boolean'); }
-  if (opts.hooks != null && !Array.isArray(opts.hooks)) { throw new TypeError('opts.hooks must be an array'); }
-  if (opts.hooksOpts != null && typeof opts.hooksOpts !== 'object') { throw new TypeError('opts.hooksOpts must be an object'); }
-  if (opts.tail != null && typeof opts.tail !== 'boolean') { throw new TypeError('opts.tail must be a boolean'); }
-  if (opts.tailRetry != null && typeof opts.tailRetry !== 'number') { throw new TypeError('opts.tailRetry must be a number'); }
-  if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
-
-  this._log = opts.log || {
-    emerg:   console.error,
-    alert:   console.error,
-    crit:    console.error,
-    err:     console.error,
-    warning: console.log,
-    notice:  console.log,
-    info:    console.log,
-    debug:   console.log,
-    debug2:  console.log,
-    getFileStream: noop,
-    getErrorStream: noop,
-    close: noop
-  };
-
-  this._mt = mt;
-  this._opts = opts;
-
-  this._db = mt._db;
-
-  var filter = opts.filter || {};
-  var hooks = opts.hooks || [];
-  var hooksOpts = opts.hooksOpts || {};
-
-  Readable.call(this, { objectMode: !opts.bson });
-
-  var sOpts = {
-    log: opts.log,
-    first: opts.first,
-    last: opts.last,
-    excludeFirst: opts.excludeFirst,
-    excludeLast: opts.excludeLast,
-    reverse: opts.reverse,
-    tail: opts.tail,
-    tailRetry: opts.tailRetry
-  };
-  this._log.notice('smt sOpts: %j, filter: %j, hooks: %d, hooksOpts: %j', sOpts, filter, hooks.length, hooksOpts);
-  this._source = mt._local.createReadStream(sOpts);
-
-  var that = this;
-
-  /**
-   * Call back with array of connected parents for item.
-   *
-   * findConnectedParents(v)
-   *   parents <- {}
-   *   for every pa in parents(v)
-   *     item <- lookup(pa)
-   *     if match(item, crit)
-   *       parents set pa
-   *     else
-   *       parents set parents.findConnectedParents(pa)
-   *   return parents
-   */
-  function findConnectedParents(item, crit, cb) {
-    that._log.debug('smt findConnectedParents %s', item.h.pa);
-    var parents = {};
-    async.eachSeries(item.h.pa, function(pav, cb2) {
-      mt._local.getByVersion(pav, function(err, pa) {
-        if (err) { cb2(err); return; }
-
-        // descend if not all criteria hold on this item
-        if (!match(crit, pa.b)) {
-          that._log.debug('smt findConnectedParents crit does not hold, descend');
-          findConnectedParents(pa, crit, function(err, nParents) {
-            if (err) { cb2(err); return; }
-            Object.keys(nParents).forEach(function(pa2) {
-              parents[pa2] = true;
-            });
-            cb2();
-          });
-        } else {
-          runHooks(hooks, that._db, pa, hooksOpts, function(err, afterItem) {
-            if (err) { cb2(err); return; }
-
-            // descend if hooks filter out the item
-            if (afterItem) {
-              that._log.debug('smt findConnectedParents add to parents %s', pa.h.v);
-              parents[pa.h.v] = true;
-              cb2();
-            } else {
-              that._log.debug('smt findConnectedParents crit holds, but hooks filter, descend');
-              findConnectedParents(pa, crit, function(err, nParents) {
-                if (err) { cb2(err); return; }
-                Object.keys(nParents).forEach(function(pa2) {
-                  parents[pa2] = true;
-                });
-                cb2();
-              });
-            }
-          });
-        }
-      });
-    }, function(err) {
-      if (err) { cb(err); return; }
-
-      cb(null, parents);
-    });
-  }
-
-  var str = that._source;
-  var endEmitted, handlingData;
-
-  function handleData(item) {
-    str.pause();
-    handlingData = true;
-
-    that._log.debug('smt data %j', item.h);
-
-    // don't emit if not all criteria hold on this item
-    if (!match(filter, item.b)) {
-      that._log.info('smt filter %j', filter);
-      handlingData = false;
-      str.resume();
-      if (endEmitted) {
-        that.push(null);
-      }
-      return;
-    }
-
-    runHooks(hooks, that._db, item, hooksOpts, function(err, afterItem) {
-      if (err) { that.emit(err); return; }
-
-      // skip if hooks filter out the item
-      if (!afterItem) {
-        that._log.info('smt hook filtered %j', item.h);
-        handlingData = false;
-        str.resume();
-        if (endEmitted) {
-          that.push(null);
-        }
-        return;
-      }
-
-      // else find parents
-      findConnectedParents(afterItem, filter, function(err, parents) {
-        if (err) { that.emit(err); return; }
-
-        afterItem.h.pa = Object.keys(parents);
-
-        // remove perspective and local state
-        delete afterItem.h.pe;
-        delete afterItem.h.i;
-        delete afterItem.m;
-
-        // push the bson or native object out to the reader, and resume if not flooded
-        that._log.info('smt push %j', afterItem.h);
-        var proceed = that.push(opts.bson ? BSON.serialize(afterItem) : afterItem);
-        handlingData = false;
-        if (proceed) { str.resume(); }
-        if (endEmitted) {
-          that.push(null);
-        }
-      });
-    });
-  }
-
-  this._source.on('data', handleData);
-
-  // proxy error
-  this._source.on('error', function(err) {
-    that._log.crit('smt stream error %s', err);
-    that.emit('error', err);
-  });
-
-  this._source.on('end', function() {
-    that._log.notice('smt stream ended');
-    endEmitted = true;
-    if (!handlingData) {
-      that.push(null);
-    }
-  });
-}
-util.inherits(StreamMergeTree, Readable);
-
-module.exports = StreamMergeTree;
-
-// return a new stream with the same parameters
-StreamMergeTree.prototype.reopen = function() {
-  return new StreamMergeTree(this._mt, this._opts);
-};
-
-// proxy close on tailable streams
-StreamMergeTree.prototype.close = function() {
-  this._source.close();
-};
-
-
-
-/////////////////////
-//// PRIVATE API ////
-/////////////////////
-
-
-
-/**
- * Implementation of _read method of Readable stream. This method is not called
- * directly. In this implementation size of read buffer is ignored
- */
-StreamMergeTree.prototype._read = function() {
-  this._source.resume();
-};
-
-}).call(this,require('_process'),require("buffer").Buffer)
-},{"./noop":14,"./run_hooks":16,"_process":327,"async":19,"bson":23,"buffer":128,"match-object":94,"stream":347,"util":352}],4:[function(require,module,exports){
-(function (process,Buffer){
-/**
- * Copyright 2015 Netsend.
- *
- * This file is part of PersDB.
- *
- * PersDB is free software: you can redistribute it and/or modify it under the
- * terms of the GNU Affero General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later
- * version.
- *
- * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along
- * with PersDB. If not, see <https://www.gnu.org/licenses/>.
- */
-
-/* jshint -W018, -W030, -W116 */
-
-'use strict';
-
-var util = require('util');
-var Transform = require('stream').Transform;
-
-var async = require('async');
-var BSON, bson = require('bson');
-if (process.browser) {
-  BSON = new bson();
-} else {
-  BSON = new bson.BSONPure.BSON();
-}
+var Transform = stream.Transform;
 
 var Tree;
 
@@ -1232,11 +942,8 @@ function StreamTree(tree, opts) {
   this.tree = tree;
 
   this._opts = opts;
-  this._opts.objectMode = true;
 
-  Transform.call(this, this._opts);
-
-  this._destroyed = false;
+  Transform.call(this, xtend(opts, { objectMode: true }));
 
   this._setupSource();
 }
@@ -1287,17 +994,10 @@ function determineRange(tree, opts, cb) {
       // start reading the ikey index
       r = tree.getIKeyRange({ minI: first, maxI: last });
     }
-    tree._log.info('st range start: %j, end: %j', r.s.toString('hex'), r.e.toString('hex'));
+    tree._log.debug2('st range start: %j, end: %j', r.s.toString('hex'), r.e.toString('hex'));
     cb(err, r);
   });
 }
-
-// proxy destroy
-StreamTree.prototype.destroy = function() {
-  this.tree._log.debug2('st destroy');
-  this._it.destroy();
-  this._destroyed = true;
-};
 
 StreamTree.prototype._setupSource = function() {
   var that = this;
@@ -1325,13 +1025,8 @@ StreamTree.prototype._setupSource = function() {
 
     that.tree._log.debug2('st streamOpts %j', streamOpts);
 
-    that._it = that.tree._db.createReadStream(streamOpts);
-
-    that._it.pipe(that);
-
-    that._it.on('error', function(err) {
-      that.emit('error', err);
-    });
+    // setup stream
+    that.tree._db.createReadStream(streamOpts).pipe(that);
   });
 };
 
@@ -1359,15 +1054,7 @@ StreamTree.prototype._transform = function(obj, enc, cb) {
         value = BSON.deserialize(obj.value);
       }
     }
-    var cont = this.push(value);
-    if (!cont) {
-      this.tree._log.debug2('st pause and wait for drain');
-      this.pause();
-      this.on('drain', function() {
-        that.read(0);
-      });
-    }
-    process.nextTick(cb);
+    cb(null, value);
   } else {
     // ikey is used
     var key = Tree.parseKey(obj.key);
@@ -1377,7 +1064,7 @@ StreamTree.prototype._transform = function(obj, enc, cb) {
     this.tree._db.get(dsKey, function(err, item) {
       if (err) {
         that.tree._log.err('st item err %j %s', obj.key, err);
-        that.emit('error', err);
+        cb(err);
         return;
       }
 
@@ -1396,15 +1083,7 @@ StreamTree.prototype._transform = function(obj, enc, cb) {
           value = BSON.deserialize(item);
         }
       }
-      var cont = that.push(value);
-      if (!cont) {
-        that.tree._log.debug2('st pause and wait for drain');
-        that.pause();
-        that.on('drain', function() {
-          that.read(0);
-        });
-      }
-      cb();
+      cb(null, value);
     });
   }
 };
@@ -1412,95 +1091,7 @@ StreamTree.prototype._transform = function(obj, enc, cb) {
 module.exports = StreamTree;
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":327,"async":19,"bson":23,"buffer":128,"stream":347,"util":352}],5:[function(require,module,exports){
-/**
- * Copyright 2015 Netsend.
- *
- * This file is part of Mastersync.
- *
- * Mastersync is free software: you can redistribute it and/or modify it under the
- * terms of the GNU Affero General Public License as published by the Free Software
- * Foundation, either version 3 of the License, or (at your option) any later
- * version.
- *
- * Mastersync is distributed in the hope that it will be useful, but WITHOUT ANY
- * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
- * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
- *
- * You should have received a copy of the GNU Affero General Public License along
- * with Mastersync. If not, see <https://www.gnu.org/licenses/>.
- */
-
-/* jshint -W116 */
-
-'use strict';
-
-var util = require('util');
-var Readable = require('stream').Readable;
-
-/**
- * Create a serial read stream.
- *
- * @param {Array} streams  array of readable streams
- * @param {Object} [opts]  stream.Readable options for this stream
- */
-function ConcatReadStream(streams, opts) {
-  if (!Array.isArray(streams)) { throw new TypeError('streams must be an array'); }
-  if (!streams.length) { throw new Error('provide at least one stream'); }
-
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object' || Array.isArray(opts)) { throw new TypeError('opts must be an object'); }
-
-  this._currStream = streams[0];
-  opts.objectMode = opts.objectMode || this._currStream._readableState.objectMode;
-
-  this._streams = streams;
-  this._opts = opts;
-
-  var that = this;
-
-  // ensure all streams are paused and register resume handlers when the previous stream ends
-  streams.forEach(function(stream, i) {
-    stream.pause();
-    stream.on('data', function(data) {
-      if (!that.push(data)) {
-        stream.pause();
-      }
-    });
-    if (i + 1 < streams.length) {
-      stream.on('end', function() {
-        that._currStream = streams[i + 1];
-        that._currStream.resume();
-      });
-    } else {
-      // this is the last stream
-      stream.on('end', function() {
-        that.push(null);
-      });
-    }
-  });
-
-  Readable.call(this, opts);
-}
-
-util.inherits(ConcatReadStream, Readable);
-
-// cascade reopen method on each stream
-ConcatReadStream.prototype.reopen = function() {
-  var streams = [];
-  this._streams.forEach(function(stream) {
-    streams.push(stream.reopen());
-  });
-  return new ConcatReadStream(streams, this._opts);
-};
-
-ConcatReadStream.prototype._read = function() {
-  this._currStream.resume();
-};
-
-module.exports = ConcatReadStream;
-
-},{"stream":347,"util":352}],6:[function(require,module,exports){
+},{"_process":327,"async":17,"bson":21,"buffer":128,"stream":347,"util":352,"xtend":126}],4:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -1548,7 +1139,7 @@ function valid(req) {
 
 module.exports.valid = valid;
 
-},{}],7:[function(require,module,exports){
+},{}],5:[function(require,module,exports){
 /**
  * Copyright 2014-2015 Netsend.
  *
@@ -1910,7 +1501,7 @@ findLCAs._lr = _lr;
 
 module.exports = findLCAs;
 
-},{"./noop":14}],8:[function(require,module,exports){
+},{"./noop":12}],6:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -2008,7 +1599,7 @@ function invalidHeader(h) {
 
 module.exports = invalidHeader;
 
-},{"./invalid_id":9}],9:[function(require,module,exports){
+},{"./invalid_id":7}],7:[function(require,module,exports){
 (function (Buffer){
 /**
  * Copyright 2015 Netsend.
@@ -2073,7 +1664,7 @@ function invalidId(id) {
 module.exports = invalidId;
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],10:[function(require,module,exports){
+},{"buffer":128}],8:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -2144,7 +1735,7 @@ function invalidItem(item) {
 
 module.exports = invalidItem;
 
-},{"./invalid_header":8}],11:[function(require,module,exports){
+},{"./invalid_header":6}],9:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -2204,7 +1795,7 @@ function invalidLocalHeader(h) {
 
 module.exports = invalidLocalHeader;
 
-},{"./invalid_id":9}],12:[function(require,module,exports){
+},{"./invalid_id":7}],10:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015 Netsend.
@@ -2441,12 +2032,12 @@ function merge(sX, sY, opts, cb) {
   };
 
   findLCAs(sX, sY, findLcaOpts, function(err, lcas, lcasX, lcasY, itemX, itemY) {
-    if (err) { cb(err); return; }
+    if (err) { cb(err, null, null, lcas); return; }
 
     if (lcas.length < 1) {
       error = new Error('no lca found');
       log.err('merge error %s', error);
-      cb(error);
+      cb(error, null, null, lcas);
       return;
     }
 
@@ -2494,7 +2085,7 @@ function merge(sX, sY, opts, cb) {
         process.nextTick(cb2);
       }
     }, function(err) {
-      if (err) { cb(err); return; }
+      if (err) { cb(err, null, null, lcas); return; }
       var merged;
       try {
         log.debug('_doMerge itemX: %j, itemY: %j, lcaX: %j, lcaY: %j', itemX, itemY, prevLcaX, prevLcaY);
@@ -2502,10 +2093,10 @@ function merge(sX, sY, opts, cb) {
         log.debug('merge result x: %j, y: %j', merged[0], merged[1]);
       } catch(err) {
         log.err('merge error: %s', err);
-        cb(err);
+        cb(err, null, null, lcas);
         return;
       }
-      cb(null, merged[0], merged[1]);
+      cb(null, merged[0], merged[1], lcas);
     });
   });
 }
@@ -2515,7 +2106,7 @@ merge._doMerge = _doMerge;
 module.exports = merge;
 
 }).call(this,require('_process'))
-},{"./find_lcas":7,"./noop":14,"./three_way_merge":17,"_process":327,"async":19}],13:[function(require,module,exports){
+},{"./find_lcas":5,"./noop":12,"./three_way_merge":15,"_process":327,"async":17}],11:[function(require,module,exports){
 (function (process,Buffer){
 /**
  * Copyright 2015, 2016 Netsend.
@@ -2540,38 +2131,28 @@ module.exports = merge;
 'use strict';
 
 var crypto = require('crypto');
-var Transform = require('stream').Transform;
+var stream = require('stream');
 
 var async = require('async');
-var BSON, bson = require('bson');
-if (process.browser) {
-  BSON = new bson();
-} else {
-  BSON = new bson.BSONPure.BSON();
-}
-
-var isEqual = require('is-equal');
+var bson = require('bson');
 var match = require('match-object');
+var xtend = require('xtend');
 
 var Tree = require('./tree');
 var merge = require('./merge');
 var noop = require('./noop');
 var invalidLocalHeader = require('./invalid_local_header');
-//var streamify = require('./streamify');
-var ConcatReadStream = require('./concat_read_stream');
-var StreamMergeTree = require('./_stream_merge_tree');
 var runHooks = require('./run_hooks');
 
-// wrapper around streamify that supports "reopen" recursively
-/*
-function streamifier(dag) {
-  var result = streamify(dag);
-  result.reopen = function() {
-    return streamifier(dag);
-  };
-  return result;
+var Transform = stream.Transform;
+var Writable = stream.Writable;
+
+var BSON;
+if (process.browser) {
+  BSON = new bson();
+} else {
+  BSON = new bson.BSONPure.BSON();
 }
-*/
 
 /**
  * MergeTree
@@ -2580,7 +2161,7 @@ function streamifier(dag) {
  * local perspective.
  *
  * If both local and remote updates can come in make sure to use
- * mergeTree.mergeAll and optionally mergeTree.createLocalWriteStream.
+ * mergeTree.startMerge and optionally mergeTree.createLocalWriteStream.
  *
  * @param {LevelUP.db} db  database for persistent storage
  * @param {Object} [opts]  object containing configurable parameters
@@ -2599,11 +2180,6 @@ function streamifier(dag) {
  *   transform {Function}  transformation function to run on each item
  *                         signature: function(item, cb) cb should be called
  *                         with an error or a (possibly transformed) item
- *   mergeHandler {Function}  function to handle newly created merges
- *                            signature: function (merged, lhead, next)
- *   conflictHandler {Function}  function to handle merges with conflicts
- *                               signature: function (attrs, shead, lhead, next)
- *                               call next with a new item or null if not resolved.
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
@@ -2668,11 +2244,8 @@ function MergeTree(db, opts) {
     log: this._log
   };
 
-  // signal updates per perspective
-  this._updatedPerspectives = {};
-
   this._perspectives.forEach(function(perspective) {
-    that.addPerspective(perspective);
+    that._pe[perspective] = new Tree(that._db, perspective, that._treeOpts);
   });
 
   this._local = new Tree(db, this.localName, this._treeOpts);
@@ -2683,19 +2256,13 @@ function MergeTree(db, opts) {
     skipValidation: true
   });
 
-  // use new merge handler if given
-  this.ensureMergeHandler(opts.mergeHandler);
-
-  // use new conflict handler if given
-  this._ensureConflictHandler(opts.conflictHandler);
-
   this._opts = opts;
 }
 
 module.exports = MergeTree;
 
 /**
- * Dynamically add a new perspective.
+ * Dynamically add a new perspective and setup a reader for the merge stream.
  *
  * @param {Number|base64 String} version  valid lbeint or base64 int
  */
@@ -2706,8 +2273,25 @@ MergeTree.prototype.addPerspective = function addPerspective(perspective) {
   if (this._pe[perspective]) { throw new Error('perspective already exists'); }
 
   this._pe[perspective] = new Tree(this._db, perspective, this._treeOpts);
-  // signal update on init
-  this._updatedPerspectives[perspective] = true;
+  // start merging
+  var that = this;
+  this._local.lastByPerspective(perspective, 'base64', function(err, v) {
+    if (err) {
+      that._log.err('addPerspective %s', err);
+      throw err;
+    }
+
+    var opts = { tail: true };
+    if (v) {
+      opts = xtend({
+        first: v,
+        excludeFirst: true
+      }, opts);
+    }
+    that._setupMerge(perspective, opts, function(err) {
+      if (err) { that._log.info('mt: %s error: %s', perspective, err); }
+    });
+  });
 };
 
 /**
@@ -2754,19 +2338,178 @@ MergeTree.prototype.getRemoteTrees = function getRemoteTrees() {
 };
 
 /**
- * Get a stream over each item in the order of insertion into the tree.
+ * Get a readable stream over each item in the order of insertion into the tree.
  *
  * @param {Object} [opts]  object containing configurable parameters
  *
  * opts:
- *   see StreamMergeTree opts
+ *   bson {Boolean, default false}  whether to return a BSON serialized or
+ *                                  deserialized object (false).
+ *   filter {Object}  conditions a document should hold
+ *   first {base64 String}  first version, offset
+ *   last {base64 String}  last version
+ *   excludeFirst {Boolean, default false}  whether or not first should be
+ *                                          excluded
+ *   excludeLast {Boolean, default false}  whether or not last should be
+ *                                         excluded
+ *   reverse {Boolean, default false}  if true, starts with last version
+ *   hooks {Array}  array of asynchronous functions to execute, each hook has the following signature: db, object, options,
+ *                  callback and should callback with an error object, the new item and possibly extra data.
+ *   hooksOpts {Object}  options to pass to a hook
+ *   tail {Boolean, default false}  if true, keeps the stream open
+ *   tailRetry {Number, default 1000}  reopen readers every tailRetry ms
+ *   log {Object, default console}  log object that contains debug2, debug, info,
+ *       notice, warning, err, crit and emerg functions. Uses console.log and
+ *       console.error by default.
  */
 MergeTree.prototype.createReadStream = function createReadStream(opts) {
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object' || Array.isArray(opts)) { throw new TypeError('opts must be an object'); }
+  if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
-  opts.log = opts.log || this._log;
-  return new StreamMergeTree(this, opts);
+  // keys with undefined values will override these defaults
+  opts = xtend({
+    bson: false,
+    filter: {},
+    excludeFirst: false,
+    excludeLast: false,
+    reverse: false,
+    hooks: [],
+    hooksOpts: {},
+    tail: false,
+    tailRetry: 1000,
+    log: this._log
+  }, opts);
+
+  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
+  if (opts.filter != null && typeof opts.filter !== 'object') { throw new TypeError('opts.filter must be an object'); }
+  if (opts.first != null) {
+    if (typeof opts.first !== 'number' && typeof opts.first !== 'string') { throw new TypeError('opts.first must be a base64 string or a number'); }
+    if (typeof opts.first === 'string' && Buffer.byteLength(opts.first, 'base64') !== this._vSize) { throw new Error('opts.first must be the same size as the configured vSize'); }
+  }
+  if (opts.excludeFirst != null && typeof opts.excludeFirst !== 'boolean') { throw new TypeError('opts.excludeFirst must be a boolean'); }
+  if (opts.hooks != null && !Array.isArray(opts.hooks)) { throw new TypeError('opts.hooks must be an array'); }
+  if (opts.hooksOpts != null && typeof opts.hooksOpts !== 'object') { throw new TypeError('opts.hooksOpts must be an object'); }
+  if (opts.tail != null && typeof opts.tail !== 'boolean') { throw new TypeError('opts.tail must be a boolean'); }
+  if (opts.tailRetry != null && typeof opts.tailRetry !== 'number') { throw new TypeError('opts.tailRetry must be a number'); }
+  if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
+
+  this._log.info('createReadStream opts: %j', opts);
+
+  var that = this;
+
+  // shortcut
+  var filter = opts.filter || {};
+  var hooks = opts.hooks || [];
+  var hooksOpts = opts.hooksOpts || {};
+
+  /**
+   * Call back with array of connected parents for item.
+   *
+   * findConnectedParents(v)
+   *   parents <- {}
+   *   for every pa in parents(v)
+   *     item <- lookup(pa)
+   *     if match(item, crit)
+   *       parents set pa
+   *     else
+   *       parents set parents.findConnectedParents(pa)
+   *   return parents
+   */
+  function findConnectedParents(item, crit, cb) {
+    that._log.debug2('createReadStream findConnectedParents %s', item.h.pa);
+    var parents = {};
+    async.eachSeries(item.h.pa, function(pav, cb2) {
+      that._local.getByVersion(pav, function(err, pa) {
+        if (err) { cb2(err); return; }
+
+        // descend if not all criteria hold on this item
+        if (!match(crit, pa.b)) {
+          that._log.debug2('createReadStream findConnectedParents crit does not hold, descend');
+          findConnectedParents(pa, crit, function(err, nParents) {
+            if (err) { cb2(err); return; }
+            Object.keys(nParents).forEach(function(pa2) {
+              parents[pa2] = true;
+            });
+            cb2();
+          });
+        } else {
+          runHooks(hooks, that._db, pa, hooksOpts, function(err, afterItem) {
+            if (err) { cb2(err); return; }
+
+            // descend if hooks filter out the item
+            if (afterItem) {
+              that._log.debug2('createReadStream findConnectedParents add to parents %s', pa.h.v);
+              parents[pa.h.v] = true;
+              cb2();
+            } else {
+              that._log.debug2('createReadStream findConnectedParents crit holds, but hooks filter, descend');
+              findConnectedParents(pa, crit, function(err, nParents) {
+                if (err) { cb2(err); return; }
+                Object.keys(nParents).forEach(function(pa2) {
+                  parents[pa2] = true;
+                });
+                cb2();
+              });
+            }
+          });
+        }
+      });
+    }, function(err) {
+      if (err) { cb(err); return; }
+      cb(null, parents);
+    });
+  }
+
+  var transformer = new Transform({
+    readableObjectMode: !opts.bson,
+    writableObjectMode: true,
+    transform: function (item, enc, cb) {
+      that._log.debug2('createReadStream data %j', item.h);
+
+      // don't emit if not all criteria hold on this item
+      if (!match(filter, item.b)) {
+        that._log.debug2('createReadStream filter %j', filter);
+        cb();
+        return;
+      }
+
+      runHooks(hooks, that._db, item, hooksOpts, function(err, afterItem) {
+        if (err) { that.emit(err); return; }
+
+        // skip if hooks filter out the item
+        if (!afterItem) {
+          that._log.debug2('createReadStream hook filtered %j', item.h);
+          cb();
+          return;
+        }
+
+        // else find parents
+        findConnectedParents(afterItem, filter, function(err, parents) {
+          if (err) { that.emit(err); return; }
+
+          afterItem.h.pa = Object.keys(parents);
+
+          // remove perspective and local state
+          delete afterItem.h.pe;
+          delete afterItem.h.i;
+          delete afterItem.m;
+
+          // push the bson or native object out to the reader, and resume if not flooded
+          that._log.debug('createReadStream push %j', afterItem.h);
+          cb(null, opts.bson ? BSON.serialize(afterItem) : afterItem);
+        });
+      });
+    }
+  });
+
+  // always read objects instead of bson
+  var rw = this._local.createReadStream(xtend(opts, { bson: false }));
+  rw.pipe(transformer);
+
+  // proxy finish
+  transformer.on('finish', function() {
+    rw.end();
+  });
+  return transformer;
 };
 
 /**
@@ -2806,13 +2549,13 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
 
   if (remote === this.localName) {
     error = 'perspective should differ from local name';
-    this._log.err('merge_tree createRemoteWriteStream %s %s', error, remote);
+    this._log.err('mt createRemoteWriteStream %s %s', error, remote);
     throw new Error(error);
   }
 
   if (remote === this._stageName) {
     error = 'perspective should differ from stage name';
-    this._log.err('merge_tree createRemoteWriteStream %s %s', error, remote);
+    this._log.err('mt createRemoteWriteStream %s %s', error, remote);
     throw new Error(error);
   }
 
@@ -2820,24 +2563,24 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
 
   if (!tree) {
     error = 'perspective not found';
-    that._log.err('merge_tree createRemoteWriteStream %s %s', error, remote);
+    that._log.err('mt createRemoteWriteStream %s %s', error, remote);
     throw new Error(error);
   }
 
-  this._log.info('merge_tree createRemoteWriteStream opened tree %s', remote);
+  this._log.info('mt createRemoteWriteStream opened tree %s', remote);
 
   var filter = opts.filter || {};
   var hooks = opts.hooks || [];
   var hooksOpts = opts.hooksOpts || [];
   var db = that._db;
 
-  return new Transform({
+  return new Writable({
     objectMode: true,
-    transform: function(item, encoding, cb) {
+    write: function(item, encoding, cb) {
       try {
         item.h.pe = remote;
       } catch(err) {
-        that._log.err('merge_tree createRemoteWriteStream %s %s', err, remote);
+        that._log.err('mt createRemoteWriteStream %s %s', err, remote);
         process.nextTick(function() {
           cb(err);
         });
@@ -2845,7 +2588,7 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
       }
 
       if (!match(filter, item.b)) {
-        that._log.info('merge_tree createRemoteWriteStream filter %j', filter);
+        that._log.info('mt createRemoteWriteStream filter %j', filter);
         cb();
         return;
       }
@@ -2855,15 +2598,11 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
 
         if (afterItem) {
           // push the item out to the reader
-          that._log.info('merge_tree createRemoteWriteStream write %s %j', remote, afterItem.h);
-          tree.write(afterItem, function(err) {
-            if (err) { tree.once('error', noop); cb(err); return; }
-            that._updatedPerspectives[remote] = true;
-            cb();
-          });
+          that._log.debug('mt createRemoteWriteStream write %s %j', remote, afterItem.h);
+          tree.write(afterItem, cb);
         } else {
           // if hooks filter out the item don't push
-          that._log.info('merge_tree createRemoteWriteStream filter %s %j', remote, item.h);
+          that._log.debug('mt createRemoteWriteStream filter %s %j', remote, item.h);
           cb();
         }
       });
@@ -2872,342 +2611,219 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
 };
 
 /**
- * Save a new version from the local perspective or a confirmation of a handled
- * merge (that originated from a remote and exists in the stage) in the local tree.
+ * Save a new local version or a confirmation of a merge with a remote into the
+ * local tree.
  *
  * New items should have the following structure:
  * {
- *   h: {Object}  header containing the following values:
- *     id:  {mixed}  id of this item
- *     [v]: {base64 String}  supply version to confirm a handled merge or
- *                           deterministically set the version. If not set, a
- *                           new random version will be generated.
- *     [d]: {Boolean}  true if this id is deleted
- *   [m]: {mixed}  meta info to store with this document
- *   [b]: {mixed}  document to save
+ *   n: new version
  * }
  *
- * @param {Object} item  item to save
- * @param {Function} cb  Callback that is called once the item is saved. First
- *                       parameter will be an error object or null.
+ * Merges should have the following structure:
+ * {
+ *   n: new version
+ *   l: expected local version
+ *   lcas: list of lca's
+ *   pe: perspective of remote
+ * }
+ *
+ * @return {stream.Writable}
  */
 MergeTree.prototype.createLocalWriteStream = function createLocalWriteStream() {
   var that = this;
 
-  return new Transform({
-    objectMode: true,
-    transform: function(item, encoding, cb) {
-      if (typeof item !== 'object') {
-        process.nextTick(function() {
-          cb(new TypeError('item must be an object'));
-        });
+  if (this._localWriteStream) {
+    throw new Error('local write stream already created');
+  }
+
+  var error;
+  var local = this._local;
+
+  /**
+   * 1. New local version
+   * Save as a local fast-forward.
+   */
+  function handleNewLocalItem(lhead, item, cb) {
+    that._log.debug('mt createLocalWriteStream NEW %j, local: %j', item.h, lhead);
+
+    error = invalidLocalHeader(item.h);
+    if (error) {
+      process.nextTick(function() {
+        cb(new TypeError('item.' + error));
+      });
+      return;
+    }
+
+    if (item.h.pa) {
+      error = new Error('did not expect local item to have a parent defined');
+      that._log.err('mt createLocalWriteStream %s %j', error, item);
+      process.nextTick(function() {
+        cb(error);
+      });
+      return;
+    }
+
+    // parent is current local head
+    var newItem = {
+      h: {
+        id: item.h.id,
+        pa: lhead ? [lhead] : []
+      }
+    };
+
+    if (item.b) {
+      newItem.b = item.b;
+    }
+
+    if (item.m) {
+      newItem.m = item.m;
+    }
+
+    if (item.h.v) {
+      newItem.h.v = item.h.v;
+    } else {
+      // generate new random version because the items content might already exist
+      newItem.h.v = MergeTree._generateRandomVersion(that._vSize);
+    }
+
+    if (item.h.d) {
+      newItem.h.d = true;
+    }
+
+    local.write(newItem, function(err) {
+      if (err) { local.once('error', noop); cb(err); return; }
+      cb();
+    });
+  }
+
+  /**
+   * 2. Merge confirmation (either a fast-forward by a remote or a merge with a
+   *    remote).
+   *
+   * If new version is from a perspective, it's a fast-forward, copy everything up
+   * to this new version from the remote tree to the local tree.
+   * If the new version has no perspective, it's a merge between a local and a
+   * remote version. The merge must have exactly two parents and one of them must
+   * point to the local head. Copy everything up until the other parent from the
+   * remote tree to the local tree.
+   *
+   * Handles normal merges and conflict resolving merges.
+   *
+   * @param {String} lhead  version number of the local head
+   * @param {Object} obj  new object
+   * @param {Function} cb  First parameter will be an error object or null.
+   */
+  function handleMerge(lhead, obj, cb) {
+    // move with ancestors to local, see startMerge
+    that._log.debug('mt createLocalWriteStream ACK %j, lhead: %j', obj.n.h, lhead);
+
+    // make sure this is a merge of the current local head
+    if (!lhead && obj.l || lhead && !obj.l) {
+      // unless one of the parents directly references the head
+      if (!~obj.n.h.pa.indexOf(lhead)) {
+        error = 'not a merge of lhead';
+        that._log.debug('mt createLocalWriteStream error %s, obj.l: %j', error, obj.l && obj.l.h || obj.l);
+        cb(new Error(error));
         return;
       }
-      if (typeof cb !== 'function') {
-        process.nextTick(function() {
-          cb(new TypeError('cb must be a function'));
-        });
+    } else if (lhead != (obj.l && obj.l.h.v)) {
+      // unless one of the parents directly references the head
+      if (!~obj.n.h.pa.indexOf(lhead)) {
+        error = 'lhead differs from obj.l';
+        that._log.debug('mt createLocalWriteStream error %s, obj.l: %j', error, obj.l && obj.l.h || obj.l);
+        cb(new Error(error));
         return;
-      }
-
-      var error = invalidLocalHeader(item.h);
-      if (error) {
-        process.nextTick(function() {
-          cb(new TypeError('item.' + error));
-        });
-        return;
-      }
-
-      if (item.h.pa) {
-        error = new Error('did not expect local item to have a parent defined');
-        that._log.err('merge_tree createLocalWriteStream %s %j', error, item);
-        process.nextTick(function() {
-          cb(error);
-        });
-        return;
-      }
-
-      // use local and staging tree
-      var local = that._local;
-      var stage = that._stage;
-
-      function handleStageItem(err, exists) {
-        if (err) { cb(err); return; }
-
-        if (exists && isEqual(exists.b, item.b)) {
-          // see mergeWithLocal
-          that._log.info('merge_tree createLocalWriteStream ack %j move with ancestors to local', item.h);
-
-          // use header from item in stage and copy body and any meta info from the user supplied item
-          exists.m = item.m;
-          exists.b = item.b;
-          item = exists;
-
-          // ack, move everything up to this item to the local tree
-          stage.iterateInsertionOrder({ id: item.h.id, last: item.h.v }, function(stageItem, next) {
-            // move item from stage to local
-            local.write(stageItem, function(err) {
-              if (err) { local.once('error', noop); next(err); return; }
-              stage.del(stageItem, next);
-            });
-          }, cb);
-        } else {
-          that._log.debug('merge_tree createLocalWriteStream new item %j determine parent by last non-conflicting head in local', item.h);
-
-          var heads = [];
-          local.getHeads({ id: item.h.id, skipConflicts: true }, function(head, next) {
-            heads.push(head.h.v);
-            next();
-          }, function(err) {
-            if (err) { cb(err); return; }
-
-            that._log.debug('merge_tree createLocalWriteStream found heads %s', heads);
-
-            if (heads.length > 1) {
-              error = 'more than one non-conflicting head in local tree';
-              that._log.err('merge_tree createLocalWriteStream %s %j', error, item);
-              cb(new Error(error));
-              return;
-            }
-
-            var newItem = {
-              h: {
-                id: item.h.id,
-                pa: heads
-              }
-            };
-
-            if (item.b) {
-              newItem.b = item.b;
-            }
-
-            if (item.m) {
-              newItem.m = item.m;
-            }
-
-            if (item.h.v) {
-              newItem.h.v = item.h.v;
-            } else {
-              // generate new random version because the items content might already exist
-              newItem.h.v = MergeTree._generateRandomVersion(that._vSize);
-            }
-
-            if (item.h.d) {
-              newItem.h.d = true;
-            }
-
-            that._log.debug('merge_tree createLocalWriteStream write new head in local %j', newItem.h);
-
-            local.write(newItem, function(err) {
-              if (err) { local.once('error', noop); cb(err); return; }
-              cb();
-            });
-          });
-        }
-      }
-      if (item.h.v) {
-        // check if this version is in the stage or not
-        stage.getByVersion(item.h.v, handleStageItem);
-      } else {
-        handleStageItem();
       }
     }
-  });
-};
 
-/**
- * Copy all items in stree that are not in the local tree to staging. Then merge
- * stage with local.
- *
- * Only mutates the staging tree.
- *
- * Transform can be provided to the constructor.
- *
- * @param {Object} stree  source tree to merge
- * @param {Function} cb  First parameter will be an error object or null.
- */
-MergeTree.prototype.mergeWithLocal = function mergeWithLocal(stree, cb) {
-  if (typeof stree !== 'object' || Array.isArray(stree)) { throw new TypeError('stree must be an object'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+    // for now, only support one lca
+    if (obj.lcas.length > 1) {
+      cb(new Error('can not merge with more than one lca'));
+      return;
+    }
 
-  var local = this._local;
-  var stage = this._stage;
-  var that = this;
+    // copy all items from the remote tree to the local tree in one atomic operation to ensure one head
+    var items = [];
 
-  this._log.info('mergeWithLocal %s -> %s (via %s)', stree.name, local.name, stage.name);
+    var firstInRemote = obj.lcas[0];
+    var lastInRemote;
 
-  this._copyMissingToStage(stree, local, function(err) {
-    if (err) { cb(err); return; }
-
-    that._mergeStageWithLocal(cb);
-
-    /*
-    MergeTree._mergeTrees(stree, local, function iterator(smerge, dmerge, shead, dhead, next) {
-      if (shead.h.pe !== stree.name) {
-        error = new Error('shead and stree perspective mismatch');
-        that._log.err('mergeWithLocal %s %j', error, shead);
-        next(error);
+    if (obj.n.h.pe) { // this is a fast-forward to an item in a remote tree
+      lastInRemote = obj.n.h.v;
+    } else { // this is a merge between a remote and the local head
+      // expect one parent to point to the local head
+      if (obj.n.h.pa.length !== 2) {
+        cb(new Error('merge must have exactly one remote parent and one local parent'));
+        return;
+      }
+      if (obj.n.h.pa[0] !== lhead && obj.n.h.pa[1] !== lhead) {
+        cb(new Error('merge must have the local head as one of it\'s parents'));
         return;
       }
 
-      that._log.debug('mergeWithLocal _mergeTrees smerge: %j, dmerge: %j, shead: %j, dhead: %j', smerge, dmerge, shead, dhead);
+      if (obj.n.h.pa[0] === lhead) {
+        lastInRemote = obj.n.h.pa[1];
+      } else {
+        lastInRemote = obj.n.h.pa[0];
+      }
 
-      that._transform(shead, function(err, nitem) {
-        if (err) {
-          that._log.err('mergeWithLocal transform shead error %s %j', err, shead);
-          next(err);
+      // put the merge at the top of the array as this can not be found in the remote tree
+      items.push(obj.n);
+    }
+
+    var opts = {
+      id: obj.n.h.id,
+      excludeFirst: true,
+      first: firstInRemote,
+      last:  lastInRemote,
+      reverse: true // backwards in case a merge is the new head
+    };
+    that._pe[obj.pe].createReadStream(opts).on('readable', function() {
+      var item = this.read();
+      if (item) items.unshift(item); // unshift in case a merge is the new head
+    }).on('error', cb).on('end', function() {
+      that._log.debug('mt createLocalWriteStream copying %d items from %s', items.length, obj.pe);
+      // ensure meta info of the acknowledged head is on the new head
+      if (obj.n.m) {
+        items[items.length - 1].m = obj.n.m;
+      }
+      local.write(items, cb); // atomic write of the new head and items leading to it
+    });
+  }
+
+  this._localWriteStream = new Writable({
+    objectMode: true,
+    write: function(obj, encoding, cb) {
+      // determine local head for this id
+      var id = obj.n.h.id;
+      var heads = [];
+      local.createHeadReadStream({ id: id }).on('readable', function() {
+        var head = this.read();
+
+        if (head) {
+          heads.push(head.h.v);
           return;
         }
 
-        shead = nitem;
+        // end of stream
 
-        // if there was a conflict, save shead in stage with conflict flag set
-        if (Array.isArray(smerge)) {
-          // set conflict flag
-          shead.h.c = true;
-          stage.write(shead, function(err) {
-            if (err) { stage.once('error', noop); next(err); return; }
-            next();
-          });
+        if (heads.length > 1) {
+          error = 'more than one local head';
+          that._log.err('mt createLocalWriteStream %s %s %j', error, id, heads);
+          cb(new Error(error));
           return;
         }
 
-        // merge given head with non-deleted and non-conflicting head in stage (if not already in stage)
-        function mergeNewHeadWithStage(newHead) {
-          var headOpts = {
-            id: newHead.h.id,
-            skipDeletes: true,
-            skipConflicts: true
-          };
-          var alreadyInStage;
-          var heads = [];
-          stage.getHeads(headOpts, function(head, snext) {
-            if (head.h.v === newHead.h.v) {
-              alreadyInStage = true;
-            }
-            heads.push(head);
-            snext();
-          }, function(err) {
-            if (err) { next(err); return; }
-
-            that._log.debug('mergeWithLocal head in stage %j', heads);
-
-            if (heads.length > 1) {
-              next(new Error('more than one head in stage'));
-              return;
-            }
-
-            // if no previous head in stage, insert new head in staging and call merge handler with the new head and the current local head
-            if (!heads.length) {
-              stage.write(newHead, function(err) {
-                if (err) {
-                  // write error in stage
-                  that._log.err('mergeWithLocal stage write error %s %j', err, newHead);
-                  stage.once('error', noop);
-                  next(err);
-                  return;
-                }
-                that._log.debug('mergeWithLocal write first new head %j', newHead);
-                that._mergeHandler(newHead, dhead, next);
-              });
-              return;
-            }
-
-            var stageHead = heads[0];
-
-            // if the newly created head is already an existing head in stage, call merge handler with the existing head and
-            // the current local head. this might happen after ungraceful exit
-            if (alreadyInStage) {
-              that._log.debug('mergeWithLocal newly created merge %j already in stage %j', newHead, stageHead);
-              that._mergeHandler(stageHead, dhead, next);
-              return;
-            }
-
-            // merge with previous head in stage
-            var sX = new ConcatReadStream([streamifier(heads), stree.createReadStream({ id: newHead.h.id, reverse: true })]);
-            var sY = new ConcatReadStream([streamifier(heads), stree.createReadStream({ id: newHead.h.id, reverse: true })]);
-
-            var opts = {
-              rootX: newHead,
-              rootY: stageHead
-            };
-            merge(sX, sY, opts, function(err, merged) {
-              // if conflict, write new head with conflict flag set, don't call merge handler
-              if (err) {
-                that._log.err('mergeWithLocal staging merge error %s %j %j', err, newHead, stageHead);
-                // set conflict flag
-                newHead.h.c = true;
-                stage.write(newHead, function(err) {
-                  if (err) { stage.once('error', noop); next(err); return; }
-                  next();
-                });
-                return;
-              }
-
-              // if fast-forward, write new head and call merge handler with the new merged head and the current local head
-              if (merged.h.v && merged.h.v === newHead.h.v) {
-                stage.write(newHead, function(err) {
-                  if (err) {
-                    that._log.err('mergeWithLocal stage newHead write error %s %j %j', err, newHead);
-                    stage.once('error', noop);
-                    next(err);
-                    return;
-                  }
-                  that._log.debug('mergeWithLocal write new head by fast-forward %j %j', newHead, merged);
-                  that._mergeHandler(newHead, dhead, next);
-                });
-                return;
-              }
-
-              // else insert new head and new merge and call merge handler with the new merged head and the current local head
-              that._log.debug('mergeWithLocal write new head %j and merge %j', newHead, merged);
-              stage.write(newHead, function(err) {
-                if (err) {
-                  that._log.err('mergeWithLocal stage newHead write error %s %j %j', err, newHead);
-                  stage.once('error', noop);
-                  next(err);
-                  return;
-                }
-
-                merged.h.v = MergeTree._versionContent(merged); // merkle-tree
-
-                stage.write(merged, function(err) {
-                  if (err) {
-                    that._log.err('mergeWithLocal stage merge write error %s %j %j', err, newHead, merged);
-                    stage.once('error', noop);
-                    next(err);
-                    return;
-                  }
-                  that._mergeHandler(merged, dhead, next);
-                });
-              });
-            });
-          });
+        // deletegate to merge or local version handler
+        if (obj.lcas) {
+          handleMerge(heads[0], obj, cb);
+        } else {
+          handleNewLocalItem(heads[0], obj.n, cb);
         }
-
-        // determine new item, merge, merge ff
-        if (!smerge) {
-          // merge ff
-          that._log.debug('mergeWithLocal use transformed shead %j', shead);
-          mergeNewHeadWithStage(shead);
-          return;
-        }
-
-        // merge
-        that._transform(smerge, function(err, nitem) {
-          if (err) {
-            that._log.err('mergeWithLocal transform smerge error %s %j', err, smerge);
-            next(err);
-            return;
-          }
-          that._log.debug('mergeWithLocal use transformed smerge %j', nitem);
-
-          mergeNewHeadWithStage(nitem);
-        });
-      });
-    }, cb);
-    */
+      }).on('error', cb);
+    }
   });
+  return this._localWriteStream;
 };
 
 /**
@@ -3249,7 +2865,7 @@ MergeTree.prototype.lastReceivedFromRemote = function lastReceivedFromRemote(rem
 
   if (!tree) {
     var error = 'remote not found';
-    this._log.err('merge_tree %s %s', error, remote);
+    this._log.err('mt %s %s', error, remote);
     throw new Error(error);
   }
 
@@ -3257,116 +2873,111 @@ MergeTree.prototype.lastReceivedFromRemote = function lastReceivedFromRemote(rem
 };
 
 /**
- * Set a mergeHandler. Use if both createLocalWriteStream and
- * createRemoteWriteStream are in use. This function is called with every newly
- * created merge (either by fast-forward or three-way-merge). If no function is
- * specified, a default merge handler is created that will directly write to the
- * local write stream.
+ * Start merging, first clear the stage, than determine offsets for each perspective
+ * finally start merge procedure (which utilizes the stage).
  *
- * This way, by using an intermediate stage, remote updates can be saved locally in
- * an asynchronous way. Make sure any processed merges are written back to the
- * local write stream in the same order as mergeHandler was called. It's ok to miss
- * some items as long as the order does not change.
- *
- * @param {Function} [mergeHandler]  function to handle newly created merges
- *                                   signature: function (merged, lhead, next)
- */
-MergeTree.prototype.ensureMergeHandler = function ensureMergeHandler(mergeHandler) {
-  if (mergeHandler != null && typeof mergeHandler !== 'function') { throw new TypeError('mergeHandler must be a function'); }
-
-  if (mergeHandler) {
-    this._mergeHandler = mergeHandler;
-  }
-  // ensure a mergeHandler is set
-  if (!this._mergeHandler) {
-    var writable = this.createLocalWriteStream();
-    this._mergeHandler = function(merged, lhead, next) {
-      // local items should not have a parent, it is determined by the local write stream
-      delete merged.h.pa;
-      writable.write(merged, function(err) {
-        if (err) { writable.once('error', noop); next(err); return; }
-        next();
-      });
-    };
-  }
-};
-
-/**
- * Do a merge of every updated perspective with local. If an interval is given a
- * loop is started that can be interrupted by setting mergeTree.stopAutoMerge to
- * true.
- *
- * @param {Object} [opts]  object containing configurable parameters
+ * @param {Object} [opts]  object containing configurable parameters for _mergeAll
+ * @return {stream.Readable} a readable stream with newly merged items, of the
+ * following form:
+ * {
+ *   n: {}   // new merged object or in case of a conflict, the remote head
+ *   o: {}   // previous head
+ *   c: []   // name of keys with conflicts in case of a merge conflict
+ * }
  *
  * opts:
- *   interval {Number, default 0}  time in ms to wait and repeat a merge, 0 is off.
- *   mergeHandler {Function}  function that should handle newly created merges
- *                            signature: function (merged, lhead, next)
- *   conflictHandler {Function}  function to handle merges with conflicts
- *                               signature: function (attrs, shead, lhead, next)
- *                               call next with a new item or null if not resolved.
- *   done {Function}  Called after last merge is executed. First parameter will be
- *                    an error object or null. Only called if repeat is false or
- *                    closed.
+ *   all tree.createReadStream options
+ *   tail {Boolean, default true}  keep tailing trees to merge
+ *   ready {Function}  called when all streams are started
  */
-MergeTree.prototype.mergeAll = function mergeAll(opts) {
-  if (opts == null) { opts = {}; }
+MergeTree.prototype.startMerge = function startMerge(opts) {
+  opts = xtend({
+    tail: true
+  }, opts);
+  if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
-  if (opts.interval != null && typeof opts.interval !== 'number') { throw new TypeError('opts.interval must be a number'); }
-  if (opts.mergeHandler != null && typeof opts.mergeHandler !== 'function') { throw new TypeError('opts.mergeHandler must be a function'); }
-  if (opts.conflictHandler != null && typeof opts.conflictHandler !== 'function') { throw new TypeError('opts.conflictHandler must be a function'); }
-  if (opts.done != null && typeof opts.done !== 'function') { throw new TypeError('opts.done must be a function'); }
+  if (this._mergeStream) {
+    throw new Error('merge already running');
+  }
 
-  this._log.debug2('merge_tree mergeAll');
-
-  this._mergeInterval = opts.interval || 0;
-
-  // use new mergeHandler if given
-  this.ensureMergeHandler(opts.mergeHandler);
-
-  // use new conflictHandler if given
-  this._ensureConflictHandler(opts.conflictHandler);
-
-  var done = opts.done || noop;
+  this._mergeStream = this._createMergeStream();
 
   var that = this;
-  setTimeout(function() {
-    async.eachSeries(that._perspectives, function(pe, cb2) {
-      if (that._updatedPerspectives[pe]) {
-        that.mergeWithLocal(that._pe[pe], function(err) {
-          that._updatedPerspectives[pe] = false;
-          cb2(err);
-        });
-      } else {
-        cb2();
-      }
-    }, function(err) {
-      if (err) { done(err); return; }
 
-      if (that._mergeInterval && !that.stopAutoMerge) {
-        // don't pass on merge or conflict handler to allow ensureMergeHandler to register new handlers
-        that.mergeAll({
-          interval: opts.interval,
-          done: opts.done
+  // first clear the stage
+  this._stage.createReadStream().pipe(new Writable({
+    objectMode: true,
+    write: function(item, enc, cb2) {
+      that._stage.del(item, cb2);
+    }
+  })).on('finish', function() {
+    // for each perspective determine last version in the local tree and start a tailing readstream
+    async.eachSeries(that._perspectives, function(pe, cb2) {
+      that._local.lastByPerspective(pe, 'base64', function(err, v) {
+        if (err) { cb2(err); return; }
+        var opts2 = xtend(opts);
+        if (v) {
+          opts2 = xtend({
+            first: v,
+            excludeFirst: true
+          }, opts2);
+        }
+        that._setupMerge(pe, opts2, function(err) {
+          if (err) { that._log.info('%s error: %s', pe, err); }
         });
-      } else {
-        done();
-      }
-    });
-  }, this._mergeInterval);
+        cb2();
+      });
+    }, opts.ready || noop);
+  });
+
+  return this._mergeStream;
 };
 
 /**
- * Close open read and write streams, merge once more and call back.
- *
- * TODO: should wait for all writers to finish, for now, just wait at least 100ms
+ * Close trees and merge stream.
  *
  * @param {Function} [cb]  Called after all is closed. First parameter will be an
  *                         error object or null.
  */
 MergeTree.prototype.close = function close(cb) {
-  this.stopAutoMerge = true;
-  setTimeout(cb, (this._mergeInterval || 0) + 100); // wait at least 100ms
+  var that = this;
+  var tasks = [];
+  that._perspectives.forEach(function(pe) {
+    tasks.push(function(cb2) {
+      that._log.debug('mt closing %s tree', pe);
+      that._pe[pe].end(cb2);
+    });
+  });
+  if (this._mergeStream) {
+    tasks.push(function(cb2) {
+      that._log.debug('mt closing merge stream');
+      that._mergeStream.end(cb2);
+    });
+  }
+
+  // create some arbitrary time to let any readers timeout
+  tasks.push(function(cb2) {
+    that._log.debug('mt wait...');
+    setTimeout(cb2, 100);
+  });
+
+  if (this._localWriteStream) {
+    tasks.push(function(cb2) {
+      that._log.debug('mt closing local write stream');
+      that._localWriteStream.end(cb2);
+    });
+  }
+
+  tasks.push(function(cb2) {
+    that._log.debug('mt closing stage tree');
+    that._stage.end(cb2);
+  });
+  tasks.push(function(cb2) {
+    that._log.debug('mt closing local tree');
+    that._local.end(cb2);
+  });
+
+  async.series(tasks, cb);
 };
 
 /**
@@ -3409,312 +3020,163 @@ MergeTree.prototype.stats = function stats(cb) {
 
 
 /**
- * Set a conflictHandler. Use if both createLocalWriteStream and
- * createRemoteWriteStream are in use. This function is called with every newly
- * created merge that has a conflict. Call tree.getConflicts to get conflicting
- * merges.
+ * Start merging a perspective.
  *
- * @param {Function} [conflictHandler]  function to handle newly conflicting merges
- *                                      signature:
- *                                      function (attrs, shead, lhead, next)
- *                                      call next with a new item or null if not
- *                                      resolved.
+ * @param {String} name of the perspective to start merging
+ * @param {Object} [opts]  tree.createReadStream options
+ * @param {Function} cb  called if a stream ends or an error occurs
  */
-MergeTree.prototype._ensureConflictHandler = function _ensureConflictHandler(conflictHandler) {
-  if (conflictHandler != null && typeof conflictHandler !== 'function') { throw new TypeError('conflictHandler must be a function'); }
-
-  if (conflictHandler) {
-    this._conflictHandler = conflictHandler;
-  }
-  // ensure a conflictHandler is set
-  if (!this._conflictHandler) {
-    this._conflictHandler = function(attrs, shead, lhead, cb) {
-      cb();
-    };
-  }
-};
-
-/**
- * Copy all items in stree that are not in dtree to stage. Run transform before
- * saving.
- *
- * @param {Object} stree  source tree to merge
- * @param {Object} dtree  dest tree to compare with
- * @param {Function} cb  First parameter will be an error object or null.
- */
-MergeTree.prototype._copyMissingToStage = function _copyMissingToStage(stree, dtree, cb) {
-  if (typeof stree !== 'object') { throw new TypeError('stree must be an object'); }
-  if (typeof dtree !== 'object') { throw new TypeError('dtree must be an object'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+MergeTree.prototype._setupMerge = function _setupMerge(pe, opts, cb) {
+  cb = cb || noop;
 
   var that = this;
+  var reader = that._pe[pe].createReadStream(opts)
+  reader.pipe(new Transform({
+    objectMode: true,
+    transform: function(sitem, enc, cb2) {
+      delete sitem.h.i;
+      cb2(null, sitem);
+    }
+  })).on('finish', cb).pipe(that._mergeStream);
 
-  MergeTree._iterateMissing(stree, dtree, function(sitem, next) {
-    that._stage.getByVersion(sitem.h.v, function(err, inStage) {
-      if (err) { next(err); return; }
-      if (inStage) {
-        that._log.debug('merge_tree _copyMissingToStage already in stage %s', sitem.h.v);
-        next();
-        return;
-      }
-
-      that._transform(sitem, function(err, nitem) {
-        if (err) {
-          that._log.err('_copyMissingToStage transform error %s %j', err, sitem);
-          next(err);
-          return;
-        }
-
-        // filter item
-        if (nitem == null) {
-          next();
-          return;
-        }
-
-        that._log.debug('merge_tree _copyMissingToStage %s', sitem.h.v);
-        nitem.h.pe = stree.name;
-        that._stage.write(nitem, next);
-      });
-    });
-  }, cb);
+  // close reader if merge stream closes
+  that._mergeStream.on('finish', function() {
+    that._log.debug('mt _setupMerge end reader %s', pe);
+    reader.end();
+  });
 };
 
 /**
- * Merge stage with local. Merge every non-conflicting head in stage in insertion
- * order with the one non-conflicting head in local. Call merge handler with the
- * head from stage, the head from local and the merged result. If there is a merge
- * conflict, the conflict handler is invoked with an array of conflicting
- * attributes and both heads.
+ * Merge items with local.
  *
- * merge handler is called at most "number of heads in stage" times.
+ * Merge every remote item with the head in local, if any. Call back with the
+ * merged result and the head from local. If there is a merge conflict call back
+ * with the remote item and the local head and an array of conflicting key names.
  *
- * @param {Function} cb  First parameter will be an error object or null.
+ * If the item is already in local, don't call back, just update the last version
+ * by perspective in local.
  */
-MergeTree.prototype._mergeStageWithLocal = function _mergeStageWithLocal(cb) {
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  var stage = this._stage;
+MergeTree.prototype._createMergeStream = function _createMergeStream() {
   var local = this._local;
   var that  = this;
+  var error;
 
-  // find all heads in insertion order
-  stage.iterateInsertionOrder(function(sitem, snext) {
-    that._log.debug('_mergeStageWithLocal process %s', sitem.h.v);
-    var headOpts = {
-      id: sitem.h.id,
-      skipConflicts: true
-    };
-    stage.getHeads(headOpts, function(shead, shnext) {
-      if (shead.h.v !== sitem.h.v) {
-        that._log.debug('_mergeStageWithLocal skip head %s, not this item %s', shead.h.v, sitem.h.v);
-        shnext();
+  var transformer = new Transform({
+    objectMode: true,
+    transform: function(ritem, enc, cb) {
+      var rtree = that._pe[ritem.h.pe];
+      if (!rtree) {
+        error = new Error('remote tree could not be determined');
+        that._log.err('mt _createMergeStream %s %j', error, ritem.h);
+        cb(error);
         return;
       }
 
-      that._log.debug('_mergeStageWithLocal item %s is a head', sitem.h.v);
+      // clone object to prevent side effects
+      ritem = xtend(ritem);
+      ritem.h = xtend(ritem.h);
 
-      // merge with the one non-conflicting head in local
+      that._log.debug2('mt _createMergeStream %s', ritem.h.v);
+
+      // merge with the head in local, if any
       var lheads = [];
-      local.getHeads(headOpts, function(lhead, lnext) {
-        lheads.push(lhead);
-        lnext();
-      }, function(err) {
-        if (err) { shnext(err); return; }
-
+      var headOpts = {
+        id: ritem.h.id
+      };
+      local.createHeadReadStream(headOpts).pipe(new Writable({
+        objectMode: true,
+        write: function(lhead, enc, cb2) {
+          lheads.push(lhead);
+          cb2();
+        }
+      })).on('finish', function() {
         if (lheads.length > 1) {
-          var error = new Error('more than one head in local');
-          that._log.err('_mergeStageWithLocal error %s %j', error, lheads);
-          shnext(error);
+          error = new Error('more than one head in local');
+          that._log.err('mt _createMergeStream error %s %j', error, lheads);
+          cb(error);
           return;
         }
 
         if (!lheads.length) {
+          that._log.debug('mt _createMergeStream fast-forward %j', ritem.h);
+
           // new item not in local yet, fast-forward
-          that._mergeHandler(shead, null, shnext);
+          cb(null, {
+            n: ritem,
+            l: null,
+            lcas: [],
+            pe: rtree.name,
+            c: null
+          });
           return;
         }
 
         var lhead = lheads[0];
 
-        that._log.debug('_mergeStageWithLocal merge %j with %j', sitem.h, lhead.h);
+        that._log.debug('mt _createMergeStream merge %j with %j', ritem.h, lhead.h);
 
-        // merge with previous head in stage
-        var sX = new ConcatReadStream([ stage.createReadStream({ id: shead.h.id, reverse: true }), local.createReadStream({ id: lhead.h.id, reverse: true }) ]);
-        var sY = local.createReadStream({ id: lhead.h.id, reverse: true });
+        // merge remote item with local head
+        var sX = rtree.createReadStream({ id: ritem.h.id, last: ritem.h.v, reverse: true });
+        var sY = local.createReadStream({ id: lhead.h.id, last: lhead.h.v, reverse: true });
 
-        var opts = {
-          rootX: shead,
-          rootY: lhead
-        };
-        merge(sX, sY, opts, function(err, smerge, lmerge) {
+        merge(sX, sY, function(err, rmerge, lmerge, lcas) {
           if (err) {
             if (err.name !== 'MergeConflict') {
-              that._log.err('_mergeStageWithLocal merge error %s %j %j', err, shead, lhead, err.stack);
-              shnext(err);
+              that._log.err('mt _createMergeStream merge error %s %j %j', err, ritem, lhead, err.stack);
+              cb(err);
               return;
             }
-            that._conflictHandler(err.conflict, shead.b, lhead.b, function(item) {
-              that._log.notice('_mergeStageWithLocal merge conflict %s %j %j', err.conflict, shead, lhead);
-              if (item) {
-                // use new item body as new version
-                var newItem = {
-                  h: {
-                    id: shead.h.id,
-                    v: '',
-                    pa: [shead.h.v, lhead.h.v].sort()
-                  },
-                  b: item
-                };
-                newItem.h.v = MergeTree._versionContent(item, that._vSize); // merkle-tree
-                // schedule next run
-                that._updatedPerspectives[shead.h.pe] = true;
-                stage.write(newItem, shnext);
-              } else {
-                // mark shead conflict for later processing and proceed
-                stage.setConflictByVersion(shead.h.v, shnext);
-              }
+
+            // merge conflict
+            that._log.notice('mt _createMergeStream merge conflict %s %j %j', err.conflict, ritem, lhead);
+            cb(null, {
+              n: ritem,
+              l: lhead,
+              lcas: lcas,
+              pe: rtree.name,
+              c: err.conflict
             });
             return;
           }
 
           // this item either exists in both trees, in only one of the trees (fast-forward) or in none of the trees (genuine merge)
-          // if a fast-forward for stage, ignore
+          // if a fast-forward for rtree, update last by perspective in local
           if (!lmerge.h.v) {
             // merge
 
             // create a version based on content
-            smerge.h.pa.sort();
-            smerge.h.v = MergeTree._versionContent(smerge); // merkle-tree
+            rmerge.h.pa.sort();
+            rmerge.h.v = MergeTree._versionContent(rmerge); // merkle-tree
 
-            that._log.info('_mergeStageWithLocal merge %j', smerge.h);
+            that._log.info('mt _createMergeStream merge %j', rmerge.h);
 
-            // save to stage and call merge handler
-            stage.write(smerge, function(err) {
-              if (err) { shnext(err); return; }
-              that._mergeHandler(smerge, lhead, shnext);
+            cb(null, {
+              n: rmerge,
+              l: lhead,
+              lcas: lcas,
+              pe: rtree.name,
+              c: null
             });
           } else if (!lmerge.h.i) {
-            // merge by fast-forward, already in stage, call merge handler
-            that._log.info('_mergeStageWithLocal merge ff %j', smerge.h);
-            if (smerge.h.i) {
-              that._mergeHandler(smerge, lhead, shnext);
-            } else {
-              that._log.info('_mergeStageWithLocal save merge %j', smerge.h);
-              stage.write(smerge, function(err) {
-                if (err) { shnext(err); return; }
-                that._mergeHandler(smerge, lhead, shnext);
-              });
-            }
+            // merge by fast-forward
+            that._log.info('mt _createMergeStream fast-forward %j', rmerge.h);
+            cb(null, {
+              n: ritem,
+              l: lhead,
+              lcas: lcas,
+              pe: rtree.name,
+              c: null
+            });
           } else {
-            // lmerge already exists in local tree (has both h.v and h.i)
-            that._log.info('_mergeStageWithLocal exists in local ff %j', lmerge.h);
-            shnext();
+            // version already in local tree (has both h.v and h.i)
+            that._log.debug('mt _createMergeStream set last by %s = %s', ritem.h.pe, lmerge.h.v);
+            local.write(ritem, cb);
           }
         });
-      });
-    }, snext);
-  }, cb);
-};
-
-/**
- * Start iterating over src starting at the last version of stree that is in dtree.
- *
- * Ensures insertion order of src.
- *
- * @param {Object} stree  source tree
- * @param {Object} dtree  destination tree
- * @param {Function} iterator  function(item, next) called with src item and
- *                             next handler
- * @param {Function} cb  First parameter will be an error object or null.
- */
-MergeTree._iterateMissing = function _iterateMissing(stree, dtree, iterator, cb) {
-  if (typeof stree !== 'object') { throw new TypeError('stree must be an object'); }
-  if (typeof dtree !== 'object') { throw new TypeError('dtree must be an object'); }
-  if (typeof iterator !== 'function') { throw new TypeError('iterator must be a function'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  // determine offset
-  dtree.lastByPerspective(stree.name, 'base64', function(err, v) {
-    if (err) { cb(err); return; }
-
-    var opts = {};
-    if (v) {
-      opts.first = v;
-      opts.excludeFirst = true;
+      }).on('error', cb);
     }
-    stree.iterateInsertionOrder(opts, iterator, cb);
   });
-};
-
-/**
- * Copy all items from stree to dtree. Maintains insertion order of stree.
- *
- * @param {Object} stree  source tree to search
- * @param {Object} dtree  destination tree
- * @param {Object} [opts]  object containing configurable parameters
- * @param {Function} cb  First parameter will be an error object or null.
- *
- * opts:
- *   first {base64 String}  first version that should be used
- *   last {base64 String}  last version to copy
- *   excludeFirst {Boolean, default false}  whether or not first should be
- *                                         excluded
- *   excludeLast {Boolean, default false}  whether or not last should be
- *                                         excluded
- *   transform {Function}  transformation function to run on each item
- *                         signature: function(item, cb2) cb2 should be called
- *                         with an optional error and a possibly transformed
- *                         item
- */
-MergeTree._copyTo = function _copyTo(stree, dtree, opts, cb) {
-  if (typeof opts === 'function') {
-    cb = opts;
-    opts = null;
-  }
-
-  opts = opts || {};
-  if (typeof stree !== 'object') { throw new TypeError('stree must be an object'); }
-  if (typeof dtree !== 'object') { throw new TypeError('dtree must be an object'); }
-  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  opts.transform = opts.transform || function(item, cb2) { cb2(null, item); };
-
-  var first = true;
-  stree.iterateInsertionOrder({ first: opts.first }, function(item, next) {
-    if (first) {
-      first = false;
-      if (opts.first && item.h.v === opts.first && opts.excludeFirst) {
-        next();
-        return;
-      }
-    }
-
-    if (opts.last && item.h.v === opts.last && opts.excludeLast) {
-      next(null, false);
-      return;
-    }
-
-    opts.transform(item, function(err, nitem) {
-      if (err) { next(err); return; }
-      if (nitem === null || typeof nitem === 'undefined') {
-        next();
-        return;
-      }
-
-      // allow one error without bubbling up
-      dtree.once('error', function() {});
-
-      dtree.write(nitem, function(err) {
-        if (err) { dtree.once('error', noop); next(err); return; }
-        if (opts.last && opts.last === item.h.v) {
-          next(null, false);
-        } else {
-          next();
-        }
-      });
-    });
-  }, cb);
+  return transformer;
 };
 
 /**
@@ -3759,7 +3221,7 @@ MergeTree._generateRandomVersion = function _generateRandomVersion(size) {
 };
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"./_stream_merge_tree":3,"./concat_read_stream":5,"./invalid_local_header":11,"./merge":12,"./noop":14,"./run_hooks":16,"./tree":18,"_process":327,"async":19,"bson":23,"buffer":128,"crypto":132,"is-equal":41,"match-object":94,"stream":347}],14:[function(require,module,exports){
+},{"./invalid_local_header":9,"./merge":10,"./noop":12,"./run_hooks":14,"./tree":16,"_process":327,"async":17,"bson":21,"buffer":128,"crypto":132,"match-object":92,"stream":347,"xtend":126}],12:[function(require,module,exports){
 /**
  * Copyright 2016 Netsend.
  *
@@ -3782,7 +3244,7 @@ MergeTree._generateRandomVersion = function _generateRandomVersion(size) {
 
 module.exports = function() {};
 
-},{}],15:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 /**
  * Copyright 2014, 2015 Netsend.
  *
@@ -3858,7 +3320,7 @@ function parsePersConfigs(arr) {
 
 module.exports = parsePersConfigs;
 
-},{"url":349}],16:[function(require,module,exports){
+},{"url":349}],14:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -3900,7 +3362,7 @@ function runHooks(hooks, db, item, opts, cb) {
 
 module.exports = runHooks;
 
-},{"async":19}],17:[function(require,module,exports){
+},{"async":17}],15:[function(require,module,exports){
 /**
  * Copyright 2015 Netsend.
  *
@@ -4047,10 +3509,10 @@ mark in conflict when
 
 module.exports = threeWayMerge;
 
-},{"is-equal":41}],18:[function(require,module,exports){
+},{"is-equal":39}],16:[function(require,module,exports){
 (function (process,Buffer){
 /**
- * Copyright 2015 Netsend.
+ * Copyright 2015, 2016 Netsend.
  *
  * This file is part of PersDB.
  *
@@ -4595,7 +4057,14 @@ Tree.prototype.getHeadVersions = function getHeadVersions(id, cb) {
   var result = [];
 
   var that = this;
-  it.on('data', function(headKey) {
+  it.on('readable', function() {
+    var headKey = it.read();
+
+    if (!headKey) { // end of stream
+      cb(null, result);
+      return;
+    }
+
     var key = Tree.parseKey(headKey, { decodeV: 'base64' });
 
     that._log.debug('t:%s getHeadVersions iterate key %j', that.name, key);
@@ -4603,10 +4072,6 @@ Tree.prototype.getHeadVersions = function getHeadVersions(id, cb) {
   });
 
   it.on('error', cb);
-
-  it.on('end', function() {
-    cb(null, result);
-  });
 };
 
 /**
@@ -4643,7 +4108,7 @@ Tree.prototype.createHeadReadStream = function createHeadReadStream(opts) {
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
 
   var r = this.getHeadKeyRange(id);
-  this._log.debug('t:%s getHeads range %j', this.name, r);
+  this._log.debug2('t:%s createHeadReadStream range %j', this.name, r);
 
   var that = this;
 
@@ -4657,16 +4122,16 @@ Tree.prototype.createHeadReadStream = function createHeadReadStream(opts) {
       if (opts.skipConflicts && val.c) { cb2(); return; }
       if (opts.skipDeletes && val.d) { cb2(); return; }
 
-      that._log.debug2('t:%s getHeads iterate key %j val %j', that.name, key, val);
+      that._log.debug2('t:%s createHeadReadStream iterate key %j val %j', that.name, key, val);
 
       that._db.get(that._composeDsKey(key.id, val.i), function(err, item) {
         if (err) {
-          that._log.err('t:%s getHeads %s', that.name, err);
+          that._log.err('t:%s createHeadReadStream %s', that.name, err);
           cb2(err);
           return;
         }
 
-        that._log.debug2('t:%s getHeads iterate item %j', that.name, item);
+        that._log.debug2('t:%s createHeadReadStream iterate item %j', that.name, item);
 
         var value;
         if (opts.bson) {
@@ -4725,22 +4190,16 @@ Tree.prototype.getHeads = function getHeads(opts, iterator, cb) {
   if (typeof iterator !== 'function') { throw new TypeError('iterator must be a function'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  this._log.debug('t:%s getHeads', this.name);
-
   var contin, error;
 
-  var transformer = new Transform({
+  var writable = new Writable({
     objectMode: true,
-    transform: function(head, encoding, cb2) {
-      var that = this;
-
-      if (error || contin === false) { cb2(); return; }
-
+    write: function(head, encoding, cb2) {
       iterator(head, function(err, cont) {
         if (err) {
           error = err;
           // signal the end
-          that.push(null);
+          writable.end();
           cb2();
           return;
         }
@@ -4748,7 +4207,7 @@ Tree.prototype.getHeads = function getHeads(opts, iterator, cb) {
         if (cont != null && !cont) {
           contin = false;
           // signal the end
-          that.push(null);
+          writable.end();
           cb2();
           return;
         }
@@ -4758,7 +4217,7 @@ Tree.prototype.getHeads = function getHeads(opts, iterator, cb) {
     }
   });
 
-  this.createHeadReadStream(opts).pipe(transformer).on('finish', function() {
+  this.createHeadReadStream(opts).pipe(writable).on('finish', function() {
     cb(error, contin);
   });
 };
@@ -4787,7 +4246,7 @@ Tree.prototype.getByVersion = function getByVersion(version, opts, cb) {
   if (typeof opts !== 'object' || Array.isArray(opts)) { throw new TypeError('opts must be an object'); }
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
 
-  this._log.debug('t:%s getByVersion %s', this.name, version);
+  this._log.debug2('t:%s getByVersion %s', this.name, version);
 
   var that = this;
   this._getDsKeyByVersion(version, function(err, dsKey) {
@@ -4821,15 +4280,9 @@ Tree.prototype.getByVersion = function getByVersion(version, opts, cb) {
 };
 
 /**
- * Get an iterator over each item in the order of insertion into the tree.
+ * Get a readable stream over each item in the order of insertion into the tree.
  *
  * @param {Object} [opts]  object containing configurable parameters
- * @param {Function} iterator  function(item, next) called with each item.
- *                             signature: next(err, continue) if continue is false
- *                             iteration will abort. if null or true, iteration
- *                             will continue to the next item.
- * @param {Function} cb  First parameter will be an error object or null, second
- *                       parameter will be the last iterator continue value.
  *
  * opts:
  *   id {String|Object}  limit to one specific DAG
@@ -4842,74 +4295,13 @@ Tree.prototype.getByVersion = function getByVersion(version, opts, cb) {
  *   reverse {Boolean, default false}  if true, starts with last version
  *   bson {Boolean, default false}  whether to BSON serialize the object or not
  */
-Tree.prototype.iterateInsertionOrder = function iterateInsertionOrder(opts, iterator, cb) {
-  if (typeof opts === 'function') {
-    cb = iterator;
-    iterator = opts;
-    opts = null;
-  }
-
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object' || Array.isArray(opts)) { throw new TypeError('opts must be an object'); }
-  if (typeof iterator !== 'function') { throw new TypeError('iterator must be a function'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  var s = new StreamTree(this, opts);
-
-  var that = this;
-  var ended, processing, cbCalled, lastCont;
-  s.on('data', function(item) {
-    s.pause();
-    processing = true;
-    iterator(item, function(err, cont) {
-      if (err) {
-        if (!cbCalled) {
-          cbCalled = true;
-          cb(err);
-        } else {
-          that._log.err('t:%s iterateInsertionOrder cb already called (iterator)', that.name, err);
-        }
-        return;
-      }
-      lastCont = cont;
-      if (cont != null && !cont) {
-        s.destroy();
-        if (!cbCalled) {
-          cbCalled = true;
-          cb(null, lastCont);
-        }
-        return;
-      }
-      processing = false;
-      if (ended && !cbCalled) {
-        cbCalled = true;
-        cb(null, lastCont);
-        return;
-      }
-      s.resume();
-    });
-  });
-
-  s.on('error', function(err) {
-    if (!cbCalled) {
-      cbCalled = true;
-      cb(err);
-    } else {
-      that._log.err('t:%s iterateInsertionOrder cb already called', that.name, err);
-    }
-  });
-  s.on('end', function() {
-    ended = true;
-    if (!processing && !cbCalled) {
-      cbCalled = true;
-      cb(null, lastCont);
-    }
-  });
+Tree.prototype.insertionOrderStream = function insertionOrderStream(opts) {
+  return new StreamTree(this, opts);
 };
 
 /**
  * Get a stream over each item in the order of insertion into the tree. If tail is
- * true, the returned stream will have a "close" method.
+ * true, the returned stream will have an "end" method.
  *
  * @param {Object} [opts]  object containing configurable parameters
  *
@@ -4942,25 +4334,11 @@ Tree.prototype.createReadStream = function createReadStream(opts) {
   var excludeFirst = opts.excludeFirst;
   var that         = this;
 
-  var running, timeout, ws, rs;
+  var timeout, ts, rs;
 
-  function scheduleNextOnEnd() {
-    that._log.debug('t:%s createReadStream schedule next', that.name);
-    running = false;
-    rs.unpipe(ws);
-    timeout = setTimeout(setupNewReaderToWriter, opts.tailRetry || 1000);
-  }
-
-  function scheduleEndOnEnd() {
-    that._log.debug('t:%s createReadStream schedule end', that.name);
-    running = false;
-    rs.unpipe(ws);
-    ws.end();
-  }
-
-  // create a new rs, pipe it to ws
-  function setupNewReaderToWriter() {
-    that._log.debug('t:%s createReadStream open reader: %j', that.name, opts);
+  // create a new rs, pipe it to ts
+  function setupReader() {
+    that._log.debug2('t:%s createReadStream open reader: %j', that.name, opts);
     rs = new StreamTree(that, {
       id:            opts.id,
       first:         first,
@@ -4968,8 +4346,14 @@ Tree.prototype.createReadStream = function createReadStream(opts) {
       bson:          opts.bson
     });
 
-    running = true;
-    rs.once('end', scheduleNextOnEnd);
+    rs.once('end', function() {
+      // cleanup
+      rs.unpipe(ts);
+
+      that._log.debug2('t:%s createReadStream schedule next', that.name);
+      timeout = setTimeout(setupReader, opts.tailRetry || 1000);
+    });
+
     rs.once('error', function(err) {
       // since this is a retry tail, skip version not found errors, maybe the requested version will exist later
       if (err.message === 'version not found') {
@@ -4979,12 +4363,12 @@ Tree.prototype.createReadStream = function createReadStream(opts) {
         rs.emit('error', err);
       }
     });
-    rs.pipe(ws, { end: false });
+    rs.pipe(ts, { end: false });
   }
 
   if (opts.tail) {
     // track last emitted version
-    ws = new Transform({
+    ts = new Transform({
       objectMode: true,
       transform: function(obj, enc, cb) {
         first = obj.h.v;
@@ -4992,23 +4376,17 @@ Tree.prototype.createReadStream = function createReadStream(opts) {
       }
     });
 
-    setupNewReaderToWriter();
+    setupReader();
+
     // exclude first on subsequent iterations
     excludeFirst = true;
 
-    // implement way to stop tailing
-    ws.close = function() {
-      that._log.debug('t:%s createReadStream close', that.name);
-      if (running) {
-        rs.removeListener('end', scheduleNextOnEnd);
-        rs.once('end', scheduleEndOnEnd);
-      } else {
-        that._log.debug('t:%s createReadStream end now', that.name);
-        clearTimeout(timeout);
-        ws.end();
-      }
-    };
-    return ws;
+    // clear any scheduled timeout if end() is called
+    ts.on('finish', function() {
+      that._log.debug('t:%s createReadStream finished', that.name);
+      clearTimeout(timeout);
+    });
+    return ts;
   } else {
     return new StreamTree(that, opts);
   }
@@ -5044,15 +4422,18 @@ Tree.prototype.lastVersion = function lastVersion(decodeV, cb) {
     error = err;
   });
 
-  it.on('data', function(val) {
+  it.on('readable', function() {
+    var val = it.read();
+
+    if (!val) { // end of stream
+      if (error) { cb(error, null); return; }
+
+      that._log.debug('t:%s lastVersion %s', that.name, v);
+      cb(null, v);
+      return;
+    }
+
     v = Tree.parseKey(val, { decodeV: decodeV }).v;
-  });
-
-  it.on('end', function() {
-    if (error) { cb(error, null); return; }
-
-    that._log.debug('t:%s lastVersion %s', that.name, v);
-    cb(null, v);
   });
 };
 
@@ -5099,7 +4480,7 @@ Tree.prototype.lastByPerspective = function lastByPerspective(pe, decodeV, cb) {
 
     var v = Tree.parseKey(vkey, { decodeV: decodeV }).v;
 
-    that._log.debug('t:%s lastByPerspective %s %s', that.name, pe, v);
+    that._log.debug2('t:%s lastByPerspective %s %s', that.name, pe, v);
     cb(null, v);
   });
 };
@@ -5156,20 +4537,23 @@ Tree.prototype.stats = function stats(cb) {
   var conflict = 0;
   var deleted = 0;
 
-  this.getHeads(function(head, next) {
+  this.createHeadReadStream().on('readable', function() {
+    var head = this.read();
+
+    if (!head) { // end of stream
+      cb(null, {
+        heads: {
+          count: headCount,
+          conflict: conflict,
+          deleted: deleted
+        }
+      });
+      return;
+    }
+
     headCount++;
     if (head.h.c) { conflict++; }
     if (head.h.d) { deleted++; }
-    next();
-  }, function(err) {
-    if (err) { cb(err); return; }
-    cb(null, {
-      heads: {
-        count: headCount,
-        conflict: conflict,
-        deleted: deleted
-      }
-    });
   });
 };
 
@@ -5242,13 +4626,27 @@ Tree.prototype.inBufferById = function inBufferById(id) {
   var found = false;
 
   if (this._buffer && this._buffer.length)
-    found = this._buffer.some(item => id === item.chunk.h.id);
+    found = this._buffer.some(function(item) {
+      // support "atomic" array elements (see _writev)
+      if (Array.isArray(item.chunk)) { // descend
+        return item.chunk.some(item2 => id === item2.h.id);
+      } else {
+        return id === item.chunk.h.id;
+      }
+    });
 
   if (found)
     return true;
 
   // synchronous walk over the internal node writable stream buffer
-  return this._writableState.getBuffer().some(item => id === item.chunk.h.id);
+  return this._writableState.getBuffer().some(function(item) {
+    // support "atomic" array elements (see _writev)
+    if (Array.isArray(item.chunk)) { // descend
+      return item.chunk.some(item2 => id === item2.h.id);
+    } else {
+      return id === item.chunk.h.id;
+    }
+  });
 };
 
 /**
@@ -5262,13 +4660,27 @@ Tree.prototype.inBufferByVersion = function inBufferByVersion(version) {
   var found = false;
 
   if (this._buffer && this._buffer.length)
-    found = this._buffer.some(item => version === item.chunk.h.v);
+    found = this._buffer.some(function(item) {
+      // support "atomic" array elements (see _writev)
+      if (Array.isArray(item.chunk)) { // descend
+        return item.chunk.some(item2 => version === item2.h.v);
+      } else {
+        return version === item.chunk.h.v;
+      }
+    });
 
   if (found)
     return true;
 
   // synchronous walk over the internal node writable stream buffer
-  return this._writableState.getBuffer().some(item => version === item.chunk.h.v);
+  return this._writableState.getBuffer().some(function(item) {
+    // support "atomic" array elements (see _writev)
+    if (Array.isArray(item.chunk)) { // descend
+      return item.chunk.some(item2 => version === item2.h.v);
+    } else {
+      return version === item.chunk.h.v;
+    }
+  });
 };
 
 
@@ -5335,7 +4747,7 @@ Tree.prototype._resolveVtoI = function _resolveVtoI(version, cb) {
     }
 
     var i = Tree.parseKey(dsKey).i;
-    that._log.debug('t:%s _resolveVtoI %s => %s', that.name, version, i);
+    that._log.debug2('t:%s _resolveVtoI %s => %s', that.name, version, i);
     cb(null, i);
   });
 };
@@ -5362,14 +4774,17 @@ Tree.prototype._maxI = function _maxI(cb) {
     error = err;
   });
 
-  it.on('data', function(i) {
+  it.on('readable', function() {
+    var i = it.read();
+
+    if (!i) { // end of stream
+      that._log.debug2('t:%s _maxI %s', that.name, found);
+      cb(error, found);
+      return;
+    }
+
     that._log.debug2('t:%s _maxI i %s', that.name, i);
     found = Tree.parseKey(i).i;
-  });
-
-  it.on('end', function() {
-    that._log.debug2('t:%s _maxI %s', that.name, found);
-    cb(error, found);
   });
 };
 
@@ -5402,6 +4817,9 @@ Tree.prototype._write = function(item, encoding, cb) {
  * Keep a record of last written version per perspective to assist
  * lastByPerspective.
  *
+ * If chunk is an array it will be treated atomically, futhermore adjacent non-
+ * array items will be grouped together in one atomic operation.
+ *
  * @param {Array} items  items to save
  * @param {Function} cb  Callback that is called once all items are saved. First
  *                       parameter will be an error object or null.
@@ -5411,10 +4829,6 @@ Tree.prototype._write = function(item, encoding, cb) {
  *   any item is not a new child
  */
 Tree.prototype._writev = function(items, cb) {
-  if (!Array.isArray(items)) { throw new TypeError('items must be an array'); }
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  var error;
   var that = this;
 
   // save buffer for inspection by inBuffer
@@ -5426,27 +4840,62 @@ Tree.prototype._writev = function(items, cb) {
     cb.apply(cb, arguments);
   }
 
-  // check each item
-  async.filterSeries(items, function(chunk, cb3) {
+  var group = [];
+  function flushGroup(cb3) {
+    if (group.length) {
+      that._saveAtomic(group, cb3);
+      group = [];
+    } else {
+      process.nextTick(cb3);
+    }
+  }
+
+  // split arrays and group adjacent non-array chunks.
+  async.eachSeries(items, function(chunk, cb3) {
     var item = chunk.chunk;
+    if (Array.isArray(item)) {
+      // first any previous items
+      flushGroup(function(err) {
+        if (err) { cb3(err); return; }
+        that._saveAtomic(item, cb3);
+      });
+    } else {
+      group.push(item);
+      cb3();
+    }
+  }, function(err) {
+    if (err) { cb2(err); return; }
+    flushGroup(cb2); // flush any remaining options
+  });
+};
+
+Tree.prototype._saveAtomic = function(items, cb) {
+  if (!Array.isArray(items)) { throw new TypeError('items must be an array'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var error;
+  var that = this;
+
+  // check each item
+  async.filterSeries(items, function(item, cb2) {
     var msg = invalidItem(item);
     if (msg) {
       process.nextTick(function() {
         that._log.err('t:%s %s %j', that.name, msg, item);
-        cb2(new Error(msg));
+        cb(new Error(msg));
       });
       return;
     }
 
     if (that._skipValidation) {
       // keep it in the set to write
-      cb3(true);
+      cb2(true);
       return;
     }
 
     // check if this item is valid or only misses some parents that are still in the batch
     that._validNewItem(item, items, function(err, valid, missingParents, exists) {
-      if (err) { cb2(err); return; }
+      if (err) { cb(err); return; }
 
       // always accept existing items from remote (happens if a new remote is added)
       if (!valid && exists && item.h.pe && item.h.pe !== that.name) {
@@ -5454,11 +4903,11 @@ Tree.prototype._writev = function(items, cb) {
         that._db.put(that._composeUsKey(item.h.pe), that._composeVKey(item.h.v), function(err) {
           if (err) {
             that._log.err('t:%s _writev could not update perspective in uskey %s %j', that.name, err, item.h);
-            cb2(err);
+            cb(err);
             return;
           }
           that._log.info('t:%s _writev updated last received perspective version of existing version %j', that.name, item.h);
-          cb3(false);
+          cb2(false);
         });
         return;
       }
@@ -5466,25 +4915,24 @@ Tree.prototype._writev = function(items, cb) {
       if (!valid) {
         error = new Error('not a valid new item');
         that._log.err('t:%s _writev %s %j', that.name, error, item.h);
-        cb2(error);
+        cb(error);
         return;
       }
 
       // keep it in the set to write
-      cb3(true);
+      cb2(true);
     });
   }, function(fitems) {
     var tra = [];
 
     // create batch insert, maintain order
-    async.eachSeries(fitems, function(chunk, cb3) {
-      var item = chunk.chunk;
+    async.eachSeries(fitems, function(item, cb2) {
       that._nextI(function(err, i) {
-        if (err) { cb3(err); return; }
+        if (err) { cb2(err); return; }
 
         item.h.i = i;
 
-        that._log.debug('t:%s _writev new data item %j', that.name, item);
+        that._log.debug('t:%s _writev %j (%d)', that.name, item.h, fitems.length);
 
         // update indexes and add new version
         var iKey = that._composeIKey(i);
@@ -5497,7 +4945,6 @@ Tree.prototype._writev = function(items, cb) {
 
         // delete all heads this new item replaces
         item.h.pa.forEach(function(pa) {
-          that._log.debug('t:%s _writev delete old head %s %s', that.name, item.h.id, pa);
           tra.push({ type: 'del', key: that._composeHeadKey(item.h.id, pa) });
         });
         tra.push({ type: 'put', key: headKey, value: headVal });
@@ -5512,22 +4959,22 @@ Tree.prototype._writev = function(items, cb) {
         // update data
         var bitem = process.browser ? item : BSON.serialize(item);
         tra.push({ type: 'put', key: dsKey, value: bitem });
-        cb3();
+        cb2();
       });
     }, function(err) {
-      if (err) { cb2(err); return; }
+      if (err) { cb(err); return; }
 
       // do batch insert
       that._db.batch(tra, function(err) {
         // emit item if successfully written, or an error otherwise
         if (err) {
           that._log.err('t:%s _writev items not written %d %s', that.name, tra.length, err);
-          cb2(err);
+          cb(err);
           return;
         }
 
         that._log.debug2('t:%s _writev items written %d', that.name, tra.length);
-        cb2();
+        cb();
       });
     });
   });
@@ -5842,7 +5289,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
   var version = item.h.v;
   var parents = item.h.pa;
 
-  this._log.debug('t:%s _validNewItem id: %s, version: %s, parents: %s', that.name, id, version, parents);
+  this._log.debug2('t:%s _validNewItem id: %s, version: %s, parents: %s', that.name, id, version, parents);
 
   // make sure this version does not exist
   var vKey = this._composeVKey(version);
@@ -5875,7 +5322,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
         }
       }
 
-      that._log.debug('t:%s _validNewItem good, this version does not exist in the tree', that.name);
+      that._log.debug2('t:%s _validNewItem good, this version does not exist in the tree', that.name);
 
       // check which parents do not exist in the tree
       var missingParents = [];
@@ -5904,8 +5351,6 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
             cb2(error);
             return;
           }
-
-          that._log.debug('t:%s _validNewItem parent exists %s', that.name, pa);
           cb2();
         });
       }, function(err) {
@@ -5917,7 +5362,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
         if (missingParents.length && batch.length) {
           if (missingParents.every(function(pa) {
             return batch.some(function(oitem) {
-              return oitem.chunk.h.v === pa;
+              return oitem.h.v === pa;
             });
           })) {
             that._log.info('t:%s _validNewItem parent(s) are not in DAG but in batch, set valid %j', that.name, item.h);
@@ -5949,8 +5394,6 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
 
       // done iterating tree, check batch with new items
       batch.some(function(item) {
-        item = item.chunk;
-
         if (item.h.v === item.h.v) {
           // done
           return true;
@@ -6001,7 +5444,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
           }
         }
 
-        that._log.debug('t:%s _validNewItem good, this version does not exist in the tree', that.name);
+        that._log.debug2('t:%s _validNewItem good, this version does not exist in the tree', that.name);
 
         cb(null, !heads.length, heads, false);
       });
@@ -6010,7 +5453,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
 };
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"./_stream_tree":4,"./invalid_item":10,"./noop":14,"_process":327,"async":19,"bson":23,"buffer":128,"stream":347,"util":352,"xtend":126}],19:[function(require,module,exports){
+},{"./_stream_tree":3,"./invalid_item":8,"./noop":12,"_process":327,"async":17,"bson":21,"buffer":128,"stream":347,"util":352,"xtend":126}],17:[function(require,module,exports){
 (function (process){
 /*!
  * async
@@ -7137,7 +6580,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
 }());
 
 }).call(this,require('_process'))
-},{"_process":327}],20:[function(require,module,exports){
+},{"_process":327}],18:[function(require,module,exports){
 (function (process,Buffer){
 /**
  * Copyright (c) 2014, 2015 Tim Kuijsten
@@ -7323,7 +6766,7 @@ BSONStream.prototype._transform = function _transform(chunk, encoding, cb) {
 };
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":327,"bson":23,"buffer":128,"stream":347,"util":352}],21:[function(require,module,exports){
+},{"_process":327,"bson":21,"buffer":128,"stream":347,"util":352}],19:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -7674,7 +7117,7 @@ module.exports = Binary;
 module.exports.Binary = Binary;
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"buffer":128}],22:[function(require,module,exports){
+},{"buffer":128}],20:[function(require,module,exports){
 (function (process){
 /**
  * Binary Parser.
@@ -8063,7 +7506,7 @@ BinaryParser.Buffer = BinaryParserBuffer;
 exports.BinaryParser = BinaryParser;
 
 }).call(this,require('_process'))
-},{"_process":327,"util":352}],23:[function(require,module,exports){
+},{"_process":327,"util":352}],21:[function(require,module,exports){
 (function (Buffer){
 // "use strict"
 
@@ -8390,7 +7833,7 @@ module.exports.MaxKey = MaxKey;
 module.exports.BSONRegExp = BSONRegExp;
 
 }).call(this,require("buffer").Buffer)
-},{"./binary":21,"./code":24,"./db_ref":25,"./double":26,"./float_parser":27,"./long":28,"./map":29,"./max_key":30,"./min_key":31,"./objectid":32,"./parser/calculate_size":33,"./parser/deserializer":34,"./parser/serializer":35,"./regexp":36,"./symbol":37,"./timestamp":38,"buffer":128}],24:[function(require,module,exports){
+},{"./binary":19,"./code":22,"./db_ref":23,"./double":24,"./float_parser":25,"./long":26,"./map":27,"./max_key":28,"./min_key":29,"./objectid":30,"./parser/calculate_size":31,"./parser/deserializer":32,"./parser/serializer":33,"./regexp":34,"./symbol":35,"./timestamp":36,"buffer":128}],22:[function(require,module,exports){
 /**
  * A class representation of the BSON Code type.
  *
@@ -8415,7 +7858,7 @@ Code.prototype.toJSON = function() {
 
 module.exports = Code;
 module.exports.Code = Code;
-},{}],25:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 /**
  * A class representation of the BSON DBRef type.
  *
@@ -8448,7 +7891,7 @@ DBRef.prototype.toJSON = function() {
 
 module.exports = DBRef;
 module.exports.DBRef = DBRef;
-},{}],26:[function(require,module,exports){
+},{}],24:[function(require,module,exports){
 /**
  * A class representation of the BSON Double type.
  *
@@ -8482,7 +7925,7 @@ Double.prototype.toJSON = function() {
 
 module.exports = Double;
 module.exports.Double = Double;
-},{}],27:[function(require,module,exports){
+},{}],25:[function(require,module,exports){
 // Copyright (c) 2008, Fair Oaks Labs, Inc.
 // All rights reserved.
 // 
@@ -8604,7 +8047,7 @@ var writeIEEE754 = function(buffer, value, offset, endian, mLen, nBytes) {
 
 exports.readIEEE754 = readIEEE754;
 exports.writeIEEE754 = writeIEEE754;
-},{}],28:[function(require,module,exports){
+},{}],26:[function(require,module,exports){
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -9461,7 +8904,7 @@ Long.TWO_PWR_24_ = Long.fromInt(1 << 24);
  */
 module.exports = Long;
 module.exports.Long = Long;
-},{}],29:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 (function (global){
 "use strict"
 
@@ -9590,7 +9033,7 @@ if(typeof global.Map !== 'undefined') {
   module.exports.Map = Map;
 }
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],30:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 /**
  * A class representation of the BSON MaxKey type.
  *
@@ -9605,7 +9048,7 @@ function MaxKey() {
 
 module.exports = MaxKey;
 module.exports.MaxKey = MaxKey;
-},{}],31:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 /**
  * A class representation of the BSON MinKey type.
  *
@@ -9620,7 +9063,7 @@ function MinKey() {
 
 module.exports = MinKey;
 module.exports.MinKey = MinKey;
-},{}],32:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 (function (process){
 /**
  * Module dependencies.
@@ -9910,7 +9353,7 @@ module.exports.ObjectID = ObjectID;
 module.exports.ObjectId = ObjectID;
 
 }).call(this,require('_process'))
-},{"./binary_parser":22,"_process":327}],33:[function(require,module,exports){
+},{"./binary_parser":20,"_process":327}],31:[function(require,module,exports){
 (function (Buffer){
 "use strict"
 
@@ -10224,7 +9667,7 @@ var JS_INT_MIN_LONG = Long.fromNumber(-0x20000000000000);  // Any integer down t
 module.exports = calculateObjectSize;
 
 }).call(this,require("buffer").Buffer)
-},{"../binary":21,"../code":24,"../db_ref":25,"../double":26,"../float_parser":27,"../long":28,"../max_key":30,"../min_key":31,"../objectid":32,"../regexp":36,"../symbol":37,"../timestamp":38,"buffer":128}],34:[function(require,module,exports){
+},{"../binary":19,"../code":22,"../db_ref":23,"../double":24,"../float_parser":25,"../long":26,"../max_key":28,"../min_key":29,"../objectid":30,"../regexp":34,"../symbol":35,"../timestamp":36,"buffer":128}],32:[function(require,module,exports){
 "use strict"
 
 var readIEEE754 = require('../float_parser').readIEEE754,
@@ -10757,7 +10200,7 @@ var JS_INT_MIN_LONG = Long.fromNumber(-0x20000000000000);  // Any integer down t
 
 module.exports = deserialize
 
-},{"../binary":21,"../code":24,"../db_ref":25,"../double":26,"../float_parser":27,"../long":28,"../max_key":30,"../min_key":31,"../objectid":32,"../regexp":36,"../symbol":37,"../timestamp":38,"util":352}],35:[function(require,module,exports){
+},{"../binary":19,"../code":22,"../db_ref":23,"../double":24,"../float_parser":25,"../long":26,"../max_key":28,"../min_key":29,"../objectid":30,"../regexp":34,"../symbol":35,"../timestamp":36,"util":352}],33:[function(require,module,exports){
 (function (Buffer){
 "use strict"
 
@@ -11673,7 +11116,7 @@ var JS_INT_MIN_LONG = Long.fromNumber(-0x20000000000000);  // Any integer down t
 module.exports = serializeInto;
 
 }).call(this,{"isBuffer":require("../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"../binary":21,"../code":24,"../db_ref":25,"../double":26,"../float_parser":27,"../long":28,"../map":29,"../max_key":30,"../min_key":31,"../objectid":32,"../regexp":36,"../symbol":37,"../timestamp":38}],36:[function(require,module,exports){
+},{"../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"../binary":19,"../code":22,"../db_ref":23,"../double":24,"../float_parser":25,"../long":26,"../map":27,"../max_key":28,"../min_key":29,"../objectid":30,"../regexp":34,"../symbol":35,"../timestamp":36}],34:[function(require,module,exports){
 /**
  * A class representation of the BSON RegExp type.
  *
@@ -11704,7 +11147,7 @@ function BSONRegExp(pattern, options) {
 
 module.exports = BSONRegExp;
 module.exports.BSONRegExp = BSONRegExp;
-},{}],37:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /**
  * A class representation of the BSON Symbol type.
  *
@@ -11752,7 +11195,7 @@ Symbol.prototype.toJSON = function() {
 
 module.exports = Symbol;
 module.exports.Symbol = Symbol;
-},{}],38:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -12609,7 +12052,7 @@ Timestamp.TWO_PWR_24_ = Timestamp.fromInt(1 << 24);
  */
 module.exports = Timestamp;
 module.exports.Timestamp = Timestamp;
-},{}],39:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 'use strict';
 
 module.exports = function () {
@@ -12636,7 +12079,7 @@ module.exports = function () {
 	return { Map: mapForEach, Set: setForEach };
 };
 
-},{}],40:[function(require,module,exports){
+},{}],38:[function(require,module,exports){
 'use strict';
 
 var isSymbol = require('is-symbol');
@@ -12655,7 +12098,7 @@ module.exports = function getSymbolIterator() {
 	return symbolIterator;
 };
 
-},{"is-symbol":53}],41:[function(require,module,exports){
+},{"is-symbol":51}],39:[function(require,module,exports){
 'use strict';
 
 var whyNotEqual = require('./why');
@@ -12664,7 +12107,7 @@ module.exports = function isEqual(value, other) {
 	return whyNotEqual(value, other) === '';
 };
 
-},{"./why":54}],42:[function(require,module,exports){
+},{"./why":52}],40:[function(require,module,exports){
 var ERROR_MESSAGE = 'Function.prototype.bind called on incompatible ';
 var slice = Array.prototype.slice;
 var toStr = Object.prototype.toString;
@@ -12714,17 +12157,17 @@ module.exports = function bind(that) {
     return bound;
 };
 
-},{}],43:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 var implementation = require('./implementation');
 
 module.exports = Function.prototype.bind || implementation;
 
-},{"./implementation":42}],44:[function(require,module,exports){
+},{"./implementation":40}],42:[function(require,module,exports){
 var bind = require('function-bind');
 
 module.exports = bind.call(Function.call, Object.prototype.hasOwnProperty);
 
-},{"function-bind":43}],45:[function(require,module,exports){
+},{"function-bind":41}],43:[function(require,module,exports){
 'use strict';
 
 var isCallable = require('is-callable');
@@ -12741,7 +12184,7 @@ module.exports = function isArrowFunction(fn) {
 		(isArrowFnWithParensRegex.test(fnStr) || isArrowFnWithoutParensRegex.test(fnStr));
 };
 
-},{"is-callable":47}],46:[function(require,module,exports){
+},{"is-callable":45}],44:[function(require,module,exports){
 'use strict';
 
 var boolToStr = Boolean.prototype.toString;
@@ -12764,7 +12207,7 @@ module.exports = function isBoolean(value) {
 	return hasToStringTag ? tryBooleanObject(value) : toStr.call(value) === boolClass;
 };
 
-},{}],47:[function(require,module,exports){
+},{}],45:[function(require,module,exports){
 'use strict';
 
 var fnToStr = Function.prototype.toString;
@@ -12805,7 +12248,7 @@ module.exports = function isCallable(value) {
 	return strClass === fnClass || strClass === genClass;
 };
 
-},{}],48:[function(require,module,exports){
+},{}],46:[function(require,module,exports){
 'use strict';
 
 var getDay = Date.prototype.getDay;
@@ -12827,7 +12270,7 @@ module.exports = function isDateObject(value) {
 	return hasToStringTag ? tryDateObject(value) : toStr.call(value) === dateClass;
 };
 
-},{}],49:[function(require,module,exports){
+},{}],47:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -12841,7 +12284,7 @@ module.exports = function isGeneratorFunction(fn) {
 };
 
 
-},{}],50:[function(require,module,exports){
+},{}],48:[function(require,module,exports){
 'use strict';
 
 var numToStr = Number.prototype.toString;
@@ -12863,7 +12306,7 @@ module.exports = function isNumberObject(value) {
 	return hasToStringTag ? tryNumberObject(value) : toStr.call(value) === numClass;
 };
 
-},{}],51:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 'use strict';
 
 var regexExec = RegExp.prototype.exec;
@@ -12884,7 +12327,7 @@ module.exports = function isRegex(value) {
 	return hasToStringTag ? tryRegexExec(value) : toStr.call(value) === regexClass;
 };
 
-},{}],52:[function(require,module,exports){
+},{}],50:[function(require,module,exports){
 'use strict';
 
 var strValue = String.prototype.valueOf;
@@ -12906,7 +12349,7 @@ module.exports = function isString(value) {
 	return hasToStringTag ? tryStringObject(value) : toStr.call(value) === strClass;
 };
 
-},{}],53:[function(require,module,exports){
+},{}],51:[function(require,module,exports){
 'use strict';
 
 var toStr = Object.prototype.toString;
@@ -12935,7 +12378,7 @@ if (hasSymbols) {
 	};
 }
 
-},{}],54:[function(require,module,exports){
+},{}],52:[function(require,module,exports){
 'use strict';
 
 var ObjectPrototype = Object.prototype;
@@ -13021,7 +12464,7 @@ module.exports = function whyNotEqual(value, other) {
 	}
 
 	var valToStr = toStr.call(value);
-	var otherToStr = toStr.call(value);
+	var otherToStr = toStr.call(other);
 	if (valToStr !== otherToStr) {
 		return 'toStringTag is not the same: ' + valToStr + ' !== ' + otherToStr;
 	}
@@ -13206,8 +12649,8 @@ module.exports = function whyNotEqual(value, other) {
 		for (key in value) {
 			if (has(value, key)) {
 				if (!has(other, key)) { return 'first argument has key "' + key + '"; second does not'; }
-				valueKeyIsRecursive = value[key] && value[key][key] === value;
-				otherKeyIsRecursive = other[key] && other[key][key] === other;
+				valueKeyIsRecursive = !!value[key] && value[key][key] === value;
+				otherKeyIsRecursive = !!other[key] && other[key][key] === other;
 				if (valueKeyIsRecursive !== otherKeyIsRecursive) {
 					if (valueKeyIsRecursive) { return 'first argument has a circular reference at key "' + key + '"; second does not'; }
 					return 'second argument has a circular reference at key "' + key + '"; first does not';
@@ -13221,7 +12664,9 @@ module.exports = function whyNotEqual(value, other) {
 			}
 		}
 		for (key in other) {
-			if (has(other, key) && !has(value, key)) { return 'second argument has key "' + key + '"; first does not'; }
+			if (has(other, key) && !has(value, key)) {
+				return 'second argument has key "' + key + '"; first does not';
+			}
 		}
 		return '';
 	}
@@ -13229,7 +12674,7 @@ module.exports = function whyNotEqual(value, other) {
 	return false;
 };
 
-},{"./getCollectionsForEach":39,"./getSymbolIterator":40,"has":44,"is-arrow-function":45,"is-boolean-object":46,"is-callable":47,"is-date-object":48,"is-generator-function":49,"is-number-object":50,"is-regex":51,"is-string":52,"is-symbol":53}],55:[function(require,module,exports){
+},{"./getCollectionsForEach":37,"./getSymbolIterator":38,"has":42,"is-arrow-function":43,"is-boolean-object":44,"is-callable":45,"is-date-object":46,"is-generator-function":47,"is-number-object":48,"is-regex":49,"is-string":50,"is-symbol":51}],53:[function(require,module,exports){
 (function (Buffer){
 /**
  * Copyright (c) 2014, 2015, 2016 Tim Kuijsten
@@ -13440,7 +12885,7 @@ LDJSONStream.prototype._flush = function _flush(cb) {
 };
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128,"stream":347,"util":352}],56:[function(require,module,exports){
+},{"buffer":128,"stream":347,"util":352}],54:[function(require,module,exports){
 (function (process,Buffer){
 module.exports = Level
 
@@ -13733,7 +13178,7 @@ Level.destroy = function(db, callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"./iterator":57,"_process":327,"abstract-leveldown":61,"buffer":128,"util":352,"xtend":126}],57:[function(require,module,exports){
+},{"./iterator":55,"_process":327,"abstract-leveldown":59,"buffer":128,"util":352,"xtend":126}],55:[function(require,module,exports){
 (function (process,Buffer){
 var util = require('util')
 var AbstractIterator  = require('abstract-leveldown').AbstractIterator
@@ -13934,7 +13379,7 @@ Iterator.prototype._next = function(callback) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":327,"abstract-leveldown":61,"buffer":128,"ltgt":63,"util":352,"xtend":126}],58:[function(require,module,exports){
+},{"_process":327,"abstract-leveldown":59,"buffer":128,"ltgt":61,"util":352,"xtend":126}],56:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -14026,7 +13471,7 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 module.exports = AbstractChainedBatch
 
 }).call(this,require('_process'))
-},{"_process":327}],59:[function(require,module,exports){
+},{"_process":327}],57:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -14079,7 +13524,7 @@ AbstractIterator.prototype.end = function (callback) {
 module.exports = AbstractIterator
 
 }).call(this,require('_process'))
-},{"_process":327}],60:[function(require,module,exports){
+},{"_process":327}],58:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -14355,13 +13800,13 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./abstract-chained-batch":58,"./abstract-iterator":59,"_process":327,"xtend":126}],61:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./abstract-chained-batch":56,"./abstract-iterator":57,"_process":327,"xtend":126}],59:[function(require,module,exports){
 exports.AbstractLevelDOWN    = require('./abstract-leveldown')
 exports.AbstractIterator     = require('./abstract-iterator')
 exports.AbstractChainedBatch = require('./abstract-chained-batch')
 exports.isLevelDOWN          = require('./is-leveldown')
 
-},{"./abstract-chained-batch":58,"./abstract-iterator":59,"./abstract-leveldown":60,"./is-leveldown":62}],62:[function(require,module,exports){
+},{"./abstract-chained-batch":56,"./abstract-iterator":57,"./abstract-leveldown":58,"./is-leveldown":60}],60:[function(require,module,exports){
 var AbstractLevelDOWN = require('./abstract-leveldown')
 
 function isLevelDOWN (db) {
@@ -14377,7 +13822,7 @@ function isLevelDOWN (db) {
 
 module.exports = isLevelDOWN
 
-},{"./abstract-leveldown":60}],63:[function(require,module,exports){
+},{"./abstract-leveldown":58}],61:[function(require,module,exports){
 (function (Buffer){
 
 exports.compare = function (a, b) {
@@ -14527,7 +13972,7 @@ exports.filter = function (range, compare) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],64:[function(require,module,exports){
+},{"../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],62:[function(require,module,exports){
 const levelup = require('levelup')
 
 function packager (leveldown) {
@@ -14555,8 +14000,8 @@ function packager (leveldown) {
 
 module.exports = packager
 
-},{"levelup":66}],65:[function(require,module,exports){
-/* Copyright (c) 2012-2015 LevelUP contributors
+},{"levelup":64}],63:[function(require,module,exports){
+/* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
  * <https://github.com/level/levelup/blob/master/LICENSE.md>
@@ -14640,9 +14085,9 @@ Batch.prototype.write = function (callback) {
 
 module.exports = Batch
 
-},{"./util":67,"level-errors":77}],66:[function(require,module,exports){
+},{"./util":65,"level-errors":75}],64:[function(require,module,exports){
 (function (process){
-/* Copyright (c) 2012-2015 LevelUP contributors
+/* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
  * <https://github.com/level/levelup/blob/master/LICENSE.md>
@@ -15043,8 +14488,8 @@ module.exports.repair  = deprecate(
 
 
 }).call(this,require('_process'))
-},{"./batch":65,"./util":67,"_process":327,"deferred-leveldown":69,"events":324,"level-codec":75,"level-errors":77,"level-iterator-stream":81,"prr":92,"util":352,"xtend":126}],67:[function(require,module,exports){
-/* Copyright (c) 2012-2015 LevelUP contributors
+},{"./batch":63,"./util":65,"_process":327,"deferred-leveldown":67,"events":324,"level-codec":73,"level-errors":75,"level-iterator-stream":79,"prr":90,"util":352,"xtend":126}],65:[function(require,module,exports){
+/* Copyright (c) 2012-2016 LevelUP contributors
  * See list at <https://github.com/level/levelup#contributing>
  * MIT License
  * <https://github.com/level/levelup/blob/master/LICENSE.md>
@@ -15122,7 +14567,7 @@ module.exports = {
   , isDefined       : isDefined
 }
 
-},{"../package.json":93,"level-errors":77,"leveldown":127,"leveldown/package":127,"semver":127,"util":352,"xtend":126}],68:[function(require,module,exports){
+},{"../package.json":91,"level-errors":75,"leveldown":127,"leveldown/package":127,"semver":127,"util":352,"xtend":126}],66:[function(require,module,exports){
 var util = require('util')
   , AbstractIterator = require('abstract-leveldown').AbstractIterator
 
@@ -15158,7 +14603,7 @@ DeferredIterator.prototype._operation = function (method, args) {
 
 module.exports = DeferredIterator;
 
-},{"abstract-leveldown":73,"util":352}],69:[function(require,module,exports){
+},{"abstract-leveldown":71,"util":352}],67:[function(require,module,exports){
 (function (Buffer,process){
 var util              = require('util')
   , AbstractLevelDOWN = require('abstract-leveldown').AbstractLevelDOWN
@@ -15218,7 +14663,7 @@ module.exports                  = DeferredLevelDOWN
 module.exports.DeferredIterator = DeferredIterator
 
 }).call(this,{"isBuffer":require("../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./deferred-iterator":68,"_process":327,"abstract-leveldown":73,"util":352}],70:[function(require,module,exports){
+},{"../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./deferred-iterator":66,"_process":327,"abstract-leveldown":71,"util":352}],68:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -15301,9 +14746,9 @@ AbstractChainedBatch.prototype.write = function (options, callback) {
 
 module.exports = AbstractChainedBatch
 }).call(this,require('_process'))
-},{"_process":327}],71:[function(require,module,exports){
-arguments[4][59][0].apply(exports,arguments)
-},{"_process":327,"dup":59}],72:[function(require,module,exports){
+},{"_process":327}],69:[function(require,module,exports){
+arguments[4][57][0].apply(exports,arguments)
+},{"_process":327,"dup":57}],70:[function(require,module,exports){
 (function (Buffer,process){
 /* Copyright (c) 2013 Rod Vagg, MIT License */
 
@@ -15579,11 +15024,11 @@ AbstractLevelDOWN.prototype._checkKey = function (obj, type) {
 module.exports = AbstractLevelDOWN
 
 }).call(this,{"isBuffer":require("../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")},require('_process'))
-},{"../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./abstract-chained-batch":70,"./abstract-iterator":71,"_process":327,"xtend":126}],73:[function(require,module,exports){
-arguments[4][61][0].apply(exports,arguments)
-},{"./abstract-chained-batch":70,"./abstract-iterator":71,"./abstract-leveldown":72,"./is-leveldown":74,"dup":61}],74:[function(require,module,exports){
-arguments[4][62][0].apply(exports,arguments)
-},{"./abstract-leveldown":72,"dup":62}],75:[function(require,module,exports){
+},{"../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326,"./abstract-chained-batch":68,"./abstract-iterator":69,"_process":327,"xtend":126}],71:[function(require,module,exports){
+arguments[4][59][0].apply(exports,arguments)
+},{"./abstract-chained-batch":68,"./abstract-iterator":69,"./abstract-leveldown":70,"./is-leveldown":72,"dup":59}],72:[function(require,module,exports){
+arguments[4][60][0].apply(exports,arguments)
+},{"./abstract-leveldown":70,"dup":60}],73:[function(require,module,exports){
 var encodings = require('./lib/encodings');
 
 module.exports = Codec;
@@ -15691,7 +15136,7 @@ Codec.prototype.valueAsBuffer = function(opts){
 };
 
 
-},{"./lib/encodings":76}],76:[function(require,module,exports){
+},{"./lib/encodings":74}],74:[function(require,module,exports){
 (function (Buffer){
 
 exports.utf8 = exports['utf-8'] = {
@@ -15771,7 +15216,7 @@ function isBinary(data){
 
 
 }).call(this,require("buffer").Buffer)
-},{"buffer":128}],77:[function(require,module,exports){
+},{"buffer":128}],75:[function(require,module,exports){
 /* Copyright (c) 2012-2015 LevelUP contributors
  * See list at <https://github.com/rvagg/node-levelup#contributing>
  * MIT License
@@ -15795,7 +15240,7 @@ module.exports = {
   , EncodingError       : createError('EncodingError', LevelUPError)
 }
 
-},{"errno":79}],78:[function(require,module,exports){
+},{"errno":77}],76:[function(require,module,exports){
 var prr = require('prr')
 
 function init (type, message, cause) {
@@ -15852,7 +15297,7 @@ module.exports = function (errno) {
   }
 }
 
-},{"prr":80}],79:[function(require,module,exports){
+},{"prr":78}],77:[function(require,module,exports){
 var all = module.exports.all = [
   {
     errno: -2,
@@ -16167,7 +15612,7 @@ all.forEach(function (error) {
 module.exports.custom = require('./custom')(module.exports)
 module.exports.create = module.exports.custom.createError
 
-},{"./custom":78}],80:[function(require,module,exports){
+},{"./custom":76}],78:[function(require,module,exports){
 /*!
   * prr
   * (c) 2013 Rod Vagg <rod@vagg.org>
@@ -16231,7 +15676,7 @@ module.exports.create = module.exports.custom.createError
 
   return prr
 })
-},{}],81:[function(require,module,exports){
+},{}],79:[function(require,module,exports){
 var inherits = require('inherits');
 var Readable = require('readable-stream').Readable;
 var extend = require('xtend');
@@ -16289,7 +15734,7 @@ ReadStream.prototype._cleanup = function(){
 };
 
 
-},{"inherits":82,"level-errors":77,"readable-stream":91,"xtend":126}],82:[function(require,module,exports){
+},{"inherits":80,"level-errors":75,"readable-stream":89,"xtend":126}],80:[function(require,module,exports){
 if (typeof Object.create === 'function') {
   // implementation from standard node.js 'util' module
   module.exports = function inherits(ctor, superCtor) {
@@ -16314,7 +15759,7 @@ if (typeof Object.create === 'function') {
   }
 }
 
-},{}],83:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -16407,7 +15852,7 @@ function forEach (xs, f) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_readable":85,"./_stream_writable":87,"_process":327,"core-util-is":88,"inherits":82}],84:[function(require,module,exports){
+},{"./_stream_readable":83,"./_stream_writable":85,"_process":327,"core-util-is":86,"inherits":80}],82:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -16455,7 +15900,7 @@ PassThrough.prototype._transform = function(chunk, encoding, cb) {
   cb(null, chunk);
 };
 
-},{"./_stream_transform":86,"core-util-is":88,"inherits":82}],85:[function(require,module,exports){
+},{"./_stream_transform":84,"core-util-is":86,"inherits":80}],83:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -17410,7 +16855,7 @@ function indexOf (xs, x) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":83,"_process":327,"buffer":128,"core-util-is":88,"events":324,"inherits":82,"isarray":89,"stream":347,"string_decoder/":90,"util":127}],86:[function(require,module,exports){
+},{"./_stream_duplex":81,"_process":327,"buffer":128,"core-util-is":86,"events":324,"inherits":80,"isarray":87,"stream":347,"string_decoder/":88,"util":127}],84:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -17621,7 +17066,7 @@ function done(stream, er) {
   return stream.push(null);
 }
 
-},{"./_stream_duplex":83,"core-util-is":88,"inherits":82}],87:[function(require,module,exports){
+},{"./_stream_duplex":81,"core-util-is":86,"inherits":80}],85:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -18102,7 +17547,7 @@ function endWritable(stream, state, cb) {
 }
 
 }).call(this,require('_process'))
-},{"./_stream_duplex":83,"_process":327,"buffer":128,"core-util-is":88,"inherits":82,"stream":347}],88:[function(require,module,exports){
+},{"./_stream_duplex":81,"_process":327,"buffer":128,"core-util-is":86,"inherits":80,"stream":347}],86:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -18213,12 +17658,12 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],89:[function(require,module,exports){
+},{"../../../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],87:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],90:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -18441,7 +17886,7 @@ function base64DetectIncompleteChar(buffer) {
   this.charLength = this.charReceived ? 3 : 0;
 }
 
-},{"buffer":128}],91:[function(require,module,exports){
+},{"buffer":128}],89:[function(require,module,exports){
 (function (process){
 exports = module.exports = require('./lib/_stream_readable.js');
 exports.Stream = require('stream');
@@ -18455,13 +17900,13 @@ if (!process.browser && process.env.READABLE_STREAM === 'disable') {
 }
 
 }).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":83,"./lib/_stream_passthrough.js":84,"./lib/_stream_readable.js":85,"./lib/_stream_transform.js":86,"./lib/_stream_writable.js":87,"_process":327,"stream":347}],92:[function(require,module,exports){
-arguments[4][80][0].apply(exports,arguments)
-},{"dup":80}],93:[function(require,module,exports){
+},{"./lib/_stream_duplex.js":81,"./lib/_stream_passthrough.js":82,"./lib/_stream_readable.js":83,"./lib/_stream_transform.js":84,"./lib/_stream_writable.js":85,"_process":327,"stream":347}],90:[function(require,module,exports){
+arguments[4][78][0].apply(exports,arguments)
+},{"dup":78}],91:[function(require,module,exports){
 module.exports={
   "name": "levelup",
   "description": "Fast & simple storage - a Node.js-style LevelDB wrapper",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "contributors": [
     {
       "name": "Rod Vagg",
@@ -18506,7 +17951,7 @@ module.exports={
     {
       "name": "Paolo Fragomeni",
       "email": "paolo@async.ly",
-      "url": "https://github.com/hij1nx"
+      "url": "https://github.com/0x00a"
     },
     {
       "name": "Anton Whalley",
@@ -18581,15 +18026,15 @@ module.exports={
     "test": "tape test/*-test.js | faucet"
   },
   "license": "MIT",
-  "gitHead": "40bd66872974140c79a74d9411b992ddffa926a4",
+  "gitHead": "bcc242cfc4ec035f9228a5cd54903cb126659a00",
   "bugs": {
     "url": "https://github.com/level/levelup/issues"
   },
-  "_id": "levelup@1.3.1",
-  "_shasum": "8030758bb1b1dafdb71bfb55fff0caa2740cb846",
+  "_id": "levelup@1.3.2",
+  "_shasum": "b321d3071f0e75c2dfaf2f0fe8864e5b9a387bc9",
   "_from": "levelup@>=1.3.0 <1.4.0",
-  "_npmVersion": "3.5.0",
-  "_nodeVersion": "4.2.2",
+  "_npmVersion": "3.8.6",
+  "_nodeVersion": "6.1.0",
   "_npmUser": {
     "name": "ralphtheninja",
     "email": "ralphtheninja@riseup.net"
@@ -18609,15 +18054,19 @@ module.exports={
     }
   ],
   "dist": {
-    "shasum": "8030758bb1b1dafdb71bfb55fff0caa2740cb846",
-    "tarball": "https://registry.npmjs.org/levelup/-/levelup-1.3.1.tgz"
+    "shasum": "b321d3071f0e75c2dfaf2f0fe8864e5b9a387bc9",
+    "tarball": "https://registry.npmjs.org/levelup/-/levelup-1.3.2.tgz"
+  },
+  "_npmOperationalInternal": {
+    "host": "packages-16-east.internal.npmjs.com",
+    "tmp": "tmp/levelup-1.3.2.tgz_1463496525467_0.4644940535072237"
   },
   "directories": {},
-  "_resolved": "https://registry.npmjs.org/levelup/-/levelup-1.3.1.tgz",
+  "_resolved": "https://registry.npmjs.org/levelup/-/levelup-1.3.2.tgz",
   "readme": "ERROR: No README data found!"
 }
 
-},{}],94:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Tim Kuijsten
  *
@@ -18680,7 +18129,7 @@ function match(criteria, obj) {
 
 module.exports = match;
 
-},{}],95:[function(require,module,exports){
+},{}],93:[function(require,module,exports){
 /**
  * Copyright (c) 2014, 2015, 2016 Tim Kuijsten
  *
@@ -18739,7 +18188,7 @@ function filter(obj, keys, recurse) {
 
 module.exports = filter;
 
-},{}],96:[function(require,module,exports){
+},{}],94:[function(require,module,exports){
 // a duplex stream is just a stream that is both readable and writable.
 // Since JS doesn't have multiple prototypal inheritance, this class
 // prototypally inherits from Readable, and then parasitically from
@@ -18815,7 +18264,7 @@ function forEach(xs, f) {
     f(xs[i], i);
   }
 }
-},{"./_stream_readable":97,"./_stream_writable":99,"core-util-is":100,"inherits":101,"process-nextick-args":103}],97:[function(require,module,exports){
+},{"./_stream_readable":95,"./_stream_writable":97,"core-util-is":98,"inherits":99,"process-nextick-args":101}],95:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -19698,7 +19147,7 @@ function indexOf(xs, x) {
   return -1;
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":96,"_process":327,"buffer":128,"core-util-is":100,"events":324,"inherits":101,"isarray":102,"process-nextick-args":103,"string_decoder/":104,"util":127}],98:[function(require,module,exports){
+},{"./_stream_duplex":94,"_process":327,"buffer":128,"core-util-is":98,"events":324,"inherits":99,"isarray":100,"process-nextick-args":101,"string_decoder/":102,"util":127}],96:[function(require,module,exports){
 // a transform stream is a readable/writable stream where you do
 // something with the data.  Sometimes it's called a "filter",
 // but that's not a great name for it, since that implies a thing where
@@ -19879,7 +19328,7 @@ function done(stream, er) {
 
   return stream.push(null);
 }
-},{"./_stream_duplex":96,"core-util-is":100,"inherits":101}],99:[function(require,module,exports){
+},{"./_stream_duplex":94,"core-util-is":98,"inherits":99}],97:[function(require,module,exports){
 (function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
@@ -20398,7 +19847,7 @@ function CorkedRequest(state) {
   };
 }
 }).call(this,require('_process'))
-},{"./_stream_duplex":96,"_process":327,"buffer":128,"core-util-is":100,"events":324,"inherits":101,"process-nextick-args":103,"util-deprecate":105}],100:[function(require,module,exports){
+},{"./_stream_duplex":94,"_process":327,"buffer":128,"core-util-is":98,"events":324,"inherits":99,"process-nextick-args":101,"util-deprecate":103}],98:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -20509,16 +19958,16 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],101:[function(require,module,exports){
-arguments[4][82][0].apply(exports,arguments)
-},{"dup":82}],102:[function(require,module,exports){
+},{"../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],99:[function(require,module,exports){
+arguments[4][80][0].apply(exports,arguments)
+},{"dup":80}],100:[function(require,module,exports){
 var toString = {}.toString;
 
 module.exports = Array.isArray || function (arr) {
   return toString.call(arr) == '[object Array]';
 };
 
-},{}],103:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -20530,21 +19979,44 @@ if (!process.version ||
   module.exports = process.nextTick;
 }
 
-function nextTick(fn) {
-  var args = new Array(arguments.length - 1);
-  var i = 0;
-  while (i < args.length) {
-    args[i++] = arguments[i];
+function nextTick(fn, arg1, arg2, arg3) {
+  if (typeof fn !== 'function') {
+    throw new TypeError('"callback" argument must be a function');
   }
-  process.nextTick(function afterTick() {
-    fn.apply(null, args);
-  });
+  var len = arguments.length;
+  var args, i;
+  switch (len) {
+  case 0:
+  case 1:
+    return process.nextTick(fn);
+  case 2:
+    return process.nextTick(function afterTickOne() {
+      fn.call(null, arg1);
+    });
+  case 3:
+    return process.nextTick(function afterTickTwo() {
+      fn.call(null, arg1, arg2);
+    });
+  case 4:
+    return process.nextTick(function afterTickThree() {
+      fn.call(null, arg1, arg2, arg3);
+    });
+  default:
+    args = new Array(len - 1);
+    i = 0;
+    while (i < args.length) {
+      args[i++] = arguments[i];
+    }
+    return process.nextTick(function afterTick() {
+      fn.apply(null, args);
+    });
+  }
 }
 
 }).call(this,require('_process'))
-},{"_process":327}],104:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"buffer":128,"dup":90}],105:[function(require,module,exports){
+},{"_process":327}],102:[function(require,module,exports){
+arguments[4][88][0].apply(exports,arguments)
+},{"buffer":128,"dup":88}],103:[function(require,module,exports){
 (function (global){
 
 /**
@@ -20615,10 +20087,10 @@ function config (name) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],106:[function(require,module,exports){
+},{}],104:[function(require,module,exports){
 module.exports = require("./lib/_stream_transform.js")
 
-},{"./lib/_stream_transform.js":98}],107:[function(require,module,exports){
+},{"./lib/_stream_transform.js":96}],105:[function(require,module,exports){
 (function (process){
 var Transform = require('readable-stream/transform')
   , inherits  = require('util').inherits
@@ -20718,11 +20190,12 @@ module.exports.obj = through2(function (options, transform, flush) {
 })
 
 }).call(this,require('_process'))
-},{"_process":327,"readable-stream/transform":106,"util":352,"xtend":126}],108:[function(require,module,exports){
+},{"_process":327,"readable-stream/transform":104,"util":352,"xtend":126}],106:[function(require,module,exports){
 (function (process,Buffer){
 var stream = require('readable-stream')
 var eos = require('end-of-stream')
 var inherits = require('inherits')
+var shift = require('stream-shift')
 
 var SIGNAL_FLUSH = new Buffer([0])
 
@@ -20878,9 +20351,8 @@ Duplexify.prototype._forward = function() {
   this._forwarding = true
 
   var data
-  var state = this._readable2._readableState
 
-  while ((data = this._readable2.read(state.buffer.length ? state.buffer[0].length : state.length)) !== null) {
+  while ((data = shift(this._readable2)) !== null) {
     this._drained = this.push(data)
   }
 
@@ -20949,7 +20421,7 @@ Duplexify.prototype.end = function(data, enc, cb) {
 module.exports = Duplexify
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":327,"buffer":128,"end-of-stream":109,"inherits":123,"readable-stream":122}],109:[function(require,module,exports){
+},{"_process":327,"buffer":128,"end-of-stream":107,"inherits":123,"readable-stream":121,"stream-shift":122}],107:[function(require,module,exports){
 var once = require('once');
 
 var noop = function() {};
@@ -21022,7 +20494,7 @@ var eos = function(stream, opts, callback) {
 };
 
 module.exports = eos;
-},{"once":111}],110:[function(require,module,exports){
+},{"once":109}],108:[function(require,module,exports){
 // Returns a wrapper function that returns a wrapped callback
 // The wrapper function should do some stuff, and return a
 // presumably different callback function.
@@ -21057,7 +20529,7 @@ function wrappy (fn, cb) {
   }
 }
 
-},{}],111:[function(require,module,exports){
+},{}],109:[function(require,module,exports){
 var wrappy = require('wrappy')
 module.exports = wrappy(once)
 
@@ -21080,9 +20552,9 @@ function once (fn) {
   return f
 }
 
-},{"wrappy":110}],112:[function(require,module,exports){
-arguments[4][96][0].apply(exports,arguments)
-},{"./_stream_readable":114,"./_stream_writable":116,"core-util-is":117,"dup":96,"inherits":123,"process-nextick-args":119}],113:[function(require,module,exports){
+},{"wrappy":108}],110:[function(require,module,exports){
+arguments[4][94][0].apply(exports,arguments)
+},{"./_stream_readable":112,"./_stream_writable":114,"core-util-is":116,"dup":94,"inherits":123,"process-nextick-args":118}],111:[function(require,module,exports){
 // a passthrough stream.
 // basically just the most minimal sort of Transform stream.
 // Every written chunk gets output as-is.
@@ -21109,11 +20581,1085 @@ function PassThrough(options) {
 PassThrough.prototype._transform = function (chunk, encoding, cb) {
   cb(null, chunk);
 };
-},{"./_stream_transform":115,"core-util-is":117,"inherits":123}],114:[function(require,module,exports){
-arguments[4][97][0].apply(exports,arguments)
-},{"./_stream_duplex":112,"_process":327,"buffer":128,"core-util-is":117,"dup":97,"events":324,"inherits":123,"isarray":118,"process-nextick-args":119,"string_decoder/":120,"util":127}],115:[function(require,module,exports){
-arguments[4][98][0].apply(exports,arguments)
-},{"./_stream_duplex":112,"core-util-is":117,"dup":98,"inherits":123}],116:[function(require,module,exports){
+},{"./_stream_transform":113,"core-util-is":116,"inherits":123}],112:[function(require,module,exports){
+(function (process){
+'use strict';
+
+module.exports = Readable;
+
+/*<replacement>*/
+var processNextTick = require('process-nextick-args');
+/*</replacement>*/
+
+/*<replacement>*/
+var isArray = require('isarray');
+/*</replacement>*/
+
+Readable.ReadableState = ReadableState;
+
+/*<replacement>*/
+var EE = require('events').EventEmitter;
+
+var EElistenerCount = function (emitter, type) {
+  return emitter.listeners(type).length;
+};
+/*</replacement>*/
+
+/*<replacement>*/
+var Stream;
+(function () {
+  try {
+    Stream = require('st' + 'ream');
+  } catch (_) {} finally {
+    if (!Stream) Stream = require('events').EventEmitter;
+  }
+})();
+/*</replacement>*/
+
+var Buffer = require('buffer').Buffer;
+/*<replacement>*/
+var bufferShim = require('buffer-shims');
+/*</replacement>*/
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+/*<replacement>*/
+var debugUtil = require('util');
+var debug = void 0;
+if (debugUtil && debugUtil.debuglog) {
+  debug = debugUtil.debuglog('stream');
+} else {
+  debug = function () {};
+}
+/*</replacement>*/
+
+var StringDecoder;
+
+util.inherits(Readable, Stream);
+
+var hasPrependListener = typeof EE.prototype.prependListener === 'function';
+
+function prependListener(emitter, event, fn) {
+  if (hasPrependListener) return emitter.prependListener(event, fn);
+
+  // This is a brutally ugly hack to make sure that our error handler
+  // is attached before any userland ones.  NEVER DO THIS. This is here
+  // only because this code needs to continue to work with older versions
+  // of Node.js that do not include the prependListener() method. The goal
+  // is to eventually remove this hack.
+  if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
+}
+
+var Duplex;
+function ReadableState(options, stream) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  options = options || {};
+
+  // object stream flag. Used to make read(n) ignore n and to
+  // make all the buffer merging and length checks go away
+  this.objectMode = !!options.objectMode;
+
+  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
+
+  // the point at which it stops calling _read() to fill the buffer
+  // Note: 0 is a valid value, means "don't call _read preemptively ever"
+  var hwm = options.highWaterMark;
+  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
+  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
+
+  // cast to ints.
+  this.highWaterMark = ~ ~this.highWaterMark;
+
+  this.buffer = [];
+  this.length = 0;
+  this.pipes = null;
+  this.pipesCount = 0;
+  this.flowing = null;
+  this.ended = false;
+  this.endEmitted = false;
+  this.reading = false;
+
+  // a flag to be able to tell if the onwrite cb is called immediately,
+  // or on a later tick.  We set this to true at first, because any
+  // actions that shouldn't happen until "later" should generally also
+  // not happen before the first write call.
+  this.sync = true;
+
+  // whenever we return null, then we set a flag to say
+  // that we're awaiting a 'readable' event emission.
+  this.needReadable = false;
+  this.emittedReadable = false;
+  this.readableListening = false;
+  this.resumeScheduled = false;
+
+  // Crypto is kind of old and crusty.  Historically, its default string
+  // encoding is 'binary' so we have to make this configurable.
+  // Everything else in the universe uses 'utf8', though.
+  this.defaultEncoding = options.defaultEncoding || 'utf8';
+
+  // when piping, we only care about 'readable' events that happen
+  // after read()ing all the bytes and not getting any pushback.
+  this.ranOut = false;
+
+  // the number of writers that are awaiting a drain event in .pipe()s
+  this.awaitDrain = 0;
+
+  // if true, a maybeReadMore has been scheduled
+  this.readingMore = false;
+
+  this.decoder = null;
+  this.encoding = null;
+  if (options.encoding) {
+    if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
+    this.decoder = new StringDecoder(options.encoding);
+    this.encoding = options.encoding;
+  }
+}
+
+var Duplex;
+function Readable(options) {
+  Duplex = Duplex || require('./_stream_duplex');
+
+  if (!(this instanceof Readable)) return new Readable(options);
+
+  this._readableState = new ReadableState(options, this);
+
+  // legacy
+  this.readable = true;
+
+  if (options && typeof options.read === 'function') this._read = options.read;
+
+  Stream.call(this);
+}
+
+// Manually shove something into the read() buffer.
+// This returns true if the highWaterMark has not been hit yet,
+// similar to how Writable.write() returns true if you should
+// write() some more.
+Readable.prototype.push = function (chunk, encoding) {
+  var state = this._readableState;
+
+  if (!state.objectMode && typeof chunk === 'string') {
+    encoding = encoding || state.defaultEncoding;
+    if (encoding !== state.encoding) {
+      chunk = bufferShim.from(chunk, encoding);
+      encoding = '';
+    }
+  }
+
+  return readableAddChunk(this, state, chunk, encoding, false);
+};
+
+// Unshift should *always* be something directly out of read()
+Readable.prototype.unshift = function (chunk) {
+  var state = this._readableState;
+  return readableAddChunk(this, state, chunk, '', true);
+};
+
+Readable.prototype.isPaused = function () {
+  return this._readableState.flowing === false;
+};
+
+function readableAddChunk(stream, state, chunk, encoding, addToFront) {
+  var er = chunkInvalid(state, chunk);
+  if (er) {
+    stream.emit('error', er);
+  } else if (chunk === null) {
+    state.reading = false;
+    onEofChunk(stream, state);
+  } else if (state.objectMode || chunk && chunk.length > 0) {
+    if (state.ended && !addToFront) {
+      var e = new Error('stream.push() after EOF');
+      stream.emit('error', e);
+    } else if (state.endEmitted && addToFront) {
+      var _e = new Error('stream.unshift() after end event');
+      stream.emit('error', _e);
+    } else {
+      var skipAdd;
+      if (state.decoder && !addToFront && !encoding) {
+        chunk = state.decoder.write(chunk);
+        skipAdd = !state.objectMode && chunk.length === 0;
+      }
+
+      if (!addToFront) state.reading = false;
+
+      // Don't add to the buffer if we've decoded to an empty string chunk and
+      // we're not in object mode
+      if (!skipAdd) {
+        // if we want the data now, just emit it.
+        if (state.flowing && state.length === 0 && !state.sync) {
+          stream.emit('data', chunk);
+          stream.read(0);
+        } else {
+          // update the buffer info.
+          state.length += state.objectMode ? 1 : chunk.length;
+          if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
+
+          if (state.needReadable) emitReadable(stream);
+        }
+      }
+
+      maybeReadMore(stream, state);
+    }
+  } else if (!addToFront) {
+    state.reading = false;
+  }
+
+  return needMoreData(state);
+}
+
+// if it's past the high water mark, we can push in some more.
+// Also, if we have no data yet, we can stand some
+// more bytes.  This is to work around cases where hwm=0,
+// such as the repl.  Also, if the push() triggered a
+// readable event, and the user called read(largeNumber) such that
+// needReadable was set, then we ought to push more, so that another
+// 'readable' event will be triggered.
+function needMoreData(state) {
+  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
+}
+
+// backwards compatibility.
+Readable.prototype.setEncoding = function (enc) {
+  if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
+  this._readableState.decoder = new StringDecoder(enc);
+  this._readableState.encoding = enc;
+  return this;
+};
+
+// Don't raise the hwm > 8MB
+var MAX_HWM = 0x800000;
+function computeNewHighWaterMark(n) {
+  if (n >= MAX_HWM) {
+    n = MAX_HWM;
+  } else {
+    // Get the next highest power of 2
+    n--;
+    n |= n >>> 1;
+    n |= n >>> 2;
+    n |= n >>> 4;
+    n |= n >>> 8;
+    n |= n >>> 16;
+    n++;
+  }
+  return n;
+}
+
+function howMuchToRead(n, state) {
+  if (state.length === 0 && state.ended) return 0;
+
+  if (state.objectMode) return n === 0 ? 0 : 1;
+
+  if (n === null || isNaN(n)) {
+    // only flow one buffer at a time
+    if (state.flowing && state.buffer.length) return state.buffer[0].length;else return state.length;
+  }
+
+  if (n <= 0) return 0;
+
+  // If we're asking for more than the target buffer level,
+  // then raise the water mark.  Bump up to the next highest
+  // power of 2, to prevent increasing it excessively in tiny
+  // amounts.
+  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
+
+  // don't have that much.  return null, unless we've ended.
+  if (n > state.length) {
+    if (!state.ended) {
+      state.needReadable = true;
+      return 0;
+    } else {
+      return state.length;
+    }
+  }
+
+  return n;
+}
+
+// you can override either this method, or the async _read(n) below.
+Readable.prototype.read = function (n) {
+  debug('read', n);
+  var state = this._readableState;
+  var nOrig = n;
+
+  if (typeof n !== 'number' || n > 0) state.emittedReadable = false;
+
+  // if we're doing read(0) to trigger a readable event, but we
+  // already have a bunch of data in the buffer, then just trigger
+  // the 'readable' event and move on.
+  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
+    debug('read: emitReadable', state.length, state.ended);
+    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
+    return null;
+  }
+
+  n = howMuchToRead(n, state);
+
+  // if we've ended, and we're now clear, then finish it up.
+  if (n === 0 && state.ended) {
+    if (state.length === 0) endReadable(this);
+    return null;
+  }
+
+  // All the actual chunk generation logic needs to be
+  // *below* the call to _read.  The reason is that in certain
+  // synthetic stream cases, such as passthrough streams, _read
+  // may be a completely synchronous operation which may change
+  // the state of the read buffer, providing enough data when
+  // before there was *not* enough.
+  //
+  // So, the steps are:
+  // 1. Figure out what the state of things will be after we do
+  // a read from the buffer.
+  //
+  // 2. If that resulting state will trigger a _read, then call _read.
+  // Note that this may be asynchronous, or synchronous.  Yes, it is
+  // deeply ugly to write APIs this way, but that still doesn't mean
+  // that the Readable class should behave improperly, as streams are
+  // designed to be sync/async agnostic.
+  // Take note if the _read call is sync or async (ie, if the read call
+  // has returned yet), so that we know whether or not it's safe to emit
+  // 'readable' etc.
+  //
+  // 3. Actually pull the requested chunks out of the buffer and return.
+
+  // if we need a readable event, then we need to do some reading.
+  var doRead = state.needReadable;
+  debug('need readable', doRead);
+
+  // if we currently have less than the highWaterMark, then also read some
+  if (state.length === 0 || state.length - n < state.highWaterMark) {
+    doRead = true;
+    debug('length less than watermark', doRead);
+  }
+
+  // however, if we've ended, then there's no point, and if we're already
+  // reading, then it's unnecessary.
+  if (state.ended || state.reading) {
+    doRead = false;
+    debug('reading or ended', doRead);
+  }
+
+  if (doRead) {
+    debug('do read');
+    state.reading = true;
+    state.sync = true;
+    // if the length is currently zero, then we *need* a readable event.
+    if (state.length === 0) state.needReadable = true;
+    // call internal read method
+    this._read(state.highWaterMark);
+    state.sync = false;
+  }
+
+  // If _read pushed data synchronously, then `reading` will be false,
+  // and we need to re-evaluate how much data we can return to the user.
+  if (doRead && !state.reading) n = howMuchToRead(nOrig, state);
+
+  var ret;
+  if (n > 0) ret = fromList(n, state);else ret = null;
+
+  if (ret === null) {
+    state.needReadable = true;
+    n = 0;
+  }
+
+  state.length -= n;
+
+  // If we have nothing in the buffer, then we want to know
+  // as soon as we *do* get something into the buffer.
+  if (state.length === 0 && !state.ended) state.needReadable = true;
+
+  // If we tried to read() past the EOF, then emit end on the next tick.
+  if (nOrig !== n && state.ended && state.length === 0) endReadable(this);
+
+  if (ret !== null) this.emit('data', ret);
+
+  return ret;
+};
+
+function chunkInvalid(state, chunk) {
+  var er = null;
+  if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== null && chunk !== undefined && !state.objectMode) {
+    er = new TypeError('Invalid non-string/buffer chunk');
+  }
+  return er;
+}
+
+function onEofChunk(stream, state) {
+  if (state.ended) return;
+  if (state.decoder) {
+    var chunk = state.decoder.end();
+    if (chunk && chunk.length) {
+      state.buffer.push(chunk);
+      state.length += state.objectMode ? 1 : chunk.length;
+    }
+  }
+  state.ended = true;
+
+  // emit 'readable' now to make sure it gets picked up.
+  emitReadable(stream);
+}
+
+// Don't emit readable right away in sync mode, because this can trigger
+// another read() call => stack overflow.  This way, it might trigger
+// a nextTick recursion warning, but that's not so bad.
+function emitReadable(stream) {
+  var state = stream._readableState;
+  state.needReadable = false;
+  if (!state.emittedReadable) {
+    debug('emitReadable', state.flowing);
+    state.emittedReadable = true;
+    if (state.sync) processNextTick(emitReadable_, stream);else emitReadable_(stream);
+  }
+}
+
+function emitReadable_(stream) {
+  debug('emit readable');
+  stream.emit('readable');
+  flow(stream);
+}
+
+// at this point, the user has presumably seen the 'readable' event,
+// and called read() to consume some data.  that may have triggered
+// in turn another _read(n) call, in which case reading = true if
+// it's in progress.
+// However, if we're not ended, or reading, and the length < hwm,
+// then go ahead and try to read some more preemptively.
+function maybeReadMore(stream, state) {
+  if (!state.readingMore) {
+    state.readingMore = true;
+    processNextTick(maybeReadMore_, stream, state);
+  }
+}
+
+function maybeReadMore_(stream, state) {
+  var len = state.length;
+  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
+    debug('maybeReadMore read 0');
+    stream.read(0);
+    if (len === state.length)
+      // didn't get any data, stop spinning.
+      break;else len = state.length;
+  }
+  state.readingMore = false;
+}
+
+// abstract method.  to be overridden in specific implementation classes.
+// call cb(er, data) where data is <= n in length.
+// for virtual (non-string, non-buffer) streams, "length" is somewhat
+// arbitrary, and perhaps not very meaningful.
+Readable.prototype._read = function (n) {
+  this.emit('error', new Error('not implemented'));
+};
+
+Readable.prototype.pipe = function (dest, pipeOpts) {
+  var src = this;
+  var state = this._readableState;
+
+  switch (state.pipesCount) {
+    case 0:
+      state.pipes = dest;
+      break;
+    case 1:
+      state.pipes = [state.pipes, dest];
+      break;
+    default:
+      state.pipes.push(dest);
+      break;
+  }
+  state.pipesCount += 1;
+  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
+
+  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
+
+  var endFn = doEnd ? onend : cleanup;
+  if (state.endEmitted) processNextTick(endFn);else src.once('end', endFn);
+
+  dest.on('unpipe', onunpipe);
+  function onunpipe(readable) {
+    debug('onunpipe');
+    if (readable === src) {
+      cleanup();
+    }
+  }
+
+  function onend() {
+    debug('onend');
+    dest.end();
+  }
+
+  // when the dest drains, it reduces the awaitDrain counter
+  // on the source.  This would be more elegant with a .once()
+  // handler in flow(), but adding and removing repeatedly is
+  // too slow.
+  var ondrain = pipeOnDrain(src);
+  dest.on('drain', ondrain);
+
+  var cleanedUp = false;
+  function cleanup() {
+    debug('cleanup');
+    // cleanup event handlers once the pipe is broken
+    dest.removeListener('close', onclose);
+    dest.removeListener('finish', onfinish);
+    dest.removeListener('drain', ondrain);
+    dest.removeListener('error', onerror);
+    dest.removeListener('unpipe', onunpipe);
+    src.removeListener('end', onend);
+    src.removeListener('end', cleanup);
+    src.removeListener('data', ondata);
+
+    cleanedUp = true;
+
+    // if the reader is waiting for a drain event from this
+    // specific writer, then it would cause it to never start
+    // flowing again.
+    // So, if this is awaiting a drain, then we just call it now.
+    // If we don't know, then assume that we are waiting for one.
+    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
+  }
+
+  src.on('data', ondata);
+  function ondata(chunk) {
+    debug('ondata');
+    var ret = dest.write(chunk);
+    if (false === ret) {
+      // If the user unpiped during `dest.write()`, it is possible
+      // to get stuck in a permanently paused state if that write
+      // also returned false.
+      // => Check whether `dest` is still a piping destination.
+      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
+        debug('false write response, pause', src._readableState.awaitDrain);
+        src._readableState.awaitDrain++;
+      }
+      src.pause();
+    }
+  }
+
+  // if the dest has an error, then stop piping into it.
+  // however, don't suppress the throwing behavior for this.
+  function onerror(er) {
+    debug('onerror', er);
+    unpipe();
+    dest.removeListener('error', onerror);
+    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
+  }
+
+  // Make sure our error handler is attached before userland ones.
+  prependListener(dest, 'error', onerror);
+
+  // Both close and finish should trigger unpipe, but only once.
+  function onclose() {
+    dest.removeListener('finish', onfinish);
+    unpipe();
+  }
+  dest.once('close', onclose);
+  function onfinish() {
+    debug('onfinish');
+    dest.removeListener('close', onclose);
+    unpipe();
+  }
+  dest.once('finish', onfinish);
+
+  function unpipe() {
+    debug('unpipe');
+    src.unpipe(dest);
+  }
+
+  // tell the dest that it's being piped to
+  dest.emit('pipe', src);
+
+  // start the flow if it hasn't been started already.
+  if (!state.flowing) {
+    debug('pipe resume');
+    src.resume();
+  }
+
+  return dest;
+};
+
+function pipeOnDrain(src) {
+  return function () {
+    var state = src._readableState;
+    debug('pipeOnDrain', state.awaitDrain);
+    if (state.awaitDrain) state.awaitDrain--;
+    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
+      state.flowing = true;
+      flow(src);
+    }
+  };
+}
+
+Readable.prototype.unpipe = function (dest) {
+  var state = this._readableState;
+
+  // if we're not piping anywhere, then do nothing.
+  if (state.pipesCount === 0) return this;
+
+  // just one destination.  most common case.
+  if (state.pipesCount === 1) {
+    // passed in one, but it's not the right one.
+    if (dest && dest !== state.pipes) return this;
+
+    if (!dest) dest = state.pipes;
+
+    // got a match.
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+    if (dest) dest.emit('unpipe', this);
+    return this;
+  }
+
+  // slow case. multiple pipe destinations.
+
+  if (!dest) {
+    // remove all.
+    var dests = state.pipes;
+    var len = state.pipesCount;
+    state.pipes = null;
+    state.pipesCount = 0;
+    state.flowing = false;
+
+    for (var _i = 0; _i < len; _i++) {
+      dests[_i].emit('unpipe', this);
+    }return this;
+  }
+
+  // try to find the right one.
+  var i = indexOf(state.pipes, dest);
+  if (i === -1) return this;
+
+  state.pipes.splice(i, 1);
+  state.pipesCount -= 1;
+  if (state.pipesCount === 1) state.pipes = state.pipes[0];
+
+  dest.emit('unpipe', this);
+
+  return this;
+};
+
+// set up data events if they are asked for
+// Ensure readable listeners eventually get something
+Readable.prototype.on = function (ev, fn) {
+  var res = Stream.prototype.on.call(this, ev, fn);
+
+  // If listening to data, and it has not explicitly been paused,
+  // then call resume to start the flow of data on the next tick.
+  if (ev === 'data' && false !== this._readableState.flowing) {
+    this.resume();
+  }
+
+  if (ev === 'readable' && !this._readableState.endEmitted) {
+    var state = this._readableState;
+    if (!state.readableListening) {
+      state.readableListening = true;
+      state.emittedReadable = false;
+      state.needReadable = true;
+      if (!state.reading) {
+        processNextTick(nReadingNextTick, this);
+      } else if (state.length) {
+        emitReadable(this, state);
+      }
+    }
+  }
+
+  return res;
+};
+Readable.prototype.addListener = Readable.prototype.on;
+
+function nReadingNextTick(self) {
+  debug('readable nexttick read 0');
+  self.read(0);
+}
+
+// pause() and resume() are remnants of the legacy readable stream API
+// If the user uses them, then switch into old mode.
+Readable.prototype.resume = function () {
+  var state = this._readableState;
+  if (!state.flowing) {
+    debug('resume');
+    state.flowing = true;
+    resume(this, state);
+  }
+  return this;
+};
+
+function resume(stream, state) {
+  if (!state.resumeScheduled) {
+    state.resumeScheduled = true;
+    processNextTick(resume_, stream, state);
+  }
+}
+
+function resume_(stream, state) {
+  if (!state.reading) {
+    debug('resume read 0');
+    stream.read(0);
+  }
+
+  state.resumeScheduled = false;
+  stream.emit('resume');
+  flow(stream);
+  if (state.flowing && !state.reading) stream.read(0);
+}
+
+Readable.prototype.pause = function () {
+  debug('call pause flowing=%j', this._readableState.flowing);
+  if (false !== this._readableState.flowing) {
+    debug('pause');
+    this._readableState.flowing = false;
+    this.emit('pause');
+  }
+  return this;
+};
+
+function flow(stream) {
+  var state = stream._readableState;
+  debug('flow', state.flowing);
+  if (state.flowing) {
+    do {
+      var chunk = stream.read();
+    } while (null !== chunk && state.flowing);
+  }
+}
+
+// wrap an old-style stream as the async data source.
+// This is *not* part of the readable stream interface.
+// It is an ugly unfortunate mess of history.
+Readable.prototype.wrap = function (stream) {
+  var state = this._readableState;
+  var paused = false;
+
+  var self = this;
+  stream.on('end', function () {
+    debug('wrapped end');
+    if (state.decoder && !state.ended) {
+      var chunk = state.decoder.end();
+      if (chunk && chunk.length) self.push(chunk);
+    }
+
+    self.push(null);
+  });
+
+  stream.on('data', function (chunk) {
+    debug('wrapped data');
+    if (state.decoder) chunk = state.decoder.write(chunk);
+
+    // don't skip over falsy values in objectMode
+    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
+
+    var ret = self.push(chunk);
+    if (!ret) {
+      paused = true;
+      stream.pause();
+    }
+  });
+
+  // proxy all the other methods.
+  // important when wrapping filters and duplexes.
+  for (var i in stream) {
+    if (this[i] === undefined && typeof stream[i] === 'function') {
+      this[i] = function (method) {
+        return function () {
+          return stream[method].apply(stream, arguments);
+        };
+      }(i);
+    }
+  }
+
+  // proxy certain important events.
+  var events = ['error', 'close', 'destroy', 'pause', 'resume'];
+  forEach(events, function (ev) {
+    stream.on(ev, self.emit.bind(self, ev));
+  });
+
+  // when we try to consume some more bytes, simply unpause the
+  // underlying stream.
+  self._read = function (n) {
+    debug('wrapped _read', n);
+    if (paused) {
+      paused = false;
+      stream.resume();
+    }
+  };
+
+  return self;
+};
+
+// exposed for testing purposes only.
+Readable._fromList = fromList;
+
+// Pluck off n bytes from an array of buffers.
+// Length is the combined lengths of all the buffers in the list.
+function fromList(n, state) {
+  var list = state.buffer;
+  var length = state.length;
+  var stringMode = !!state.decoder;
+  var objectMode = !!state.objectMode;
+  var ret;
+
+  // nothing in the list, definitely empty.
+  if (list.length === 0) return null;
+
+  if (length === 0) ret = null;else if (objectMode) ret = list.shift();else if (!n || n >= length) {
+    // read it all, truncate the array.
+    if (stringMode) ret = list.join('');else if (list.length === 1) ret = list[0];else ret = Buffer.concat(list, length);
+    list.length = 0;
+  } else {
+    // read just some of it.
+    if (n < list[0].length) {
+      // just take a part of the first list item.
+      // slice is the same for buffers and strings.
+      var buf = list[0];
+      ret = buf.slice(0, n);
+      list[0] = buf.slice(n);
+    } else if (n === list[0].length) {
+      // first list is a perfect match
+      ret = list.shift();
+    } else {
+      // complex case.
+      // we have enough to cover it, but it spans past the first buffer.
+      if (stringMode) ret = '';else ret = bufferShim.allocUnsafe(n);
+
+      var c = 0;
+      for (var i = 0, l = list.length; i < l && c < n; i++) {
+        var _buf = list[0];
+        var cpy = Math.min(n - c, _buf.length);
+
+        if (stringMode) ret += _buf.slice(0, cpy);else _buf.copy(ret, c, 0, cpy);
+
+        if (cpy < _buf.length) list[0] = _buf.slice(cpy);else list.shift();
+
+        c += cpy;
+      }
+    }
+  }
+
+  return ret;
+}
+
+function endReadable(stream) {
+  var state = stream._readableState;
+
+  // If we get here before consuming all the bytes, then that is a
+  // bug in node.  Should never happen.
+  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
+
+  if (!state.endEmitted) {
+    state.ended = true;
+    processNextTick(endReadableNT, state, stream);
+  }
+}
+
+function endReadableNT(state, stream) {
+  // Check that we didn't get one last unshift.
+  if (!state.endEmitted && state.length === 0) {
+    state.endEmitted = true;
+    stream.readable = false;
+    stream.emit('end');
+  }
+}
+
+function forEach(xs, f) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    f(xs[i], i);
+  }
+}
+
+function indexOf(xs, x) {
+  for (var i = 0, l = xs.length; i < l; i++) {
+    if (xs[i] === x) return i;
+  }
+  return -1;
+}
+}).call(this,require('_process'))
+},{"./_stream_duplex":110,"_process":327,"buffer":128,"buffer-shims":115,"core-util-is":116,"events":324,"inherits":123,"isarray":117,"process-nextick-args":118,"string_decoder/":119,"util":127}],113:[function(require,module,exports){
+// a transform stream is a readable/writable stream where you do
+// something with the data.  Sometimes it's called a "filter",
+// but that's not a great name for it, since that implies a thing where
+// some bits pass through, and others are simply ignored.  (That would
+// be a valid example of a transform, of course.)
+//
+// While the output is causally related to the input, it's not a
+// necessarily symmetric or synchronous transformation.  For example,
+// a zlib stream might take multiple plain-text writes(), and then
+// emit a single compressed chunk some time in the future.
+//
+// Here's how this works:
+//
+// The Transform stream has all the aspects of the readable and writable
+// stream classes.  When you write(chunk), that calls _write(chunk,cb)
+// internally, and returns false if there's a lot of pending writes
+// buffered up.  When you call read(), that calls _read(n) until
+// there's enough pending readable data buffered up.
+//
+// In a transform stream, the written data is placed in a buffer.  When
+// _read(n) is called, it transforms the queued up data, calling the
+// buffered _write cb's as it consumes chunks.  If consuming a single
+// written chunk would result in multiple output chunks, then the first
+// outputted bit calls the readcb, and subsequent chunks just go into
+// the read buffer, and will cause it to emit 'readable' if necessary.
+//
+// This way, back-pressure is actually determined by the reading side,
+// since _read has to be called to start processing a new chunk.  However,
+// a pathological inflate type of transform can cause excessive buffering
+// here.  For example, imagine a stream where every byte of input is
+// interpreted as an integer from 0-255, and then results in that many
+// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
+// 1kb of data being output.  In this case, you could write a very small
+// amount of input, and end up with a very large amount of output.  In
+// such a pathological inflating mechanism, there'd be no way to tell
+// the system to stop doing the transform.  A single 4MB write could
+// cause the system to run out of memory.
+//
+// However, even in such a pathological case, only a single written chunk
+// would be consumed, and then the rest would wait (un-transformed) until
+// the results of the previous transformed chunk were consumed.
+
+'use strict';
+
+module.exports = Transform;
+
+var Duplex = require('./_stream_duplex');
+
+/*<replacement>*/
+var util = require('core-util-is');
+util.inherits = require('inherits');
+/*</replacement>*/
+
+util.inherits(Transform, Duplex);
+
+function TransformState(stream) {
+  this.afterTransform = function (er, data) {
+    return afterTransform(stream, er, data);
+  };
+
+  this.needTransform = false;
+  this.transforming = false;
+  this.writecb = null;
+  this.writechunk = null;
+  this.writeencoding = null;
+}
+
+function afterTransform(stream, er, data) {
+  var ts = stream._transformState;
+  ts.transforming = false;
+
+  var cb = ts.writecb;
+
+  if (!cb) return stream.emit('error', new Error('no writecb in Transform class'));
+
+  ts.writechunk = null;
+  ts.writecb = null;
+
+  if (data !== null && data !== undefined) stream.push(data);
+
+  cb(er);
+
+  var rs = stream._readableState;
+  rs.reading = false;
+  if (rs.needReadable || rs.length < rs.highWaterMark) {
+    stream._read(rs.highWaterMark);
+  }
+}
+
+function Transform(options) {
+  if (!(this instanceof Transform)) return new Transform(options);
+
+  Duplex.call(this, options);
+
+  this._transformState = new TransformState(this);
+
+  // when the writable side finishes, then flush out anything remaining.
+  var stream = this;
+
+  // start out asking for a readable event once data is transformed.
+  this._readableState.needReadable = true;
+
+  // we have implemented the _read method, and done the other things
+  // that Readable wants before the first _read call, so unset the
+  // sync guard flag.
+  this._readableState.sync = false;
+
+  if (options) {
+    if (typeof options.transform === 'function') this._transform = options.transform;
+
+    if (typeof options.flush === 'function') this._flush = options.flush;
+  }
+
+  this.once('prefinish', function () {
+    if (typeof this._flush === 'function') this._flush(function (er) {
+      done(stream, er);
+    });else done(stream);
+  });
+}
+
+Transform.prototype.push = function (chunk, encoding) {
+  this._transformState.needTransform = false;
+  return Duplex.prototype.push.call(this, chunk, encoding);
+};
+
+// This is the part where you do stuff!
+// override this function in implementation classes.
+// 'chunk' is an input chunk.
+//
+// Call `push(newChunk)` to pass along transformed output
+// to the readable side.  You may call 'push' zero or more times.
+//
+// Call `cb(err)` when you are done with this chunk.  If you pass
+// an error, then that'll put the hurt on the whole operation.  If you
+// never call cb(), then you'll never get another chunk.
+Transform.prototype._transform = function (chunk, encoding, cb) {
+  throw new Error('Not implemented');
+};
+
+Transform.prototype._write = function (chunk, encoding, cb) {
+  var ts = this._transformState;
+  ts.writecb = cb;
+  ts.writechunk = chunk;
+  ts.writeencoding = encoding;
+  if (!ts.transforming) {
+    var rs = this._readableState;
+    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
+  }
+};
+
+// Doesn't matter what the args are here.
+// _transform does all the work.
+// That we got here means that the readable side wants more data.
+Transform.prototype._read = function (n) {
+  var ts = this._transformState;
+
+  if (ts.writechunk !== null && ts.writecb && !ts.transforming) {
+    ts.transforming = true;
+    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
+  } else {
+    // mark that we need a transform, so that any data that comes in
+    // will get processed, now that we've asked for it.
+    ts.needTransform = true;
+  }
+};
+
+function done(stream, er) {
+  if (er) return stream.emit('error', er);
+
+  // if there's nothing in the write buffer, then that means
+  // that nothing more will ever be provided
+  var ws = stream._writableState;
+  var ts = stream._transformState;
+
+  if (ws.length) throw new Error('Calling transform done when ws.length != 0');
+
+  if (ts.transforming) throw new Error('Calling transform done when still transforming');
+
+  return stream.push(null);
+}
+},{"./_stream_duplex":110,"core-util-is":116,"inherits":123}],114:[function(require,module,exports){
+(function (process){
 // A bit simpler than readable streams.
 // Implement an async ._write(chunk, encoding, cb), and it'll handle all
 // the drain event emission and buffering.
@@ -21127,11 +21673,7 @@ var processNextTick = require('process-nextick-args');
 /*</replacement>*/
 
 /*<replacement>*/
-var asyncWrite = !true ? setImmediate : processNextTick;
-/*</replacement>*/
-
-/*<replacement>*/
-var Buffer = require('buffer').Buffer;
+var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : processNextTick;
 /*</replacement>*/
 
 Writable.WritableState = WritableState;
@@ -21159,6 +21701,9 @@ var Stream;
 /*</replacement>*/
 
 var Buffer = require('buffer').Buffer;
+/*<replacement>*/
+var bufferShim = require('buffer-shims');
+/*</replacement>*/
 
 util.inherits(Writable, Stream);
 
@@ -21262,10 +21807,9 @@ function WritableState(options, stream) {
   // count buffered requests
   this.bufferedRequestCount = 0;
 
-  // create the two objects needed to store the corked requests
-  // they are not a linked list, as no new elements are inserted in there
+  // allocate the first CorkedRequest, there is always
+  // one allocated and free to use, and we maintain at most two
   this.corkedRequestsFree = new CorkedRequest(this);
-  this.corkedRequestsFree.next = new CorkedRequest(this);
 }
 
 WritableState.prototype.getBuffer = function writableStateGetBuffer() {
@@ -21312,7 +21856,7 @@ function Writable(options) {
 
 // Otherwise people can pipe Writable streams, which is just wrong.
 Writable.prototype.pipe = function () {
-  this.emit('error', new Error('Cannot pipe. Not readable.'));
+  this.emit('error', new Error('Cannot pipe, not readable'));
 };
 
 function writeAfterEnd(stream, cb) {
@@ -21329,9 +21873,16 @@ function writeAfterEnd(stream, cb) {
 // how many bytes or characters.
 function validChunk(stream, state, chunk, cb) {
   var valid = true;
-
-  if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== null && chunk !== undefined && !state.objectMode) {
-    var er = new TypeError('Invalid non-string/buffer chunk');
+  var er = false;
+  // Always throw error if a null is written
+  // if we are not in object mode then throw
+  // if it is not a buffer, string, or undefined.
+  if (chunk === null) {
+    er = new TypeError('May not write null values to stream');
+  } else if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
+    er = new TypeError('Invalid non-string/buffer chunk');
+  }
+  if (er) {
     stream.emit('error', er);
     processNextTick(cb, er);
     valid = false;
@@ -21381,11 +21932,12 @@ Writable.prototype.setDefaultEncoding = function setDefaultEncoding(encoding) {
   if (typeof encoding === 'string') encoding = encoding.toLowerCase();
   if (!(['hex', 'utf8', 'utf-8', 'ascii', 'binary', 'base64', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le', 'raw'].indexOf((encoding + '').toLowerCase()) > -1)) throw new TypeError('Unknown encoding: ' + encoding);
   this._writableState.defaultEncoding = encoding;
+  return this;
 };
 
 function decodeChunk(state, chunk, encoding) {
   if (!state.objectMode && state.decodeStrings !== false && typeof chunk === 'string') {
-    chunk = new Buffer(chunk, encoding);
+    chunk = bufferShim.from(chunk, encoding);
   }
   return chunk;
 }
@@ -21508,12 +22060,16 @@ function clearBuffer(stream, state) {
 
     doWrite(stream, state, true, state.length, buffer, '', holder.finish);
 
-    // doWrite is always async, defer these to save a bit of time
+    // doWrite is almost always async, defer these to save a bit of time
     // as the hot path ends with doWrite
     state.pendingcb++;
     state.lastBufferedRequest = null;
-    state.corkedRequestsFree = holder.next;
-    holder.next = null;
+    if (holder.next) {
+      state.corkedRequestsFree = holder.next;
+      holder.next = null;
+    } else {
+      state.corkedRequestsFree = new CorkedRequest(state);
+    }
   } else {
     // Slow case, write chunks one-by-one
     while (entry) {
@@ -21630,7 +22186,120 @@ function CorkedRequest(state) {
     }
   };
 }
-},{"./_stream_duplex":112,"buffer":128,"core-util-is":117,"events":324,"inherits":123,"process-nextick-args":119,"util-deprecate":121}],117:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./_stream_duplex":110,"_process":327,"buffer":128,"buffer-shims":115,"core-util-is":116,"events":324,"inherits":123,"process-nextick-args":118,"util-deprecate":120}],115:[function(require,module,exports){
+(function (global){
+'use strict';
+
+var buffer = require('buffer');
+var Buffer = buffer.Buffer;
+var SlowBuffer = buffer.SlowBuffer;
+var MAX_LEN = buffer.kMaxLength || 2147483647;
+exports.alloc = function alloc(size, fill, encoding) {
+  if (typeof Buffer.alloc === 'function') {
+    return Buffer.alloc(size, fill, encoding);
+  }
+  if (typeof encoding === 'number') {
+    throw new TypeError('encoding must not be number');
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size > MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  var enc = encoding;
+  var _fill = fill;
+  if (_fill === undefined) {
+    enc = undefined;
+    _fill = 0;
+  }
+  var buf = new Buffer(size);
+  if (typeof _fill === 'string') {
+    var fillBuf = new Buffer(_fill, enc);
+    var flen = fillBuf.length;
+    var i = -1;
+    while (++i < size) {
+      buf[i] = fillBuf[i % flen];
+    }
+  } else {
+    buf.fill(_fill);
+  }
+  return buf;
+}
+exports.allocUnsafe = function allocUnsafe(size) {
+  if (typeof Buffer.allocUnsafe === 'function') {
+    return Buffer.allocUnsafe(size);
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size > MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  return new Buffer(size);
+}
+exports.from = function from(value, encodingOrOffset, length) {
+  if (typeof Buffer.from === 'function' && (!global.Uint8Array || Uint8Array.from !== Buffer.from)) {
+    return Buffer.from(value, encodingOrOffset, length);
+  }
+  if (typeof value === 'number') {
+    throw new TypeError('"value" argument must not be a number');
+  }
+  if (typeof value === 'string') {
+    return new Buffer(value, encodingOrOffset);
+  }
+  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
+    var offset = encodingOrOffset;
+    if (arguments.length === 1) {
+      return new Buffer(value);
+    }
+    if (typeof offset === 'undefined') {
+      offset = 0;
+    }
+    var len = length;
+    if (typeof len === 'undefined') {
+      len = value.byteLength - offset;
+    }
+    if (offset >= value.byteLength) {
+      throw new RangeError('\'offset\' is out of bounds');
+    }
+    if (len > value.byteLength - offset) {
+      throw new RangeError('\'length\' is out of bounds');
+    }
+    return new Buffer(value.slice(offset, offset + len));
+  }
+  if (Buffer.isBuffer(value)) {
+    var out = new Buffer(value.length);
+    value.copy(out, 0, 0, value.length);
+    return out;
+  }
+  if (value) {
+    if (Array.isArray(value) || (typeof ArrayBuffer !== 'undefined' && value.buffer instanceof ArrayBuffer) || 'length' in value) {
+      return new Buffer(value);
+    }
+    if (value.type === 'Buffer' && Array.isArray(value.data)) {
+      return new Buffer(value.data);
+    }
+  }
+
+  throw new TypeError('First argument must be a string, Buffer, ' + 'ArrayBuffer, Array, or array-like object.');
+}
+exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
+  if (typeof Buffer.allocUnsafeSlow === 'function') {
+    return Buffer.allocUnsafeSlow(size);
+  }
+  if (typeof size !== 'number') {
+    throw new TypeError('size must be a number');
+  }
+  if (size >= MAX_LEN) {
+    throw new RangeError('size is too large');
+  }
+  return new SlowBuffer(size);
+}
+
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"buffer":128}],116:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -21741,15 +22410,16 @@ function objectToString(o) {
 }
 
 }).call(this,{"isBuffer":require("../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js")})
-},{"../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],118:[function(require,module,exports){
-arguments[4][102][0].apply(exports,arguments)
-},{"dup":102}],119:[function(require,module,exports){
+},{"../../../../../../../../../../../../../usr/local/lib/node_modules/browserify/node_modules/insert-module-globals/node_modules/is-buffer/index.js":326}],117:[function(require,module,exports){
+arguments[4][100][0].apply(exports,arguments)
+},{"dup":100}],118:[function(require,module,exports){
+arguments[4][101][0].apply(exports,arguments)
+},{"_process":327,"dup":101}],119:[function(require,module,exports){
+arguments[4][88][0].apply(exports,arguments)
+},{"buffer":128,"dup":88}],120:[function(require,module,exports){
 arguments[4][103][0].apply(exports,arguments)
-},{"_process":327,"dup":103}],120:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"buffer":128,"dup":90}],121:[function(require,module,exports){
-arguments[4][105][0].apply(exports,arguments)
-},{"dup":105}],122:[function(require,module,exports){
+},{"dup":103}],121:[function(require,module,exports){
+(function (process){
 var Stream = (function (){
   try {
     return require('st' + 'ream'); // hack to fix a circular dependency issue when used with browserify
@@ -21763,15 +22433,36 @@ exports.Duplex = require('./lib/_stream_duplex.js');
 exports.Transform = require('./lib/_stream_transform.js');
 exports.PassThrough = require('./lib/_stream_passthrough.js');
 
-// inline-process-browser and unreachable-branch-transform make sure this is
-// removed in browserify builds
-if (!true) {
-  module.exports = require('stream');
+if (!process.browser && process.env.READABLE_STREAM === 'disable' && Stream) {
+  module.exports = Stream;
 }
 
-},{"./lib/_stream_duplex.js":112,"./lib/_stream_passthrough.js":113,"./lib/_stream_readable.js":114,"./lib/_stream_transform.js":115,"./lib/_stream_writable.js":116,"stream":347}],123:[function(require,module,exports){
-arguments[4][82][0].apply(exports,arguments)
-},{"dup":82}],124:[function(require,module,exports){
+}).call(this,require('_process'))
+},{"./lib/_stream_duplex.js":110,"./lib/_stream_passthrough.js":111,"./lib/_stream_readable.js":112,"./lib/_stream_transform.js":113,"./lib/_stream_writable.js":114,"_process":327}],122:[function(require,module,exports){
+module.exports = shift
+
+function shift (stream) {
+  var rs = stream._readableState
+  if (!rs) return null
+  return rs.objectMode ? stream.read() : stream.read(getStateLength(rs))
+}
+
+function getStateLength (state) {
+  if (state.buffer.length) {
+    // Since node 6.3.0 state.buffer is a BufferList not an array
+    if (state.buffer.head) {
+      return state.buffer.head.data.length
+    }
+
+    return state.buffer[0].length
+  }
+
+  return state.length
+}
+
+},{}],123:[function(require,module,exports){
+arguments[4][80][0].apply(exports,arguments)
+},{"dup":80}],124:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -21921,7 +22612,7 @@ function WebSocketStream(target, protocols, options) {
 }
 
 }).call(this,require('_process'),require("buffer").Buffer)
-},{"_process":327,"buffer":128,"duplexify":108,"through2":107,"ws":124}],126:[function(require,module,exports){
+},{"_process":327,"buffer":128,"duplexify":106,"through2":105,"ws":124}],126:[function(require,module,exports){
 module.exports = extend
 
 var hasOwnProperty = Object.prototype.hasOwnProperty;
@@ -23857,8 +24548,8 @@ exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
 }
 
 },{}],131:[function(require,module,exports){
-arguments[4][102][0].apply(exports,arguments)
-},{"dup":102}],132:[function(require,module,exports){
+arguments[4][100][0].apply(exports,arguments)
+},{"dup":100}],132:[function(require,module,exports){
 'use strict'
 
 exports.randomBytes = exports.rng = exports.pseudoRandomBytes = exports.prng = require('randombytes')
@@ -39906,8 +40597,8 @@ function isUndefined(arg) {
 }
 
 },{}],325:[function(require,module,exports){
-arguments[4][82][0].apply(exports,arguments)
-},{"dup":82}],326:[function(require,module,exports){
+arguments[4][80][0].apply(exports,arguments)
+},{"dup":80}],326:[function(require,module,exports){
 /**
  * Determine if an object is Buffer
  *
@@ -40742,1728 +41433,18 @@ exports.encode = exports.stringify = require('./encode');
 module.exports = require("./lib/_stream_duplex.js")
 
 },{"./lib/_stream_duplex.js":333}],333:[function(require,module,exports){
-arguments[4][96][0].apply(exports,arguments)
-},{"./_stream_readable":335,"./_stream_writable":337,"core-util-is":339,"dup":96,"inherits":325,"process-nextick-args":341}],334:[function(require,module,exports){
+arguments[4][94][0].apply(exports,arguments)
+},{"./_stream_readable":335,"./_stream_writable":337,"core-util-is":339,"dup":94,"inherits":325,"process-nextick-args":341}],334:[function(require,module,exports){
+arguments[4][111][0].apply(exports,arguments)
+},{"./_stream_transform":336,"core-util-is":339,"dup":111,"inherits":325}],335:[function(require,module,exports){
+arguments[4][112][0].apply(exports,arguments)
+},{"./_stream_duplex":333,"_process":327,"buffer":128,"buffer-shims":338,"core-util-is":339,"dup":112,"events":324,"inherits":325,"isarray":340,"process-nextick-args":341,"string_decoder/":348,"util":127}],336:[function(require,module,exports){
 arguments[4][113][0].apply(exports,arguments)
-},{"./_stream_transform":336,"core-util-is":339,"dup":113,"inherits":325}],335:[function(require,module,exports){
-(function (process){
-'use strict';
-
-module.exports = Readable;
-
-/*<replacement>*/
-var processNextTick = require('process-nextick-args');
-/*</replacement>*/
-
-/*<replacement>*/
-var isArray = require('isarray');
-/*</replacement>*/
-
-Readable.ReadableState = ReadableState;
-
-/*<replacement>*/
-var EE = require('events').EventEmitter;
-
-var EElistenerCount = function (emitter, type) {
-  return emitter.listeners(type).length;
-};
-/*</replacement>*/
-
-/*<replacement>*/
-var Stream;
-(function () {
-  try {
-    Stream = require('st' + 'ream');
-  } catch (_) {} finally {
-    if (!Stream) Stream = require('events').EventEmitter;
-  }
-})();
-/*</replacement>*/
-
-var Buffer = require('buffer').Buffer;
-/*<replacement>*/
-var bufferShim = require('buffer-shims');
-/*</replacement>*/
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-/*<replacement>*/
-var debugUtil = require('util');
-var debug = void 0;
-if (debugUtil && debugUtil.debuglog) {
-  debug = debugUtil.debuglog('stream');
-} else {
-  debug = function () {};
-}
-/*</replacement>*/
-
-var StringDecoder;
-
-util.inherits(Readable, Stream);
-
-var hasPrependListener = typeof EE.prototype.prependListener === 'function';
-
-function prependListener(emitter, event, fn) {
-  if (hasPrependListener) return emitter.prependListener(event, fn);
-
-  // This is a brutally ugly hack to make sure that our error handler
-  // is attached before any userland ones.  NEVER DO THIS. This is here
-  // only because this code needs to continue to work with older versions
-  // of Node.js that do not include the prependListener() method. The goal
-  // is to eventually remove this hack.
-  if (!emitter._events || !emitter._events[event]) emitter.on(event, fn);else if (isArray(emitter._events[event])) emitter._events[event].unshift(fn);else emitter._events[event] = [fn, emitter._events[event]];
-}
-
-var Duplex;
-function ReadableState(options, stream) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  options = options || {};
-
-  // object stream flag. Used to make read(n) ignore n and to
-  // make all the buffer merging and length checks go away
-  this.objectMode = !!options.objectMode;
-
-  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.readableObjectMode;
-
-  // the point at which it stops calling _read() to fill the buffer
-  // Note: 0 is a valid value, means "don't call _read preemptively ever"
-  var hwm = options.highWaterMark;
-  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
-  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
-
-  // cast to ints.
-  this.highWaterMark = ~ ~this.highWaterMark;
-
-  this.buffer = [];
-  this.length = 0;
-  this.pipes = null;
-  this.pipesCount = 0;
-  this.flowing = null;
-  this.ended = false;
-  this.endEmitted = false;
-  this.reading = false;
-
-  // a flag to be able to tell if the onwrite cb is called immediately,
-  // or on a later tick.  We set this to true at first, because any
-  // actions that shouldn't happen until "later" should generally also
-  // not happen before the first write call.
-  this.sync = true;
-
-  // whenever we return null, then we set a flag to say
-  // that we're awaiting a 'readable' event emission.
-  this.needReadable = false;
-  this.emittedReadable = false;
-  this.readableListening = false;
-  this.resumeScheduled = false;
-
-  // Crypto is kind of old and crusty.  Historically, its default string
-  // encoding is 'binary' so we have to make this configurable.
-  // Everything else in the universe uses 'utf8', though.
-  this.defaultEncoding = options.defaultEncoding || 'utf8';
-
-  // when piping, we only care about 'readable' events that happen
-  // after read()ing all the bytes and not getting any pushback.
-  this.ranOut = false;
-
-  // the number of writers that are awaiting a drain event in .pipe()s
-  this.awaitDrain = 0;
-
-  // if true, a maybeReadMore has been scheduled
-  this.readingMore = false;
-
-  this.decoder = null;
-  this.encoding = null;
-  if (options.encoding) {
-    if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
-    this.decoder = new StringDecoder(options.encoding);
-    this.encoding = options.encoding;
-  }
-}
-
-var Duplex;
-function Readable(options) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  if (!(this instanceof Readable)) return new Readable(options);
-
-  this._readableState = new ReadableState(options, this);
-
-  // legacy
-  this.readable = true;
-
-  if (options && typeof options.read === 'function') this._read = options.read;
-
-  Stream.call(this);
-}
-
-// Manually shove something into the read() buffer.
-// This returns true if the highWaterMark has not been hit yet,
-// similar to how Writable.write() returns true if you should
-// write() some more.
-Readable.prototype.push = function (chunk, encoding) {
-  var state = this._readableState;
-
-  if (!state.objectMode && typeof chunk === 'string') {
-    encoding = encoding || state.defaultEncoding;
-    if (encoding !== state.encoding) {
-      chunk = bufferShim.from(chunk, encoding);
-      encoding = '';
-    }
-  }
-
-  return readableAddChunk(this, state, chunk, encoding, false);
-};
-
-// Unshift should *always* be something directly out of read()
-Readable.prototype.unshift = function (chunk) {
-  var state = this._readableState;
-  return readableAddChunk(this, state, chunk, '', true);
-};
-
-Readable.prototype.isPaused = function () {
-  return this._readableState.flowing === false;
-};
-
-function readableAddChunk(stream, state, chunk, encoding, addToFront) {
-  var er = chunkInvalid(state, chunk);
-  if (er) {
-    stream.emit('error', er);
-  } else if (chunk === null) {
-    state.reading = false;
-    onEofChunk(stream, state);
-  } else if (state.objectMode || chunk && chunk.length > 0) {
-    if (state.ended && !addToFront) {
-      var e = new Error('stream.push() after EOF');
-      stream.emit('error', e);
-    } else if (state.endEmitted && addToFront) {
-      var _e = new Error('stream.unshift() after end event');
-      stream.emit('error', _e);
-    } else {
-      var skipAdd;
-      if (state.decoder && !addToFront && !encoding) {
-        chunk = state.decoder.write(chunk);
-        skipAdd = !state.objectMode && chunk.length === 0;
-      }
-
-      if (!addToFront) state.reading = false;
-
-      // Don't add to the buffer if we've decoded to an empty string chunk and
-      // we're not in object mode
-      if (!skipAdd) {
-        // if we want the data now, just emit it.
-        if (state.flowing && state.length === 0 && !state.sync) {
-          stream.emit('data', chunk);
-          stream.read(0);
-        } else {
-          // update the buffer info.
-          state.length += state.objectMode ? 1 : chunk.length;
-          if (addToFront) state.buffer.unshift(chunk);else state.buffer.push(chunk);
-
-          if (state.needReadable) emitReadable(stream);
-        }
-      }
-
-      maybeReadMore(stream, state);
-    }
-  } else if (!addToFront) {
-    state.reading = false;
-  }
-
-  return needMoreData(state);
-}
-
-// if it's past the high water mark, we can push in some more.
-// Also, if we have no data yet, we can stand some
-// more bytes.  This is to work around cases where hwm=0,
-// such as the repl.  Also, if the push() triggered a
-// readable event, and the user called read(largeNumber) such that
-// needReadable was set, then we ought to push more, so that another
-// 'readable' event will be triggered.
-function needMoreData(state) {
-  return !state.ended && (state.needReadable || state.length < state.highWaterMark || state.length === 0);
-}
-
-// backwards compatibility.
-Readable.prototype.setEncoding = function (enc) {
-  if (!StringDecoder) StringDecoder = require('string_decoder/').StringDecoder;
-  this._readableState.decoder = new StringDecoder(enc);
-  this._readableState.encoding = enc;
-  return this;
-};
-
-// Don't raise the hwm > 8MB
-var MAX_HWM = 0x800000;
-function computeNewHighWaterMark(n) {
-  if (n >= MAX_HWM) {
-    n = MAX_HWM;
-  } else {
-    // Get the next highest power of 2
-    n--;
-    n |= n >>> 1;
-    n |= n >>> 2;
-    n |= n >>> 4;
-    n |= n >>> 8;
-    n |= n >>> 16;
-    n++;
-  }
-  return n;
-}
-
-function howMuchToRead(n, state) {
-  if (state.length === 0 && state.ended) return 0;
-
-  if (state.objectMode) return n === 0 ? 0 : 1;
-
-  if (n === null || isNaN(n)) {
-    // only flow one buffer at a time
-    if (state.flowing && state.buffer.length) return state.buffer[0].length;else return state.length;
-  }
-
-  if (n <= 0) return 0;
-
-  // If we're asking for more than the target buffer level,
-  // then raise the water mark.  Bump up to the next highest
-  // power of 2, to prevent increasing it excessively in tiny
-  // amounts.
-  if (n > state.highWaterMark) state.highWaterMark = computeNewHighWaterMark(n);
-
-  // don't have that much.  return null, unless we've ended.
-  if (n > state.length) {
-    if (!state.ended) {
-      state.needReadable = true;
-      return 0;
-    } else {
-      return state.length;
-    }
-  }
-
-  return n;
-}
-
-// you can override either this method, or the async _read(n) below.
-Readable.prototype.read = function (n) {
-  debug('read', n);
-  var state = this._readableState;
-  var nOrig = n;
-
-  if (typeof n !== 'number' || n > 0) state.emittedReadable = false;
-
-  // if we're doing read(0) to trigger a readable event, but we
-  // already have a bunch of data in the buffer, then just trigger
-  // the 'readable' event and move on.
-  if (n === 0 && state.needReadable && (state.length >= state.highWaterMark || state.ended)) {
-    debug('read: emitReadable', state.length, state.ended);
-    if (state.length === 0 && state.ended) endReadable(this);else emitReadable(this);
-    return null;
-  }
-
-  n = howMuchToRead(n, state);
-
-  // if we've ended, and we're now clear, then finish it up.
-  if (n === 0 && state.ended) {
-    if (state.length === 0) endReadable(this);
-    return null;
-  }
-
-  // All the actual chunk generation logic needs to be
-  // *below* the call to _read.  The reason is that in certain
-  // synthetic stream cases, such as passthrough streams, _read
-  // may be a completely synchronous operation which may change
-  // the state of the read buffer, providing enough data when
-  // before there was *not* enough.
-  //
-  // So, the steps are:
-  // 1. Figure out what the state of things will be after we do
-  // a read from the buffer.
-  //
-  // 2. If that resulting state will trigger a _read, then call _read.
-  // Note that this may be asynchronous, or synchronous.  Yes, it is
-  // deeply ugly to write APIs this way, but that still doesn't mean
-  // that the Readable class should behave improperly, as streams are
-  // designed to be sync/async agnostic.
-  // Take note if the _read call is sync or async (ie, if the read call
-  // has returned yet), so that we know whether or not it's safe to emit
-  // 'readable' etc.
-  //
-  // 3. Actually pull the requested chunks out of the buffer and return.
-
-  // if we need a readable event, then we need to do some reading.
-  var doRead = state.needReadable;
-  debug('need readable', doRead);
-
-  // if we currently have less than the highWaterMark, then also read some
-  if (state.length === 0 || state.length - n < state.highWaterMark) {
-    doRead = true;
-    debug('length less than watermark', doRead);
-  }
-
-  // however, if we've ended, then there's no point, and if we're already
-  // reading, then it's unnecessary.
-  if (state.ended || state.reading) {
-    doRead = false;
-    debug('reading or ended', doRead);
-  }
-
-  if (doRead) {
-    debug('do read');
-    state.reading = true;
-    state.sync = true;
-    // if the length is currently zero, then we *need* a readable event.
-    if (state.length === 0) state.needReadable = true;
-    // call internal read method
-    this._read(state.highWaterMark);
-    state.sync = false;
-  }
-
-  // If _read pushed data synchronously, then `reading` will be false,
-  // and we need to re-evaluate how much data we can return to the user.
-  if (doRead && !state.reading) n = howMuchToRead(nOrig, state);
-
-  var ret;
-  if (n > 0) ret = fromList(n, state);else ret = null;
-
-  if (ret === null) {
-    state.needReadable = true;
-    n = 0;
-  }
-
-  state.length -= n;
-
-  // If we have nothing in the buffer, then we want to know
-  // as soon as we *do* get something into the buffer.
-  if (state.length === 0 && !state.ended) state.needReadable = true;
-
-  // If we tried to read() past the EOF, then emit end on the next tick.
-  if (nOrig !== n && state.ended && state.length === 0) endReadable(this);
-
-  if (ret !== null) this.emit('data', ret);
-
-  return ret;
-};
-
-function chunkInvalid(state, chunk) {
-  var er = null;
-  if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== null && chunk !== undefined && !state.objectMode) {
-    er = new TypeError('Invalid non-string/buffer chunk');
-  }
-  return er;
-}
-
-function onEofChunk(stream, state) {
-  if (state.ended) return;
-  if (state.decoder) {
-    var chunk = state.decoder.end();
-    if (chunk && chunk.length) {
-      state.buffer.push(chunk);
-      state.length += state.objectMode ? 1 : chunk.length;
-    }
-  }
-  state.ended = true;
-
-  // emit 'readable' now to make sure it gets picked up.
-  emitReadable(stream);
-}
-
-// Don't emit readable right away in sync mode, because this can trigger
-// another read() call => stack overflow.  This way, it might trigger
-// a nextTick recursion warning, but that's not so bad.
-function emitReadable(stream) {
-  var state = stream._readableState;
-  state.needReadable = false;
-  if (!state.emittedReadable) {
-    debug('emitReadable', state.flowing);
-    state.emittedReadable = true;
-    if (state.sync) processNextTick(emitReadable_, stream);else emitReadable_(stream);
-  }
-}
-
-function emitReadable_(stream) {
-  debug('emit readable');
-  stream.emit('readable');
-  flow(stream);
-}
-
-// at this point, the user has presumably seen the 'readable' event,
-// and called read() to consume some data.  that may have triggered
-// in turn another _read(n) call, in which case reading = true if
-// it's in progress.
-// However, if we're not ended, or reading, and the length < hwm,
-// then go ahead and try to read some more preemptively.
-function maybeReadMore(stream, state) {
-  if (!state.readingMore) {
-    state.readingMore = true;
-    processNextTick(maybeReadMore_, stream, state);
-  }
-}
-
-function maybeReadMore_(stream, state) {
-  var len = state.length;
-  while (!state.reading && !state.flowing && !state.ended && state.length < state.highWaterMark) {
-    debug('maybeReadMore read 0');
-    stream.read(0);
-    if (len === state.length)
-      // didn't get any data, stop spinning.
-      break;else len = state.length;
-  }
-  state.readingMore = false;
-}
-
-// abstract method.  to be overridden in specific implementation classes.
-// call cb(er, data) where data is <= n in length.
-// for virtual (non-string, non-buffer) streams, "length" is somewhat
-// arbitrary, and perhaps not very meaningful.
-Readable.prototype._read = function (n) {
-  this.emit('error', new Error('not implemented'));
-};
-
-Readable.prototype.pipe = function (dest, pipeOpts) {
-  var src = this;
-  var state = this._readableState;
-
-  switch (state.pipesCount) {
-    case 0:
-      state.pipes = dest;
-      break;
-    case 1:
-      state.pipes = [state.pipes, dest];
-      break;
-    default:
-      state.pipes.push(dest);
-      break;
-  }
-  state.pipesCount += 1;
-  debug('pipe count=%d opts=%j', state.pipesCount, pipeOpts);
-
-  var doEnd = (!pipeOpts || pipeOpts.end !== false) && dest !== process.stdout && dest !== process.stderr;
-
-  var endFn = doEnd ? onend : cleanup;
-  if (state.endEmitted) processNextTick(endFn);else src.once('end', endFn);
-
-  dest.on('unpipe', onunpipe);
-  function onunpipe(readable) {
-    debug('onunpipe');
-    if (readable === src) {
-      cleanup();
-    }
-  }
-
-  function onend() {
-    debug('onend');
-    dest.end();
-  }
-
-  // when the dest drains, it reduces the awaitDrain counter
-  // on the source.  This would be more elegant with a .once()
-  // handler in flow(), but adding and removing repeatedly is
-  // too slow.
-  var ondrain = pipeOnDrain(src);
-  dest.on('drain', ondrain);
-
-  var cleanedUp = false;
-  function cleanup() {
-    debug('cleanup');
-    // cleanup event handlers once the pipe is broken
-    dest.removeListener('close', onclose);
-    dest.removeListener('finish', onfinish);
-    dest.removeListener('drain', ondrain);
-    dest.removeListener('error', onerror);
-    dest.removeListener('unpipe', onunpipe);
-    src.removeListener('end', onend);
-    src.removeListener('end', cleanup);
-    src.removeListener('data', ondata);
-
-    cleanedUp = true;
-
-    // if the reader is waiting for a drain event from this
-    // specific writer, then it would cause it to never start
-    // flowing again.
-    // So, if this is awaiting a drain, then we just call it now.
-    // If we don't know, then assume that we are waiting for one.
-    if (state.awaitDrain && (!dest._writableState || dest._writableState.needDrain)) ondrain();
-  }
-
-  src.on('data', ondata);
-  function ondata(chunk) {
-    debug('ondata');
-    var ret = dest.write(chunk);
-    if (false === ret) {
-      // If the user unpiped during `dest.write()`, it is possible
-      // to get stuck in a permanently paused state if that write
-      // also returned false.
-      // => Check whether `dest` is still a piping destination.
-      if ((state.pipesCount === 1 && state.pipes === dest || state.pipesCount > 1 && indexOf(state.pipes, dest) !== -1) && !cleanedUp) {
-        debug('false write response, pause', src._readableState.awaitDrain);
-        src._readableState.awaitDrain++;
-      }
-      src.pause();
-    }
-  }
-
-  // if the dest has an error, then stop piping into it.
-  // however, don't suppress the throwing behavior for this.
-  function onerror(er) {
-    debug('onerror', er);
-    unpipe();
-    dest.removeListener('error', onerror);
-    if (EElistenerCount(dest, 'error') === 0) dest.emit('error', er);
-  }
-
-  // Make sure our error handler is attached before userland ones.
-  prependListener(dest, 'error', onerror);
-
-  // Both close and finish should trigger unpipe, but only once.
-  function onclose() {
-    dest.removeListener('finish', onfinish);
-    unpipe();
-  }
-  dest.once('close', onclose);
-  function onfinish() {
-    debug('onfinish');
-    dest.removeListener('close', onclose);
-    unpipe();
-  }
-  dest.once('finish', onfinish);
-
-  function unpipe() {
-    debug('unpipe');
-    src.unpipe(dest);
-  }
-
-  // tell the dest that it's being piped to
-  dest.emit('pipe', src);
-
-  // start the flow if it hasn't been started already.
-  if (!state.flowing) {
-    debug('pipe resume');
-    src.resume();
-  }
-
-  return dest;
-};
-
-function pipeOnDrain(src) {
-  return function () {
-    var state = src._readableState;
-    debug('pipeOnDrain', state.awaitDrain);
-    if (state.awaitDrain) state.awaitDrain--;
-    if (state.awaitDrain === 0 && EElistenerCount(src, 'data')) {
-      state.flowing = true;
-      flow(src);
-    }
-  };
-}
-
-Readable.prototype.unpipe = function (dest) {
-  var state = this._readableState;
-
-  // if we're not piping anywhere, then do nothing.
-  if (state.pipesCount === 0) return this;
-
-  // just one destination.  most common case.
-  if (state.pipesCount === 1) {
-    // passed in one, but it's not the right one.
-    if (dest && dest !== state.pipes) return this;
-
-    if (!dest) dest = state.pipes;
-
-    // got a match.
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-    if (dest) dest.emit('unpipe', this);
-    return this;
-  }
-
-  // slow case. multiple pipe destinations.
-
-  if (!dest) {
-    // remove all.
-    var dests = state.pipes;
-    var len = state.pipesCount;
-    state.pipes = null;
-    state.pipesCount = 0;
-    state.flowing = false;
-
-    for (var _i = 0; _i < len; _i++) {
-      dests[_i].emit('unpipe', this);
-    }return this;
-  }
-
-  // try to find the right one.
-  var i = indexOf(state.pipes, dest);
-  if (i === -1) return this;
-
-  state.pipes.splice(i, 1);
-  state.pipesCount -= 1;
-  if (state.pipesCount === 1) state.pipes = state.pipes[0];
-
-  dest.emit('unpipe', this);
-
-  return this;
-};
-
-// set up data events if they are asked for
-// Ensure readable listeners eventually get something
-Readable.prototype.on = function (ev, fn) {
-  var res = Stream.prototype.on.call(this, ev, fn);
-
-  // If listening to data, and it has not explicitly been paused,
-  // then call resume to start the flow of data on the next tick.
-  if (ev === 'data' && false !== this._readableState.flowing) {
-    this.resume();
-  }
-
-  if (ev === 'readable' && !this._readableState.endEmitted) {
-    var state = this._readableState;
-    if (!state.readableListening) {
-      state.readableListening = true;
-      state.emittedReadable = false;
-      state.needReadable = true;
-      if (!state.reading) {
-        processNextTick(nReadingNextTick, this);
-      } else if (state.length) {
-        emitReadable(this, state);
-      }
-    }
-  }
-
-  return res;
-};
-Readable.prototype.addListener = Readable.prototype.on;
-
-function nReadingNextTick(self) {
-  debug('readable nexttick read 0');
-  self.read(0);
-}
-
-// pause() and resume() are remnants of the legacy readable stream API
-// If the user uses them, then switch into old mode.
-Readable.prototype.resume = function () {
-  var state = this._readableState;
-  if (!state.flowing) {
-    debug('resume');
-    state.flowing = true;
-    resume(this, state);
-  }
-  return this;
-};
-
-function resume(stream, state) {
-  if (!state.resumeScheduled) {
-    state.resumeScheduled = true;
-    processNextTick(resume_, stream, state);
-  }
-}
-
-function resume_(stream, state) {
-  if (!state.reading) {
-    debug('resume read 0');
-    stream.read(0);
-  }
-
-  state.resumeScheduled = false;
-  stream.emit('resume');
-  flow(stream);
-  if (state.flowing && !state.reading) stream.read(0);
-}
-
-Readable.prototype.pause = function () {
-  debug('call pause flowing=%j', this._readableState.flowing);
-  if (false !== this._readableState.flowing) {
-    debug('pause');
-    this._readableState.flowing = false;
-    this.emit('pause');
-  }
-  return this;
-};
-
-function flow(stream) {
-  var state = stream._readableState;
-  debug('flow', state.flowing);
-  if (state.flowing) {
-    do {
-      var chunk = stream.read();
-    } while (null !== chunk && state.flowing);
-  }
-}
-
-// wrap an old-style stream as the async data source.
-// This is *not* part of the readable stream interface.
-// It is an ugly unfortunate mess of history.
-Readable.prototype.wrap = function (stream) {
-  var state = this._readableState;
-  var paused = false;
-
-  var self = this;
-  stream.on('end', function () {
-    debug('wrapped end');
-    if (state.decoder && !state.ended) {
-      var chunk = state.decoder.end();
-      if (chunk && chunk.length) self.push(chunk);
-    }
-
-    self.push(null);
-  });
-
-  stream.on('data', function (chunk) {
-    debug('wrapped data');
-    if (state.decoder) chunk = state.decoder.write(chunk);
-
-    // don't skip over falsy values in objectMode
-    if (state.objectMode && (chunk === null || chunk === undefined)) return;else if (!state.objectMode && (!chunk || !chunk.length)) return;
-
-    var ret = self.push(chunk);
-    if (!ret) {
-      paused = true;
-      stream.pause();
-    }
-  });
-
-  // proxy all the other methods.
-  // important when wrapping filters and duplexes.
-  for (var i in stream) {
-    if (this[i] === undefined && typeof stream[i] === 'function') {
-      this[i] = function (method) {
-        return function () {
-          return stream[method].apply(stream, arguments);
-        };
-      }(i);
-    }
-  }
-
-  // proxy certain important events.
-  var events = ['error', 'close', 'destroy', 'pause', 'resume'];
-  forEach(events, function (ev) {
-    stream.on(ev, self.emit.bind(self, ev));
-  });
-
-  // when we try to consume some more bytes, simply unpause the
-  // underlying stream.
-  self._read = function (n) {
-    debug('wrapped _read', n);
-    if (paused) {
-      paused = false;
-      stream.resume();
-    }
-  };
-
-  return self;
-};
-
-// exposed for testing purposes only.
-Readable._fromList = fromList;
-
-// Pluck off n bytes from an array of buffers.
-// Length is the combined lengths of all the buffers in the list.
-function fromList(n, state) {
-  var list = state.buffer;
-  var length = state.length;
-  var stringMode = !!state.decoder;
-  var objectMode = !!state.objectMode;
-  var ret;
-
-  // nothing in the list, definitely empty.
-  if (list.length === 0) return null;
-
-  if (length === 0) ret = null;else if (objectMode) ret = list.shift();else if (!n || n >= length) {
-    // read it all, truncate the array.
-    if (stringMode) ret = list.join('');else if (list.length === 1) ret = list[0];else ret = Buffer.concat(list, length);
-    list.length = 0;
-  } else {
-    // read just some of it.
-    if (n < list[0].length) {
-      // just take a part of the first list item.
-      // slice is the same for buffers and strings.
-      var buf = list[0];
-      ret = buf.slice(0, n);
-      list[0] = buf.slice(n);
-    } else if (n === list[0].length) {
-      // first list is a perfect match
-      ret = list.shift();
-    } else {
-      // complex case.
-      // we have enough to cover it, but it spans past the first buffer.
-      if (stringMode) ret = '';else ret = bufferShim.allocUnsafe(n);
-
-      var c = 0;
-      for (var i = 0, l = list.length; i < l && c < n; i++) {
-        var _buf = list[0];
-        var cpy = Math.min(n - c, _buf.length);
-
-        if (stringMode) ret += _buf.slice(0, cpy);else _buf.copy(ret, c, 0, cpy);
-
-        if (cpy < _buf.length) list[0] = _buf.slice(cpy);else list.shift();
-
-        c += cpy;
-      }
-    }
-  }
-
-  return ret;
-}
-
-function endReadable(stream) {
-  var state = stream._readableState;
-
-  // If we get here before consuming all the bytes, then that is a
-  // bug in node.  Should never happen.
-  if (state.length > 0) throw new Error('"endReadable()" called on non-empty stream');
-
-  if (!state.endEmitted) {
-    state.ended = true;
-    processNextTick(endReadableNT, state, stream);
-  }
-}
-
-function endReadableNT(state, stream) {
-  // Check that we didn't get one last unshift.
-  if (!state.endEmitted && state.length === 0) {
-    state.endEmitted = true;
-    stream.readable = false;
-    stream.emit('end');
-  }
-}
-
-function forEach(xs, f) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    f(xs[i], i);
-  }
-}
-
-function indexOf(xs, x) {
-  for (var i = 0, l = xs.length; i < l; i++) {
-    if (xs[i] === x) return i;
-  }
-  return -1;
-}
-}).call(this,require('_process'))
-},{"./_stream_duplex":333,"_process":327,"buffer":128,"buffer-shims":338,"core-util-is":339,"events":324,"inherits":325,"isarray":340,"process-nextick-args":341,"string_decoder/":348,"util":127}],336:[function(require,module,exports){
-// a transform stream is a readable/writable stream where you do
-// something with the data.  Sometimes it's called a "filter",
-// but that's not a great name for it, since that implies a thing where
-// some bits pass through, and others are simply ignored.  (That would
-// be a valid example of a transform, of course.)
-//
-// While the output is causally related to the input, it's not a
-// necessarily symmetric or synchronous transformation.  For example,
-// a zlib stream might take multiple plain-text writes(), and then
-// emit a single compressed chunk some time in the future.
-//
-// Here's how this works:
-//
-// The Transform stream has all the aspects of the readable and writable
-// stream classes.  When you write(chunk), that calls _write(chunk,cb)
-// internally, and returns false if there's a lot of pending writes
-// buffered up.  When you call read(), that calls _read(n) until
-// there's enough pending readable data buffered up.
-//
-// In a transform stream, the written data is placed in a buffer.  When
-// _read(n) is called, it transforms the queued up data, calling the
-// buffered _write cb's as it consumes chunks.  If consuming a single
-// written chunk would result in multiple output chunks, then the first
-// outputted bit calls the readcb, and subsequent chunks just go into
-// the read buffer, and will cause it to emit 'readable' if necessary.
-//
-// This way, back-pressure is actually determined by the reading side,
-// since _read has to be called to start processing a new chunk.  However,
-// a pathological inflate type of transform can cause excessive buffering
-// here.  For example, imagine a stream where every byte of input is
-// interpreted as an integer from 0-255, and then results in that many
-// bytes of output.  Writing the 4 bytes {ff,ff,ff,ff} would result in
-// 1kb of data being output.  In this case, you could write a very small
-// amount of input, and end up with a very large amount of output.  In
-// such a pathological inflating mechanism, there'd be no way to tell
-// the system to stop doing the transform.  A single 4MB write could
-// cause the system to run out of memory.
-//
-// However, even in such a pathological case, only a single written chunk
-// would be consumed, and then the rest would wait (un-transformed) until
-// the results of the previous transformed chunk were consumed.
-
-'use strict';
-
-module.exports = Transform;
-
-var Duplex = require('./_stream_duplex');
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-util.inherits(Transform, Duplex);
-
-function TransformState(stream) {
-  this.afterTransform = function (er, data) {
-    return afterTransform(stream, er, data);
-  };
-
-  this.needTransform = false;
-  this.transforming = false;
-  this.writecb = null;
-  this.writechunk = null;
-  this.writeencoding = null;
-}
-
-function afterTransform(stream, er, data) {
-  var ts = stream._transformState;
-  ts.transforming = false;
-
-  var cb = ts.writecb;
-
-  if (!cb) return stream.emit('error', new Error('no writecb in Transform class'));
-
-  ts.writechunk = null;
-  ts.writecb = null;
-
-  if (data !== null && data !== undefined) stream.push(data);
-
-  cb(er);
-
-  var rs = stream._readableState;
-  rs.reading = false;
-  if (rs.needReadable || rs.length < rs.highWaterMark) {
-    stream._read(rs.highWaterMark);
-  }
-}
-
-function Transform(options) {
-  if (!(this instanceof Transform)) return new Transform(options);
-
-  Duplex.call(this, options);
-
-  this._transformState = new TransformState(this);
-
-  // when the writable side finishes, then flush out anything remaining.
-  var stream = this;
-
-  // start out asking for a readable event once data is transformed.
-  this._readableState.needReadable = true;
-
-  // we have implemented the _read method, and done the other things
-  // that Readable wants before the first _read call, so unset the
-  // sync guard flag.
-  this._readableState.sync = false;
-
-  if (options) {
-    if (typeof options.transform === 'function') this._transform = options.transform;
-
-    if (typeof options.flush === 'function') this._flush = options.flush;
-  }
-
-  this.once('prefinish', function () {
-    if (typeof this._flush === 'function') this._flush(function (er) {
-      done(stream, er);
-    });else done(stream);
-  });
-}
-
-Transform.prototype.push = function (chunk, encoding) {
-  this._transformState.needTransform = false;
-  return Duplex.prototype.push.call(this, chunk, encoding);
-};
-
-// This is the part where you do stuff!
-// override this function in implementation classes.
-// 'chunk' is an input chunk.
-//
-// Call `push(newChunk)` to pass along transformed output
-// to the readable side.  You may call 'push' zero or more times.
-//
-// Call `cb(err)` when you are done with this chunk.  If you pass
-// an error, then that'll put the hurt on the whole operation.  If you
-// never call cb(), then you'll never get another chunk.
-Transform.prototype._transform = function (chunk, encoding, cb) {
-  throw new Error('Not implemented');
-};
-
-Transform.prototype._write = function (chunk, encoding, cb) {
-  var ts = this._transformState;
-  ts.writecb = cb;
-  ts.writechunk = chunk;
-  ts.writeencoding = encoding;
-  if (!ts.transforming) {
-    var rs = this._readableState;
-    if (ts.needTransform || rs.needReadable || rs.length < rs.highWaterMark) this._read(rs.highWaterMark);
-  }
-};
-
-// Doesn't matter what the args are here.
-// _transform does all the work.
-// That we got here means that the readable side wants more data.
-Transform.prototype._read = function (n) {
-  var ts = this._transformState;
-
-  if (ts.writechunk !== null && ts.writecb && !ts.transforming) {
-    ts.transforming = true;
-    this._transform(ts.writechunk, ts.writeencoding, ts.afterTransform);
-  } else {
-    // mark that we need a transform, so that any data that comes in
-    // will get processed, now that we've asked for it.
-    ts.needTransform = true;
-  }
-};
-
-function done(stream, er) {
-  if (er) return stream.emit('error', er);
-
-  // if there's nothing in the write buffer, then that means
-  // that nothing more will ever be provided
-  var ws = stream._writableState;
-  var ts = stream._transformState;
-
-  if (ws.length) throw new Error('Calling transform done when ws.length != 0');
-
-  if (ts.transforming) throw new Error('Calling transform done when still transforming');
-
-  return stream.push(null);
-}
-},{"./_stream_duplex":333,"core-util-is":339,"inherits":325}],337:[function(require,module,exports){
-(function (process){
-// A bit simpler than readable streams.
-// Implement an async ._write(chunk, encoding, cb), and it'll handle all
-// the drain event emission and buffering.
-
-'use strict';
-
-module.exports = Writable;
-
-/*<replacement>*/
-var processNextTick = require('process-nextick-args');
-/*</replacement>*/
-
-/*<replacement>*/
-var asyncWrite = !process.browser && ['v0.10', 'v0.9.'].indexOf(process.version.slice(0, 5)) > -1 ? setImmediate : processNextTick;
-/*</replacement>*/
-
-Writable.WritableState = WritableState;
-
-/*<replacement>*/
-var util = require('core-util-is');
-util.inherits = require('inherits');
-/*</replacement>*/
-
-/*<replacement>*/
-var internalUtil = {
-  deprecate: require('util-deprecate')
-};
-/*</replacement>*/
-
-/*<replacement>*/
-var Stream;
-(function () {
-  try {
-    Stream = require('st' + 'ream');
-  } catch (_) {} finally {
-    if (!Stream) Stream = require('events').EventEmitter;
-  }
-})();
-/*</replacement>*/
-
-var Buffer = require('buffer').Buffer;
-/*<replacement>*/
-var bufferShim = require('buffer-shims');
-/*</replacement>*/
-
-util.inherits(Writable, Stream);
-
-function nop() {}
-
-function WriteReq(chunk, encoding, cb) {
-  this.chunk = chunk;
-  this.encoding = encoding;
-  this.callback = cb;
-  this.next = null;
-}
-
-var Duplex;
-function WritableState(options, stream) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  options = options || {};
-
-  // object stream flag to indicate whether or not this stream
-  // contains buffers or objects.
-  this.objectMode = !!options.objectMode;
-
-  if (stream instanceof Duplex) this.objectMode = this.objectMode || !!options.writableObjectMode;
-
-  // the point at which write() starts returning false
-  // Note: 0 is a valid value, means that we always return false if
-  // the entire buffer is not flushed immediately on write()
-  var hwm = options.highWaterMark;
-  var defaultHwm = this.objectMode ? 16 : 16 * 1024;
-  this.highWaterMark = hwm || hwm === 0 ? hwm : defaultHwm;
-
-  // cast to ints.
-  this.highWaterMark = ~ ~this.highWaterMark;
-
-  this.needDrain = false;
-  // at the start of calling end()
-  this.ending = false;
-  // when end() has been called, and returned
-  this.ended = false;
-  // when 'finish' is emitted
-  this.finished = false;
-
-  // should we decode strings into buffers before passing to _write?
-  // this is here so that some node-core streams can optimize string
-  // handling at a lower level.
-  var noDecode = options.decodeStrings === false;
-  this.decodeStrings = !noDecode;
-
-  // Crypto is kind of old and crusty.  Historically, its default string
-  // encoding is 'binary' so we have to make this configurable.
-  // Everything else in the universe uses 'utf8', though.
-  this.defaultEncoding = options.defaultEncoding || 'utf8';
-
-  // not an actual buffer we keep track of, but a measurement
-  // of how much we're waiting to get pushed to some underlying
-  // socket or file.
-  this.length = 0;
-
-  // a flag to see when we're in the middle of a write.
-  this.writing = false;
-
-  // when true all writes will be buffered until .uncork() call
-  this.corked = 0;
-
-  // a flag to be able to tell if the onwrite cb is called immediately,
-  // or on a later tick.  We set this to true at first, because any
-  // actions that shouldn't happen until "later" should generally also
-  // not happen before the first write call.
-  this.sync = true;
-
-  // a flag to know if we're processing previously buffered items, which
-  // may call the _write() callback in the same tick, so that we don't
-  // end up in an overlapped onwrite situation.
-  this.bufferProcessing = false;
-
-  // the callback that's passed to _write(chunk,cb)
-  this.onwrite = function (er) {
-    onwrite(stream, er);
-  };
-
-  // the callback that the user supplies to write(chunk,encoding,cb)
-  this.writecb = null;
-
-  // the amount that is being written when _write is called.
-  this.writelen = 0;
-
-  this.bufferedRequest = null;
-  this.lastBufferedRequest = null;
-
-  // number of pending user-supplied write callbacks
-  // this must be 0 before 'finish' can be emitted
-  this.pendingcb = 0;
-
-  // emit prefinish if the only thing we're waiting for is _write cbs
-  // This is relevant for synchronous Transform streams
-  this.prefinished = false;
-
-  // True if the error was already emitted and should not be thrown again
-  this.errorEmitted = false;
-
-  // count buffered requests
-  this.bufferedRequestCount = 0;
-
-  // allocate the first CorkedRequest, there is always
-  // one allocated and free to use, and we maintain at most two
-  this.corkedRequestsFree = new CorkedRequest(this);
-}
-
-WritableState.prototype.getBuffer = function writableStateGetBuffer() {
-  var current = this.bufferedRequest;
-  var out = [];
-  while (current) {
-    out.push(current);
-    current = current.next;
-  }
-  return out;
-};
-
-(function () {
-  try {
-    Object.defineProperty(WritableState.prototype, 'buffer', {
-      get: internalUtil.deprecate(function () {
-        return this.getBuffer();
-      }, '_writableState.buffer is deprecated. Use _writableState.getBuffer ' + 'instead.')
-    });
-  } catch (_) {}
-})();
-
-var Duplex;
-function Writable(options) {
-  Duplex = Duplex || require('./_stream_duplex');
-
-  // Writable ctor is applied to Duplexes, though they're not
-  // instanceof Writable, they're instanceof Readable.
-  if (!(this instanceof Writable) && !(this instanceof Duplex)) return new Writable(options);
-
-  this._writableState = new WritableState(options, this);
-
-  // legacy.
-  this.writable = true;
-
-  if (options) {
-    if (typeof options.write === 'function') this._write = options.write;
-
-    if (typeof options.writev === 'function') this._writev = options.writev;
-  }
-
-  Stream.call(this);
-}
-
-// Otherwise people can pipe Writable streams, which is just wrong.
-Writable.prototype.pipe = function () {
-  this.emit('error', new Error('Cannot pipe, not readable'));
-};
-
-function writeAfterEnd(stream, cb) {
-  var er = new Error('write after end');
-  // TODO: defer error events consistently everywhere, not just the cb
-  stream.emit('error', er);
-  processNextTick(cb, er);
-}
-
-// If we get something that is not a buffer, string, null, or undefined,
-// and we're not in objectMode, then that's an error.
-// Otherwise stream chunks are all considered to be of length=1, and the
-// watermarks determine how many objects to keep in the buffer, rather than
-// how many bytes or characters.
-function validChunk(stream, state, chunk, cb) {
-  var valid = true;
-  var er = false;
-  // Always throw error if a null is written
-  // if we are not in object mode then throw
-  // if it is not a buffer, string, or undefined.
-  if (chunk === null) {
-    er = new TypeError('May not write null values to stream');
-  } else if (!Buffer.isBuffer(chunk) && typeof chunk !== 'string' && chunk !== undefined && !state.objectMode) {
-    er = new TypeError('Invalid non-string/buffer chunk');
-  }
-  if (er) {
-    stream.emit('error', er);
-    processNextTick(cb, er);
-    valid = false;
-  }
-  return valid;
-}
-
-Writable.prototype.write = function (chunk, encoding, cb) {
-  var state = this._writableState;
-  var ret = false;
-
-  if (typeof encoding === 'function') {
-    cb = encoding;
-    encoding = null;
-  }
-
-  if (Buffer.isBuffer(chunk)) encoding = 'buffer';else if (!encoding) encoding = state.defaultEncoding;
-
-  if (typeof cb !== 'function') cb = nop;
-
-  if (state.ended) writeAfterEnd(this, cb);else if (validChunk(this, state, chunk, cb)) {
-    state.pendingcb++;
-    ret = writeOrBuffer(this, state, chunk, encoding, cb);
-  }
-
-  return ret;
-};
-
-Writable.prototype.cork = function () {
-  var state = this._writableState;
-
-  state.corked++;
-};
-
-Writable.prototype.uncork = function () {
-  var state = this._writableState;
-
-  if (state.corked) {
-    state.corked--;
-
-    if (!state.writing && !state.corked && !state.finished && !state.bufferProcessing && state.bufferedRequest) clearBuffer(this, state);
-  }
-};
-
-Writable.prototype.setDefaultEncoding = function setDefaultEncoding(encoding) {
-  // node::ParseEncoding() requires lower case.
-  if (typeof encoding === 'string') encoding = encoding.toLowerCase();
-  if (!(['hex', 'utf8', 'utf-8', 'ascii', 'binary', 'base64', 'ucs2', 'ucs-2', 'utf16le', 'utf-16le', 'raw'].indexOf((encoding + '').toLowerCase()) > -1)) throw new TypeError('Unknown encoding: ' + encoding);
-  this._writableState.defaultEncoding = encoding;
-  return this;
-};
-
-function decodeChunk(state, chunk, encoding) {
-  if (!state.objectMode && state.decodeStrings !== false && typeof chunk === 'string') {
-    chunk = bufferShim.from(chunk, encoding);
-  }
-  return chunk;
-}
-
-// if we're already writing something, then just put this
-// in the queue, and wait our turn.  Otherwise, call _write
-// If we return false, then we need a drain event, so set that flag.
-function writeOrBuffer(stream, state, chunk, encoding, cb) {
-  chunk = decodeChunk(state, chunk, encoding);
-
-  if (Buffer.isBuffer(chunk)) encoding = 'buffer';
-  var len = state.objectMode ? 1 : chunk.length;
-
-  state.length += len;
-
-  var ret = state.length < state.highWaterMark;
-  // we must ensure that previous needDrain will not be reset to false.
-  if (!ret) state.needDrain = true;
-
-  if (state.writing || state.corked) {
-    var last = state.lastBufferedRequest;
-    state.lastBufferedRequest = new WriteReq(chunk, encoding, cb);
-    if (last) {
-      last.next = state.lastBufferedRequest;
-    } else {
-      state.bufferedRequest = state.lastBufferedRequest;
-    }
-    state.bufferedRequestCount += 1;
-  } else {
-    doWrite(stream, state, false, len, chunk, encoding, cb);
-  }
-
-  return ret;
-}
-
-function doWrite(stream, state, writev, len, chunk, encoding, cb) {
-  state.writelen = len;
-  state.writecb = cb;
-  state.writing = true;
-  state.sync = true;
-  if (writev) stream._writev(chunk, state.onwrite);else stream._write(chunk, encoding, state.onwrite);
-  state.sync = false;
-}
-
-function onwriteError(stream, state, sync, er, cb) {
-  --state.pendingcb;
-  if (sync) processNextTick(cb, er);else cb(er);
-
-  stream._writableState.errorEmitted = true;
-  stream.emit('error', er);
-}
-
-function onwriteStateUpdate(state) {
-  state.writing = false;
-  state.writecb = null;
-  state.length -= state.writelen;
-  state.writelen = 0;
-}
-
-function onwrite(stream, er) {
-  var state = stream._writableState;
-  var sync = state.sync;
-  var cb = state.writecb;
-
-  onwriteStateUpdate(state);
-
-  if (er) onwriteError(stream, state, sync, er, cb);else {
-    // Check if we're actually ready to finish, but don't emit yet
-    var finished = needFinish(state);
-
-    if (!finished && !state.corked && !state.bufferProcessing && state.bufferedRequest) {
-      clearBuffer(stream, state);
-    }
-
-    if (sync) {
-      /*<replacement>*/
-      asyncWrite(afterWrite, stream, state, finished, cb);
-      /*</replacement>*/
-    } else {
-        afterWrite(stream, state, finished, cb);
-      }
-  }
-}
-
-function afterWrite(stream, state, finished, cb) {
-  if (!finished) onwriteDrain(stream, state);
-  state.pendingcb--;
-  cb();
-  finishMaybe(stream, state);
-}
-
-// Must force callback to be called on nextTick, so that we don't
-// emit 'drain' before the write() consumer gets the 'false' return
-// value, and has a chance to attach a 'drain' listener.
-function onwriteDrain(stream, state) {
-  if (state.length === 0 && state.needDrain) {
-    state.needDrain = false;
-    stream.emit('drain');
-  }
-}
-
-// if there's something in the buffer waiting, then process it
-function clearBuffer(stream, state) {
-  state.bufferProcessing = true;
-  var entry = state.bufferedRequest;
-
-  if (stream._writev && entry && entry.next) {
-    // Fast case, write everything using _writev()
-    var l = state.bufferedRequestCount;
-    var buffer = new Array(l);
-    var holder = state.corkedRequestsFree;
-    holder.entry = entry;
-
-    var count = 0;
-    while (entry) {
-      buffer[count] = entry;
-      entry = entry.next;
-      count += 1;
-    }
-
-    doWrite(stream, state, true, state.length, buffer, '', holder.finish);
-
-    // doWrite is almost always async, defer these to save a bit of time
-    // as the hot path ends with doWrite
-    state.pendingcb++;
-    state.lastBufferedRequest = null;
-    if (holder.next) {
-      state.corkedRequestsFree = holder.next;
-      holder.next = null;
-    } else {
-      state.corkedRequestsFree = new CorkedRequest(state);
-    }
-  } else {
-    // Slow case, write chunks one-by-one
-    while (entry) {
-      var chunk = entry.chunk;
-      var encoding = entry.encoding;
-      var cb = entry.callback;
-      var len = state.objectMode ? 1 : chunk.length;
-
-      doWrite(stream, state, false, len, chunk, encoding, cb);
-      entry = entry.next;
-      // if we didn't call the onwrite immediately, then
-      // it means that we need to wait until it does.
-      // also, that means that the chunk and cb are currently
-      // being processed, so move the buffer counter past them.
-      if (state.writing) {
-        break;
-      }
-    }
-
-    if (entry === null) state.lastBufferedRequest = null;
-  }
-
-  state.bufferedRequestCount = 0;
-  state.bufferedRequest = entry;
-  state.bufferProcessing = false;
-}
-
-Writable.prototype._write = function (chunk, encoding, cb) {
-  cb(new Error('not implemented'));
-};
-
-Writable.prototype._writev = null;
-
-Writable.prototype.end = function (chunk, encoding, cb) {
-  var state = this._writableState;
-
-  if (typeof chunk === 'function') {
-    cb = chunk;
-    chunk = null;
-    encoding = null;
-  } else if (typeof encoding === 'function') {
-    cb = encoding;
-    encoding = null;
-  }
-
-  if (chunk !== null && chunk !== undefined) this.write(chunk, encoding);
-
-  // .end() fully uncorks
-  if (state.corked) {
-    state.corked = 1;
-    this.uncork();
-  }
-
-  // ignore unnecessary end() calls.
-  if (!state.ending && !state.finished) endWritable(this, state, cb);
-};
-
-function needFinish(state) {
-  return state.ending && state.length === 0 && state.bufferedRequest === null && !state.finished && !state.writing;
-}
-
-function prefinish(stream, state) {
-  if (!state.prefinished) {
-    state.prefinished = true;
-    stream.emit('prefinish');
-  }
-}
-
-function finishMaybe(stream, state) {
-  var need = needFinish(state);
-  if (need) {
-    if (state.pendingcb === 0) {
-      prefinish(stream, state);
-      state.finished = true;
-      stream.emit('finish');
-    } else {
-      prefinish(stream, state);
-    }
-  }
-  return need;
-}
-
-function endWritable(stream, state, cb) {
-  state.ending = true;
-  finishMaybe(stream, state);
-  if (cb) {
-    if (state.finished) processNextTick(cb);else stream.once('finish', cb);
-  }
-  state.ended = true;
-  stream.writable = false;
-}
-
-// It seems a linked list but it is not
-// there will be only 2 of these for each stream
-function CorkedRequest(state) {
-  var _this = this;
-
-  this.next = null;
-  this.entry = null;
-
-  this.finish = function (err) {
-    var entry = _this.entry;
-    _this.entry = null;
-    while (entry) {
-      var cb = entry.callback;
-      state.pendingcb--;
-      cb(err);
-      entry = entry.next;
-    }
-    if (state.corkedRequestsFree) {
-      state.corkedRequestsFree.next = _this;
-    } else {
-      state.corkedRequestsFree = _this;
-    }
-  };
-}
-}).call(this,require('_process'))
-},{"./_stream_duplex":333,"_process":327,"buffer":128,"buffer-shims":338,"core-util-is":339,"events":324,"inherits":325,"process-nextick-args":341,"util-deprecate":342}],338:[function(require,module,exports){
-(function (global){
-'use strict';
-
-var buffer = require('buffer');
-var Buffer = buffer.Buffer;
-var SlowBuffer = buffer.SlowBuffer;
-var MAX_LEN = buffer.kMaxLength || 2147483647;
-exports.alloc = function alloc(size, fill, encoding) {
-  if (typeof Buffer.alloc === 'function') {
-    return Buffer.alloc(size, fill, encoding);
-  }
-  if (typeof encoding === 'number') {
-    throw new TypeError('encoding must not be number');
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size > MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  var enc = encoding;
-  var _fill = fill;
-  if (_fill === undefined) {
-    enc = undefined;
-    _fill = 0;
-  }
-  var buf = new Buffer(size);
-  if (typeof _fill === 'string') {
-    var fillBuf = new Buffer(_fill, enc);
-    var flen = fillBuf.length;
-    var i = -1;
-    while (++i < size) {
-      buf[i] = fillBuf[i % flen];
-    }
-  } else {
-    buf.fill(_fill);
-  }
-  return buf;
-}
-exports.allocUnsafe = function allocUnsafe(size) {
-  if (typeof Buffer.allocUnsafe === 'function') {
-    return Buffer.allocUnsafe(size);
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size > MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  return new Buffer(size);
-}
-exports.from = function from(value, encodingOrOffset, length) {
-  if (typeof Buffer.from === 'function' && (!global.Uint8Array || Uint8Array.from !== Buffer.from)) {
-    return Buffer.from(value, encodingOrOffset, length);
-  }
-  if (typeof value === 'number') {
-    throw new TypeError('"value" argument must not be a number');
-  }
-  if (typeof value === 'string') {
-    return new Buffer(value, encodingOrOffset);
-  }
-  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) {
-    var offset = encodingOrOffset;
-    if (arguments.length === 1) {
-      return new Buffer(value);
-    }
-    if (typeof offset === 'undefined') {
-      offset = 0;
-    }
-    var len = length;
-    if (typeof len === 'undefined') {
-      len = value.byteLength - offset;
-    }
-    if (offset >= value.byteLength) {
-      throw new RangeError('\'offset\' is out of bounds');
-    }
-    if (len > value.byteLength - offset) {
-      throw new RangeError('\'length\' is out of bounds');
-    }
-    return new Buffer(value.slice(offset, offset + len));
-  }
-  if (Buffer.isBuffer(value)) {
-    var out = new Buffer(value.length);
-    value.copy(out, 0, 0, value.length);
-    return out;
-  }
-  if (value) {
-    if (Array.isArray(value) || (typeof ArrayBuffer !== 'undefined' && value.buffer instanceof ArrayBuffer) || 'length' in value) {
-      return new Buffer(value);
-    }
-    if (value.type === 'Buffer' && Array.isArray(value.data)) {
-      return new Buffer(value.data);
-    }
-  }
-
-  throw new TypeError('First argument must be a string, Buffer, ' + 'ArrayBuffer, Array, or array-like object.');
-}
-exports.allocUnsafeSlow = function allocUnsafeSlow(size) {
-  if (typeof Buffer.allocUnsafeSlow === 'function') {
-    return Buffer.allocUnsafeSlow(size);
-  }
-  if (typeof size !== 'number') {
-    throw new TypeError('size must be a number');
-  }
-  if (size >= MAX_LEN) {
-    throw new RangeError('size is too large');
-  }
-  return new SlowBuffer(size);
-}
-
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"buffer":128}],339:[function(require,module,exports){
+},{"./_stream_duplex":333,"core-util-is":339,"dup":113,"inherits":325}],337:[function(require,module,exports){
+arguments[4][114][0].apply(exports,arguments)
+},{"./_stream_duplex":333,"_process":327,"buffer":128,"buffer-shims":338,"core-util-is":339,"dup":114,"events":324,"inherits":325,"process-nextick-args":341,"util-deprecate":342}],338:[function(require,module,exports){
+arguments[4][115][0].apply(exports,arguments)
+},{"buffer":128,"dup":115}],339:[function(require,module,exports){
 (function (Buffer){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -42575,82 +41556,19 @@ function objectToString(o) {
 
 }).call(this,{"isBuffer":require("../../../../insert-module-globals/node_modules/is-buffer/index.js")})
 },{"../../../../insert-module-globals/node_modules/is-buffer/index.js":326}],340:[function(require,module,exports){
-arguments[4][102][0].apply(exports,arguments)
-},{"dup":102}],341:[function(require,module,exports){
-(function (process){
-'use strict';
-
-if (!process.version ||
-    process.version.indexOf('v0.') === 0 ||
-    process.version.indexOf('v1.') === 0 && process.version.indexOf('v1.8.') !== 0) {
-  module.exports = nextTick;
-} else {
-  module.exports = process.nextTick;
-}
-
-function nextTick(fn, arg1, arg2, arg3) {
-  if (typeof fn !== 'function') {
-    throw new TypeError('"callback" argument must be a function');
-  }
-  var len = arguments.length;
-  var args, i;
-  switch (len) {
-  case 0:
-  case 1:
-    return process.nextTick(fn);
-  case 2:
-    return process.nextTick(function afterTickOne() {
-      fn.call(null, arg1);
-    });
-  case 3:
-    return process.nextTick(function afterTickTwo() {
-      fn.call(null, arg1, arg2);
-    });
-  case 4:
-    return process.nextTick(function afterTickThree() {
-      fn.call(null, arg1, arg2, arg3);
-    });
-  default:
-    args = new Array(len - 1);
-    i = 0;
-    while (i < args.length) {
-      args[i++] = arguments[i];
-    }
-    return process.nextTick(function afterTick() {
-      fn.apply(null, args);
-    });
-  }
-}
-
-}).call(this,require('_process'))
-},{"_process":327}],342:[function(require,module,exports){
-arguments[4][105][0].apply(exports,arguments)
-},{"dup":105}],343:[function(require,module,exports){
+arguments[4][100][0].apply(exports,arguments)
+},{"dup":100}],341:[function(require,module,exports){
+arguments[4][101][0].apply(exports,arguments)
+},{"_process":327,"dup":101}],342:[function(require,module,exports){
+arguments[4][103][0].apply(exports,arguments)
+},{"dup":103}],343:[function(require,module,exports){
 module.exports = require("./lib/_stream_passthrough.js")
 
 },{"./lib/_stream_passthrough.js":334}],344:[function(require,module,exports){
-(function (process){
-var Stream = (function (){
-  try {
-    return require('st' + 'ream'); // hack to fix a circular dependency issue when used with browserify
-  } catch(_){}
-}());
-exports = module.exports = require('./lib/_stream_readable.js');
-exports.Stream = Stream || exports;
-exports.Readable = exports;
-exports.Writable = require('./lib/_stream_writable.js');
-exports.Duplex = require('./lib/_stream_duplex.js');
-exports.Transform = require('./lib/_stream_transform.js');
-exports.PassThrough = require('./lib/_stream_passthrough.js');
-
-if (!process.browser && process.env.READABLE_STREAM === 'disable' && Stream) {
-  module.exports = Stream;
-}
-
-}).call(this,require('_process'))
-},{"./lib/_stream_duplex.js":333,"./lib/_stream_passthrough.js":334,"./lib/_stream_readable.js":335,"./lib/_stream_transform.js":336,"./lib/_stream_writable.js":337,"_process":327}],345:[function(require,module,exports){
-arguments[4][106][0].apply(exports,arguments)
-},{"./lib/_stream_transform.js":336,"dup":106}],346:[function(require,module,exports){
+arguments[4][121][0].apply(exports,arguments)
+},{"./lib/_stream_duplex.js":333,"./lib/_stream_passthrough.js":334,"./lib/_stream_readable.js":335,"./lib/_stream_transform.js":336,"./lib/_stream_writable.js":337,"_process":327,"dup":121}],345:[function(require,module,exports){
+arguments[4][104][0].apply(exports,arguments)
+},{"./lib/_stream_transform.js":336,"dup":104}],346:[function(require,module,exports){
 module.exports = require("./lib/_stream_writable.js")
 
 },{"./lib/_stream_writable.js":337}],347:[function(require,module,exports){
@@ -42783,8 +41701,8 @@ Stream.prototype.pipe = function(dest, options) {
 };
 
 },{"events":324,"inherits":325,"readable-stream/duplex.js":332,"readable-stream/passthrough.js":343,"readable-stream/readable.js":344,"readable-stream/transform.js":345,"readable-stream/writable.js":346}],348:[function(require,module,exports){
-arguments[4][90][0].apply(exports,arguments)
-},{"buffer":128,"dup":90}],349:[function(require,module,exports){
+arguments[4][88][0].apply(exports,arguments)
+},{"buffer":128,"dup":88}],349:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
