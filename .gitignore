@@ -1,5 +1,3 @@
 browser/config.json
-config/*.hjson
-config/*.pem
-local
+config/local/
 node_modules

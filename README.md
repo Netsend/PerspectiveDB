@@ -52,22 +52,22 @@ $ sudo useradd -d /var/empty -r -s /bin/false -U pdblevel
 
 Create a user account database:
 ```
-$ omask=$(umask); umask 077 && touch local/config/passwd.hjson; umask $omask
+$ omask=$(umask); umask 077 && touch config/local/passwd.hjson; umask $omask
 ```
 
 Grant access to a user for remote login, i.e. "john":
 ```
-$ ./bin/adduser john >> local/config/passwd.hjson
+$ ./bin/adduser john >> config/local/passwd.hjson
 ```
 
 Create a config file. I.e. copy and edit example.hjson:
 ```
-$ cp config/example.hjson local/config/pdb.hjson
+$ cp config/examples/example.hjson config/local/pdb.hjson
 ```
 
 Start the server:
 ```
-$ sudo bin/persdb local/config/pdb.hjson
+$ sudo bin/persdb config/local/pdb.hjson
 ```
 
 By default a tcp server is started on 127.0.0.1 port 2344. Communication between
@@ -85,17 +85,17 @@ Generate the following files:
 * self signed certificate (or use a certificate signed by one of the major CAs)
 ```
 $ umask 077
-$ openssl dhparam -outform PEM -out config/dhparam.pem 2048
-$ openssl genrsa -out config/key.pem 2048
+$ openssl dhparam -outform PEM -out config/local/dhparam.pem 2048
+$ openssl genrsa -out config/local/key.pem 2048
 $ umask 022
-$ openssl req -new -sha256 -key config/key.pem -out config/csr.pem
-$ openssl x509 -req -in config/csr.pem -signkey config/key.pem -out config/cert.pem
-$ rm config/csr.pem
+$ openssl req -new -sha256 -key config/local/key.pem -out config/local/csr.pem
+$ openssl x509 -req -in config/local/csr.pem -signkey config/local/key.pem -out config/local/cert.pem
+$ rm config/local/csr.pem
 ```
 
 Edit your config to enable the WebSocket server and include these three files.
 Relative paths are relative to the directory of the config file. An example is
-given in config/example-with-websocket.hjson.
+given in config/examples/example-with-websocket.hjson.
 
 A web client is included in the browser directory. An online example of this
 code is available at [netsend.nl/persbd](https://netsend.nl/persdb/).

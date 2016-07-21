@@ -13,7 +13,7 @@ dbs: [
     chroot: /srv/persdb/mydb
     perspectives: [{
       name: "john"
-      users: "passwd.hjson"
+      passdb: "passwd.hjson"
       import: true
       export: true
     }]
