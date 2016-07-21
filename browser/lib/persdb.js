@@ -50,10 +50,10 @@ function debugReq(req) {
  * "connections()" for an overview of connected systems and "connect()" to
  * initiate WebSocket connections.
  *
- * This class emits "merge" events when new merges have been saved.
+ * This class emits "data" events when new merges have been saved.
  *
  * 1. setup all import and export hooks, filters etc.
- * 2. use mergeHandler or use ES6 Proxy to transparently proxy IndexedDB updates
+ * 2. uses ES6 Proxy to transparently proxy IndexedDB updates
  * 3. connect() creates authenticated WebSockets and starts transfering BSON
  *
  * @param {Object} idb     IndexedDB instance
@@ -63,15 +63,6 @@ function debugReq(req) {
  *   name {String, default "_pdb"}  name of this database
  *   iterator {Function}            called with every new item from a remote
  *   perspectives {Array}           array of other perspectives with url
- *   mergeInterval {Number, default 5000} time in ms to wait and repeat a merge, 0
- *                                  means off.
- *   mergeHandler {Function}        function to handle newly created merges
- *                                  signature: function (merged, lhead, next). If
- *                                  not provided a transparent ES6 Proxy is used.
- *   conflictHandler {Function}     function to handle merges with conflicts
- *                                  signature: function (attrs, shead, lhead, next)
- *                                  call next with a new item or null if not
- *                                  resolved.
  *   mergeTree {Object}             any MergeTree options
  */
 function PersDB(idb, opts) {
@@ -83,9 +74,6 @@ function PersDB(idb, opts) {
   if (opts.name != null && typeof opts.name !== 'string') { throw new TypeError('opts.name must be a string'); }
   if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
   if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
-  if (opts.mergeInterval != null && typeof opts.mergeInterval !== 'number') { throw new TypeError('opts.mergeInterval must be a number'); }
-  if (opts.mergeHandler != null && typeof opts.mergeHandler !== 'function') { throw new TypeError('opts.mergeHandler must be a function'); }
-  if (opts.conflictHandler != null && typeof opts.conflictHandler !== 'function') { throw new TypeError('opts.conflictHandler must be a function'); }
   if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
 
   EE.call(this, opts);
@@ -113,12 +101,8 @@ function PersDB(idb, opts) {
   this._idb = idb;
   this._opts = opts;
   this._connections = {};
-  this._mergeInterval = this._opts.mergeInterval;
-  if (this._mergeInterval == null) {
-    this._mergeInterval = 5000;
-  }
 
-  this._db = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, storeName: name });
+  this._db = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: name });
 
   // setup list of connections to initiate and create an index by perspective name
   this._persCfg = parsePersConfigs(this._opts.perspectives || []);
@@ -181,7 +165,6 @@ function PersDB(idb, opts) {
   });
 
   // set options
-  // merge handler needs a writable stream, pass it later to mergeAll
   var mtOpts = this._opts.mergeTree || {};
   mtOpts.perspectives = Object.keys(this._persCfg.pers);
   mtOpts.log = this._log;
@@ -208,14 +191,6 @@ function PersDB(idb, opts) {
       }
     }
   }));
-
-  /*
-  mtOpts.conflictHandler = this._opts.conflictHandler;
-  this._mt.mergeAll({
-    mergeHandler: mergeHandler,
-    interval: that._mergeInterval
-  });
-  */
 }
 
 util.inherits(PersDB, EE);

@@ -266,8 +266,14 @@ function main(db, pdb) {
   });
 
   pdb.on('data', function(item) {
-    localTable.appendChild(createPdbTableRow(item));
+    localTable.appendChild(createPdbTableRow(item.n));
     reloadCustomersList();
+  });
+
+  pdb.on('conflict', function(item) {
+    console.error('merge conflict', item.c, item.n, item.l);
+    var msg = document.querySelector('#msg');
+    msg.textContent = 'Error merging ' +  JSON.stringify(item.n.h) + ' with ' + JSON.stringify(item.l.h) + ': ' + attrs.join(' ');
   });
 
   // setup connection manager
@@ -363,11 +369,6 @@ req.onsuccess = function(ev) {
   var opts = {
     name: 'demo',
     perspectives: [config],
-    conflictHandler: function(attrs, newHead, lhead, cb) {
-      console.error('merge conflict', attrs, newHead, lhead);
-      var msg = document.querySelector('#msg');
-      msg.textContent = 'Error merging ' +  JSON.stringify(newHead) + ' with ' + JSON.stringify(lhead) + ': ' + attrs.join(' ');
-    }
   };
   var pdb = new PersDB(db, opts);
   main(db, pdb);
