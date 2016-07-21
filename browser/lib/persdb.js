@@ -90,7 +90,7 @@ function PersDB(idb, opts) {
     notice:  console.log.bind(console),
     info:    console.log.bind(console),
     debug:   console.log.bind(console),
-    debug2:  console.log.bind(console),
+    debug2:  noop,
     getFileStream: noop,
     getErrorStream: noop,
     close: noop
