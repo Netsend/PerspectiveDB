@@ -21,6 +21,7 @@
 'use strict';
 
 var EE = require('events');
+var stream = require('stream');
 var util = require('util');
 
 var async = require('async');
@@ -183,43 +184,38 @@ function PersDB(idb, opts) {
   // merge handler needs a writable stream, pass it later to mergeAll
   var mtOpts = this._opts.mergeTree || {};
   mtOpts.perspectives = Object.keys(this._persCfg.pers);
-  mtOpts.conflictHandler = this._opts.conflictHandler;
   mtOpts.log = this._log;
 
   this._mt = new MergeTree(that._db, mtOpts);
 
-  var writer = this._mt.createLocalWriteStream();
-  var w = function(item, cb) {
-    cb = cb || noop;
-    writer.write(item, function(err) {
-      if (err) { cb(err); return; }
-      cb();
-      that.emit('data', item);
-    });
-  };
+  // transparently proxy IndexedDB updates using proxy module
+  var localWriter = this._mt.createLocalWriteStream();
+  localWriter = localWriter.write.bind(localWriter);
+  var mergeWriter = proxy(this._idb, localWriter);
 
-  var mergeHandler;
-  if (this._opts.mergeHandler) {
-    // use given mergeHandler
-    mergeHandler = function(newVersion, prevVersion, cb) {
-      that._opts.mergeHandler(newVersion, prevVersion, function(err) {
-        if (err) { cb(err); return; }
-        w(newVersion, cb);
-      });
-    };
-  } else {
-    // transparently proxy IndexedDB updates using proxy module
-    var reader = proxy(this._idb, w);
-    mergeHandler = function(newVersion, prevVersion, cb) {
-      reader(newVersion, prevVersion, cb);
-    };
-  }
+  // start auto-merging remote versions
+  this._mt.startMerge().pipe(new stream.Writable({
+    objectMode: true,
+    write: function(obj, enc, cb) {
+      if (obj.c && obj.c.length) {
+        // TODO: save in conflict object store
+        that.emit('conflict', obj);
+        process.nextTick(cb);
+      } else {
+        // let the proxy handle the confirmation to the local write stream
+        mergeWriter(obj, cb);
+        that.emit('data', obj);
+      }
+    }
+  }));
 
-  // start auto-merging
+  /*
+  mtOpts.conflictHandler = this._opts.conflictHandler;
   this._mt.mergeAll({
     mergeHandler: mergeHandler,
     interval: that._mergeInterval
   });
+  */
 }
 
 util.inherits(PersDB, EE);

@@ -1,5 +1,5 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-(function (global){
+(function (process,global){
 /**
  * Copyright 2015, 2016 Netsend.
  *
@@ -23,6 +23,7 @@
 'use strict';
 
 var EE = require('events');
+var stream = require('stream');
 var util = require('util');
 
 var async = require('async');
@@ -185,43 +186,38 @@ function PersDB(idb, opts) {
   // merge handler needs a writable stream, pass it later to mergeAll
   var mtOpts = this._opts.mergeTree || {};
   mtOpts.perspectives = Object.keys(this._persCfg.pers);
-  mtOpts.conflictHandler = this._opts.conflictHandler;
   mtOpts.log = this._log;
 
   this._mt = new MergeTree(that._db, mtOpts);
 
-  var writer = this._mt.createLocalWriteStream();
-  var w = function(item, cb) {
-    cb = cb || noop;
-    writer.write(item, function(err) {
-      if (err) { cb(err); return; }
-      cb();
-      that.emit('data', item);
-    });
-  };
+  // transparently proxy IndexedDB updates using proxy module
+  var localWriter = this._mt.createLocalWriteStream();
+  localWriter = localWriter.write.bind(localWriter);
+  var mergeWriter = proxy(this._idb, localWriter);
 
-  var mergeHandler;
-  if (this._opts.mergeHandler) {
-    // use given mergeHandler
-    mergeHandler = function(newVersion, prevVersion, cb) {
-      that._opts.mergeHandler(newVersion, prevVersion, function(err) {
-        if (err) { cb(err); return; }
-        w(newVersion, cb);
-      });
-    };
-  } else {
-    // transparently proxy IndexedDB updates using proxy module
-    var reader = proxy(this._idb, w);
-    mergeHandler = function(newVersion, prevVersion, cb) {
-      reader(newVersion, prevVersion, cb);
-    };
-  }
+  // start auto-merging remote versions
+  this._mt.startMerge().pipe(new stream.Writable({
+    objectMode: true,
+    write: function(obj, enc, cb) {
+      if (obj.c && obj.c.length) {
+        // TODO: save in conflict object store
+        that.emit('conflict', obj);
+        process.nextTick(cb);
+      } else {
+        // let the proxy handle the confirmation to the local write stream
+        mergeWriter(obj, cb);
+        that.emit('data', obj);
+      }
+    }
+  }));
 
-  // start auto-merging
+  /*
+  mtOpts.conflictHandler = this._opts.conflictHandler;
   this._mt.mergeAll({
     mergeHandler: mergeHandler,
     interval: that._mergeInterval
   });
+  */
 }
 
 util.inherits(PersDB, EE);
@@ -525,8 +521,8 @@ PersDB.prototype._connHandler = function _connHandler(conn, pers) {
   });
 };
 
-}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../../lib/data_request":4,"../../lib/merge_tree":11,"../../lib/parse_pers_configs":13,"./proxy":2,"async":17,"bson-stream":18,"events":324,"ld-jsonstream":53,"level-js":54,"level-packager":62,"object-key-filter":93,"util":352,"websocket-stream":125}],2:[function(require,module,exports){
+}).call(this,require('_process'),typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"../../lib/data_request":4,"../../lib/merge_tree":11,"../../lib/parse_pers_configs":13,"./proxy":2,"_process":327,"async":17,"bson-stream":18,"events":324,"ld-jsonstream":53,"level-js":54,"level-packager":62,"object-key-filter":93,"stream":347,"util":352,"websocket-stream":125}],2:[function(require,module,exports){
 /**
  * Copyright 2015, 2016 Netsend.
  *
@@ -566,13 +562,16 @@ if (errors.length) {
 }
 
 /**
+ * See MergeTree.createLocalWriteStream for localWriter object syntax and
+ * MergeTree.startMerge for mergeWriter object syntax.
+ *
  * @param {IndexedDB} idb  IndexedDB instance to monitor and sync
- * @param {Function} writer  write new local versions: function(newObj, cb)
- * @return {Function} reader(newVersion, prevVersion, cb)
+ * @param {Function} localWriter  write new local versions: function(localWriterObj, cb)
+ * @return {Function} mergeWriter(mergeObj, cb)
  */
-module.exports = function(idb, writer) {
+module.exports = function(idb, localWriter) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-  if (writer == null || typeof writer !== 'function') { throw new TypeError('writer must be a function'); }
+  if (localWriter == null || typeof localWriter !== 'function') { throw new TypeError('localWriter must be a function'); }
 
   const keyPaths = {};
 
@@ -602,11 +601,13 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev, ev.target.result) },
-        b: value
+        n: {
+          h: { id: _generateId(ev, ev.target.result) },
+          b: value
+        }
       };
       console.log('postAdd', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -619,11 +620,13 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev, ev.target.result) },
-        b: value
+        n: {
+          h: { id: _generateId(ev, ev.target.result) },
+          b: value
+        }
       };
       console.log('postPut', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -636,13 +639,15 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: {
-          id: _generateId(ev, key),
-          d: true
+        n: {
+          h: {
+            id: _generateId(ev, key),
+            d: true
+          }
         }
       };
       console.log('postDelete', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -795,12 +800,15 @@ module.exports = function(idb, writer) {
   var origTransaction = idb.transaction.bind(idb);
   idb.transaction = proxyTransaction(idb.transaction);
 
-  // remote item handler
-  return function reader(newVersion, prevVersion, cb) {
+  // remote item handler. save new object in collection and call localWriter with it
+  return function mergeWriter(obj, cb) {
+    var newVersion = obj.n;
+    var prevVersion = obj.l;
+
     var osName = _objectStoreFromId(newVersion.h.id);
     var id = _idFromId(newVersion.h.id);
 
-    console.log('READER', osName, newVersion.h);
+    console.log('mergeWriter', osName, newVersion.h);
 
     // open a rw transaction on the object store
     var tr = origTransaction([osName], 'readwrite');
@@ -822,21 +830,21 @@ module.exports = function(idb, writer) {
 
     tr.oncomplete = function(ev) {
       // success
-      console.log('READER success', ev);
+      console.log('mergeWriter success', ev);
 
-      // confirm new version is written
-      writer(newVersion, cb);
+      // confirm new version
+      localWriter(obj, cb);
     };
 
     tr.onabort = function(ev) {
       // abort
-      console.error('READER abort', ev);
+      console.error('mergeWriter abort', ev);
       cb(ev.target);
     };
 
     tr.onerror = function(ev) {
       // error
-      console.error('READER error', ev);
+      console.error('mergeWriter error', ev);
       cb(ev.target);
     };
 
@@ -2598,7 +2606,7 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
 
         if (afterItem) {
           // push the item out to the reader
-          that._log.debug('mt createRemoteWriteStream write %s %j', remote, afterItem.h);
+          that._log.debug2('mt createRemoteWriteStream write %s %j', remote, afterItem.h);
           tree.write(afterItem, cb);
         } else {
           // if hooks filter out the item don't push
@@ -2626,6 +2634,7 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
  *   lcas: list of lca's
  *   pe: perspective of remote
  * }
+ * all other properties are ignored.
  *
  * @return {stream.Writable}
  */
@@ -2881,7 +2890,9 @@ MergeTree.prototype.lastReceivedFromRemote = function lastReceivedFromRemote(rem
  * following form:
  * {
  *   n: {}   // new merged object or in case of a conflict, the remote head
- *   o: {}   // previous head
+ *   l: {}   // previous head
+ *   lcas: [] // array with version numbers of each lca for n and l
+ *   pe: pe  // name of the remote tree
  *   c: []   // name of keys with conflicts in case of a merge conflict
  * }
  *

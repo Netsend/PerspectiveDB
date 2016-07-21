@@ -37,13 +37,16 @@ if (errors.length) {
 }
 
 /**
+ * See MergeTree.createLocalWriteStream for localWriter object syntax and
+ * MergeTree.startMerge for mergeWriter object syntax.
+ *
  * @param {IndexedDB} idb  IndexedDB instance to monitor and sync
- * @param {Function} writer  write new local versions: function(newObj, cb)
- * @return {Function} reader(newVersion, prevVersion, cb)
+ * @param {Function} localWriter  write new local versions: function(localWriterObj, cb)
+ * @return {Function} mergeWriter(mergeObj, cb)
  */
-module.exports = function(idb, writer) {
+module.exports = function(idb, localWriter) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-  if (writer == null || typeof writer !== 'function') { throw new TypeError('writer must be a function'); }
+  if (localWriter == null || typeof localWriter !== 'function') { throw new TypeError('localWriter must be a function'); }
 
   const keyPaths = {};
 
@@ -73,11 +76,13 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev, ev.target.result) },
-        b: value
+        n: {
+          h: { id: _generateId(ev, ev.target.result) },
+          b: value
+        }
       };
       console.log('postAdd', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -90,11 +95,13 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: { id: _generateId(ev, ev.target.result) },
-        b: value
+        n: {
+          h: { id: _generateId(ev, ev.target.result) },
+          b: value
+        }
       };
       console.log('postPut', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -107,13 +114,15 @@ module.exports = function(idb, writer) {
     // wait for return with key
     ret.onsuccess = function(ev) {
       var obj = {
-        h: {
-          id: _generateId(ev, key),
-          d: true
+        n: {
+          h: {
+            id: _generateId(ev, key),
+            d: true
+          }
         }
       };
       console.log('postDelete', obj);
-      writer(obj);
+      localWriter(obj);
     };
   }
 
@@ -266,12 +275,15 @@ module.exports = function(idb, writer) {
   var origTransaction = idb.transaction.bind(idb);
   idb.transaction = proxyTransaction(idb.transaction);
 
-  // remote item handler
-  return function reader(newVersion, prevVersion, cb) {
+  // remote item handler. save new object in collection and call localWriter with it
+  return function mergeWriter(obj, cb) {
+    var newVersion = obj.n;
+    var prevVersion = obj.l;
+
     var osName = _objectStoreFromId(newVersion.h.id);
     var id = _idFromId(newVersion.h.id);
 
-    console.log('READER', osName, newVersion.h);
+    console.log('mergeWriter', osName, newVersion.h);
 
     // open a rw transaction on the object store
     var tr = origTransaction([osName], 'readwrite');
@@ -293,21 +305,21 @@ module.exports = function(idb, writer) {
 
     tr.oncomplete = function(ev) {
       // success
-      console.log('READER success', ev);
+      console.log('mergeWriter success', ev);
 
-      // confirm new version is written
-      writer(newVersion, cb);
+      // confirm new version
+      localWriter(obj, cb);
     };
 
     tr.onabort = function(ev) {
       // abort
-      console.error('READER abort', ev);
+      console.error('mergeWriter abort', ev);
       cb(ev.target);
     };
 
     tr.onerror = function(ev) {
       // error
-      console.error('READER error', ev);
+      console.error('mergeWriter error', ev);
       cb(ev.target);
     };
 
