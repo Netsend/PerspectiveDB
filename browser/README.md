@@ -43,21 +43,9 @@ req.onsuccess = function(ev) {
     password: 'secret'
   }
 
-  pdb.connect(aRemote, function(err) {
-    if (err) throw err
-  })
+  pdb.connect(aRemote);
 
-
-  ////////
-  // all object stores in MyDB are now automatically synced with the db foo on
-  // example.com
-
-
-  pdb.on('error', function(err) {
-    console.error('error:', err)
-  })
-
-  // listen for merge conflicts. these are saved to MyDB.conflicts as well for
+  // listen for merge conflicts. These are saved to MyDB.conflicts as well for
   // later inspection.
   pdb.on('conflict', function(item) {
     console.error('merge conflict:', item.c, item.n, item.l)
