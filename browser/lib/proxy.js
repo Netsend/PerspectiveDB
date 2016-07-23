@@ -16,141 +16,55 @@
  * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* jshint -W116 */
-
 'use strict';
 
-var errors = [];
-if (typeof indexedDB !== 'object') {
-  errors.push('missing Indexed Database API');
-}
-if (typeof crypto !== 'object') {
-  errors.push('missing Web Cryptography API');
-}
 if (typeof Proxy !== 'function') {
-  errors.push('missing ES6 Proxy');
+  throw new Error('missing ES6 Proxy');
 }
 
-if (errors.length) {
-  console.error(errors);
-  throw new Error(errors.join(', '));
-}
+function noop() {}
 
 /**
- * See MergeTree.createLocalWriteStream for localWriter object syntax and
- * MergeTree.startMerge for mergeWriter object syntax.
+ * Proxies the transaction method on idb so that pre- and post handlers for all
+ * update methods can be registered and selectively activated for each transaction
+ * and object store.
  *
- * @param {IndexedDB} idb  IndexedDB instance to monitor and sync
- * @param {Function} localWriter  write new local versions: function(localWriterObj, cb)
- * @return {Function} mergeWriter(mergeObj, cb)
+ * @param {IndexedDB} idb  an opened IndexedDB database to proxy
+ * @param {Function} doProxy  function that gets the mode and name of each
+ *                            transaction and object store and should return either
+ *                            true or false about whether or not to invoke the
+ *                            handlers. function(mode, name) => boolean
+ * @param {Object} handlers  pre- and post handlers for add, put, delete and clear.
+ * @return {Function} original transaction method in order to bypass the proxy.
  */
-module.exports = function(idb, localWriter) {
+function proxy(idb, doProxy, handlers) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-  if (localWriter == null || typeof localWriter !== 'function') { throw new TypeError('localWriter must be a function'); }
-
-  const keyPaths = {};
-
-  function _generateId(ev, key) {
-    return ev.target.source.name + '\x01' + key;
-  }
-
-  // @return {Array}  containing name of object store and id
-  function _objectStoreFromId(id) {
-    // expect only one 0x01
-    return id.split('\x01', 1)[0];
-  }
-
-  // @return {Array}  containing name of object store and id
-  function _idFromId(id) {
-    // expect only one 0x01
-    return id.split('\x01', 2)[1];
-  }
+  if (typeof doProxy !== 'function') { throw new TypeError('doProxy must be a function'); }
+  if (handlers == null || typeof handlers !== 'object') { throw new TypeError('handlers must be an object'); }
 
   // pre and post handlers for objectStore.add, put, delete and clear
-  function preAdd(os, value, key) {
-    console.log('preAdd');
-  }
+  var preAdd    = handlers.preAdd || noop;
+  var prePut    = handlers.prePut || noop;
+  var preDelete = handlers.preDelete || noop;
+  var preClear  = handlers.preClear || noop;
 
-  function postAdd(os, value, key, ret) {
-    console.log('postAdd', os.name, key, value);
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: _generateId(ev, ev.target.result) },
-          b: value
-        }
-      };
-      console.log('postAdd', obj);
-      localWriter(obj);
-    };
-  }
-
-  function prePut(os, value, key) {
-    console.log('prePut');
-  }
-
-  function postPut(os, value, key, ret) {
-    console.log('postPut', os.name, key, value);
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: _generateId(ev, ev.target.result) },
-          b: value
-        }
-      };
-      console.log('postPut', obj);
-      localWriter(obj);
-    };
-  }
-
-  function preDelete(os, key, ret) {
-    console.log('preDelete');
-  }
-
-  function postDelete(os, key, ret) {
-    console.log('postDelete', os.name, key);
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: {
-            id: _generateId(ev, key),
-            d: true
-          }
-        }
-      };
-      console.log('postDelete', obj);
-      localWriter(obj);
-    };
-  }
-
-  function preClear() {
-    console.log('preClear');
-    // TODO: should be translated in a delete for every object
-  }
-
-  function postClear() {
-    console.log('postClear');
-  }
+  var postAdd    = handlers.postAdd || noop;
+  var postPut    = handlers.postPut || noop;
+  var postDelete = handlers.postDelete || noop;
+  var postClear  = handlers.postClear || noop;
 
   // proxy db.transaction.objectStore function to catch new object store modification commands
-  function proxyObjectStore(target) {
+  function proxyObjectStore(target, mode) {
     return new Proxy(target, {
       apply: function(target, that, args) {
-        // proxy all modification calls that are not on the snapshot collection itself
-        /*
-        TODO: incorporate object store differentiation in level
-        if (args[0] === SNAPSHOT_COLLECTION) {
-          console.log('target', target, 'that', that, 'args', args);
-          return target.apply(that, args);
-        }
-        */
-
         console.log('proxyObjectStore', target, args);
 
         var obj = target.apply(that, args);
+
+        // only proxy if doProxy returns true 
+        if (!doProxy(mode, target.name)) {
+          return obj;
+        }
 
         // proxy add, put, delete and clear
         var origAdd = obj.add;
@@ -161,33 +75,33 @@ module.exports = function(idb, localWriter) {
         // proxy add
         function proxyAdd(value, key) {
           preAdd(obj, value, key);
-          var ret = origAdd.apply(obj, arguments);
-          postAdd(obj, value, key, ret);
-          return ret;
+          var req = origAdd.apply(obj, arguments);
+          postAdd(obj, value, key, req);
+          return req;
         }
 
         // proxy put
         function proxyPut(value, key) {
           prePut(obj, value, key);
-          var ret = origPut.apply(obj, arguments);
-          postPut(obj, value, key, ret);
-          return ret;
+          var req = origPut.apply(obj, arguments);
+          postPut(obj, value, key, req);
+          return req;
         }
 
         // proxy delete by adding a delete item
         function proxyDelete(key) {
           preDelete(obj, key);
-          var ret = origDelete.apply(obj, arguments);
-          postDelete(obj, key, ret);
-          return ret;
+          var req = origDelete.apply(obj, arguments);
+          postDelete(obj, key, req);
+          return req;
         }
 
         // proxy clear by adding one delete per item
         function proxyClear() {
           preClear(obj);
-          var ret = origClear.apply(obj, arguments);
-          postClear(obj, ret);
-          return ret;
+          var req = origClear.apply(obj, arguments);
+          postClear(obj, req);
+          return req;
         }
 
         obj.add = proxyAdd;
@@ -204,135 +118,17 @@ module.exports = function(idb, localWriter) {
   function proxyTransaction(target) {
     return new Proxy(target, {
       apply: function(target, that, args) {
-        // add snapshot collection to readwrite transactions
-        var method;
-        try {
-          method = args[1];
-        } catch(err) {
-        }
-
-        if (method === 'readwrite') {
-          // TODO: incorporate object store differentiation in level
-          //args[0].push(SNAPSHOT_COLLECTION);
-          var obj = target.apply(that, args);
-          obj.addEventListener('success', function(ev) {
-            //var transaction = ev.target.result;
-            console.log('proxyTransaction success');
-          });
-
-          console.log('proxyTransaction', target, args, obj.mode);
-
-          // proxy the opening of object stores for the target transaction
-          obj.objectStore = proxyObjectStore(obj.objectStore);
-          return obj;
-        }
-
-        console.log('proxyTransaction not a readwrite transaction:', method);
-        return target.apply(that, args);
-      }
-    });
-  }
-
-  // proxy indexedDB.open method and catch the creation of new database instances
-  /*
-  function proxyIdbOpen(target) {
-    return new Proxy(target, {
-      apply: function(target, that, args) {
+        // proxy the opening of object stores for the target transaction
         var obj = target.apply(that, args);
-
-        obj.addEventListener('upgradeneeded', function(ev) {
-          console.log('proxyIdbOpen upgradeneeded', ev);
-
-          var db = ev.target.result;
-
-          try {
-            // TODO: incorporate object store differentiation in level
-            //db.createObjectStore(SNAPSHOT_COLLECTION, { keyPath: 'h.i', autoIncrement: true });
-          } catch (err) {
-            if (err.name !== 'ConstraintError') {
-              throw err;
-            }
-          }
-        });
-
-        obj.addEventListener('success', function(ev) {
-          console.log('proxyIdbOpen success');
-
-          var db = ev.target.result;
-
-          db.transaction = proxyTransaction(db.transaction);
-        });
-
-        console.log('proxyIdbOpen', target, args, obj);
+        obj.objectStore = proxyObjectStore(obj.objectStore, obj.mode);
         return obj;
       }
     });
   }
 
-  indexedDB.open = proxyIdbOpen(indexedDB.open);
-  */
-
   var origTransaction = idb.transaction.bind(idb);
   idb.transaction = proxyTransaction(idb.transaction);
+  return origTransaction;
+}
 
-  // remote item handler. save new object in collection and call localWriter with it
-  return function mergeWriter(obj, cb) {
-    var newVersion = obj.n;
-    var prevVersion = obj.l;
-
-    var osName = _objectStoreFromId(newVersion.h.id);
-    var id = _idFromId(newVersion.h.id);
-
-    console.log('mergeWriter', osName, newVersion.h);
-
-    // open a rw transaction on the object store
-    var tr = origTransaction([osName], 'readwrite');
-    var os = tr.objectStore(osName);
-
-    // make sure the keypath of this object store is known
-    if (!keyPaths.hasOwnProperty(osName)) {
-      keyPaths[osName] = os.keyPath;
-      if (typeof keyPaths[osName] !== 'string') {
-        console.error('warning: keypath is not a string, converting: %s, store: %s', keyPaths[osName], osName);
-        keyPaths[osName] = Object.prototype.toString(keyPaths[osName]);
-      }
-    }
-
-    // ensure keypath is set if the store has a keypath
-    if (keyPaths[osName] && !newVersion.b[keyPaths[osName]]) {
-      newVersion.b[keyPaths[osName]] = id;
-    }
-
-    tr.oncomplete = function(ev) {
-      // success
-      console.log('mergeWriter success', ev);
-
-      // confirm new version
-      localWriter(obj, cb);
-    };
-
-    tr.onabort = function(ev) {
-      // abort
-      console.error('mergeWriter abort', ev);
-      cb(ev.target);
-    };
-
-    tr.onerror = function(ev) {
-      // error
-      console.error('mergeWriter error', ev);
-      cb(ev.target);
-    };
-
-    // prepare for local write
-    // new items should not have a parent
-    delete newVersion.h.pa;
-
-    if (newVersion.h.d) {
-      console.log('delete', newVersion.h);
-      os.delete(id);
-    } else {
-      console.log('put', newVersion.b);
-      os.put(newVersion.b);
-    }
-  };
-};
+module.exports = proxy;
