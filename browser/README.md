@@ -46,8 +46,8 @@ req.onsuccess = function(ev) {
   pdb.connect(aRemote);
 
   // listen for merge conflicts.
-  pdb.on('conflict', function(item) {
-    console.error('merge conflict:', item.c, item.n, item.l)
+  pdb.on('conflict', function(obj) {
+    console.error('merge conflict:', obj)
   })
 
   // merges happen when updates are coming in from a remote
