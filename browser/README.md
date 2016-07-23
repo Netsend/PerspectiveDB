@@ -3,7 +3,75 @@
 Features:
 * transparent versioning by using ES6 Proxy (Firefox only for now)
 
-# Usage
+# Usage example
+
+Track changes to all object stores in "MyDB" and sync with the server at
+wss://example.com.
+
+First include browser/build/persdb.js in your project:
+example.html:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+<title>PersDB example</title>
+</head>
+<body>
+<script type="text/javascript" src="../build/persdb.js"></script>
+<script type="text/javascript" src="example.js"></script>
+</body>
+</html>
+```
+
+example.js:
+```js
+// open an IndexedDB instance
+var req = indexedDB.open('MyDB')
+
+req.onsuccess = function(ev) {
+  var db = ev.target.result
+
+  // pass the IndexedDB instance to PersDB, PersDB is a global set by including
+  // build.js.
+  var pdb = new PersDB(db)
+
+  // connect to a remote peer at wss://example.com (use the default port, 3344)
+  var aRemote = {
+    name: 'aRemote',        // a local name to refer to the remote
+    host: 'example.com',    // address of a secure websocket server
+    db: 'foo',              // the name of the database on the remote
+    username: 'joe',
+    password: 'secret'
+  }
+
+  pdb.connect(aRemote, function(err) {
+    if (err) throw err
+  })
+
+
+  ////////
+  // all object stores in MyDB are now automatically synced with the db foo on
+  // example.com
+
+
+  pdb.on('error', function(err) {
+    console.error('error:', err)
+  })
+
+  // listen for merge conflicts. these are saved to MyDB.conflicts as well for
+  // later inspection.
+  pdb.on('conflict', function(item) {
+    console.error('merge conflict:', item.c, item.n, item.l)
+  })
+
+  // merges happen when updates are coming in from a remote
+  pdb.on('merge', function(item) {
+    console.log('new merge:', item)
+  })
+}
+```
+
+# Building with browserify
 
 Clone this repo and use browserify to create a bundle that can be loaded in the
 browser.
@@ -17,7 +85,7 @@ $ browserify browser/example/example.js > browser/build/build.js
 
 See config.json and example.html for a working example.
 
-For instructions on how to start a server, see the main readme.
+For instructions on how to start a websocket server, see the main readme.
 
 # License
 
