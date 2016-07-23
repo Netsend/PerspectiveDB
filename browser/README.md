@@ -5,11 +5,10 @@ Features:
 
 # Usage example
 
-Track changes to all object stores in "MyDB" and sync with the server at
-wss://example.com.
+Track changes to all object stores in "MyDB" and sync with the WebSocket server
+at example.com.
 
-First include browser/build/persdb.js in your project:
-example.html:
+Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/persdb/master/browser/build/persdb.js) in your html file:
 ```html
 <!DOCTYPE html>
 <html>
