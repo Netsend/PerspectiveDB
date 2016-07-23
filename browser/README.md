@@ -22,7 +22,7 @@ Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/pers
 </html>
 ```
 
-example.js:
+example.js looks as follows:
 ```js
 // open an IndexedDB instance
 var req = indexedDB.open('MyDB')
