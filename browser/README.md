@@ -36,7 +36,7 @@ req.onsuccess = function(ev) {
 
   // connect to a remote peer at wss://example.com (use the default port, 3344)
   var aRemote = {
-    name: 'aRemote',        // a local name to refer to the remote
+    name: 'aRemote',        // a local reference for the remote
     host: 'example.com',    // address of a secure websocket server
     db: 'foo',              // the name of the database on the remote
     username: 'joe',
