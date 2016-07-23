@@ -50,9 +50,9 @@ req.onsuccess = function(ev) {
     console.error('merge conflict:', obj)
   })
 
-  // merges happen when updates are coming in from a remote
-  pdb.on('merge', function(item) {
-    console.log('new merge saved:', item)
+  // a data event is emitted for every new version
+  pdb.on('data', function(item) {
+    console.log('new version:', item)
   })
 }
 ```
