@@ -24,7 +24,7 @@ Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/pers
 
 example.js looks as follows:
 ```js
-// open an IndexedDB instance
+// open an IndexedDB instance as usual
 var req = indexedDB.open('MyDB')
 
 req.onsuccess = function(ev) {
