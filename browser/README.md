@@ -1,14 +1,12 @@
 # PersDB-browser
 
-Features:
-* transparent versioning by using ES6 Proxy (Firefox only for now)
+Track changes to IndexedDB object stores and sync with peers over a WebSocket.
 
-# Usage example
+# Example
 
-Track changes to all object stores in "MyDB" and sync with the WebSocket server
-at example.com.
+Create the store *customers* and sync with a peer at example.com.
 
-Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/persdb/master/browser/build/persdb.js) in your html file:
+Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/persdb/master/browser/build/persdb.js) in your html so that the global PersDB is set:
 ```html
 <!DOCTYPE html>
 <html>
@@ -23,23 +21,25 @@ Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/pers
 </html>
 ```
 
-example.js looks as follows:
+[example.js](https://github.com/Netsend/persdb/blob/master/browser/example/example.js) looks as follows:
 ```js
 // open an IndexedDB instance as usual
 var req = indexedDB.open('MyDB')
+
+// create a store
+req.onupgradeneeded = (ev) => {
+  var db = ev.target.result
+  db.createObjectStore('customers', { keyPath: 'email' })
+}
 
 req.onsuccess = (ev) => {
   var db = ev.target.result
 
   // Initiate PersDB with this database. Use watch mode to automatically track
-  // changes to the object stores. This requires support for ES6 Proxy, e.g.
-  // Firefox 18+ or Chrome 49+. If not using watch mode, then all updates to any
-  // object store should be written via pdb.put and pdb.del.
-  var pdb = new PersDB(db, { // PersDB is a global set by including build.js.
-    watch: true
-  })
+  // changes. This requires support for ES6 Proxy (Firefox 18+ or Chrome 49+).
+  var pdb = new PersDB(db, { watch: true })
 
-  // connect to a remote peer at wss://example.com (use the default port, 3344)
+  // connect to a remote peer at wss://example.com
   pdb.connect({
     name: 'aRemote',         // local reference for the remote
     host: 'example.com',     // address of a secure websocket server
@@ -47,8 +47,8 @@ req.onsuccess = (ev) => {
     username: 'joe',
     password: 'secret'
   }).then(() => {
-    console.log('connected');
-  }).catch(err => console.error(err));
+    console.log('connected')
+  }).catch(err => console.error(err))
 
   // a data event is emitted for every new version
   pdb.on('data', (item) => {
@@ -56,6 +56,9 @@ req.onsuccess = (ev) => {
   })
 }
 ```
+
+If not using watch mode, then all updates to any object store should be written
+via `pdb.put` and `pdb.del`.
 
 # Building with browserify
 
