@@ -400,7 +400,7 @@ tasks.push(function(done) {
                   lcas: [],
                   pe: pe,
                   c: null,
-                  err: 'E11000 duplicate key error index: pdb.test3.$_id_  dup key: { : "foo" }'
+                  err: 'no item in collection expected'
                 }]);
                 done();
               });
