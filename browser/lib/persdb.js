@@ -57,7 +57,7 @@ function debugReq(req) {
  * 2. uses ES6 Proxy to transparently proxy IndexedDB updates
  * 3. connect() creates authenticated WebSockets and starts transfering BSON
  *
- * @param {Object} idb     IndexedDB instance
+ * @param {Object} idb  opened IndexedDB database
  * @param {Object} [opts]  object containing configurable parameters
  *
  * opts:
@@ -311,8 +311,20 @@ PersDB.prototype.connections = function connections() {
  * Create an authenticated secure WebSocket connection to a remote peer and start
  * transfering BSON.
  *
- * @param {Object} remote  configuration details of the remote
+ * @param {Object} remote  configuration details of the remote, see below.
  * @return {Promise}
+ *
+ * required:
+ *   name {String}  local reference to the remote
+ *   host {String}  address of the remote
+ *   db {String}  name of the database on the remote
+ *   username {String}  username of remote account
+ *   password {String}  password of remote account
+ *
+ * opts:
+ *   import {Boolean, default true}  import changes from remote
+ *   export {Boolean, default true}  export changes to remote
+ *   port {Number, default 3344}  port of the remote WebSocket server
  */
 PersDB.prototype.connect = function connect(remote) {
   if (remote == null || typeof remote !== 'object') { throw new TypeError('remote must be an object'); }
@@ -324,8 +336,6 @@ PersDB.prototype.connect = function connect(remote) {
 
   // options
   if (remote.port && typeof remote.port !== 'number') { throw new TypeError('remote.port must be a number'); }
-
-  this._log.debug('db setup WebSocket', debugReq(remote));
 
   var that = this;
 
@@ -376,7 +386,6 @@ PersDB.prototype.disconnect = function disconnect(cb) {
  */
 PersDB.prototype._connHandler = function _connHandler(conn, pers) {
   var connId = pers.name;
-  this._log.info('client connected %s', connId);
 
   var that = this;
 
