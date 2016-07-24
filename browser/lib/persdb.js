@@ -349,7 +349,10 @@ PersDB.prototype.connect = function connect(remote) {
       if (err) { reject(err); return; }
 
       that._mt.addPerspective(remote.name);
-      that._connHandler(conn, xtend(remote, { import: true, export: true })); // for now, always set import/export true
+      that._connHandler(conn, xtend({
+        import: true,
+        export: true,
+      }, remote));
       resolve();
     });
   });
