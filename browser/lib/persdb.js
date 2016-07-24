@@ -338,24 +338,50 @@ PersDB.prototype.connect = function connect(remote) {
   };
 
   var port = remote.port || '3344';
-
   var uri = 'wss://' + remote.host + ':' + port;
+  var error;
 
   return new Promise((resolve, reject) => {
     var conn = websocket(uri, 1); // support protocol 1 only
 
-    conn.on('error', reject);
+    var connId = getConnectionId(conn);
 
-    // send the auth request and pass the connection to connHandler
+    // register connection
+    if (that._connections[connId]) {
+      error = new Error('connection already exists');
+      that._connErrorHandler(conn, connId, error);
+      reject(error);
+      return;
+    }
+
+    conn.on('close', function() {
+      delete that._connections[connId];
+    });
+
+    that._connections[connId] = conn;
+
+    // send the auth request
     conn.write(JSON.stringify(authReq) + '\n', function(err) {
       if (err) { reject(err); return; }
 
+      // start merging
       that._mt.addPerspective(remote.name);
-      that._remoteDataConnHandler(conn, xtend({
+
+      var opts = xtend({
         import: true,
         export: true,
-      }, remote));
-      resolve();
+      }, remote);
+
+      // do the data request handshake and setup readers and writers.
+      remoteConnHandler(conn, that._mt, opts, true, remote.name, function(err) {
+        if (err) {
+          that._connErrorHandler(conn, connId, err);
+          reject(err);
+          return;
+        }
+
+        resolve();
+      });
     });
   });
 };
@@ -369,32 +395,6 @@ PersDB.prototype.disconnect = function disconnect(cb) {
     conn.end();
   }, cb);
 };
-
-/**
- * Do the handshake and setup readers and writers.
- */
-PersDB.prototype._remoteDataConnHandler = function _remoteDataConnHandler(conn, remote) {
-  var that = this;
-
-  var connId = getConnectionId(conn);
-  if (this._connections[connId]) {
-    that._connErrorHandler(conn, connId, new Error('connection already exists'));
-    return;
-  }
-
-  conn.on('error', function() {
-    delete that._connections[connId];
-  });
-  conn.on('close', function() {
-    delete that._connections[connId];
-  });
-
-  this._connections[connId] = conn;
-
-  remoteConnHandler(conn, this._mt, remote, true, remote.name, function(err) {
-    if (err) { that._connErrorHandler(conn, connId, err); return; }
-  });
-}
 
 // create an id
 PersDB._generateId = function _generateId(objectStore, key) {
