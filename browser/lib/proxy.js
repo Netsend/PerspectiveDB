@@ -61,7 +61,7 @@ function proxy(idb, doProxy, handlers) {
 
         var obj = target.apply(that, args);
 
-        // only proxy if doProxy returns true 
+        // only proxy if doProxy returns true
         if (!doProxy(mode, target.name)) {
           return obj;
         }
