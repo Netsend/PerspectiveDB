@@ -173,7 +173,12 @@ function PersDB(idb, opts) {
   });
   */
 
-  this._keyPaths = {};
+  this._stores = {}; // enable fast store lookup
+  for (var i = 0; i < idb.objectStoreNames.length; i++) {
+    var store = idb.objectStoreNames[i];
+    that._stores[store] = true;
+  }
+  this._keyPaths = {}; // enable fast key path lookup
 
   // set options
   var mtOpts = xtend(this._opts.mergeTree);
@@ -621,6 +626,11 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   var prevVersion = obj.l;
 
   var osName = PersDB._objectStoreFromId(newVersion.h.id);
+  if (!this._stores[osName]) {
+    this._log.notice('_writeMerge object from an unknown object store received', osName, newVersion.h);
+    process.nextTick(cb);
+    return;
+  }
   var id = PersDB._idFromId(newVersion.h.id);
 
   this._log.debug('_writeMerge', osName, newVersion.h);
