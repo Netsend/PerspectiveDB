@@ -318,6 +318,48 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
 });
 
+// should start a WSS server, and accept a data request + but disconnect because no export is configured and data is requested
+tasks.push(function(done) {
+  var pe = 'someClient';
+
+  function onSpawn(child) {
+    setTimeout(function() {
+      var authReq = {
+        username: pe,
+        password: 'somepass',
+        db: 'someDb'
+      };
+      var dataReq = {
+        start: true
+      };
+
+      var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
+        client.sendText(JSON.stringify(authReq) + '\n');
+
+        // expect data request
+        client.on('text', function(data) {
+          assert.deepEqual(data, JSON.stringify({ start: true }) + '\n');
+
+          client.sendText(JSON.stringify(dataReq) + '\n');
+
+          client.on('close', function() {
+            child.kill();
+          });
+        });
+      });
+    }, 1000);
+  }
+
+  var opts = {
+    onSpawn: onSpawn,
+    onExit: done,
+    testStdout: function(stdout) {
+      assert(/data requested but no export configured/.test(stdout));
+    }
+  };
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
+});
+
 // should start a WSS server, and accept a data request + two BSON items
 tasks.push(function(done) {
   var pe = 'someClient';
@@ -397,7 +439,7 @@ tasks.push(function(done) {
     onSpawn: onSpawn,
     onExit: onExit,
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
+  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import_export.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + one BSON item, and send previously saved items (depends on previous test)
@@ -513,8 +555,7 @@ tasks.push(function(done) {
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
-      assert(/someDb.* signal that no data is expected/.test(stdout));
-      assert(/otherDb.* req received {"start":false}/.test(stdout));
+      assert(/t:otherClient createReadStream open reader/.test(stdout));
     }
   };
   spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_with_client.hjson'], opts);
