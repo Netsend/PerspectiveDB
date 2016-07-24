@@ -36,7 +36,7 @@ dbs: [{
   ]
 }]
 
-localPort: 1234
+port: 1234
 
 wss: {
   cert: cert.pem

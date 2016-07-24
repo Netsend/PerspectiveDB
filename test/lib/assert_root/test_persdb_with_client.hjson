@@ -12,7 +12,7 @@
 
 log: {
   console: true
-  level: debug
+  level: debug2
 }
 
 # Milliseconds between auto processing items
@@ -53,4 +53,4 @@ dbs: [{
   ]
 }]
 
-localPort: 1234
+port: 1234
