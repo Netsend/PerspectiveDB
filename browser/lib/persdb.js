@@ -572,7 +572,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
           b: value
         }
       };
-      that._localWriter(obj);
+      that._localWriter.write(obj);
     };
   }
 
@@ -585,7 +585,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
           b: value
         }
       };
-      that._localWriter(obj);
+      that._localWriter.write(obj);
     };
   }
 
@@ -600,7 +600,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
           }
         }
       };
-      that._localWriter(obj);
+      that._localWriter.write(obj);
     };
   }
 
@@ -667,7 +667,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 
   tr.oncomplete = function(ev) {
     that._log.debug('_writeMerge success', ev);
-    that._localWriter(obj, function(err) {
+    that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
       that.emit('merge', obj);
       cb();
