@@ -669,7 +669,8 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     that._log.debug('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
-      that.emit('merge', obj);
+      that.emit('data:remote', obj.n);
+      that.emit('data', obj.n);
       cb();
     });
   };
