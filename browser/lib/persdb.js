@@ -25,24 +25,16 @@ var stream = require('stream');
 var util = require('util');
 
 var async = require('async');
-var BSONStream = require('bson-stream');
-var LDJSONStream = require('ld-jsonstream');
-var keyFilter = require('object-key-filter');
 var level = require('level-packager')(require('level-js'));
 var websocket = require('websocket-stream');
 var xtend = require('xtend');
 
 var proxy = require('./proxy');
-var dataRequest = require('../../lib/data_request');
+var getConnectionId = require('../../lib/get_connection_id');
 var MergeTree = require('../../lib/merge_tree');
-var parsePersConfigs = require('../../lib/parse_pers_configs');
+var remoteConnHandler = require('../../lib/remote_conn_handler');
 
 var noop = function() {};
-
-// filter password out request
-function debugReq(req) {
-  return keyFilter(req, ['password'], true);
-}
 
 /**
  * Start a PersDB instance.
@@ -359,7 +351,7 @@ PersDB.prototype.connect = function connect(remote) {
       if (err) { reject(err); return; }
 
       that._mt.addPerspective(remote.name);
-      that._connHandler(conn, xtend({
+      that._remoteDataConnHandler(conn, xtend({
         import: true,
         export: true,
       }, remote));
@@ -379,162 +371,30 @@ PersDB.prototype.disconnect = function disconnect(cb) {
 };
 
 /**
- * - expect one data request
- * - send one data request
- * - maybe export data
- * - maybe import data
+ * Do the handshake and setup readers and writers.
  */
-PersDB.prototype._connHandler = function _connHandler(conn, pers) {
-  var connId = pers.name;
-
+PersDB.prototype._remoteDataConnHandler = function _remoteDataConnHandler(conn, remote) {
   var that = this;
 
+  var connId = getConnectionId(conn);
   if (this._connections[connId]) {
     that._connErrorHandler(conn, connId, new Error('connection already exists'));
     return;
   }
 
+  conn.on('error', function() {
+    delete that._connections[connId];
+  });
+  conn.on('close', function() {
+    delete that._connections[connId];
+  });
+
   this._connections[connId] = conn;
 
-  this.emit('connection', connId);
-  this.emit('connection:connect', connId);
-
-  conn.on('close', function() {
-    that._log.info('%s: close', connId);
-    delete that._connections[connId];
-    that.emit('connection', connId);
-    that.emit('connection:disconnect', connId);
+  remoteConnHandler(conn, this._mt, remote, true, remote.name, function(err) {
+    if (err) { that._connErrorHandler(conn, connId, err); return; }
   });
-
-  // after data request is sent and received, setup reader and writer
-  function finalize(req) {
-    // open reader if there is an export config and data is requested
-    if (pers.export && req.start) {
-      var readerOpts = {
-        log: that._log,
-        tail: true,
-        tailRetry: 5000,
-        bson: true
-      };
-      if (typeof req.start === 'string') {
-        readerOpts.first = req.start;
-        readerOpts.excludeFirst = true;
-      }
-      if (typeof pers.export === 'object') {
-        readerOpts.filter    = pers.export.filter;
-        readerOpts.hooks     = pers.export.hooks;
-        readerOpts.hooksOpts = pers.export.hooksOpts;
-      }
-
-      var mtr = that._mt.createReadStream(readerOpts);
-
-      mtr.on('error', function(err) {
-        that._log.err('db mtr error %s %s', connId, err);
-      });
-
-      mtr.on('end', function() {
-        that._log.notice('db mtr end %s', connId);
-      });
-
-      mtr.pipe(conn);
-
-      conn.on('error', function(err) {
-        that._log.err('%s: %s', connId, err);
-        mtr.close();
-      });
-      conn.on('close', function() {
-        that._log.info('%s: close', connId);
-        mtr.close();
-        delete that._connections[connId];
-      });
-    }
-
-    // handle data from remote if requested and allowed
-    if (pers.import) {
-      // create remote transform to ensure h.pe is set to this remote and run all hooks
-      var writerOpts = {
-        db:         that._db,
-        filter:     pers.import.filter || {},
-        hooks:      pers.import.hooks || [],
-        hooksOpts:  pers.import.hooksOpts || {},
-        log:        that._log
-      };
-      // some export hooks need the name of the database
-      writerOpts.hooksOpts.to = that._db;
-
-      // set hooksOpts with all keys but the pre-configured ones
-      Object.keys(pers.import).forEach(function(key) {
-        if (!~['filter', 'hooks', 'hooksOpts'].indexOf(key)) {
-          writerOpts.hooksOpts[key] = pers.import[key];
-        }
-      });
-
-      var mtw = that._mt.createRemoteWriteStream(pers.name, writerOpts);
-
-      mtw.on('error', function(err) {
-        that._log.err('db merge tree "%s"', err);
-        conn.end();
-      });
-
-      // expect bson
-      var bs = new BSONStream();
-
-      bs.on('error', function(err) {
-        that._log.err('db bson %s', err);
-        conn.end();
-      });
-
-      // receive data from remote
-      conn.pipe(bs).pipe(mtw);
-    }
-  }
-
-  // expect one data request
-  var ls = new LDJSONStream({ flush: false, maxDocs: 1, maxBytes: 512 });
-
-  conn.pipe(ls).once('readable', function() {
-    var req = ls.read();
-    that._log.info('req received %j', req);
-
-    conn.unpipe(ls);
-
-    if (!dataRequest.valid(req)) {
-      that._log.err('invalid data request %j', req);
-      that._connErrorHandler(conn, connId, 'invalid data request');
-      return;
-    }
-
-    // send data request with last offset if there are any import rules
-    if (pers.import) {
-      // find last local item of this remote
-      that._mt.lastReceivedFromRemote(pers.name, 'base64', function(err, last) {
-        if (err) {
-          that._log.err('db _connHandler lastReceivedFromRemote %s %s', err, pers.name);
-          that._connErrorHandler(conn, connId, err);
-          return;
-        }
-
-        that._log.info('db last %s', pers.name, last);
-
-        // send data request with last offset
-        var dataReq = { start: true };
-        if (last) {
-          dataReq.start = last;
-        }
-
-        that._log.notice('db setup pipes and send back data request', dataReq);
-        conn.write(JSON.stringify(dataReq) + '\n');
-
-        finalize(req);
-      });
-    } else {
-      that._log.notice('db signal that no data is expected');
-      conn.write(JSON.stringify({ start: false }) + '\n');
-
-      finalize(req);
-    }
-  });
-};
+}
 
 // create an id
 PersDB._generateId = function _generateId(objectStore, key) {
