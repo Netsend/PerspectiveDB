@@ -505,7 +505,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   }
   var id = PersDB._idFromId(newVersion.h.id);
 
-  this._log.debug('_writeMerge', osName, newVersion.h);
+  this._log.debug2('_writeMerge', osName, newVersion.h);
 
   // open a rw transaction on the object store
   var tr = this._idbTransaction([osName], 'readwrite');
@@ -526,7 +526,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   }
 
   tr.oncomplete = function(ev) {
-    that._log.debug('_writeMerge success', ev);
+    that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
       that.emit('data:remote', obj.n);
@@ -548,10 +548,10 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   };
 
   if (newVersion.h.d) {
-    that._log.debug('delete', newVersion.h);
+    that._log.debug2('delete', newVersion.h);
     os.delete(id);
   } else {
-    that._log.debug('put', newVersion.b);
+    that._log.debug2('put', newVersion.b);
     os.put(newVersion.b);
   }
 };
