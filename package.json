@@ -60,6 +60,7 @@
     "persdb": "./bin/persdb"
   },
   "scripts": {
-    "test": "mocha ./test"
+    "test": "mocha ./test",
+    "generate-docs": "jsdoc -d docs -t doc-theme-minami browser/lib/persdb.js"
   }
 }

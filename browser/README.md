@@ -62,6 +62,11 @@ If not using watch mode, then all updates to any object store should be written
 via `pdb.put` and `pdb.del`.
 
 
+## API
+
+The API documentation can be found under [docs](https://github.com/Netsend/persdb/tree/master/docs).
+
+
 ## Building with browserify
 
 Clone this repo and use browserify to create a bundle that can be loaded in the
