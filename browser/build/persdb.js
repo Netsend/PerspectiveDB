@@ -507,7 +507,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   }
   var id = PersDB._idFromId(newVersion.h.id);
 
-  this._log.debug('_writeMerge', osName, newVersion.h);
+  this._log.debug2('_writeMerge', osName, newVersion.h);
 
   // open a rw transaction on the object store
   var tr = this._idbTransaction([osName], 'readwrite');
@@ -522,17 +522,16 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     }
   }
 
-  // ensure keypath is set if the store has a keypath
-  if (this._keyPaths[osName] && !newVersion.b[this._keyPaths[osName]]) {
+  // ensure keypath is set if the store has a keypath and this is not a delete
+  if (this._keyPaths[osName] && !newVersion.h.d && !newVersion.b[this._keyPaths[osName]]) {
     newVersion.b[this._keyPaths[osName]] = id;
   }
 
   tr.oncomplete = function(ev) {
-    that._log.debug('_writeMerge success', ev);
+    that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
-      that.emit('data:remote', obj.n);
-      that.emit('data', obj.n);
+      that.emit('data', { os: osName, n: obj.n && obj.n.b, p: obj.l && obj.l.b });
       cb();
     });
   };
@@ -550,10 +549,10 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   };
 
   if (newVersion.h.d) {
-    that._log.debug('delete', newVersion.h);
+    that._log.debug2('delete', newVersion.h);
     os.delete(id);
   } else {
-    that._log.debug('put', newVersion.b);
+    that._log.debug2('put', newVersion.b);
     os.put(newVersion.b);
   }
 };
@@ -2242,6 +2241,8 @@ MergeTree.prototype.getRemoteTrees = function getRemoteTrees() {
 MergeTree.prototype.createReadStream = function createReadStream(opts) {
   if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
+  this._log.debug('mt createReadStream opts: %j', opts);
+
   // keys with undefined values will override these defaults
   opts = xtend({
     bson: false,
@@ -2269,8 +2270,6 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
   if (opts.tailRetry != null && typeof opts.tailRetry !== 'number') { throw new TypeError('opts.tailRetry must be a number'); }
   if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
 
-  this._log.info('createReadStream opts: %j', opts);
-
   var that = this;
 
   // shortcut
@@ -2292,7 +2291,7 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
    *   return parents
    */
   function findConnectedParents(item, crit, cb) {
-    that._log.debug2('createReadStream findConnectedParents %s', item.h.pa);
+    that._log.debug2('mt createReadStream findConnectedParents %s', item.h.pa);
     var parents = {};
     async.eachSeries(item.h.pa, function(pav, cb2) {
       that._local.getByVersion(pav, function(err, pa) {
@@ -2300,7 +2299,7 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
 
         // descend if not all criteria hold on this item
         if (!match(crit, pa.b)) {
-          that._log.debug2('createReadStream findConnectedParents crit does not hold, descend');
+          that._log.debug2('mt createReadStream findConnectedParents crit does not hold, descend');
           findConnectedParents(pa, crit, function(err, nParents) {
             if (err) { cb2(err); return; }
             Object.keys(nParents).forEach(function(pa2) {
@@ -2314,11 +2313,11 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
 
             // descend if hooks filter out the item
             if (afterItem) {
-              that._log.debug2('createReadStream findConnectedParents add to parents %s', pa.h.v);
+              that._log.debug2('mt createReadStream findConnectedParents add to parents %s', pa.h.v);
               parents[pa.h.v] = true;
               cb2();
             } else {
-              that._log.debug2('createReadStream findConnectedParents crit holds, but hooks filter, descend');
+              that._log.debug2('mt createReadStream findConnectedParents crit holds, but hooks filter, descend');
               findConnectedParents(pa, crit, function(err, nParents) {
                 if (err) { cb2(err); return; }
                 Object.keys(nParents).forEach(function(pa2) {
@@ -2340,11 +2339,11 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
     readableObjectMode: !opts.bson,
     writableObjectMode: true,
     transform: function (item, enc, cb) {
-      that._log.debug2('createReadStream data %j', item.h);
+      that._log.debug2('mt createReadStream data %j', item.h);
 
       // don't emit if not all criteria hold on this item
       if (!match(filter, item.b)) {
-        that._log.debug2('createReadStream filter %j', filter);
+        that._log.debug2('mt createReadStream filter %j', filter);
         cb();
         return;
       }
@@ -2354,7 +2353,7 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
 
         // skip if hooks filter out the item
         if (!afterItem) {
-          that._log.debug2('createReadStream hook filtered %j', item.h);
+          that._log.debug2('mt createReadStream hook filtered %j', item.h);
           cb();
           return;
         }
@@ -2371,7 +2370,7 @@ MergeTree.prototype.createReadStream = function createReadStream(opts) {
           delete afterItem.m;
 
           // push the bson or native object out to the reader, and resume if not flooded
-          that._log.debug('createReadStream push %j', afterItem.h);
+          that._log.debug('mt createReadStream push %j', afterItem.h);
           cb(null, opts.bson ? BSON.serialize(afterItem) : afterItem);
         });
       });
@@ -2444,7 +2443,7 @@ MergeTree.prototype.createRemoteWriteStream = function createRemoteWriteStream(r
     throw new Error(error);
   }
 
-  this._log.info('mt createRemoteWriteStream opened tree %s', remote);
+  this._log.info('mt createRemoteWriteStream for %s', remote);
 
   var filter = opts.filter || {};
   var hooks = opts.hooks || [];
@@ -2663,7 +2662,7 @@ MergeTree.prototype.createLocalWriteStream = function createLocalWriteStream() {
       var item = this.read();
       if (item) items.unshift(item); // unshift in case a merge is the new head
     }).on('error', cb).on('end', function() {
-      that._log.debug('mt createLocalWriteStream copying %d items from %s', items.length, obj.pe);
+      that._log.debug('mt createLocalWriteStream copy after %s from %s (%d)', firstInRemote, obj.pe, items.length);
       // ensure meta info of the acknowledged head is on the new head
       if (obj.n.m) {
         items[items.length - 1].m = obj.n.m;
@@ -4432,7 +4431,7 @@ Tree.prototype.lastVersion = function lastVersion(decodeV, cb) {
     if (!val) { // end of stream
       if (error) { cb(error, null); return; }
 
-      that._log.debug('t:%s lastVersion %s', that.name, v);
+      that._log.debug2('t:%s lastVersion %s', that.name, v);
       cb(null, v);
       return;
     }
@@ -4906,11 +4905,11 @@ Tree.prototype._saveAtomic = function(items, cb) {
         // update last written perspective version
         that._db.put(that._composeUsKey(item.h.pe), that._composeVKey(item.h.v), function(err) {
           if (err) {
-            that._log.err('t:%s _writev could not update perspective in uskey %s %j', that.name, err, item.h);
+            that._log.err('t:%s _writev update uskey %s %j', that.name, err, item.h);
             cb(err);
             return;
           }
-          that._log.info('t:%s _writev updated last received perspective version of existing version %j', that.name, item.h);
+          that._log.info('t:%s _writev last %s %s', that.name, item.h.pe, item.h.v);
           cb2(false);
         });
         return;
@@ -5319,7 +5318,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
           return;
         } else {
           // the version does already exist
-          that._log.debug('t:%s _validNewItem version already exists %s', that.name, version);
+          that._log.debug2('t:%s _validNewItem version already exists %s', that.name, version);
           // call back with missing parents
           cb(null, false, [], true);
           return;
@@ -5441,7 +5440,7 @@ Tree.prototype._validNewItem = function _validNewItem(item, batch, cb) {
             return;
           } else {
             // the version does already exist
-            that._log.debug('t:%s _validNewItem version already exists %s', that.name, version);
+            that._log.debug2('t:%s _validNewItem version already exists %s', that.name, version);
             // call back with existing heads
             cb(null, !heads.length, heads, true);
             return;
