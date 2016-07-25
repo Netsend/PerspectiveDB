@@ -16,8 +16,6 @@
  * with PersDB. If not, see <https://www.gnu.org/licenses/>.
  */
 
-/* jshint -W116 */
-
 'use strict';
 
 var EE = require('events');
@@ -37,31 +35,40 @@ var remoteConnHandler = require('../../lib/remote_conn_handler');
 var noop = function() {};
 
 /**
- * Start a PersDB instance.
+ * @event PersDB#data
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ */
+/**
+ * @event PersDB#conflict
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ * @param {?Array} obj.c - array with conflicting key names
+ */
+
+/**
+ * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
+ * handled) before passing it to this constructor. If opts.watch is used, then add,
+ * put and delete operations on any of the object stores are automatically
+ * detected. Note that for watch to work, ES6 Proxy must be supported by the
+ * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
+ * and {@link PersDB#del} must be used in order to modify the contents of any
+ * object store.
  *
- * Instantiates a merge tree, hooks, filters and handles IndexedDB updates. Use
- * "connect()" to initiate WebSocket connections to other peers.
+ * @class PersDB
  *
- * This class emits "data" events when new local or merges with a remote have been
- * saved.
+ * @param {IDBDatabase} idb  opened IndexedDB database
+ * @param {Object} [opts]
+ * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
  *
- * 1. setup all import and export hooks, filters etc.
- * 2. uses ES6 Proxy to transparently proxy IndexedDB updates
- * 3. connect() creates authenticated WebSockets and starts transfering BSON
+ * @fires PersDB#data
+ * @fires PersDB#conflict
  *
- * @param {Object} idb  opened IndexedDB database
- * @param {Object} [opts]  object containing configurable parameters
- *
- * opts:
- *   watch {Boolean, default false}  watch changes to all object stores via ES6
- *                                   Proxy
- *   snapshots {String, default "_pdb"}  internal object store that contains each
- *                                       version
- *   conflicts {String, default "_conflicts"}  internal object store where merge
- *                                             conflicts should be saved
- *   iterator {Function}            called with every new item from a remote
- *   perspectives {Array}           array of other perspectives with url
- *   mergeTree {Object}             any MergeTree options
+ * @todo support loading hooks
  */
 function PersDB(idb, opts) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
@@ -205,118 +212,99 @@ util.inherits(PersDB, EE);
 
 module.exports = global.PersDB = PersDB;
 
+/**
+ * Insert or update an item in a store by key.
+ *
+ * @todo make atomic
+ *
+ * @param {String} objectStore - name of the store
+ * @param {mixed} key - key of the item to update
+ * @param {mixed} item - item contents
+ * @return {Promise}
+ */
 PersDB.prototype.put = function put(objectStore, key, item) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
   var id = PersDB._generateId(objectStore, key);
-  this._localWriter.write({
-    n: {
-      h: { id: id },
-      b: item
-    }
-  }, (err) =>  {
-    if (err) { this._log.err('put error:', err); return; }
-    // TODO do atmoic update of object store
+  return new Promise((resolve, reject) => {
+    this._localWriter.write({
+      n: {
+        h: { id: id },
+        b: item
+      }
+    }, (err) => {
+      err ? reject(err) : resolve();
+    });
   });
 };
 
+/**
+ * Delete an item by key.
+ *
+ * @todo make atomic
+ *
+ * @param {String} objectStore - name of the store
+ * @param {mixed} key - key of the item to update
+ * @return {Promise}
+ */
 PersDB.prototype.del = function del(objectStore, key) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
   var id = PersDB._generateId(objectStore, key);
-  this._localWriter.write({
-    n: {
-      h: { id: id, d: true }
-    }
-  }, (err) =>  {
-    if (err) { this._log.err('del error:', err); return; }
-    // TODO do atmoic update of object store
+  return new Promise((resolve, reject) => {
+    this._localWriter.write({
+      n: {
+        h: { id: id, d: true }
+      }
+    }, (err) =>  {
+      err ? reject(err) : resolve();
+    });
   });
 };
 
-PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
-  this._log.err('dbe connection error: %s %s', err, connId);
-  conn && conn.close();
-};
-
+/**
+ * Get a readable stream over each and every version in chronological order.
+ *
+ * @param {Object} [opts]
+ * @param {Boolean} opts.bson=false - whether to return a BSON serialized or
+ *   deserialized object (false).
+ * @param {Object} opts.filter - conditions a document should hold
+ * @param {String} opts.first - base64 first version, offset
+ * @param {String} opts.last - base64 last version
+ * @param {Boolean} opts.excludeFirst=false - whether or not first item should
+ *   be excluded
+ * @param {Boolean} opts.excludeLast=false - whether or not the last item should
+ *   be excluded
+ * @param {Boolean} opts.reverse=false - if true, starts with last version
+ * @param {Array} opts.hooks - array of asynchronous functions to execute, each
+ *   hook has the following signature: db, object, options, callback and should
+ *   callback with an error object, the new item and possibly extra data.
+ * @param {Object} opts.hooksOpts - options to pass to a hook
+ * @param {Boolean} opts.tail=false - if true, keeps the stream open
+ * @param {Number} opts.tailRetry=1000 - reopen readers every tailRetry ms
+ * @return {stream.Readable}
+ * @see {@link https://nodejs.org/api/stream.html#stream_class_stream_readable}
+ */
 PersDB.prototype.createReadStream = function createReadStream(opts) {
-  if (this._mt == null || typeof this._mt !== 'object') { throw new TypeError('mt must be instantiated'); }
   return this._mt.createReadStream(opts);
-};
-
-/**
- * Add a new perspective.
- *
- * @param {String} name  name of the perspective
- * @param {Object} cfg  the perspective configuration
- */
- /*
-PersDB.prototype.addPerspective = function addPerspective(name, cfg) {
-  if (!name || typeof name !== 'string') { throw new TypeError('name must be a string'); }
-  if (cfg == null || typeof cfg !== 'object') { throw new TypeError('cfg must be an object'); }
-  if (this._persCfg.pers[name]) { throw new Error('perspective already exists'); }
-
-  this._persCfg.connect.push(name);
-  this._persCfg.pers[name] = parsePersConfigs([cfg]).pers[name];
-  this._mt.addPerspective(name);
-};
- */
-
-/**
- * Create an array with perspectives.
- *
- * @return {Array} names of all perspectives
- */
-PersDB.prototype.getPerspectives = function getPerspectives() {
-  return Object.keys(this._persCfg.pers);
-};
-
-/**
- * Create an overview of the status of the connection of each perspective.
- *
- * @return {Object} status of each connection with the perspective name as key
- */
-PersDB.prototype.connections = function connections() {
-  var that = this;
-  var result = {};
-  Object.keys(this._persCfg.pers).forEach(function(name) {
-    var pers = that._persCfg.pers[name];
-    var uri = pers.connect.href;
-    var obj = {
-      name: name,
-      uri: uri
-    };
-    if (that._connections[uri]) {
-      obj.status = 'connected';
-    } else {
-      obj.status = 'disconnected';
-    }
-    result[name] = obj;
-  });
-
-  return result;
 };
 
 /**
  * Create an authenticated secure WebSocket connection to a remote peer and start
  * transfering BSON.
  *
- * @param {Object} remote  configuration details of the remote, see below.
+ * @param {Object} remote
+ * @param remote.name {String}  local reference to the remote
+ * @param remote.host {String}  address of the remote
+ * @param remote.db {String}  name of the database on the remote
+ * @param {String} remote.username - username of remote account
+ * @param {String} remote.password - password of remote account
+ * @param {Boolean} [remote.import=true] - import changes from remote
+ * @param {Boolean} [remote.export=true] - export changes to remote
+ * @param {Number} [remote.port=3344] - port of the remote WebSocket server
  * @return {Promise}
- *
- * required:
- *   name {String}  local reference to the remote
- *   host {String}  address of the remote
- *   db {String}  name of the database on the remote
- *   username {String}  username of remote account
- *   password {String}  password of remote account
- *
- * opts:
- *   import {Boolean, default true}  import changes from remote
- *   export {Boolean, default true}  export changes to remote
- *   port {Number, default 3344}  port of the remote WebSocket server
  */
 PersDB.prototype.connect = function connect(remote) {
   if (remote == null || typeof remote !== 'object') { throw new TypeError('remote must be an object'); }
@@ -413,10 +401,16 @@ PersDB._objectStoreFromId = function _objectStoreFromId(id) {
   return id.split('\x01', 1)[0];
 };
 
+PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
+  this._log.err('dbe connection error: %s %s', err, connId);
+  conn && conn.close();
+};
+
 /**
  * Return handlers for proxying modifications on the object stores to the snapshot
  * object store. Used if the watch option is set.
  *
+ * @private
  * @return {Object}
  */
 PersDB.prototype._getHandlers = function _getHandlers() {
@@ -468,23 +462,17 @@ PersDB.prototype._getHandlers = function _getHandlers() {
 };
 
 /**
- * Handle conflicting merges or other recoverable write errors.
- *
- * TODO: save conflicts in the conflict object store
- */
-PersDB.prototype._handleConflict = function _handleConflict(obj, cb) {
-  this.emit('conflict', obj);
-  process.nextTick(cb);
-};
-
-/**
  * Write new merges from remotes to the object store and the snapshot object store.
  *
  * See MergeTree.startMerge for object syntax.
  *
- * TODO: verify version in object store to prevent data loss because of race
+ * @todo verify version in object store to prevent data loss because of race
  * conditions between local and remote updates.
- * TODO: make the operations atomic.
+ * @todo make the operations atomic.
+ *
+ * @private
+ * @fires PersDB#data
+ * @fires PersDB#conflict
  */
 PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (obj.c && obj.c.length) {
