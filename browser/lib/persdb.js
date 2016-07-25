@@ -520,8 +520,8 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     }
   }
 
-  // ensure keypath is set if the store has a keypath
-  if (this._keyPaths[osName] && !newVersion.b[this._keyPaths[osName]]) {
+  // ensure keypath is set if the store has a keypath and this is not a delete
+  if (this._keyPaths[osName] && !newVersion.h.d && !newVersion.b[this._keyPaths[osName]]) {
     newVersion.b[this._keyPaths[osName]] = id;
   }
 
