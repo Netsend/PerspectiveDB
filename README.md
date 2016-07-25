@@ -8,14 +8,15 @@ Features:
   * don't rely on a third party (i.e. a cloud service)
   * privacy and [security](https://github.com/Netsend/persdb/wiki/privilege-separation) by design
 * multi-master replication with transformations
-* support for browsers via IndexedDB and WebSockets
+* support for browsers via IndexedDB and WebSockets (see [browser](https://github.com/Netsend/persdb/tree/master/browser))
 * support for MongoDB
 
 Status: beta
 
 Currently deploying the software into a controlled production environment.
 
-# Installation
+
+## Installation
 
 Note: Node.js 4.x is required.
 
@@ -73,7 +74,9 @@ $ sudo bin/persdb config/local/pdb.hjson
 By default a tcp server is started on 127.0.0.1 port 2344. Communication between
 different servers should be done over an ssh tunnel.
 
-# Communicate with browsers: add a WebSocket server
+
+## Communicate with browsers
+### Add a WebSocket server
 
 Communication with browsers can be done using a WebSocket. It is required to
 start the WebSocket server over a modern TLS connection with forward secrecy.
@@ -97,10 +100,13 @@ Edit your config to enable the WebSocket server and include these three files.
 Relative paths are relative to the directory of the config file. An example is
 given in config/examples/example-with-websocket.hjson.
 
-A web client is included in the browser directory. An online example of this
-code is available at [netsend.nl/persbd](https://netsend.nl/persdb/).
+### Run the web client
+A web client is included in the [browser](https://github.com/Netsend/persdb/tree/master/browser)
+directory. Use a local webserver like [http-server](https://www.npmjs.com/package/http-server)
+to run the example in [browser/example](https://github.com/Netsend/persdb/tree/master/browser/example).
 
-# SSH tunnels
+
+## SSH tunnels
 
 In order to communicate with external hosts an SSH tunnel must be used.
 Different tunnels can be setup by PersDB. For those familiar, this works just
@@ -149,12 +155,14 @@ dbs: [
 ]
 ```
 
-# Connecting with MongoDB
+
+## Connecting with MongoDB
 
 A special mongodb adapter is included that can be used to track changes in a
 collection. See adapter/mongodb/README.md for further instructions.
 
-# License
+
+## License
 
 Copyright 2012-2016 Netsend.
 
