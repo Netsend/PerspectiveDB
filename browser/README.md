@@ -2,7 +2,8 @@
 
 Track changes to IndexedDB object stores and sync with peers over a WebSocket.
 
-# Example
+
+## Example
 
 Create the store *customers* and sync with a peer at example.com.
 
@@ -60,7 +61,8 @@ req.onsuccess = (ev) => {
 If not using watch mode, then all updates to any object store should be written
 via `pdb.put` and `pdb.del`.
 
-# Building with browserify
+
+## Building with browserify
 
 Clone this repo and use browserify to create a bundle that can be loaded in the
 browser.
@@ -76,7 +78,8 @@ See config.json and example.html for a working example.
 
 For instructions on how to start a websocket server, see the main readme.
 
-# License
+
+## License
 
 Copyright 2015 Netsend.
 
