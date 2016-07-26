@@ -1,0 +1,26 @@
+#!/usr/bin/env node
+
+'use strict';
+
+var fs = require('fs');
+var path = require('path');
+
+var wss = require('websocket-stream');
+
+if (!process.argv[2]) {
+  console.log('echo stdin to url and the response to stdout');
+  console.log('usage: %s url [ca.pem]', path.basename(process.argv[1]));
+  process.exit();
+}
+
+var opts = {};
+if (process.argv[3]) {
+  opts.ca = fs.readFileSync(process.argv[3]);
+}
+var ws = wss(process.argv[2], null, opts);
+
+ws.on('connect', function() {
+  console.log('connected');
+});
+
+process.stdin.pipe(ws).pipe(process.stdout);
