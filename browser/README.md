@@ -64,7 +64,7 @@ via `pdb.put` and `pdb.del`.
 
 ## API
 
-The API documentation can be found under [docs](https://github.com/Netsend/persdb/tree/master/docs).
+The API documentation can be found under [docs](https://github.com/Netsend/persdb/tree/master/browser/docs).
 
 
 ## Building with browserify
