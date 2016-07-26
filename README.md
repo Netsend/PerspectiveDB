@@ -56,7 +56,7 @@ Create a user account database:
 $ omask=$(umask); umask 077 && touch config/local/passwd.hjson; umask $omask
 ```
 
-Grant access to a user for remote login, i.e. "john":
+Grant access to a user for remote login, i.e. setup a password for user "john":
 ```
 $ ./bin/adduser john >> config/local/passwd.hjson
 ```
