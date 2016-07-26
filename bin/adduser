@@ -40,16 +40,16 @@ function askUsername(cb) {
     });
     return;
   } else {
-    read({ output: process.stderr, prompt: 'username:' }, cb);
+    read({ output: process.stderr, prompt: 'Username:' }, cb);
   }
 }
 
 // cb(err, password)
-function askPassword(cb) {
-  read({ output: process.stderr, prompt: 'password:', silent: true }, function(err, password) {
+function askPassword(username, cb) {
+  read({ output: process.stderr, prompt: 'Define a password for ' + username + ':', silent: true }, function(err, password) {
     if (err) { cb(err); return; }
 
-    read({ output: process.stderr, prompt: 'repeat password:', silent: true }, function(err, password2) {
+    read({ output: process.stderr, prompt: 'Repeat password:', silent: true }, function(err, password2) {
       if (err) { cb(err); return; }
 
       if (password !== password2) {
@@ -65,7 +65,7 @@ function askPassword(cb) {
 askUsername(function(err, username) {
   if (err) { console.error(err.message); process.exit(1); }
 
-  askPassword(function(err, password) {
+  askPassword(username, function(err, password) {
     if (err) { console.error(err.message); process.exit(2); }
 
     var db = [];
