@@ -73,7 +73,8 @@ This module is built with [browserify](http://browserify.org). It is advised to 
 automatically create a build after each source change.
 
 ```shell
-$ watchify browser/example/example.js > browser/build/build.js
+$ npm i
+$ watchify browser/lib/persdb.js -o browser/build/persdb.js
 ```
 
 For instructions on how to start a websocket server, see the main readme.
