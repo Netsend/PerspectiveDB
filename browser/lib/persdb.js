@@ -329,7 +329,7 @@ PersDB.prototype.connect = function connect(remote) {
   var error;
 
   return new Promise((resolve, reject) => {
-    var conn = websocket(uri, 1); // support protocol 1 only
+    var conn = websocket(uri);
 
     var connId = remote.name;
 
