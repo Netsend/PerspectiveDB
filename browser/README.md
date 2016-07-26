@@ -67,26 +67,21 @@ via `pdb.put` and `pdb.del`.
 The API documentation can be found under [docs](https://github.com/Netsend/persdb/tree/master/browser/docs).
 
 
-## Building with browserify
+## Development
 
-Clone this repo and use browserify to create a bundle that can be loaded in the
-browser.
+This module is built with [browserify](http://browserify.org). It is advised to use [watchify](https://www.npmjs.com/package/watchify) to
+automatically create a build after each source change.
 
+```shell
+$ watchify browser/example/example.js > browser/build/build.js
 ```
-$ git clone https://github.com/Netsend/persdb.git
-$ cd persdb
-$ npm install
-$ browserify browser/example/example.js > browser/build/build.js
-```
-
-See config.json and example.html for a working example.
 
 For instructions on how to start a websocket server, see the main readme.
 
 
 ## License
 
-Copyright 2015 Netsend.
+Copyright 2015, 2016 Netsend.
 
 This file is part of PersDB.
 
