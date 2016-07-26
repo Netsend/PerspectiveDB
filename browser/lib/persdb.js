@@ -504,7 +504,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (!this._keyPaths.hasOwnProperty(osName)) {
     this._keyPaths[osName] = os.keyPath;
     if (typeof this._keyPaths[osName] !== 'string') {
-      console.error('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
+      that._log.warning('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
       this._keyPaths[osName] = Object.prototype.toString(this._keyPaths[osName]);
     }
   }
@@ -524,13 +524,13 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   };
 
   tr.onabort = function(ev) {
-    console.error('_writeMerge abort', ev);
+    that._log.err('_writeMerge abort', ev);
     cb(ev.target);
     that._handleConflict(obj, cb);
   };
 
   tr.onerror = function(ev) {
-    console.error('_writeMerge error', ev);
+    that._log.err('_writeMerge error', ev);
     cb(ev.target);
     that._handleConflict(obj, cb);
   };
