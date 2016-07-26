@@ -1,3 +1,7 @@
+# master process
+user: _pdbnull
+group: _pdbnull
+chroot: /var/empty
 log: {
   console: true
   level: debug
@@ -5,6 +9,7 @@ log: {
   error: /var/log/persdb-error.log
 }
 
+# db processes
 dbs: [
   {
     name: mydb
@@ -26,7 +31,3 @@ dbs: [
     }]
   }
 ]
-
-user: _pdbnull
-group: _pdbnull
-#chroot: /var/empty
