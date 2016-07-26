@@ -158,7 +158,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        log: { console: true, mask: logger.DEBUG },
+        log: { console: true, mask: logger.DEBUG2 },
         cert: cert,
         key: key,
         dhparam: dhparam
@@ -204,7 +204,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        log: { console: true, mask: logger.DEBUG },
+        log: { console: true, mask: logger.DEBUG2 },
         cert: cert,
         key: key,
         dhparam: dhparam,
@@ -255,7 +255,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        log: { console: true, mask: logger.DEBUG },
+        log: { console: true, mask: logger.DEBUG2 },
         cert: cert,
         key: key,
         dhparam: dhparam,
@@ -330,7 +330,7 @@ tasks.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        log: { console: true, mask: logger.DEBUG },
+        log: { console: true, mask: logger.DEBUG2 },
         cert: cert,
         key: key,
         dhparam: dhparam,
@@ -414,7 +414,7 @@ tasks2.push(function(done) {
     switch (msg) {
     case 'init':
       child.send({
-        log: { console: true, mask: logger.DEBUG },
+        log: { console: true, mask: logger.DEBUG2 },
         cert: cert,
         key: key,
         dhparam: dhparam,
