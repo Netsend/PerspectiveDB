@@ -333,6 +333,12 @@ PersDB.prototype.connect = function connect(remote) {
 
     var connId = remote.name;
 
+    conn.once('error', reject);
+
+    conn.on('close', function() {
+      delete that._connections[connId];
+    });
+
     // register connection
     if (that._connections[connId]) {
       error = new Error('connection already exists');
@@ -340,10 +346,6 @@ PersDB.prototype.connect = function connect(remote) {
       reject(error);
       return;
     }
-
-    conn.on('close', function() {
-      delete that._connections[connId];
-    });
 
     that._connections[connId] = conn;
 
