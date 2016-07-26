@@ -97,8 +97,7 @@ $ rm config/local/csr.pem
 ```
 
 Edit your config to enable the WebSocket server and include these three files.
-Relative paths are relative to the directory of the config file. An example is
-given in config/examples/example-with-websocket.hjson.
+Relative paths are relative to the directory of the config file.
 
 ### Run the web client
 A web client is included in the [browser](https://github.com/Netsend/persdb/tree/master/browser)

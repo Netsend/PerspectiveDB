@@ -34,5 +34,5 @@ dbs: [
 ]
 ```
 
-A full example is given in config/example-with-mongo.hjson. Make sure to specify
+A full example is given in config/examples/example.hjson. Make sure to specify
 mongo auth credentials if they are needed.

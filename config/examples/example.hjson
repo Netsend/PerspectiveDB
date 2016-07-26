@@ -1,4 +1,4 @@
-# master process
+# Master process
 user: _pdbnull
 group: _pdbnull
 chroot: /var/empty
@@ -9,24 +9,21 @@ log: {
   error: /var/log/persdb-error.log
 }
 
-# db processes
-dbs: [
-  {
-    name: mydb
-    user: pdblevel
-    group: pdblevel
-    chroot: /srv/persdb/mydb
-    perspectives: [{
-      name: "john"
-      passdb: "passwd.hjson"
-      import: true
-      export: true
-    }]
-  }
-]
+# uncomment the following to enable the WebSocket server, this is only needed
+# to sync with browsers
+# WSS process
+#wss: {
+#  key: "key.pem"               # use `umask 077 && openssl genrsa -out key.pem 2048`
+#  cert: "cert.pem"             # use `openssl req -new -sha256 -key key.pem -out csr.pem && openssl x509 -req -in csr.pem -signkey key.pem -out cert.pem`
+#  dhparam: "dhparam.pem"       # use `openssl dhparam -outform PEM -out dhparam.pem 2048`
+#  host: "SERVER-IP-ADDRESS"
+#  #port: 3344                  # this is the default
+#}
 
-# tunnel processes, if used
+# uncomment the following to enable communication with other PersDB servers,
+# this must be done over an SSH tunnel
 #tunnels: [
+# Tunnel processes
 #  {
 #    connect: ssh://mongodb.example.com:22
 #    fingerprint: DR5pI2uaxhQDyem9Cf0tQQ3RivlbC7jmJn5kkWpiY2g
@@ -35,3 +32,32 @@ dbs: [
 #    forward: 1337:127.0.0.1:27017
 #  }
 #]
+
+# DB processes
+dbs: [
+  {
+    name: mydb
+    user: pdblevel
+    group: pdblevel
+    chroot: /srv/persdb/mydb
+#    source: {                 # uncomment this section to enable the mongo
+#                              # adapter and mirror with a mongdb collection
+#      url: mongodb://127.0.0.1:27017/pdb
+#      coll: test3
+#      #dbUser: bar
+#      #oplogDbUser: bar
+#      #secrets: "secrets.hjson"
+#    }
+    perspectives: [{
+      name: "john"
+      passdb: "passwd.hjson"
+      import: true
+      export: true
+    }, {
+      name: "joe"
+      passdb: "passwd.hjson"
+      import: false            # don't import anything from joe, just export
+      export: true
+    }]
+  }
+]
