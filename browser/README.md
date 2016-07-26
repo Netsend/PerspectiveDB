@@ -77,6 +77,11 @@ $ npm i
 $ watchify browser/lib/persdb.js -o browser/build/persdb.js
 ```
 
+Quickly wipe all IndexedDBs in all your Firefox profiles on OS X:
+```shell
+$ rm -rf ~/Library/Application\ Support/Firefox/profiles/*/storage/default/*
+```
+
 For instructions on how to start a websocket server, see the main readme.
 
 
