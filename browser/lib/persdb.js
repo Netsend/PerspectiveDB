@@ -28,7 +28,6 @@ var websocket = require('websocket-stream');
 var xtend = require('xtend');
 
 var proxy = require('./proxy');
-var getConnectionId = require('../../lib/get_connection_id');
 var MergeTree = require('../../lib/merge_tree');
 var remoteConnHandler = require('../../lib/remote_conn_handler');
 
@@ -332,7 +331,7 @@ PersDB.prototype.connect = function connect(remote) {
   return new Promise((resolve, reject) => {
     var conn = websocket(uri, 1); // support protocol 1 only
 
-    var connId = getConnectionId(conn);
+    var connId = remote.name;
 
     // register connection
     if (that._connections[connId]) {
