@@ -329,15 +329,17 @@ PersDB.prototype.connect = function connect(remote) {
   var error;
 
   return new Promise((resolve, reject) => {
-    var conn = websocket(uri);
+    var conn = new WebSocket(uri);
 
     var connId = remote.name;
 
-    conn.once('error', reject);
+    conn.onerror = reject;
 
-    conn.on('close', function() {
+    // cleanup closed connections
+    conn.onclose = function() {
+      reject(); // ensure promise is called when the connection is closed prematurely
       delete that._connections[connId];
-    });
+    };
 
     // register connection
     if (that._connections[connId]) {
@@ -350,8 +352,8 @@ PersDB.prototype.connect = function connect(remote) {
     that._connections[connId] = conn;
 
     // send the auth request
-    conn.write(JSON.stringify(authReq) + '\n', function(err) {
-      if (err) { reject(err); return; }
+    conn.onopen = function() {
+      conn.send(JSON.stringify(authReq) + '\n');
 
       // start merging
       that._mt.addPerspective(remote.name);
@@ -362,7 +364,8 @@ PersDB.prototype.connect = function connect(remote) {
       }, remote);
 
       // do the data request handshake and setup readers and writers.
-      remoteConnHandler(conn, that._mt, opts, true, remote.name, function(err) {
+      // pass the socket with stream capabilities
+      remoteConnHandler(websocket(conn), that._mt, opts, true, remote.name, function(err) {
         if (err) {
           that._connErrorHandler(conn, connId, err);
           reject(err);
@@ -371,7 +374,7 @@ PersDB.prototype.connect = function connect(remote) {
 
         resolve();
       });
-    });
+    };
   });
 };
 
