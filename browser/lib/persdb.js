@@ -33,54 +33,7 @@ var remoteConnHandler = require('../../lib/remote_conn_handler');
 
 var noop = function() {};
 
-/**
- * @event PersDB#data
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- */
-/**
- * @event PersDB#conflict
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- * @param {?Array} obj.c - array with conflicting key names
- */
-
-/**
- * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
- * handled) before passing it to this constructor. If opts.watch is used, then add,
- * put and delete operations on any of the object stores are automatically
- * detected. Note that for watch to work, ES6 Proxy must be supported by the
- * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
- * and {@link PersDB#del} must be used in order to modify the contents of any
- * object store.
- *
- * @class PersDB
- *
- * @param {IDBDatabase} idb  opened IndexedDB database
- * @param {Object} [opts]
- * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
- *
- * @fires PersDB#data
- * @fires PersDB#conflict
- *
- * @todo support loading hooks
- */
-function PersDB(idb, opts) {
-  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
-
-  if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.snapshots != null && typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
-  if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
-  if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
-  if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
-
+function PersDB(idb, ldb, opts) {
   EE.call(this, opts);
 
   var that = this;
@@ -101,13 +54,10 @@ function PersDB(idb, opts) {
     close: noop
   };
 
-  var snapshots = opts.snapshots || '_pdb';
-
   this._idb = idb;
+  this._db = ldb;
   this._opts = opts;
   this._connections = {};
-
-  this._db = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
 
   // setup list of connections to initiate and create an index by perspective name
   //this._persCfg = parsePersConfigs(this._opts.perspectives || []);
@@ -188,8 +138,73 @@ function PersDB(idb, opts) {
 
   // whether or not a proxy is used, make sure the original IndexedDB transaction method is available
   this._idbTransaction = idb.transaction.bind(idb);
+}
 
-  if (this._opts.watch) {
+util.inherits(PersDB, EE);
+
+module.exports = global.PersDB = PersDB;
+
+/**
+ * @event PersDB#data
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ */
+/**
+ * @event PersDB#conflict
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ * @param {?Array} obj.c - array with conflicting key names
+ */
+
+/**
+ * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
+ * handled) before passing it to this constructor. If opts.watch is used, then add,
+ * put and delete operations on any of the object stores are automatically
+ * detected. Note that for watch to work, ES6 Proxy must be supported by the
+ * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
+ * and {@link PersDB#del} must be used in order to modify the contents of any
+ * object store.
+ *
+ * @constructor
+ *
+ * @param {IDBDatabase} idb  opened IndexedDB database
+ * @param {Object} [opts]
+ * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
+ * @return {Promise}
+ *
+ * @fires PersDB#data
+ * @fires PersDB#conflict
+ *
+ * @todo support loading hooks
+ */
+PersDB.createNode = function createNode(idb, opts) {
+  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
+
+  if (opts == null) { opts = {}; }
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+
+  if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
+  if (opts.snapshots != null && typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
+  if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
+  if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
+  if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
+
+  var snapshots = opts.snapshots || '_pdb';
+
+  var ldb = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
+  var pdb = new PersDB(idb, ldb, opts);
+
+  // auto-merge remote versions (use a writable stream to enable backpressure)
+  pdb._mt.startMerge().pipe(new stream.Writable({
+    objectMode: true,
+    write: pdb._writeMerge.bind(pdb)
+  }));
+
+  if (opts.watch) {
     // transparently track IndexedDB updates using proxy module
 
     // only proxy readwrite transactions that are not on the snapshot object store
@@ -197,19 +212,15 @@ function PersDB(idb, opts) {
       return mode === 'readwrite' && osName !== snapshots;
     }
 
-    proxy(this._idb, doProxy, that._getHandlers());
+    proxy(idb, doProxy, pdb._getHandlers());
   }
 
-  // auto-merge remote versions (use a writable stream to enable backpressure)
-  this._mt.startMerge().pipe(new stream.Writable({
-    objectMode: true,
-    write: that._writeMerge.bind(that)
-  }));
-}
-
-util.inherits(PersDB, EE);
-
-module.exports = global.PersDB = PersDB;
+  return new Promise(function(resolve, reject) {
+    process.nextTick(function() {
+      resolve(pdb);
+    });
+  });
+};
 
 /**
  * Insert or update an item in a store by key.
