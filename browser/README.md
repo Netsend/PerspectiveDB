@@ -77,7 +77,7 @@ automatically create a build after each source change.
 
 ```shell
 $ npm i
-$ watchify browser/lib/persdb.js -o browser/build/persdb.js
+$ watchify browser/lib/persdb.js -o browser/build.js
 ```
 
 Quickly wipe all IndexedDBs in all your Firefox profiles on OS X:
