@@ -519,7 +519,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   // make sure the keypath of this object store is known
   if (!this._keyPaths.hasOwnProperty(osName)) {
     this._keyPaths[osName] = os.keyPath;
-    if (typeof this._keyPaths[osName] !== 'string') {
+    if (this._keyPaths[osName] != null && typeof this._keyPaths[osName] !== 'string') {
       that._log.warning('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
       this._keyPaths[osName] = Object.prototype.toString(this._keyPaths[osName]);
     }
@@ -556,6 +556,6 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     os.delete(id);
   } else {
     that._log.debug2('put', newVersion.b);
-    os.put(newVersion.b);
+    os.put(newVersion.b, id);
   }
 };
