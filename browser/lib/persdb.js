@@ -29,10 +29,17 @@ var xtend = require('xtend');
 
 var proxy = require('./proxy');
 var MergeTree = require('../../lib/merge_tree');
+var idbIdOps = require('../../lib/idb_id_ops');
 var remoteConnHandler = require('../../lib/remote_conn_handler');
+
+// hooks
+var filterIdbStore = require('../../hooks/core/filter_idb_store');
 
 var noop = function() {};
 
+/**
+ * @class PersDB
+ */
 function PersDB(idb, ldb, opts) {
   EE.call(this, opts);
 
@@ -236,7 +243,7 @@ PersDB.prototype.put = function put(objectStore, key, item) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
-  var id = PersDB._generateId(objectStore, key);
+  var id = idbIdOps.generateId(objectStore, key);
   return new Promise((resolve, reject) => {
     this._localWriter.write({
       n: {
@@ -262,7 +269,7 @@ PersDB.prototype.del = function del(objectStore, key) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
-  var id = PersDB._generateId(objectStore, key);
+  var id = idbIdOps.generateId(objectStore, key);
   return new Promise((resolve, reject) => {
     this._localWriter.write({
       n: {
@@ -311,8 +318,9 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
  * @param remote.db {String}  name of the database on the remote
  * @param {String} remote.username - username of remote account
  * @param {String} remote.password - password of remote account
- * @param {Boolean} [remote.import=true] - import changes from remote
- * @param {Boolean} [remote.export=true] - export changes to remote
+ * @param {Array} [remote.stores] - limit synchronization to given stores
+ * @param {Boolean|Object} [remote.import=true] - import changes from remote
+ * @param {Boolean|Object} [remote.export=true] - export changes to remote
  * @param {Number} [remote.port=3344] - port of the remote WebSocket server
  * @return {Promise}
  */
@@ -338,6 +346,35 @@ PersDB.prototype.connect = function connect(remote) {
   var port = remote.port || '3344';
   var uri = 'wss://' + remote.host + ':' + port;
   var error;
+
+  // prevent side effects
+  remote = xtend(remote);
+
+  // see if imported and exported stores must be limited
+  if (remote.stores && remote.stores.length) {
+    remote.import = xtend(remote.import);
+    remote.export = xtend(remote.export);
+
+    // for import
+    if (remote.import == null || typeof remote.import === 'boolean') {
+      remote.import = {};
+    }
+
+    remote.import.hooks = remote.import.hooks || [];
+    remote.import.hooksOpts = remote.import.hooksOpts || {};
+    remote.import.hooksOpts.stores = remote.stores;
+    remote.import.hooks.push(filterIdbStore);
+
+    // same for export
+    if (remote.export == null || typeof remote.export === 'boolean') {
+      remote.export = {};
+    }
+
+    remote.export.hooks = remote.export.hooks || [];
+    remote.export.hooksOpts = remote.export.hooksOpts || {};
+    remote.export.hooksOpts.stores = remote.stores;
+    remote.export.hooks.push(filterIdbStore);
+  }
 
   return new Promise((resolve, reject) => {
     var conn = new WebSocket(uri);
@@ -401,23 +438,6 @@ PersDB.prototype.disconnect = function disconnect(cb) {
   }, cb);
 };
 
-// create an id
-PersDB._generateId = function _generateId(objectStore, key) {
-  return objectStore + '\x01' + key;
-};
-
-// extract an id
-PersDB._idFromId = function _idFromId(id) {
-  // expect only one 0x01
-  return id.split('\x01', 2)[1];
-};
-
-// extract an object store from an id
-PersDB._objectStoreFromId = function _objectStoreFromId(id) {
-  // expect only one 0x01
-  return id.split('\x01', 1)[0];
-};
-
 PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
   this._log.err('connection error with %s: %s', connId, err);
   conn && conn.close();
@@ -439,7 +459,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
     ret.onsuccess = function(ev) {
       var obj = {
         n: {
-          h: { id: PersDB._generateId(ev.target.source.name, ev.target.result) },
+          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
           b: value
         }
       };
@@ -452,7 +472,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
     ret.onsuccess = function(ev) {
       var obj = {
         n: {
-          h: { id: PersDB._generateId(ev.target.source.name, ev.target.result) },
+          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
           b: value
         }
       };
@@ -466,7 +486,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
       var obj = {
         n: {
           h: {
-            id: PersDB._generateId(ev.target.source.name, key),
+            id: idbIdOps.generateId(ev.target.source.name, key),
             d: true
           }
         }
@@ -502,13 +522,13 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   var newVersion = obj.n;
   var prevVersion = obj.l;
 
-  var osName = PersDB._objectStoreFromId(newVersion.h.id);
+  var osName = idbIdOps.objectStoreFromId(newVersion.h.id);
   if (!this._stores[osName]) {
     this._log.notice('_writeMerge object from an unknown object store received', osName, newVersion.h);
     process.nextTick(cb);
     return;
   }
-  var id = PersDB._idFromId(newVersion.h.id);
+  var id = idbIdOps.idFromId(newVersion.h.id);
 
   this._log.debug2('_writeMerge', osName, newVersion.h);
 
