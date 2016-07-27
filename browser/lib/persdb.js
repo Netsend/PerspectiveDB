@@ -38,7 +38,28 @@ var filterIdbStore = require('../../hooks/core/filter_idb_store');
 var noop = function() {};
 
 /**
+ * @event PersDB#data
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ */
+/**
+ * @event PersDB#conflict
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ * @param {?Array} obj.c - array with conflicting key names
+ */
+
+/**
+ * Use {@link PersDB.createNode} to create a new instance. Don't use new PersDB directly.
+ *
  * @class PersDB
+ *
+ * @fires PersDB#data
+ * @fires PersDB#conflict
  */
 function PersDB(idb, ldb, opts) {
   EE.call(this, opts);
@@ -90,39 +111,30 @@ util.inherits(PersDB, EE);
 module.exports = global.PersDB = PersDB;
 
 /**
- * @event PersDB#data
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- */
-/**
- * @event PersDB#conflict
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- * @param {?Array} obj.c - array with conflicting key names
- */
-
-/**
- * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
- * handled) before passing it to this constructor. If opts.watch is used, then add,
- * put and delete operations on any of the object stores are automatically
- * detected. Note that for watch to work, ES6 Proxy must be supported by the
- * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
- * and {@link PersDB#del} must be used in order to modify the contents of any
- * object store.
+ * Create a new {@link PersDB} instance. Make sure idb is opened (and upgradeneeded is
+ * handled) before passing it to this method. Furthermore, don't start writing to
+ * any object store until the promise is resolved with the pdb instance.
  *
- * @constructor
+ * If opts.watch is used, then add, put and delete operations on any of the object
+ * stores are automatically detected. Note that for watch to work, ES6 Proxy must
+ * be supported by the browser (i.e. Firefox 18+ or Chrome 49+). If watch is not
+ * used, {@link PersDB#put} and {@link PersDB#del} must be used in order to modify
+ * the contents of any object store.
+ *
+ * @example:
+ * indexedDB.open('MyDB').onsuccess = ev => {
+ *   var db = ev.target.result
+ *   var opts = { watch: true }
+ *
+ *   PersDB.createNode(db, opts).then(pdb => {
+ *     pdb.connect({ ... })
+ *   }).catch(err => console.error(err))
+ * })
  *
  * @param {IDBDatabase} idb  opened IndexedDB database
  * @param {Object} [opts]
  * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
- * @return {Promise}
- *
- * @fires PersDB#data
- * @fires PersDB#conflict
+ * @return {Promise} resolves with a new PersDB instance
  */
 PersDB.createNode = function createNode(idb, opts) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }

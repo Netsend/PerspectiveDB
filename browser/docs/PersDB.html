@@ -20,7 +20,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li><li><a href="PersDB.createNode.html">createNode</a></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -56,6 +56,10 @@
     
 
 
+
+<div class="description">
+    Use <a href="PersDB.html#.createNode">PersDB.createNode</a> to create a new instance. Don't use new PersDB directly.
+</div>
 
 
 
@@ -98,7 +102,271 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line40">line 40</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line56">line 56</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+<h5>Fires:</h5>
+<ul>
+    <li><a href="PersDB.html#event:data">PersDB#event:data</a></li>
+
+    <li><a href="PersDB.html#event:conflict">PersDB#event:conflict</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+     
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    <h4 class="name" id=".createNode"><span class="type-signature">(static) </span>createNode<span class="signature">(idb, opts<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Create a new <a href="PersDB.html">PersDB</a> instance. Make sure idb is opened (and upgradeneeded is
+handled) before passing it to this method. Furthermore, don't start writing to
+any object store until the promise is resolved with the pdb instance.
+
+If opts.watch is used, then add, put and delete operations on any of the object
+stores are automatically detected. Note that for watch to work, ES6 Proxy must
+be supported by the browser (i.e. Firefox 18+ or Chrome 49+). If watch is not
+used, <a href="PersDB.html#put">PersDB#put</a> and <a href="PersDB.html#del">PersDB#del</a> must be used in order to modify
+the contents of any object store.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>idb</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">IDBDatabase</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">opened IndexedDB database</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>opts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>watch</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">automatically watch changes to all object stores using ES6 Proxy</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line139">line 139</a>
     </li></ul></dd>
     
 
@@ -121,33 +389,30 @@
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    resolves with a new PersDB instance
+</div>
 
 
 
-    
-    </div>
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
 
-    
 
-    
-
-    
-        <h3 class="subsection-title">Classes</h3>
-
-        <dl>
-            <dt><a href="PersDB.createNode.html">createNode</a></dt>
-            <dd></dd>
-        </dl>
-    
-
-     
-
-    
+    </dd>
+</dl>
 
     
 
-    
-        <h3 class="subsection-title">Methods</h3>
+
 
         
             
@@ -620,7 +885,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line263">line 263</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line275">line 275</a>
     </li></ul></dd>
     
 
@@ -1123,7 +1388,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line243">line 243</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line255">line 255</a>
     </li></ul></dd>
     
 
@@ -1302,7 +1567,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line204">line 204</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line216">line 216</a>
     </li></ul></dd>
     
 
@@ -1504,7 +1769,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line178">line 178</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line190">line 190</a>
     </li></ul></dd>
     
 
@@ -1822,7 +2087,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line99">line 99</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line47">line 47</a>
     </li></ul></dd>
     
 
@@ -2074,7 +2339,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line92">line 92</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line40">line 40</a>
     </li></ul></dd>
     
 
@@ -2114,7 +2379,7 @@ transfering BSON.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 19:12:16 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 20:11:57 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
