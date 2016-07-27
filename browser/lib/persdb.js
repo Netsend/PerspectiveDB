@@ -406,7 +406,7 @@ PersDB._objectStoreFromId = function _objectStoreFromId(id) {
 };
 
 PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
-  this._log.err('dbe connection error: %s %s', err, connId);
+  this._log.err('connection error with %s: %s', connId, err);
   conn && conn.close();
 };
 
