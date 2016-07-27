@@ -363,6 +363,8 @@ PersDB.prototype.connect = function connect(remote) {
         export: true,
       }, remote);
 
+      conn.binaryType = 'arraybuffer';
+
       // do the data request handshake and setup readers and writers.
       // pass the socket with stream capabilities
       remoteConnHandler(websocket(conn), that._mt, opts, true, remote.name, function(err) {
