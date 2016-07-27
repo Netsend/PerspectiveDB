@@ -7,7 +7,7 @@ Track changes to IndexedDB object stores and sync with peers over a WebSocket.
 
 Create the stores *customers* and *employees* and sync with a peer at example.com.
 
-Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/persdb/master/browser/build/persdb.js) in your html so that the global PersDB is set:
+Include a [build](https://netsend.nl/persdb/build.js) in your html so that the global PersDB is set:
 ```html
 <!DOCTYPE html>
 <html>
@@ -16,7 +16,7 @@ Include [browser/build/persdb.js](https://raw.githubusercontent.com/Netsend/pers
 <title>PersDB example</title>
 </head>
 <body>
-<script type="text/javascript" src="../build/persdb.js"></script>
+<script type="text/javascript" src="https://netsend.nl/persdb/build.js"></script>
 <script type="text/javascript" src="example.js"></script>
 </body>
 </html>
@@ -61,6 +61,8 @@ req.onsuccess = (ev) => {
 
 If not using watch mode, then all updates to any object store should be written
 via `pdb.put` and `pdb.del`.
+
+Note that a build can be created by using browserify, see *Development* for instructions.
 
 
 ## API
