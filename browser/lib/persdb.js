@@ -66,68 +66,6 @@ function PersDB(idb, ldb, opts) {
   this._opts = opts;
   this._connections = {};
 
-  // setup list of connections to initiate and create an index by perspective name
-  //this._persCfg = parsePersConfigs(this._opts.perspectives || []);
-  //this._log.info('db persCfg', debugReq(this._persCfg));
-
-  // inspect protocols, currently only wss is supported as a valid protocol
-  /*
-  this._persCfg.connect.forEach(function(pe) {
-    var cfg = that._persCfg.pers[pe];
-    if (cfg.connect.protocol !== 'wss:') {
-      var err = new Error('only possible to connect to perspectives via wss');
-      that._log.err('perspective config error: %s %s', err, cfg.connect);
-      throw err;
-    }
-  });
-
-  // setup all import and export hooks, filters and a MergeTree
-
-  // return hooksOpts with all but the pre-configured keys
-  function createHooksOpts(cfg) {
-    var hooksOpts = cfg.hooksOpts || {};
-
-    Object.keys(cfg).forEach(function(key) {
-      if (!~['filter', 'hooks', 'hooksOpts', 'hide'].indexOf(key)) {
-        hooksOpts[key] = cfg[key];
-      }
-    });
-
-    return hooksOpts;
-  }
-
-  // if hooksOpts has a hide key, push a new hook in hooks
-  function ensureHideHook(hooksOpts, hooks) {
-    if (hooksOpts && hooksOpts.hide) {
-      // create a hook for keys to hide
-      var keysToHide = hooksOpts.hide;
-      hooks.push(function(db, item, opts2, cb) {
-        keysToHide.forEach(function(key) {
-          delete item[key];
-        });
-        cb(null, item);
-      });
-    }
-  }
-
-  // replace hide keys with actual hook implementations
-  Object.keys(this._persCfg.pers).forEach(function(name) {
-    var pers = that._persCfg.pers[name];
-    if (pers.import) {
-      if (pers.import.hooksOpts) {
-        ensureHideHook(pers.import.hooksOpts, pers.import.hooks);
-        pers.import.hooksOpts = createHooksOpts(pers.import.hooksOpts);
-      }
-    }
-    if (pers.export) {
-      if (pers.export.hooksOpts) {
-        ensureHideHook(pers.export.hooksOpts, pers.export.hooks);
-        pers.export.hooksOpts = createHooksOpts(pers.export.hooksOpts);
-      }
-    }
-  });
-  */
-
   this._stores = {}; // enable fast store lookup
   for (var i = 0; i < idb.objectStoreNames.length; i++) {
     var store = idb.objectStoreNames[i];
@@ -185,8 +123,6 @@ module.exports = global.PersDB = PersDB;
  *
  * @fires PersDB#data
  * @fires PersDB#conflict
- *
- * @todo support loading hooks
  */
 PersDB.createNode = function createNode(idb, opts) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
