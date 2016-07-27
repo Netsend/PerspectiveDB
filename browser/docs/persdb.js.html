@@ -20,7 +20,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li><li><a href="PersDB.createNode.html">createNode</a></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -65,60 +65,19 @@ var websocket = require('websocket-stream');
 var xtend = require('xtend');
 
 var proxy = require('./proxy');
-var getConnectionId = require('../../lib/get_connection_id');
 var MergeTree = require('../../lib/merge_tree');
+var idbIdOps = require('../../lib/idb_id_ops');
 var remoteConnHandler = require('../../lib/remote_conn_handler');
+
+// hooks
+var filterIdbStore = require('../../hooks/core/filter_idb_store');
 
 var noop = function() {};
 
 /**
- * @event PersDB#data
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- */
-/**
- * @event PersDB#conflict
- * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- * @param {?Array} obj.c - array with conflicting key names
- */
-
-/**
- * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
- * handled) before passing it to this constructor. If opts.watch is used, then add,
- * put and delete operations on any of the object stores are automatically
- * detected. Note that for watch to work, ES6 Proxy must be supported by the
- * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
- * and {@link PersDB#del} must be used in order to modify the contents of any
- * object store.
- *
  * @class PersDB
- *
- * @param {IDBDatabase} idb  opened IndexedDB database
- * @param {Object} [opts]
- * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
- *
- * @fires PersDB#data
- * @fires PersDB#conflict
- *
- * @todo support loading hooks
  */
-function PersDB(idb, opts) {
-  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-
-  if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
-
-  if (opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.snapshots != null &amp;&amp; typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
-  if (opts.iterator != null &amp;&amp; typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
-  if (opts.perspectives != null &amp;&amp; !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
-  if (opts.mergeTree != null &amp;&amp; typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
-
+function PersDB(idb, ldb, opts) {
   EE.call(this, opts);
 
   var that = this;
@@ -139,13 +98,10 @@ function PersDB(idb, opts) {
     close: noop
   };
 
-  var snapshots = opts.snapshots || '_pdb';
-
   this._idb = idb;
+  this._db = ldb;
   this._opts = opts;
   this._connections = {};
-
-  this._db = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
 
   // setup list of connections to initiate and create an index by perspective name
   //this._persCfg = parsePersConfigs(this._opts.perspectives || []);
@@ -226,8 +182,73 @@ function PersDB(idb, opts) {
 
   // whether or not a proxy is used, make sure the original IndexedDB transaction method is available
   this._idbTransaction = idb.transaction.bind(idb);
+}
 
-  if (this._opts.watch) {
+util.inherits(PersDB, EE);
+
+module.exports = global.PersDB = PersDB;
+
+/**
+ * @event PersDB#data
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ */
+/**
+ * @event PersDB#conflict
+ * @param {Object} obj
+ * @param {String} obj.os - name of the object store
+ * @param {?Object} obj.n - new version, is null on delete
+ * @param {?Object} obj.p - previous version, is null on insert
+ * @param {?Array} obj.c - array with conflicting key names
+ */
+
+/**
+ * Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
+ * handled) before passing it to this constructor. If opts.watch is used, then add,
+ * put and delete operations on any of the object stores are automatically
+ * detected. Note that for watch to work, ES6 Proxy must be supported by the
+ * browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, {@link PersDB#put}
+ * and {@link PersDB#del} must be used in order to modify the contents of any
+ * object store.
+ *
+ * @constructor
+ *
+ * @param {IDBDatabase} idb  opened IndexedDB database
+ * @param {Object} [opts]
+ * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
+ * @return {Promise}
+ *
+ * @fires PersDB#data
+ * @fires PersDB#conflict
+ *
+ * @todo support loading hooks
+ */
+PersDB.createNode = function createNode(idb, opts) {
+  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
+
+  if (opts == null) { opts = {}; }
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+
+  if (opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
+  if (opts.snapshots != null &amp;&amp; typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
+  if (opts.iterator != null &amp;&amp; typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
+  if (opts.perspectives != null &amp;&amp; !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
+  if (opts.mergeTree != null &amp;&amp; typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
+
+  var snapshots = opts.snapshots || '_pdb';
+
+  var ldb = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
+  var pdb = new PersDB(idb, ldb, opts);
+
+  // auto-merge remote versions (use a writable stream to enable backpressure)
+  pdb._mt.startMerge().pipe(new stream.Writable({
+    objectMode: true,
+    write: pdb._writeMerge.bind(pdb)
+  }));
+
+  if (opts.watch) {
     // transparently track IndexedDB updates using proxy module
 
     // only proxy readwrite transactions that are not on the snapshot object store
@@ -235,19 +256,15 @@ function PersDB(idb, opts) {
       return mode === 'readwrite' &amp;&amp; osName !== snapshots;
     }
 
-    proxy(this._idb, doProxy, that._getHandlers());
+    proxy(idb, doProxy, pdb._getHandlers());
   }
 
-  // auto-merge remote versions (use a writable stream to enable backpressure)
-  this._mt.startMerge().pipe(new stream.Writable({
-    objectMode: true,
-    write: that._writeMerge.bind(that)
-  }));
-}
-
-util.inherits(PersDB, EE);
-
-module.exports = global.PersDB = PersDB;
+  return new Promise(function(resolve, reject) {
+    process.nextTick(function() {
+      resolve(pdb);
+    });
+  });
+};
 
 /**
  * Insert or update an item in a store by key.
@@ -263,7 +280,7 @@ PersDB.prototype.put = function put(objectStore, key, item) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
-  var id = PersDB._generateId(objectStore, key);
+  var id = idbIdOps.generateId(objectStore, key);
   return new Promise((resolve, reject) => {
     this._localWriter.write({
       n: {
@@ -289,7 +306,7 @@ PersDB.prototype.del = function del(objectStore, key) {
   // should use something very much like this.writeMerge
   throw new Error('not implemented yet');
 
-  var id = PersDB._generateId(objectStore, key);
+  var id = idbIdOps.generateId(objectStore, key);
   return new Promise((resolve, reject) => {
     this._localWriter.write({
       n: {
@@ -338,8 +355,9 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
  * @param remote.db {String}  name of the database on the remote
  * @param {String} remote.username - username of remote account
  * @param {String} remote.password - password of remote account
- * @param {Boolean} [remote.import=true] - import changes from remote
- * @param {Boolean} [remote.export=true] - export changes to remote
+ * @param {Array} remote.stores - limit synchronization to given stores
+ * @param {Boolean|Object} [remote.import=true] - import changes from remote
+ * @param {Boolean|Object} [remote.export=true] - export changes to remote
  * @param {Number} [remote.port=3344] - port of the remote WebSocket server
  * @return {Promise}
  */
@@ -350,6 +368,7 @@ PersDB.prototype.connect = function connect(remote) {
   if (!remote.db || typeof remote.db !== 'string') { throw new TypeError('remote.db must be a string'); }
   if (!remote.username || typeof remote.username !== 'string') { throw new TypeError('remote.username must be a string'); }
   if (!remote.password || typeof remote.password !== 'string') { throw new TypeError('remote.password must be a string'); }
+  if (!remote.stores || !Array.isArray(remote.stores)) { throw new TypeError('remote.stores must be an array'); }
 
   // options
   if (remote.port &amp;&amp; typeof remote.port !== 'number') { throw new TypeError('remote.port must be a number'); }
@@ -366,10 +385,47 @@ PersDB.prototype.connect = function connect(remote) {
   var uri = 'wss://' + remote.host + ':' + port;
   var error;
 
-  return new Promise((resolve, reject) => {
-    var conn = websocket(uri, 1); // support protocol 1 only
+  // prevent side effects
+  remote = xtend(remote);
 
-    var connId = getConnectionId(conn);
+  // see if imported and exported stores must be limited
+  if (remote.stores &amp;&amp; remote.stores.length) {
+    remote.import = xtend(remote.import);
+    remote.export = xtend(remote.export);
+
+    // for import
+    if (remote.import == null || typeof remote.import === 'boolean') {
+      remote.import = {};
+    }
+
+    remote.import.hooks = remote.import.hooks || [];
+    remote.import.hooksOpts = remote.import.hooksOpts || {};
+    remote.import.hooksOpts.stores = remote.stores;
+    remote.import.hooks.push(filterIdbStore);
+
+    // same for export
+    if (remote.export == null || typeof remote.export === 'boolean') {
+      remote.export = {};
+    }
+
+    remote.export.hooks = remote.export.hooks || [];
+    remote.export.hooksOpts = remote.export.hooksOpts || {};
+    remote.export.hooksOpts.stores = remote.stores;
+    remote.export.hooks.push(filterIdbStore);
+  }
+
+  return new Promise((resolve, reject) => {
+    var conn = new WebSocket(uri);
+
+    var connId = remote.name;
+
+    conn.onerror = reject;
+
+    // cleanup closed connections
+    conn.onclose = function() {
+      reject(); // ensure promise is called when the connection is closed prematurely
+      delete that._connections[connId];
+    };
 
     // register connection
     if (that._connections[connId]) {
@@ -379,15 +435,11 @@ PersDB.prototype.connect = function connect(remote) {
       return;
     }
 
-    conn.on('close', function() {
-      delete that._connections[connId];
-    });
-
     that._connections[connId] = conn;
 
     // send the auth request
-    conn.write(JSON.stringify(authReq) + '\n', function(err) {
-      if (err) { reject(err); return; }
+    conn.onopen = function() {
+      conn.send(JSON.stringify(authReq) + '\n');
 
       // start merging
       that._mt.addPerspective(remote.name);
@@ -397,8 +449,11 @@ PersDB.prototype.connect = function connect(remote) {
         export: true,
       }, remote);
 
+      conn.binaryType = 'arraybuffer';
+
       // do the data request handshake and setup readers and writers.
-      remoteConnHandler(conn, that._mt, opts, true, remote.name, function(err) {
+      // pass the socket with stream capabilities
+      remoteConnHandler(websocket(conn), that._mt, opts, true, remote.name, function(err) {
         if (err) {
           that._connErrorHandler(conn, connId, err);
           reject(err);
@@ -407,7 +462,7 @@ PersDB.prototype.connect = function connect(remote) {
 
         resolve();
       });
-    });
+    };
   });
 };
 
@@ -421,25 +476,8 @@ PersDB.prototype.disconnect = function disconnect(cb) {
   }, cb);
 };
 
-// create an id
-PersDB._generateId = function _generateId(objectStore, key) {
-  return objectStore + '\x01' + key;
-};
-
-// extract an id
-PersDB._idFromId = function _idFromId(id) {
-  // expect only one 0x01
-  return id.split('\x01', 2)[1];
-};
-
-// extract an object store from an id
-PersDB._objectStoreFromId = function _objectStoreFromId(id) {
-  // expect only one 0x01
-  return id.split('\x01', 1)[0];
-};
-
 PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
-  this._log.err('dbe connection error: %s %s', err, connId);
+  this._log.err('connection error with %s: %s', connId, err);
   conn &amp;&amp; conn.close();
 };
 
@@ -459,7 +497,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
     ret.onsuccess = function(ev) {
       var obj = {
         n: {
-          h: { id: PersDB._generateId(ev.target.source.name, ev.target.result) },
+          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
           b: value
         }
       };
@@ -472,7 +510,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
     ret.onsuccess = function(ev) {
       var obj = {
         n: {
-          h: { id: PersDB._generateId(ev.target.source.name, ev.target.result) },
+          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
           b: value
         }
       };
@@ -486,7 +524,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
       var obj = {
         n: {
           h: {
-            id: PersDB._generateId(ev.target.source.name, key),
+            id: idbIdOps.generateId(ev.target.source.name, key),
             d: true
           }
         }
@@ -522,13 +560,13 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   var newVersion = obj.n;
   var prevVersion = obj.l;
 
-  var osName = PersDB._objectStoreFromId(newVersion.h.id);
+  var osName = idbIdOps.objectStoreFromId(newVersion.h.id);
   if (!this._stores[osName]) {
     this._log.notice('_writeMerge object from an unknown object store received', osName, newVersion.h);
     process.nextTick(cb);
     return;
   }
-  var id = PersDB._idFromId(newVersion.h.id);
+  var id = idbIdOps.idFromId(newVersion.h.id);
 
   this._log.debug2('_writeMerge', osName, newVersion.h);
 
@@ -539,8 +577,8 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   // make sure the keypath of this object store is known
   if (!this._keyPaths.hasOwnProperty(osName)) {
     this._keyPaths[osName] = os.keyPath;
-    if (typeof this._keyPaths[osName] !== 'string') {
-      console.error('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
+    if (this._keyPaths[osName] != null &amp;&amp; typeof this._keyPaths[osName] !== 'string') {
+      that._log.warning('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
       this._keyPaths[osName] = Object.prototype.toString(this._keyPaths[osName]);
     }
   }
@@ -560,13 +598,13 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   };
 
   tr.onabort = function(ev) {
-    console.error('_writeMerge abort', ev);
+    that._log.err('_writeMerge abort', ev);
     cb(ev.target);
     that._handleConflict(obj, cb);
   };
 
   tr.onerror = function(ev) {
-    console.error('_writeMerge error', ev);
+    that._log.err('_writeMerge error', ev);
     cb(ev.target);
     that._handleConflict(obj, cb);
   };
@@ -576,7 +614,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     os.delete(id);
   } else {
     that._log.debug2('put', newVersion.b);
-    os.put(newVersion.b);
+    os.put(newVersion.b, id);
   }
 };
 </code></pre>
@@ -591,7 +629,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Mon Jul 25 2016 20:34:49 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 18:12:34 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

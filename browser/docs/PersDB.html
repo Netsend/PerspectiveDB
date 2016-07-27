@@ -20,7 +20,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li><li><a href="PersDB.createNode.html">createNode</a></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -51,177 +51,18 @@
 
     
 
-    <h4 class="name" id="PersDB"><span class="type-signature"></span>new PersDB<span class="signature">(idb, opts<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="PersDB"><span class="type-signature"></span>new PersDB<span class="signature">()</span><span class="type-signature"></span></h4>
 
     
 
 
 
-<div class="description">
-    Creates a new PersDB instance. Make sure idb is opened (and upgradeneeded is
-handled) before passing it to this constructor. If opts.watch is used, then add,
-put and delete operations on any of the object stores are automatically
-detected. Note that for watch to work, ES6 Proxy must be supported by the
-browser (i.e. Firefox 18+ or Chrome 49+). If watch is not used, <a href="PersDB.html#put">PersDB#put</a>
-and <a href="PersDB.html#del">PersDB#del</a> must be used in order to modify the contents of any
-object store.
-</div>
 
 
 
 
 
 
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>idb</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">IDBDatabase</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">opened IndexedDB database</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>opts</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>watch</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Boolean</span>
-
-
-            
-            </td>
-
-            
-
-            
-                <td class="default">
-                
-                    false
-                
-                </td>
-            
-
-            <td class="description last">automatically watch changes to all object stores using ES6 Proxy</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -257,7 +98,7 @@ object store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line53">line 53</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line40">line 40</a>
     </li></ul></dd>
     
 
@@ -266,25 +107,11 @@ object store.
     
 
     
-    <dt class="tag-todo">To Do:</dt>
-    <dd class="tag-todo">
-        <ul>
-            <li>support loading hooks</li>
-        </ul>
-    </dd>
-    
 </dl>
 
 
 
 
-
-<h5>Fires:</h5>
-<ul>
-    <li><a href="PersDB.html#event:data">PersDB#event:data</a></li>
-
-    <li><a href="PersDB.html#event:conflict">PersDB#event:conflict</a></li>
-</ul>
 
 
 
@@ -304,6 +131,13 @@ object store.
 
     
 
+    
+        <h3 class="subsection-title">Classes</h3>
+
+        <dl>
+            <dt><a href="PersDB.createNode.html">createNode</a></dt>
+            <dd></dd>
+        </dl>
     
 
      
@@ -585,6 +419,41 @@ transfering BSON.
 
         <tr>
             
+                <td class="name"><code>stores</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">limit synchronization to given stores</td>
+        </tr>
+
+    
+
+        <tr>
+            
                 <td class="name"><code>import</code></td>
             
 
@@ -592,6 +461,9 @@ transfering BSON.
             
                 
 <span class="param-type">Boolean</span>
+|
+
+<span class="param-type">Object</span>
 
 
             
@@ -631,6 +503,9 @@ transfering BSON.
             
                 
 <span class="param-type">Boolean</span>
+|
+
+<span class="param-type">Object</span>
 
 
             
@@ -743,7 +618,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line309">line 309</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line327">line 327</a>
     </li></ul></dd>
     
 
@@ -1246,7 +1121,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line290">line 290</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line307">line 307</a>
     </li></ul></dd>
     
 
@@ -1425,7 +1300,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line251">line 251</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line268">line 268</a>
     </li></ul></dd>
     
 
@@ -1627,7 +1502,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line225">line 225</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line242">line 242</a>
     </li></ul></dd>
     
 
@@ -1945,7 +1820,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line44">line 44</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line161">line 161</a>
     </li></ul></dd>
     
 
@@ -2197,7 +2072,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line37">line 37</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line154">line 154</a>
     </li></ul></dd>
     
 
@@ -2237,7 +2112,7 @@ transfering BSON.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Mon Jul 25 2016 20:34:49 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 18:12:34 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
