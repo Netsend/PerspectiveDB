@@ -20,7 +20,7 @@ if (process.argv[3]) {
 var ws = wss(process.argv[2], null, opts);
 
 ws.on('connect', function() {
-  console.log('connected');
+  console.log('connected', ws.socket._socket.getPeerCertificate());
 });
 
 process.stdin.pipe(ws).pipe(process.stdout);
