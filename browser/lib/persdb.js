@@ -143,10 +143,11 @@ module.exports = global.PersDB = PersDB;
  *   internally for saving new versions
  * @param {String} opts.conflictStore=_conflicts  name of the object store used
  *   internally for saving conflicts
- * @return {Promise} resolves with a new PersDB instance and idb instance if
- *  snapshot and conflict stores have been created (only happens the first time)
+ * @param {Function} cb  first paramter will be an error or null, second paramter
+ *  will be the PersDB instance, third parameter will be a new IndexedDB instance
+ *  if snapshot and conflict stores have been created (only happens the first time)
  */
-PersDB.createNode = function createNode(idb, opts) {
+PersDB.createNode = function createNode(idb, opts, cb) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
 
   if (opts == null) { opts = {}; }
@@ -166,12 +167,12 @@ PersDB.createNode = function createNode(idb, opts) {
 
   var tasks = [];
   if (opts.upgradeIfNeeded && !snapshotStoreExists) {
-    tasks.push(function(cb) {
+    tasks.push(function(cb2) {
       idb.close();
       var req = indexedDB.open(idb.name, ++idb.version);
 
       req.onerror = function(ev) {
-        cb(ev.target.error);
+        cb2(ev.target.error);
       };
 
       req.onupgradeneeded = function() {
@@ -181,18 +182,18 @@ PersDB.createNode = function createNode(idb, opts) {
       req.onsuccess = function() {
         // set new idb object
         idb = req.result;
-        cb();
+        cb2();
       };
     });
   }
 
   if (opts.upgradeIfNeeded && !conflictStoreExists) {
-    tasks.push(function(cb) {
+    tasks.push(function(cb2) {
       idb.close();
       var req = indexedDB.open(idb.name, ++idb.version);
 
       req.onerror = function(ev) {
-        cb(ev.target.error);
+        cb2(ev.target.error);
       };
 
       req.onupgradeneeded = function() {
@@ -202,14 +203,14 @@ PersDB.createNode = function createNode(idb, opts) {
       req.onsuccess = function() {
         // set new idb object
         idb = req.result;
-        cb();
+        cb2();
       };
     });
   }
 
   // pass the opened database
   var pdb;
-  tasks.push(function(cb) {
+  tasks.push(function(cb2) {
     var ldb = level(idb.name, {
       storeName: snapshotStore,
       idb: idb, // pass the opened database instance
@@ -231,14 +232,12 @@ PersDB.createNode = function createNode(idb, opts) {
       var reservedStores = [snapshotStore, conflictStore];
       proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
     }
-    process.nextTick(cb);
+    process.nextTick(cb2);
   });
 
-  return new Promise(function(resolve, reject) {
-    async.series(tasks, function(err) {
-      if (err) { reject(err); return; }
-      resolve(pdb, idb);
-    });
+  async.series(tasks, function(err) {
+    if (err) { cb(err); return; }
+    cb(null, pdb, idb);
   });
 };
 
