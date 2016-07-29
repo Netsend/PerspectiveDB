@@ -135,11 +135,16 @@ module.exports = global.PersDB = PersDB;
  * @param {Object} [opts]
  * @param {Boolean} opts.watch=false  automatically watch changes to all object
  *   stores using ES6 Proxy
+ * @param {Boolean} opts.upgradeIfNeeded=false  automatically create the snapshot
+ *  and conflict store if they don't exist. This will increment the database
+ *  version and closes the passed in idb database. A newly opened idb instance will
+ *  be provided to the callback.
  * @param {String} opts.snapshotStore=_pdb  name of the object store used
  *   internally for saving new versions
  * @param {String} opts.conflictStore=_conflicts  name of the object store used
  *   internally for saving conflicts
- * @return {Promise} resolves with a new PersDB instance
+ * @return {Promise} resolves with a new PersDB instance and idb instance if
+ *  snapshot and conflict stores have been created (only happens the first time)
  */
 PersDB.createNode = function createNode(idb, opts) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
@@ -148,40 +153,91 @@ PersDB.createNode = function createNode(idb, opts) {
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
+  if (opts.upgradeIfNeeded != null && typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
   if (opts.snapshotStore != null && typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
   if (opts.conflictStore != null && typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
   var snapshotStore = opts.snapshotStore || '_pdb';
   var conflictStore = opts.conflictStore || '_conflicts';
 
-  // ensure the conflict store exists
-  var conflictStoreExists = idb.objectStoreNames.contains(conflictStore)
+  // ensure the snapshot and conflict stores exist
+  var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
+  var conflictStoreExists = idb.objectStoreNames.contains(conflictStore);
 
-  // pass the opened database
-  var ldb = level(idb.name, {
-    storeName: snapshotStore,
-    idb: idb, // pass the opened database instance
-    keyEncoding: 'binary',
-    valueEncoding: 'none',
-    asBuffer: false,
-    reopenOnTimeout: true
-  });
-  var pdb = new PersDB(idb, ldb, opts);
+  var tasks = [];
+  if (opts.upgradeIfNeeded && !snapshotStoreExists) {
+    tasks.push(function(cb) {
+      idb.close();
+      var req = indexedDB.open(idb.name, ++idb.version);
 
-  // auto-merge remote versions (use a writable stream to enable backpressure)
-  pdb._mt.startMerge().pipe(new stream.Writable({
-    objectMode: true,
-    write: pdb._writeMerge.bind(pdb)
-  }));
+      req.onerror = function(ev) {
+        cb(ev.target.error);
+      };
 
-  if (opts.watch) {
-    // transparently track IndexedDB updates using proxy module
-    proxy(idb, pdb._getHandlers(), { exclude: [snapshotStore] });
+      req.onupgradeneeded = function() {
+        req.result.createObjectStore(snapshotStore);
+      };
+
+      req.onsuccess = function() {
+        // set new idb object
+        idb = req.result;
+        cb();
+      };
+    });
   }
 
+  if (opts.upgradeIfNeeded && !conflictStoreExists) {
+    tasks.push(function(cb) {
+      idb.close();
+      var req = indexedDB.open(idb.name, ++idb.version);
+
+      req.onerror = function(ev) {
+        cb(ev.target.error);
+      };
+
+      req.onupgradeneeded = function() {
+        req.result.createObjectStore(conflictStore);
+      };
+
+      req.onsuccess = function() {
+        // set new idb object
+        idb = req.result;
+        cb();
+      };
+    });
+  }
+
+  // pass the opened database
+  var pdb;
+  tasks.push(function(cb) {
+    var ldb = level(idb.name, {
+      storeName: snapshotStore,
+      idb: idb, // pass the opened database instance
+      keyEncoding: 'binary',
+      valueEncoding: 'none',
+      asBuffer: false,
+      reopenOnTimeout: true
+    });
+    pdb = new PersDB(idb, ldb, opts);
+
+    // auto-merge remote versions (use a writable stream to enable backpressure)
+    pdb._mt.startMerge().pipe(new stream.Writable({
+      objectMode: true,
+      write: pdb._writeMerge.bind(pdb)
+    }));
+
+    if (opts.watch) {
+      // transparently track IndexedDB updates using proxy module
+      var reservedStores = [snapshotStore, conflictStore];
+      proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
+    }
+    process.nextTick(cb);
+  });
+
   return new Promise(function(resolve, reject) {
-    process.nextTick(function() {
-      resolve(pdb);
+    async.series(tasks, function(err) {
+      if (err) { reject(err); return; }
+      resolve(pdb, idb);
     });
   });
 };
