@@ -134,9 +134,11 @@ module.exports = global.PersDB = PersDB;
  * @param {IDBDatabase} idb  opened IndexedDB database
  * @param {Object} [opts]
  * @param {Boolean} opts.watch=false  automatically watch changes to all object
- *                                    stores using ES6 Proxy
- * @param {String} opts.snapshots=_pdb  name of the object store used internally
- *                                      for saving new versions
+ *   stores using ES6 Proxy
+ * @param {String} opts.snapshotStore=_pdb  name of the object store used
+ *   internally for saving new versions
+ * @param {String} opts.conflictStore=_conflicts  name of the object store used
+ *   internally for saving conflicts
  * @return {Promise} resolves with a new PersDB instance
  */
 PersDB.createNode = function createNode(idb, opts) {
@@ -146,13 +148,18 @@ PersDB.createNode = function createNode(idb, opts) {
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.snapshots != null && typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
+  if (opts.snapshotStore != null && typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
+  if (opts.conflictStore != null && typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
-  var snapshots = opts.snapshots || '_pdb';
+  var snapshotStore = opts.snapshotStore || '_pdb';
+  var conflictStore = opts.conflictStore || '_conflicts';
+
+  // ensure the conflict store exists
+  var conflictStoreExists = idb.objectStoreNames.contains(conflictStore)
 
   // pass the opened database
   var ldb = level(idb.name, {
-    storeName: snapshots,
+    storeName: snapshotStore,
     idb: idb, // pass the opened database instance
     keyEncoding: 'binary',
     valueEncoding: 'none',
@@ -169,7 +176,7 @@ PersDB.createNode = function createNode(idb, opts) {
 
   if (opts.watch) {
     // transparently track IndexedDB updates using proxy module
-    proxy(idb, pdb._getHandlers(), { exclude: [snapshots] });
+    proxy(idb, pdb._getHandlers(), { exclude: [snapshotStore] });
   }
 
   return new Promise(function(resolve, reject) {
