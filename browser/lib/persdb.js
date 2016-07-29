@@ -133,7 +133,10 @@ module.exports = global.PersDB = PersDB;
  *
  * @param {IDBDatabase} idb  opened IndexedDB database
  * @param {Object} [opts]
- * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
+ * @param {Boolean} opts.watch=false  automatically watch changes to all object
+ *                                    stores using ES6 Proxy
+ * @param {String} opts.snapshots=_pdb  name of the object store used internally
+ *                                      for saving new versions
  * @return {Promise} resolves with a new PersDB instance
  */
 PersDB.createNode = function createNode(idb, opts) {
@@ -144,13 +147,18 @@ PersDB.createNode = function createNode(idb, opts) {
 
   if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
   if (opts.snapshots != null && typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
-  if (opts.iterator != null && typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
-  if (opts.perspectives != null && !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
-  if (opts.mergeTree != null && typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
 
   var snapshots = opts.snapshots || '_pdb';
 
-  var ldb = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
+  // pass the opened database
+  var ldb = level(idb.name, {
+    storeName: snapshots,
+    idb: idb, // pass the opened database instance
+    keyEncoding: 'binary',
+    valueEncoding: 'none',
+    asBuffer: false,
+    reopenOnTimeout: true
+  });
   var pdb = new PersDB(idb, ldb, opts);
 
   // auto-merge remote versions (use a writable stream to enable backpressure)
