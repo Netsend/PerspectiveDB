@@ -158,10 +158,15 @@ function proxy(idb, handlers, opts) {
   }
 
   // proxy db.transaction.objectStore function to catch new object store modification commands
-  function proxyObjectStore(target) {
+  function proxyObjectStore(target, mode) {
     return new Proxy(target, {
       apply: function(target, that, args) {
         var obj = target.apply(that, args);
+
+        // only proxy if readwrite and not excluded
+        if (mode === 'readonly' || ~exclude.indexOf(obj.name)) {
+          return obj;
+        }
 
         // proxy add
         obj.add = new Proxy(obj.add, {
@@ -223,12 +228,7 @@ function proxy(idb, handlers, opts) {
         // proxy the opening of object stores for the target transaction
         var obj = target.apply(that, args);
 
-        // only proxy if readwrite and not excluded
-        if (obj.mode === 'readonly' || ~exclude.indexOf(obj.objectStore)) {
-          return obj;
-        }
-
-        obj.objectStore = proxyObjectStore(obj.objectStore);
+        obj.objectStore = proxyObjectStore(obj.objectStore, obj.mode);
         return obj;
       }
     });
