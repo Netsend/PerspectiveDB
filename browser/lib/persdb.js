@@ -113,8 +113,9 @@ module.exports = global.PersDB = PersDB;
 /**
  * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded is
  * handled. The snapshot and conflict store must exist or otherwise the
- * upgradeIfNeeded option must be used. Furthermore, don't start writing to any
- * object store until the call back is called with the pdb instance.
+ * upgradeIfNeeded option must be used. The conflict store must have autoIncrement
+ * set. Furthermore, don't start writing to any object store until the call back is
+ * called with the pdb instance.
  *
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must
@@ -207,7 +208,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
       };
 
       req.onupgradeneeded = function() {
-        req.result.createObjectStore(conflictStore);
+        req.result.createObjectStore(conflictStore, { autoIncrement: true });
       };
 
       req.onsuccess = function() {
@@ -241,6 +242,11 @@ PersDB.createNode = function createNode(idb, opts, cb) {
       // transparently track IndexedDB updates using proxy module
       var reservedStores = [snapshotStore, conflictStore];
       proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
+    }
+
+    // check if the conflict store has the auto increment property set
+    if (!idb.transaction(conflictStore).objectStore(conflictStore).autoIncrement) {
+      throw new Error('conflict store must have auto increment set');
     }
     process.nextTick(cb2);
   });

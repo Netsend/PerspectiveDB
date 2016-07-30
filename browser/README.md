@@ -35,7 +35,7 @@ req.onupgradeneeded = (ev) => {
 
   // needed for PersDB
   db.createObjectStore('_pdb')
-  db.createObjectStore('_conflicts')
+  db.createObjectStore('_conflicts', { autoIncrement: true })
 }
 
 req.onsuccess = (ev) => {
