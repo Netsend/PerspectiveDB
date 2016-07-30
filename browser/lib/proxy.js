@@ -27,6 +27,15 @@ function noop() {}
  *
  * @param {IndexedDB} idb  an opened IndexedDB database to proxy
  * @param {Object} handlers  pre- and post handlers for add, put, delete and clear.
+ * @param {Function} [handlers.addSuccess] - add success handler
+ * @param {Function} [handlers.addError] - add error handler
+ * @param {Function} [handlers.putSuccess] - put success handler
+ * @param {Function} [handlers.putError] - put error handler
+ * @param {Function} [handlers.deleteSuccess] - delete success handler
+ * @param {Function} [handlers.deleteError] - delete error handler
+ * @param {Function} [handlers.clearSuccess] - clear success handler
+ * @param {Function} [handlers.clearError] - clear error handler
+ * @param {Function} [handlers.addError] - add error handler
  * @param {Function} [handlers.preAdd] - pre add handler
  * @param {Function} [handlers.postAdd] - post add handler
  * @param {Function} [handlers.prePut] - pre put handler
@@ -48,6 +57,16 @@ function proxy(idb, handlers, opts) {
 
   var exclude = opts.exclude || [];
 
+  // success and error handlers
+  var addSuccess    = handlers.addSuccess || noop;
+  var addError      = handlers.addError || noop;
+  var putSuccess    = handlers.putSuccess || noop;
+  var putError      = handlers.putError || noop;
+  var deleteSuccess = handlers.deleteSuccess || noop;
+  var deleteError   = handlers.deleteError || noop;
+  var clearSuccess  = handlers.clearSuccess || noop;
+  var clearError    = handlers.clearError || noop;
+
   // pre and post handlers for objectStore.add, put, delete and clear
   var preAdd    = handlers.preAdd || noop;
   var prePut    = handlers.prePut || noop;
@@ -60,9 +79,9 @@ function proxy(idb, handlers, opts) {
   var postClear  = handlers.postClear || noop;
 
   // proxy onsuccess and onerror handlers, supports multiple onsuccess and onerror handlers
-  function proxyRequest(target) {
-    var successHandlers = [];
-    var errorHandlers = [];
+  function proxyRequest(target, method, os, key, value) {
+    var successHandler;
+    var errorHandler;
 
     var req = new Proxy(target, {
       get: function(target, property) {
@@ -70,9 +89,9 @@ function proxy(idb, handlers, opts) {
       },
       set: function(target, property, value) {
         if (property === 'onsuccess') {
-          successHandlers.push(value);
+          successHandler = value;
         } else if (property === 'onerror') {
-          errorHandlers.push(value);
+          errorHandler = value;
         } else {
           target[property] = value;
         }
@@ -80,17 +99,60 @@ function proxy(idb, handlers, opts) {
       }
     });
 
-    target.onsuccess = function() {
-      var args = arguments;
-      successHandlers.forEach(function(h) {
-        h.apply(req, args);
-      });
+    target.onsuccess = function(...args) {
+      args.push(os);
+      switch (method) {
+      case 'add':
+        args.push(key);
+        args.push(value);
+        addSuccess.apply(req, args);
+        break;
+      case 'put':
+        args.push(key);
+        args.push(value);
+        putSuccess.apply(req, args);
+        break;
+      case 'delete':
+        args.push(key);
+        deleteSuccess.apply(req, args);
+        break;
+      case 'clear':
+        clearSuccess.apply(req, args);
+        break;
+      default:
+        throw new TypeError('unknown method');
+      }
+      if (typeof successHandler === 'function') {
+        successHandler.apply(req, args);
+      }
     }
-    target.onerror = function() {
-      var args = arguments;
-      errorHandlers.forEach(function(h) {
-        h.apply(req, args);
-      });
+    target.onerror = function(...args) {
+      args.push(os);
+
+      switch (method) {
+      case 'add':
+        args.push(key);
+        args.push(value);
+        addError.apply(req, args);
+        break;
+      case 'put':
+        args.push(key);
+        args.push(value);
+        putError.apply(req, args);
+        break;
+      case 'delete':
+        args.push(key);
+        deleteError.apply(req, args);
+        break;
+      case 'clear':
+        clearError.apply(req, args);
+        break;
+      default:
+        throw new TypeError('unknown method');
+      }
+      if (typeof errorHandler === 'function') {
+        errorHandler.apply(req, args);
+      }
     }
     return req;
   }
@@ -108,7 +170,7 @@ function proxy(idb, handlers, opts) {
             var key = args[1];
 
             preAdd(obj, value, key);
-            var req = proxyRequest(target.apply(that, args));
+            var req = proxyRequest(target.apply(that, args), 'add', obj, key, value);
             postAdd(obj, value, key, req);
             return req;
           }
@@ -121,7 +183,7 @@ function proxy(idb, handlers, opts) {
             var key = args[1];
 
             prePut(obj, value, key);
-            var req = proxyRequest(target.apply(that, args));
+            var req = proxyRequest(target.apply(that, args), 'put', obj, key, value);
             postPut(obj, value, key, req);
             return req;
           }
@@ -133,7 +195,7 @@ function proxy(idb, handlers, opts) {
             var key = args[0];
 
             preDelete(obj, key);
-            var req = proxyRequest(target.apply(that, args));
+            var req = proxyRequest(target.apply(that, args), 'delete', obj, key);
             postDelete(obj, key, req);
             return req;
           }
@@ -143,7 +205,7 @@ function proxy(idb, handlers, opts) {
         obj.clear = new Proxy(obj.clear, {
           apply: function(target, that, args) {
             preClear(obj);
-            var req = proxyRequest(target.apply(that, args));
+            var req = proxyRequest(target.apply(that, args), 'clear', obj);
             postClear(obj, req);
             return req;
           }
