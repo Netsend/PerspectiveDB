@@ -145,7 +145,7 @@ module.exports = global.PersDB = PersDB;
  *   internally for saving conflicts
  * @param {Function} cb  first paramter will be an error or null, second paramter
  *  will be the PersDB instance, third parameter will be a new IndexedDB instance
- *  if snapshot and conflict stores have been created (only happens the first time)
+ *  if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).
  */
 PersDB.createNode = function createNode(idb, opts, cb) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
@@ -164,6 +164,15 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   // ensure the snapshot and conflict stores exist
   var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
   var conflictStoreExists = idb.objectStoreNames.contains(conflictStore);
+
+  if (!opts.upgradeIfNeeded) {
+    if (!snapshotStoreExists) {
+      throw new Error('snapshot store does not exist and opts.upgradeIfNeeded is false');
+    }
+    if (!conflictStoreExists) {
+      throw new Error('conflict store does not exist and opts.upgradeIfNeeded is false');
+    }
+  }
 
   var tasks = [];
   if (opts.upgradeIfNeeded && !snapshotStoreExists) {
