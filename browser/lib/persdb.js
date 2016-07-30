@@ -40,17 +40,17 @@ var noop = function() {};
 /**
  * @event PersDB#data
  * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
+ * @param {String} obj.store - name of the object store
+ * @param {?Object} obj.new - new version, is null on delete
+ * @param {?Object} obj.prev - previous version, is null on insert
  */
 /**
  * @event PersDB#conflict
  * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- * @param {?Array} obj.c - array with conflicting key names
+ * @param {String} obj.store - name of the object store
+ * @param {?Object} obj.new - new version, is null on delete
+ * @param {?Object} obj.prev - previous version, is null on insert
+ * @param {?Array} obj.conflicts - array with conflicting key names
  */
 
 /**
