@@ -111,9 +111,10 @@ util.inherits(PersDB, EE);
 module.exports = global.PersDB = PersDB;
 
 /**
- * Create a new {@link PersDB} instance. Make sure idb is opened (and upgradeneeded is
- * handled) before passing it to this method. Furthermore, don't start writing to
- * any object store until the promise is resolved with the pdb instance.
+ * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded is
+ * handled. The snapshot and conflict store must exist or otherwise the
+ * upgradeIfNeeded option must be used. Furthermore, don't start writing to any
+ * object store until the call back is called with the pdb instance.
  *
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must

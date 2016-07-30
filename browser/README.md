@@ -27,11 +27,15 @@ Include a [build](https://netsend.nl/persdb/build.js) in your html so that the g
 // open an IndexedDB instance as usual
 var req = indexedDB.open('MyDB')
 
-// create some stores to work with
+// create some stores to work with and create a snapshot and conflict store
 req.onupgradeneeded = (ev) => {
   var db = ev.target.result
   db.createObjectStore('customers', { keyPath: 'email' })
   db.createObjectStore('employees')
+
+  // needed for PersDB
+  db.createObjectStore('_pdb')
+  db.createObjectStore('_conflicts')
 }
 
 req.onsuccess = (ev) => {
@@ -39,7 +43,14 @@ req.onsuccess = (ev) => {
 
   // Initiate PersDB with this database. Use watch mode to automatically track
   // changes. This requires support for ES6 Proxy (Firefox 18+ or Chrome 49+).
-  PersDB.createNode(db, { watch: true }).then(pdb => {
+  var opts = {
+    watch: true,
+    snapshotStore: '_pdb',
+    conflictStore: '_conflicts'
+  }
+  PersDB.createNode(db, opts, (err, pdb) => {
+    if (err) throw err
+
     // connect to a remote peer at wss://example.com
     pdb.connect({
       name: 'aRemote',         // local reference for the remote
@@ -55,7 +66,7 @@ req.onsuccess = (ev) => {
     pdb.on('data', (item) => {
       console.log('new version:', item)
     })
-  }).catch(err => console.error(err))
+  })
 }
 ```
 
