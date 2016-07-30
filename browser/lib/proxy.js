@@ -18,10 +18,6 @@
 
 'use strict';
 
-if (typeof Proxy !== 'function') {
-  throw new Error('missing ES6 Proxy');
-}
-
 function noop() {}
 
 /**
@@ -30,17 +26,27 @@ function noop() {}
  * and object store.
  *
  * @param {IndexedDB} idb  an opened IndexedDB database to proxy
- * @param {Function} doProxy  function that gets the mode and name of each
- *                            transaction and object store and should return either
- *                            true or false about whether or not to invoke the
- *                            handlers. function(mode, name) => boolean
  * @param {Object} handlers  pre- and post handlers for add, put, delete and clear.
+ * @param {Function} [handlers.preAdd] - pre add handler
+ * @param {Function} [handlers.postAdd] - post add handler
+ * @param {Function} [handlers.prePut] - pre put handler
+ * @param {Function} [handlers.postPut] - post put handler
+ * @param {Function} [handlers.preDelete] - pre delete handler
+ * @param {Function} [handlers.postDelete] - post delete handler
+ * @param {Function} [handlers.preClear] - pre clear handler
+ * @param {Function} [handlers.postClear] - post clear handler
+ * @param {Object} opts
+ * @param {Array} [opts.exclude] - exclude given stores from proxying
  * @return {Function} original transaction method in order to bypass the proxy.
  */
-function proxy(idb, doProxy, handlers) {
+function proxy(idb, handlers, opts) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-  if (typeof doProxy !== 'function') { throw new TypeError('doProxy must be a function'); }
   if (handlers == null || typeof handlers !== 'object') { throw new TypeError('handlers must be an object'); }
+
+  opts = opts || {};
+  if (opts.exclude && !Array.isArray(opts.exclude)) { throw new TypeError('opts.exclude must be an array'); }
+
+  var exclude = opts.exclude || [];
 
   // pre and post handlers for objectStore.add, put, delete and clear
   var preAdd    = handlers.preAdd || noop;
@@ -53,61 +59,95 @@ function proxy(idb, doProxy, handlers) {
   var postDelete = handlers.postDelete || noop;
   var postClear  = handlers.postClear || noop;
 
+  // proxy onsuccess and onerror handlers, supports multiple onsuccess and onerror handlers
+  function proxyRequest(target) {
+    var successHandlers = [];
+    var errorHandlers = [];
+
+    var req = new Proxy(target, {
+      get: function(target, property) {
+        return target[property];
+      },
+      set: function(target, property, value) {
+        if (property === 'onsuccess') {
+          successHandlers.push(value);
+        } else if (property === 'onerror') {
+          errorHandlers.push(value);
+        } else {
+          target[property] = value;
+        }
+        return true;
+      }
+    });
+
+    target.onsuccess = function() {
+      var args = arguments;
+      successHandlers.forEach(function(h) {
+        h.apply(req, args);
+      });
+    }
+    target.onerror = function() {
+      var args = arguments;
+      errorHandlers.forEach(function(h) {
+        h.apply(req, args);
+      });
+    }
+    return req;
+  }
+
   // proxy db.transaction.objectStore function to catch new object store modification commands
-  function proxyObjectStore(target, mode) {
+  function proxyObjectStore(target) {
     return new Proxy(target, {
       apply: function(target, that, args) {
-        console.log('proxyObjectStore', target, args);
-
         var obj = target.apply(that, args);
 
-        // only proxy if doProxy returns true
-        if (!doProxy(mode, target.name)) {
-          return obj;
-        }
-
-        // proxy add, put, delete and clear
-        var origAdd = obj.add;
-        var origPut = obj.put;
-        var origDelete = obj.delete;
-        var origClear = obj.clear;
-
         // proxy add
-        function proxyAdd(value, key) {
-          preAdd(obj, value, key);
-          var req = origAdd.apply(obj, arguments);
-          postAdd(obj, value, key, req);
-          return req;
-        }
+        obj.add = new Proxy(obj.add, {
+          apply: function(target, that, args) {
+            var value = args[0];
+            var key = args[1];
+
+            preAdd(obj, value, key);
+            var req = proxyRequest(target.apply(that, args));
+            postAdd(obj, value, key, req);
+            return req;
+          }
+        });
 
         // proxy put
-        function proxyPut(value, key) {
-          prePut(obj, value, key);
-          var req = origPut.apply(obj, arguments);
-          postPut(obj, value, key, req);
-          return req;
-        }
+        obj.put = new Proxy(obj.put, {
+          apply: function(target, that, args) {
+            var value = args[0];
+            var key = args[1];
 
-        // proxy delete by adding a delete item
-        function proxyDelete(key) {
-          preDelete(obj, key);
-          var req = origDelete.apply(obj, arguments);
-          postDelete(obj, key, req);
-          return req;
-        }
+            prePut(obj, value, key);
+            var req = proxyRequest(target.apply(that, args));
+            postPut(obj, value, key, req);
+            return req;
+          }
+        });
 
-        // proxy clear by adding one delete per item
-        function proxyClear() {
-          preClear(obj);
-          var req = origClear.apply(obj, arguments);
-          postClear(obj, req);
-          return req;
-        }
+        // proxy delete
+        obj.delete = new Proxy(obj.delete, {
+          apply: function(target, that, args) {
+            var key = args[0];
 
-        obj.add = proxyAdd;
-        obj.put = proxyPut;
-        obj.delete = proxyDelete;
-        obj.clear = proxyClear;
+            preDelete(obj, key);
+            var req = proxyRequest(target.apply(that, args));
+            postDelete(obj, key, req);
+            return req;
+          }
+        });
+
+        // proxy clear
+        obj.clear = new Proxy(obj.clear, {
+          apply: function(target, that, args) {
+            preClear(obj);
+            var req = proxyRequest(target.apply(that, args));
+            postClear(obj, req);
+            return req;
+          }
+        });
 
         return obj;
       }
@@ -120,7 +160,13 @@ function proxy(idb, doProxy, handlers) {
       apply: function(target, that, args) {
         // proxy the opening of object stores for the target transaction
         var obj = target.apply(that, args);
-        obj.objectStore = proxyObjectStore(obj.objectStore, obj.mode);
+
+        // only proxy if readwrite and not excluded
+        if (obj.mode === 'readonly' || ~exclude.indexOf(obj.objectStore)) {
+          return obj;
+        }
+
+        obj.objectStore = proxyObjectStore(obj.objectStore);
         return obj;
       }
     });
