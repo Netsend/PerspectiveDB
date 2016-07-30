@@ -161,13 +161,7 @@ PersDB.createNode = function createNode(idb, opts) {
 
   if (opts.watch) {
     // transparently track IndexedDB updates using proxy module
-
-    // only proxy readwrite transactions that are not on the snapshot object store
-    function doProxy(mode, osName) {
-      return mode === 'readwrite' && osName !== snapshots;
-    }
-
-    proxy(idb, doProxy, pdb._getHandlers());
+    proxy(idb, pdb._getHandlers(), { exclude: [snapshots] });
   }
 
   return new Promise(function(resolve, reject) {
@@ -402,48 +396,47 @@ PersDB.prototype._getHandlers = function _getHandlers() {
   var that = this;
 
   // pre and post handlers for objectStore.add, put, delete and clear
-  function postAdd(os, value, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
-          b: value
-        }
-      };
-      that._localWriter.write(obj);
+  function addSuccess(ev, store, key, value) {
+    var obj = {
+      n: {
+        h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
+        b: value
+      }
     };
+    that._localWriter.write(obj);
+  }
+  function putSuccess(ev, store, key, value) {
+    var obj = {
+      n: {
+        h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
+        b: value
+      }
+    };
+    that._localWriter.write(obj);
+  }
+  function deleteSuccess(ev, store, key) {
+    var obj = {
+      n: {
+        h: {
+          id: idbIdOps.generateId(ev.target.source.name, key),
+          d: true
+        }
+      }
+    };
+    that._localWriter.write(obj);
   }
 
-  function postPut(os, value, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
-          b: value
-        }
-      };
-      that._localWriter.write(obj);
-    };
+  function addError(...args) {
+    that._log.err('add error', args);
+  }
+  function putError(...args) {
+    that._log.err('put error', args);
+  }
+  function deleteError(...args) {
+    that._log.err('delete error', args);
   }
 
-  function postDelete(os, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: {
-            id: idbIdOps.generateId(ev.target.source.name, key),
-            d: true
-          }
-        }
-      };
-      that._localWriter.write(obj);
-    };
-  }
-
-  return { postAdd, postPut, postDelete };
+  return { addSuccess, putSuccess, deleteSuccess, addError, putError, deleteError };
 };
 
 /**
