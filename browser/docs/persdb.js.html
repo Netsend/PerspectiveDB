@@ -78,17 +78,17 @@ var noop = function() {};
 /**
  * @event PersDB#data
  * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
+ * @param {String} obj.store - name of the object store
+ * @param {?Object} obj.new - new version, is null on delete
+ * @param {?Object} obj.prev - previous version, is null on insert
  */
 /**
  * @event PersDB#conflict
  * @param {Object} obj
- * @param {String} obj.os - name of the object store
- * @param {?Object} obj.n - new version, is null on delete
- * @param {?Object} obj.p - previous version, is null on insert
- * @param {?Array} obj.c - array with conflicting key names
+ * @param {String} obj.store - name of the object store
+ * @param {?Object} obj.new - new version, is null on delete
+ * @param {?Object} obj.prev - previous version, is null on insert
+ * @param {?Array} obj.conflicts - array with conflicting key names
  */
 
 /**
@@ -149,9 +149,10 @@ util.inherits(PersDB, EE);
 module.exports = global.PersDB = PersDB;
 
 /**
- * Create a new {@link PersDB} instance. Make sure idb is opened (and upgradeneeded is
- * handled) before passing it to this method. Furthermore, don't start writing to
- * any object store until the promise is resolved with the pdb instance.
+ * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded is
+ * handled. The snapshot and conflict store must exist or otherwise the
+ * upgradeIfNeeded option must be used. Furthermore, don't start writing to any
+ * object store until the call back is called with the pdb instance.
  *
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must
@@ -171,47 +172,120 @@ module.exports = global.PersDB = PersDB;
  *
  * @param {IDBDatabase} idb  opened IndexedDB database
  * @param {Object} [opts]
- * @param {Boolean} opts.watch=false  automatically watch changes to all object stores using ES6 Proxy
- * @return {Promise} resolves with a new PersDB instance
+ * @param {Boolean} opts.watch=false  automatically watch changes to all object
+ *   stores using ES6 Proxy
+ * @param {Boolean} opts.upgradeIfNeeded=false  automatically create the snapshot
+ *  and conflict store if they don't exist. This will increment the database
+ *  version and closes the passed in idb database. A newly opened idb instance will
+ *  be provided to the callback.
+ * @param {String} opts.snapshotStore=_pdb  name of the object store used
+ *   internally for saving new versions
+ * @param {String} opts.conflictStore=_conflicts  name of the object store used
+ *   internally for saving conflicts
+ * @param {Function} cb  first paramter will be an error or null, second paramter
+ *  will be the PersDB instance, third parameter will be a new IndexedDB instance
+ *  if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).
  */
-PersDB.createNode = function createNode(idb, opts) {
+PersDB.createNode = function createNode(idb, opts, cb) {
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
 
   if (opts == null) { opts = {}; }
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
   if (opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.snapshots != null &amp;&amp; typeof opts.snapshots !== 'string') { throw new TypeError('opts.snapshots must be a string'); }
-  if (opts.iterator != null &amp;&amp; typeof opts.iterator !== 'function') { throw new TypeError('opts.iterator must be a function'); }
-  if (opts.perspectives != null &amp;&amp; !Array.isArray(opts.perspectives)) { throw new TypeError('opts.perspectives must be an array'); }
-  if (opts.mergeTree != null &amp;&amp; typeof opts.mergeTree !== 'object') { throw new TypeError('opts.mergeTree must be an object'); }
+  if (opts.upgradeIfNeeded != null &amp;&amp; typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
+  if (opts.snapshotStore != null &amp;&amp; typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
+  if (opts.conflictStore != null &amp;&amp; typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
-  var snapshots = opts.snapshots || '_pdb';
+  var snapshotStore = opts.snapshotStore || '_pdb';
+  var conflictStore = opts.conflictStore || '_conflicts';
 
-  var ldb = level('_pdb', { keyEncoding: 'binary', valueEncoding: 'none', asBuffer: false, reopenOnTimeout: true, storeName: snapshots });
-  var pdb = new PersDB(idb, ldb, opts);
+  // ensure the snapshot and conflict stores exist
+  var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
+  var conflictStoreExists = idb.objectStoreNames.contains(conflictStore);
 
-  // auto-merge remote versions (use a writable stream to enable backpressure)
-  pdb._mt.startMerge().pipe(new stream.Writable({
-    objectMode: true,
-    write: pdb._writeMerge.bind(pdb)
-  }));
-
-  if (opts.watch) {
-    // transparently track IndexedDB updates using proxy module
-
-    // only proxy readwrite transactions that are not on the snapshot object store
-    function doProxy(mode, osName) {
-      return mode === 'readwrite' &amp;&amp; osName !== snapshots;
+  if (!opts.upgradeIfNeeded) {
+    if (!snapshotStoreExists) {
+      throw new Error('snapshot store does not exist and opts.upgradeIfNeeded is false');
     }
-
-    proxy(idb, doProxy, pdb._getHandlers());
+    if (!conflictStoreExists) {
+      throw new Error('conflict store does not exist and opts.upgradeIfNeeded is false');
+    }
   }
 
-  return new Promise(function(resolve, reject) {
-    process.nextTick(function() {
-      resolve(pdb);
+  var tasks = [];
+  if (opts.upgradeIfNeeded &amp;&amp; !snapshotStoreExists) {
+    tasks.push(function(cb2) {
+      idb.close();
+      var req = indexedDB.open(idb.name, ++idb.version);
+
+      req.onerror = function(ev) {
+        cb2(ev.target.error);
+      };
+
+      req.onupgradeneeded = function() {
+        req.result.createObjectStore(snapshotStore);
+      };
+
+      req.onsuccess = function() {
+        // set new idb object
+        idb = req.result;
+        cb2();
+      };
     });
+  }
+
+  if (opts.upgradeIfNeeded &amp;&amp; !conflictStoreExists) {
+    tasks.push(function(cb2) {
+      idb.close();
+      var req = indexedDB.open(idb.name, ++idb.version);
+
+      req.onerror = function(ev) {
+        cb2(ev.target.error);
+      };
+
+      req.onupgradeneeded = function() {
+        req.result.createObjectStore(conflictStore);
+      };
+
+      req.onsuccess = function() {
+        // set new idb object
+        idb = req.result;
+        cb2();
+      };
+    });
+  }
+
+  // pass the opened database
+  var pdb;
+  tasks.push(function(cb2) {
+    var ldb = level(idb.name, {
+      storeName: snapshotStore,
+      idb: idb, // pass the opened database instance
+      keyEncoding: 'binary',
+      valueEncoding: 'none',
+      asBuffer: false,
+      reopenOnTimeout: true
+    });
+    pdb = new PersDB(idb, ldb, opts);
+
+    // auto-merge remote versions (use a writable stream to enable backpressure)
+    pdb._mt.startMerge().pipe(new stream.Writable({
+      objectMode: true,
+      write: pdb._writeMerge.bind(pdb)
+    }));
+
+    if (opts.watch) {
+      // transparently track IndexedDB updates using proxy module
+      var reservedStores = [snapshotStore, conflictStore];
+      proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
+    }
+    process.nextTick(cb2);
+  });
+
+  async.series(tasks, function(err) {
+    if (err) { cb(err); return; }
+    cb(null, pdb, idb);
   });
 };
 
@@ -440,48 +514,47 @@ PersDB.prototype._getHandlers = function _getHandlers() {
   var that = this;
 
   // pre and post handlers for objectStore.add, put, delete and clear
-  function postAdd(os, value, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
-          b: value
-        }
-      };
-      that._localWriter.write(obj);
+  function addSuccess(ev, store, key, value) {
+    var obj = {
+      n: {
+        h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
+        b: value
+      }
     };
+    that._localWriter.write(obj);
+  }
+  function putSuccess(ev, store, key, value) {
+    var obj = {
+      n: {
+        h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
+        b: value
+      }
+    };
+    that._localWriter.write(obj);
+  }
+  function deleteSuccess(ev, store, key) {
+    var obj = {
+      n: {
+        h: {
+          id: idbIdOps.generateId(ev.target.source.name, key),
+          d: true
+        }
+      }
+    };
+    that._localWriter.write(obj);
   }
 
-  function postPut(os, value, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: { id: idbIdOps.generateId(ev.target.source.name, ev.target.result) },
-          b: value
-        }
-      };
-      that._localWriter.write(obj);
-    };
+  function addError(...args) {
+    that._log.err('add error', args);
+  }
+  function putError(...args) {
+    that._log.err('put error', args);
+  }
+  function deleteError(...args) {
+    that._log.err('delete error', args);
   }
 
-  function postDelete(os, key, ret) {
-    // wait for return with key
-    ret.onsuccess = function(ev) {
-      var obj = {
-        n: {
-          h: {
-            id: idbIdOps.generateId(ev.target.source.name, key),
-            d: true
-          }
-        }
-      };
-      that._localWriter.write(obj);
-    };
-  }
-
-  return { postAdd, postPut, postDelete };
+  return { addSuccess, putSuccess, deleteSuccess, addError, putError, deleteError };
 };
 
 /**
@@ -540,7 +613,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
-      that.emit('data', { os: osName, n: obj.n &amp;&amp; obj.n.b, p: obj.l &amp;&amp; obj.l.b });
+      that.emit('data', { store: osName, key: id, new: obj.n &amp;&amp; obj.n.b, prev: obj.l &amp;&amp; obj.l.b });
       cb();
     });
   };
@@ -577,7 +650,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 20:23:56 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Jul 30 2016 22:41:25 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

@@ -159,16 +159,17 @@
 
     
 
-    <h4 class="name" id=".createNode"><span class="type-signature">(static) </span>createNode<span class="signature">(idb, opts<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+    <h4 class="name" id=".createNode"><span class="type-signature">(static) </span>createNode<span class="signature">(idb, opts<span class="signature-attributes">opt</span>, cb)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Create a new <a href="PersDB.html">PersDB</a> instance. Make sure idb is opened (and upgradeneeded is
-handled) before passing it to this method. Furthermore, don't start writing to
-any object store until the promise is resolved with the pdb instance.
+    Create a new <a href="PersDB.html">PersDB</a> instance. Make sure idb is opened and upgradeneeded is
+handled. The snapshot and conflict store must exist or otherwise the
+upgradeIfNeeded option must be used. Furthermore, don't start writing to any
+object store until the call back is called with the pdb instance.
 
 If opts.watch is used, then add, put and delete operations on any of the object
 stores are automatically detected. Note that for watch to work, ES6 Proxy must
@@ -319,7 +320,100 @@ the contents of any object store.
                 </td>
             
 
-            <td class="description last">automatically watch changes to all object stores using ES6 Proxy</td>
+            <td class="description last">automatically watch changes to all object
+  stores using ES6 Proxy</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>upgradeIfNeeded</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    false
+                
+                </td>
+            
+
+            <td class="description last">automatically create the snapshot
+ and conflict store if they don't exist. This will increment the database
+ version and closes the passed in idb database. A newly opened idb instance will
+ be provided to the callback.</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>snapshotStore</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    _pdb
+                
+                </td>
+            
+
+            <td class="description last">name of the object store used
+  internally for saving new versions</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictStore</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    _conflicts
+                
+                </td>
+            
+
+            <td class="description last">name of the object store used
+  internally for saving conflicts</td>
         </tr>
 
     
@@ -327,6 +421,39 @@ the contents of any object store.
 </table>
 
             </td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>cb</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">first paramter will be an error or null, second paramter
+ will be the PersDB instance, third parameter will be a new IndexedDB instance
+ if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).</td>
         </tr>
 
     
@@ -367,7 +494,7 @@ the contents of any object store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line139">line 139</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line151">line 151</a>
     </li></ul></dd>
     
 
@@ -390,28 +517,6 @@ the contents of any object store.
 
 
 
-<h5>Returns:</h5>
-
-        
-<div class="param-desc">
-    resolves with a new PersDB instance
-</div>
-
-
-
-<dl class="param-type">
-    <dt>
-        Type
-    </dt>
-    <dd>
-        
-<span class="param-type">Promise</span>
-
-
-    </dd>
-</dl>
-
-    
 
 
 
@@ -886,7 +991,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line275">line 275</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line349">line 349</a>
     </li></ul></dd>
     
 
@@ -1389,7 +1494,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line255">line 255</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line329">line 329</a>
     </li></ul></dd>
     
 
@@ -1568,7 +1673,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line216">line 216</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line290">line 290</a>
     </li></ul></dd>
     
 
@@ -1770,7 +1875,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line190">line 190</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line264">line 264</a>
     </li></ul></dd>
     
 
@@ -1917,7 +2022,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>os</code></td>
+                <td class="name"><code>store</code></td>
             
 
             <td class="type">
@@ -1948,7 +2053,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>n</code></td>
+                <td class="name"><code>new</code></td>
             
 
             <td class="type">
@@ -1981,7 +2086,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>p</code></td>
+                <td class="name"><code>prev</code></td>
             
 
             <td class="type">
@@ -2014,7 +2119,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>c</code></td>
+                <td class="name"><code>conflicts</code></td>
             
 
             <td class="type">
@@ -2202,7 +2307,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>os</code></td>
+                <td class="name"><code>store</code></td>
             
 
             <td class="type">
@@ -2233,7 +2338,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>n</code></td>
+                <td class="name"><code>new</code></td>
             
 
             <td class="type">
@@ -2266,7 +2371,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>p</code></td>
+                <td class="name"><code>prev</code></td>
             
 
             <td class="type">
@@ -2380,7 +2485,7 @@ transfering BSON.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Jul 27 2016 20:23:56 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Jul 30 2016 22:41:25 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
