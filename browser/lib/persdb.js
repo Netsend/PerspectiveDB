@@ -502,7 +502,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
-      that.emit('data', { os: osName, n: obj.n && obj.n.b, p: obj.l && obj.l.b });
+      that.emit('data', { store: osName, key: obj.n.h.id, new: obj.n && obj.n.b, prev: obj.l && obj.l.b });
       cb();
     });
   };
