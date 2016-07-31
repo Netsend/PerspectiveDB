@@ -23,6 +23,7 @@ var stream = require('stream');
 var util = require('util');
 
 var async = require('async');
+var idbReadableStream = require('idb-readable-stream');
 var level = require('level-packager')(require('level-js'));
 var websocket = require('websocket-stream');
 var xtend = require('xtend');
@@ -37,6 +38,8 @@ var remoteConnHandler = require('../../lib/remote_conn_handler');
 
 // hooks
 var filterIdbStore = require('../../hooks/core/filter_idb_store');
+
+var Writable = stream.Writable;
 
 /**
  * @event PersDB#data
@@ -236,7 +239,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
     pdb = new PersDB(idb, ldb, opts);
 
     // auto-merge remote versions (use a writable stream to enable backpressure)
-    pdb._mt.startMerge().pipe(new stream.Writable({
+    pdb._mt.startMerge().pipe(new Writable({
       objectMode: true,
       write: pdb._writeMerge.bind(pdb)
     }));
@@ -310,6 +313,111 @@ PersDB.prototype.del = function del(objectStore, key) {
       err ? reject(err) : resolve();
     });
   });
+};
+
+/**
+ * Resolve a conflict by conflict key.
+ *
+ * @param {Number} conflictKey  key of the conflict in the conflict collection
+ * @param {Object} newVersion  new version of the object to save
+ * @param {Boolean} [del]  whether to delete the object from the object store
+ * @return {Promise}
+ */
+PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, newVersion, del) {
+  var that = this;
+
+  return new Promise(function(resolve, reject) {
+    // fetch the conflicting object
+    var tr = this._idbTransaction([this._conflictStore], 'readonly');
+    tr.objectStore([this._conflictStore]).get(conflictKey);
+
+    tr.onabort = function(ev) {
+      that._log.err('resolve conflict abort', ev, conflictKey, newVersion);
+      reject(ev.target);
+    };
+
+    tr.onerror = function(ev) {
+      that._log.err('resolve conflict error', ev.error, conflictKey, newVersion);
+      reject(ev.target);
+    };
+
+    // write new merge and delete from conflict store
+    tr.oncomplete = function(ev) {
+      var conflict = ev.result;
+      that._log.debug('conflict resolved %j', conflict.n.h);
+
+      // ensure no conflicts or errors are set
+      conflict.c = null;
+      delete conflict.err;
+
+      if (del) {
+        conflict.n.h.d = true;
+      }
+      conflict.n.b = newVersion;
+
+      that._writeMerge(conflict, null, function(err) {
+        if (err) { reject(err); return; }
+
+        tr = that._idbTransaction([that._conflictStore], 'readwrite');
+        tr.objectStore([that._conflictStore]).del(conflictKey);
+
+        tr.onabort = function(ev) {
+          that._log.err('resolve conflict cleanup abort', ev, conflictKey, newVersion);
+          reject(ev.target);
+        };
+
+        tr.onerror = function(ev) {
+          that._log.err('resolve conflict cleanup error', ev.error, conflictKey, newVersion);
+          reject(ev.target);
+        };
+
+        tr.oncomplete = function() {
+          resolve();
+        };
+      });
+    };
+  });
+};
+
+/**
+ * Get an iterator over all unresolved conflicts.
+ *
+ * @param {Object} [opts]  createReadStream options
+ * @param {Function} next  iterator called with conflict key, conflict object and
+ *   a callback to proceed. The proceed callback has the following signature:
+ *    function(resolved, newVersion, [del])
+ *      resolved {Boolean} - indicates whether this conflict is resolved and should
+ *        be deleted from the conflict store or not. If not resolved the other
+ *        params are not evaluated.
+ *      newVersion {Object} - is the new version that should be saved in the object
+ *        store
+ *      del {Boolean} - is an option to indicate that the new version should be
+ *        deleted from the object store (and from the conflict store as well)
+ * @param {Function} done  final callback when done iterating
+ */
+PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
+  if (typeof opts === 'function') {
+    done = next;
+    next = opts;
+    opts = {};
+  }
+  opts = opts || {};
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+  if (typeof next !== 'function') { throw new TypeError('next must be a function'); }
+  if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
+
+  var that = this;
+
+  var reader = idbReadableStream(this._idb, this._conflictStore);
+  reader.pipe(new Writable({
+    objectMode: true,
+    write: function(item, enc, cb) {
+      next(item.key, item.value, function(resolved, newVersion, del) {
+        if (!resolved) { cb(); return; }
+        that.resolveConflict(item.key, newVersion, del).then(cb).catch(cb);
+      });
+    }
+  })).on('finish', done).on('error', done);
 };
 
 /**
