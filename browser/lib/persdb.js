@@ -28,14 +28,15 @@ var websocket = require('websocket-stream');
 var xtend = require('xtend');
 
 var proxy = require('./proxy');
-var MergeTree = require('../../lib/merge_tree');
+
 var idbIdOps = require('../../lib/idb_id_ops');
+var isEqual = require('../../lib/is_equal');
+var MergeTree = require('../../lib/merge_tree');
+var noop = require('../../lib/noop');
 var remoteConnHandler = require('../../lib/remote_conn_handler');
 
 // hooks
 var filterIdbStore = require('../../hooks/core/filter_idb_store');
-
-var noop = function() {};
 
 /**
  * @event PersDB#data
@@ -86,6 +87,8 @@ function PersDB(idb, ldb, opts) {
   this._db = ldb;
   this._opts = opts;
   this._connections = {};
+  this._snapshotStore = opts.snapshotStore || '_pdb';
+  this._conflictStore = opts.conflictStore || '_conflicts';
 
   this._stores = {}; // enable fast store lookup
   for (var i = 0; i < idb.objectStoreNames.length; i++) {
@@ -540,7 +543,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  */
 PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (obj.c && obj.c.length) {
-    that._handleConflict(obj, cb);
+    that._handleConflict(new Error('upstream merge conflict'), obj, cb);
     return;
   }
 
@@ -549,60 +552,103 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   var newVersion = obj.n;
   var prevVersion = obj.l;
 
-  var osName = idbIdOps.objectStoreFromId(newVersion.h.id);
-  if (!this._stores[osName]) {
-    this._log.notice('_writeMerge object from an unknown object store received', osName, newVersion.h);
+  var storeName = idbIdOps.objectStoreFromId(newVersion.h.id);
+  if (!this._stores[storeName]) {
+    this._log.notice('_writeMerge object from an unknown object store received', storeName, newVersion.h);
     process.nextTick(cb);
     return;
   }
   var id = idbIdOps.idFromId(newVersion.h.id);
 
-  this._log.debug2('_writeMerge', osName, newVersion.h);
+  this._log.debug2('_writeMerge', storeName, newVersion.h);
 
   // open a rw transaction on the object store
-  var tr = this._idbTransaction([osName], 'readwrite');
-  var os = tr.objectStore(osName);
+  var tr = this._idbTransaction([storeName], 'readwrite');
+  var store = tr.objectStore(storeName);
 
   // make sure the keypath of this object store is known
-  if (!this._keyPaths.hasOwnProperty(osName)) {
-    this._keyPaths[osName] = os.keyPath;
-    if (this._keyPaths[osName] != null && typeof this._keyPaths[osName] !== 'string') {
-      that._log.warning('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[osName], osName);
-      this._keyPaths[osName] = Object.prototype.toString(this._keyPaths[osName]);
+  if (!this._keyPaths.hasOwnProperty(storeName)) {
+    this._keyPaths[storeName] = store.keyPath;
+    if (this._keyPaths[storeName] != null && typeof this._keyPaths[storeName] !== 'string') {
+      that._log.warning('warning: keypath is not a string, converting: %s, store: %s', this._keyPaths[storeName], storeName);
+      this._keyPaths[storeName] = Object.prototype.toString(this._keyPaths[storeName]);
     }
   }
 
   // ensure keypath is set if the store has a keypath and this is not a delete
-  if (this._keyPaths[osName] && !newVersion.h.d && !newVersion.b[this._keyPaths[osName]]) {
-    newVersion.b[this._keyPaths[osName]] = id;
+  if (this._keyPaths[storeName] && !newVersion.h.d && !newVersion.b[this._keyPaths[storeName]]) {
+    newVersion.b[this._keyPaths[storeName]] = id;
   }
 
   tr.oncomplete = function(ev) {
     that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
-      that.emit('data', { store: osName, key: id, new: obj.n && obj.n.b, prev: obj.l && obj.l.b });
+      that.emit('data', { store: storeName, key: id, new: obj.n && obj.n.b, prev: obj.l && obj.l.b });
       cb();
     });
   };
 
   tr.onabort = function(ev) {
-    that._log.err('_writeMerge abort', ev);
-    cb(ev.target);
-    that._handleConflict(obj, cb);
+    that._log.warning('_writeMerge abort', ev);
+    that._handleConflict(ev.target, obj, cb);
   };
 
   tr.onerror = function(ev) {
-    that._log.err('_writeMerge error', ev);
-    cb(ev.target);
-    that._handleConflict(obj, cb);
+    that._log.warning('_writeMerge error', ev);
+    that._handleConflict(ev.target, obj, cb);
   };
 
-  if (newVersion.h.d) {
-    that._log.debug2('delete', newVersion.h);
-    os.delete(id);
-  } else {
-    that._log.debug2('put', newVersion.b);
-    os.put(newVersion.b, id);
-  }
+  // fetch current version and ensure there are no local changes
+  var lookup = store.get(id);
+  lookup.onsuccess = function() {
+    if (prevVersion === null) {
+      prevVersion = undefined;
+    }
+    if (isEqual(lookup.result, prevVersion)) {
+      if (newVersion.h.d) {
+        that._log.debug2('delete', newVersion.h);
+        store.delete(id);
+        // handle errors with tr.onabort
+      } else {
+        that._log.debug2('put', newVersion.b);
+        store.put(newVersion.b, id);
+        // handle errors with tr.onabort
+      }
+    } else {
+      // save in conflicts (let this transaction timeout)
+      that._handleConflict(new Error('unexpected local version'), obj);
+    }
+  };
+
+  // handle lookup errors with tr.onabort
+};
+
+// save an object in the conflict store
+PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
+  cb = cb || noop;
+
+  var that = this;
+
+  obj.err = origErr.message;
+
+  // open a write transaction on the conflict store
+  var tr = this._idbTransaction([this._conflictStore], 'readwrite');
+
+  tr.onabort = function(ev) {
+    that._log.err('save conflict abort', ev, obj.n.h, origErr);
+    cb(ev.target);
+  };
+
+  tr.onerror = function(ev) {
+    that._log.err('save conflict error', ev, obj.n.h, origErr);
+    cb(ev.target);
+  };
+
+  tr.oncomplete = function() {
+    that._log.notice('conflict saved %j', obj.n.h);
+    cb();
+  };
+
+  tr.objectStore(this._conflictStore).put(obj);
 };
