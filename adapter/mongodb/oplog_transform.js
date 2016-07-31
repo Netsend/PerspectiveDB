@@ -25,9 +25,9 @@ var util = require('util');
 
 var bson = require('bson');
 var BSONStream = require('bson-stream');
-var isEqual = require('is-equal');
 var xtend = require('xtend');
 
+var isEqual = require('../../lib/is_equal');
 var findAndDelete = require('./find_and_delete');
 
 var BSON = new bson.BSONPure.BSON();

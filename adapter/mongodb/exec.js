@@ -39,11 +39,11 @@ var url = require('url');
 var async = require('async');
 var chroot = require('chroot');
 var BSONStream = require('bson-stream');
-var isEqual = require('is-equal');
 var mongodb = require('mongodb');
 var posix = require('posix');
 var xtend = require('xtend');
 
+var isEqual = require('../../lib/is_equal');
 var findAndDelete = require('./find_and_delete');
 var logger = require('../../lib/logger');
 var noop = require('../../lib/noop');
