@@ -4,6 +4,7 @@
 
 var fs = require('fs');
 var path = require('path');
+var url = require('url');
 
 var wss = require('websocket-stream');
 
@@ -17,7 +18,29 @@ var opts = {};
 if (process.argv[3]) {
   opts.ca = fs.readFileSync(process.argv[3]);
 }
-var ws = wss(process.argv[2], null, opts);
+
+var uri = process.argv[2];
+
+// default protocol to wss if protocol is omitted
+if (!/^[a-z]+\:/.test(uri)) {
+  uri = 'wss://' + uri;
+}
+var parsedUrl = url.parse(uri);
+
+// check protocol
+if (parsedUrl.protocol !== 'wss:') {
+  console.error('protocol must be wss');
+  process.exit(1);
+}
+// default port to 3344
+if (!parsedUrl.port) {
+  parsedUrl.host = null;
+  parsedUrl.port = 3344;
+}
+uri = url.format(parsedUrl);
+
+console.log('connecting to %s', uri);
+var ws = wss(uri, null, opts);
 
 ws.on('connect', function() {
   console.log('connected', ws.socket._socket.getPeerCertificate());
