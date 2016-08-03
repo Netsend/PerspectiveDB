@@ -641,8 +641,6 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  *
  * See MergeTree.startMerge for object syntax.
  *
- * @todo verify version in object store to prevent data loss because of race
- * conditions between local and remote updates.
  * @todo make the operations atomic.
  *
  * @private
@@ -699,20 +697,19 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 
   tr.onabort = function(ev) {
     that._log.warning('_writeMerge abort', ev);
-    that._handleConflict(ev.target, obj, cb);
+    that._handleConflict(tr.error, obj, cb);
   };
 
   tr.onerror = function(ev) {
     that._log.warning('_writeMerge error', ev);
-    that._handleConflict(ev.target, obj, cb);
+    that._handleConflict(tr.error, obj, cb);
   };
 
   // fetch current version and ensure there are no local changes
   var lookup = store.get(id);
   lookup.onsuccess = function() {
-    if (prevVersion === null) {
-      prevVersion = undefined;
-    }
+    // The current item in the store is expected to match the previous version,
+    // since this is an update.
     if (isEqual(lookup.result, prevVersion)) {
       if (newVersion.h.d) {
         that._log.debug2('delete', newVersion.h);
@@ -723,6 +720,15 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
         store.put(newVersion.b, id);
         // handle errors with tr.onabort
       }
+    } else if (isEqual(lookup.result, newVersion)) {
+      // In some cases, i.e. if the user reloaded in the middle of this routine, a
+      // new version might have been saved in the store but not yet in the DAG
+      // (since this routine is not atomic and first saves in the store, then in
+      // the DAG). The next time data is asked from the remote it asks for the
+      // last version in the DAG and thus gets a version that is already in the
+      // store. Therefore double check that if the store version is not the
+      // expected previous version, maybe it already equals the new version.
+      that._log.debug2('merge already in store', newVersion.h);
     } else {
       // save in conflicts (let this transaction timeout)
       that._handleConflict(new Error('unexpected local version'), obj);
