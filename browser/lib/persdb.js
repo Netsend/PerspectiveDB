@@ -511,17 +511,17 @@ PersDB.prototype._removeItem = function _removeItem(store, key, cb) {
  * Get an item from store by key.
  *
  * @private
- * @param {String} store - name of the object store
+ * @param {String} storeName - name of the object store
  * @param {key} key - key of the object in the store
  * @param {Function} cb - first paramter will be an error or null, second paramter
  *  will be the item.
  */
-PersDB.prototype._getItem = function _getItem(store, key, cb) {
-  if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
+PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
+  if (typeof storeName !== 'string') { throw new TypeError('storeName must be a string'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  var tx = this._idbTransaction(store);
-  var req = tx.objectStore(this._conflictStore).get(key);
+  var tx = this._idbTransaction(storeName);
+  var req = tx.objectStore(storeName).get(key);
 
   tx.onabort = () => {
     cb(tx.error);
