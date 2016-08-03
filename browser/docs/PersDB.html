@@ -21,7 +21,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -103,7 +103,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line57">line 57</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line60">line 60</a>
     </li></ul></dd>
     
 
@@ -495,7 +495,7 @@ the contents of any object store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line155">line 155</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line158">line 158</a>
     </li></ul></dd>
     
 
@@ -992,7 +992,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line358">line 358</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line466">line 466</a>
     </li></ul></dd>
     
 
@@ -1495,7 +1495,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line338">line 338</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line446">line 446</a>
     </li></ul></dd>
     
 
@@ -1674,7 +1674,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line299">line 299</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line302">line 302</a>
     </li></ul></dd>
     
 
@@ -1722,6 +1722,220 @@ transfering BSON.
 </dl>
 
     
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="getConflicts"><span class="type-signature"></span>getConflicts<span class="signature">(opts<span class="signature-attributes">opt</span>, next, done)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+<div class="description">
+    Get an iterator over all unresolved conflicts.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>opts</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">createReadStream options</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>next</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">iterator called with conflict key, conflict object and
+  a callback to proceed. The proceed callback has the following signature:
+   function(resolved, newVersion, [del])
+     resolved {Boolean} - indicates whether this conflict is resolved and should
+       be deleted from the conflict store or not. If not resolved the other
+       params are not evaluated.
+     newVersion {Object} - is the new version that should be saved in the object
+       store
+     del {Boolean} - is an option to indicate that the new version should be
+       deleted from the object store (and from the conflict store as well)</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>done</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">final callback when done iterating</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line398">line 398</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1876,7 +2090,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line273">line 273</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line276">line 276</a>
     </li></ul></dd>
     
 
@@ -1891,6 +2105,229 @@ transfering BSON.
             <li>make atomic</li>
         </ul>
     </dd>
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+
+
+<dl class="param-type">
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+        
+            
+
+    
+
+    <h4 class="name" id="resolveConflict"><span class="type-signature"></span>resolveConflict<span class="signature">(conflictKey, newVersion, del<span class="signature-attributes">opt</span>)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
+
+    
+
+
+
+<div class="description">
+    Resolve a conflict by conflict key.
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictKey</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">key of the conflict in the conflict collection</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>newVersion</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">new version of the object to save</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>del</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">whether to delete the object from the object store</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line326">line 326</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
     
 </dl>
 
@@ -2194,7 +2631,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line48">line 48</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line51">line 51</a>
     </li></ul></dd>
     
 
@@ -2446,7 +2883,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line41">line 41</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line44">line 44</a>
     </li></ul></dd>
     
 
@@ -2486,7 +2923,7 @@ transfering BSON.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sun Jul 31 2016 22:52:53 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 14:14:39 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

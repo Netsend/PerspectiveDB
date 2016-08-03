@@ -21,7 +21,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -61,6 +61,7 @@ var stream = require('stream');
 var util = require('util');
 
 var async = require('async');
+var idbReadableStream = require('idb-readable-stream');
 var level = require('level-packager')(require('level-js'));
 var websocket = require('websocket-stream');
 var xtend = require('xtend');
@@ -75,6 +76,8 @@ var remoteConnHandler = require('../../lib/remote_conn_handler');
 
 // hooks
 var filterIdbStore = require('../../hooks/core/filter_idb_store');
+
+var Writable = stream.Writable;
 
 /**
  * @event PersDB#data
@@ -274,7 +277,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
     pdb = new PersDB(idb, ldb, opts);
 
     // auto-merge remote versions (use a writable stream to enable backpressure)
-    pdb._mt.startMerge().pipe(new stream.Writable({
+    pdb._mt.startMerge().pipe(new Writable({
       objectMode: true,
       write: pdb._writeMerge.bind(pdb)
     }));
@@ -348,6 +351,111 @@ PersDB.prototype.del = function del(objectStore, key) {
       err ? reject(err) : resolve();
     });
   });
+};
+
+/**
+ * Resolve a conflict by conflict key.
+ *
+ * @param {Number} conflictKey  key of the conflict in the conflict collection
+ * @param {Object} newVersion  new version of the object to save
+ * @param {Boolean} [del]  whether to delete the object from the object store
+ * @return {Promise}
+ */
+PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, newVersion, del) {
+  var that = this;
+
+  return new Promise(function(resolve, reject) {
+    // fetch the conflicting object
+    var tr = this._idbTransaction([this._conflictStore], 'readonly');
+    tr.objectStore([this._conflictStore]).get(conflictKey);
+
+    tr.onabort = function(ev) {
+      that._log.err('resolve conflict abort', ev, conflictKey, newVersion);
+      reject(ev.target);
+    };
+
+    tr.onerror = function(ev) {
+      that._log.err('resolve conflict error', ev.error, conflictKey, newVersion);
+      reject(ev.target);
+    };
+
+    // write new merge and delete from conflict store
+    tr.oncomplete = function(ev) {
+      var conflict = ev.result;
+      that._log.debug('conflict resolved %j', conflict.n.h);
+
+      // ensure no conflicts or errors are set
+      conflict.c = null;
+      delete conflict.err;
+
+      if (del) {
+        conflict.n.h.d = true;
+      }
+      conflict.n.b = newVersion;
+
+      that._writeMerge(conflict, null, function(err) {
+        if (err) { reject(err); return; }
+
+        tr = that._idbTransaction([that._conflictStore], 'readwrite');
+        tr.objectStore([that._conflictStore]).del(conflictKey);
+
+        tr.onabort = function(ev) {
+          that._log.err('resolve conflict cleanup abort', ev, conflictKey, newVersion);
+          reject(ev.target);
+        };
+
+        tr.onerror = function(ev) {
+          that._log.err('resolve conflict cleanup error', ev.error, conflictKey, newVersion);
+          reject(ev.target);
+        };
+
+        tr.oncomplete = function() {
+          resolve();
+        };
+      });
+    };
+  });
+};
+
+/**
+ * Get an iterator over all unresolved conflicts.
+ *
+ * @param {Object} [opts]  createReadStream options
+ * @param {Function} next  iterator called with conflict key, conflict object and
+ *   a callback to proceed. The proceed callback has the following signature:
+ *    function(resolved, newVersion, [del])
+ *      resolved {Boolean} - indicates whether this conflict is resolved and should
+ *        be deleted from the conflict store or not. If not resolved the other
+ *        params are not evaluated.
+ *      newVersion {Object} - is the new version that should be saved in the object
+ *        store
+ *      del {Boolean} - is an option to indicate that the new version should be
+ *        deleted from the object store (and from the conflict store as well)
+ * @param {Function} done  final callback when done iterating
+ */
+PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
+  if (typeof opts === 'function') {
+    done = next;
+    next = opts;
+    opts = {};
+  }
+  opts = opts || {};
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+  if (typeof next !== 'function') { throw new TypeError('next must be a function'); }
+  if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
+
+  var that = this;
+
+  var reader = idbReadableStream(this._idb, this._conflictStore);
+  reader.pipe(new Writable({
+    objectMode: true,
+    write: function(item, enc, cb) {
+      next(item.key, item.value, function(resolved, newVersion, del) {
+        if (!resolved) { cb(); return; }
+        that.resolveConflict(item.key, newVersion, del).then(cb).catch(cb);
+      });
+    }
+  })).on('finish', done).on('error', done);
 };
 
 /**
@@ -571,8 +679,6 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  *
  * See MergeTree.startMerge for object syntax.
  *
- * @todo verify version in object store to prevent data loss because of race
- * conditions between local and remote updates.
  * @todo make the operations atomic.
  *
  * @private
@@ -601,8 +707,8 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   this._log.debug2('_writeMerge', storeName, newVersion.h);
 
   // open a rw transaction on the object store
-  var tr = this._idbTransaction([storeName], 'readwrite');
-  var store = tr.objectStore(storeName);
+  var tx = this._idbTransaction([storeName], 'readwrite');
+  var store = tx.objectStore(storeName);
 
   // make sure the keypath of this object store is known
   if (!this._keyPaths.hasOwnProperty(storeName)) {
@@ -618,7 +724,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     newVersion.b[this._keyPaths[storeName]] = id;
   }
 
-  tr.oncomplete = function(ev) {
+  tx.oncomplete = function(ev) {
     that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
@@ -627,39 +733,47 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     });
   };
 
-  tr.onabort = function(ev) {
+  tx.onabort = function(ev) {
     that._log.warning('_writeMerge abort', ev);
-    that._handleConflict(ev.target, obj, cb);
+    that._handleConflict(tx.error, obj, cb);
   };
 
-  tr.onerror = function(ev) {
+  tx.onerror = function(ev) {
     that._log.warning('_writeMerge error', ev);
-    that._handleConflict(ev.target, obj, cb);
+    that._handleConflict(tx.error, obj, cb);
   };
 
   // fetch current version and ensure there are no local changes
   var lookup = store.get(id);
   lookup.onsuccess = function() {
-    if (prevVersion === null) {
-      prevVersion = undefined;
-    }
+    // The current item in the store is expected to match the previous version,
+    // since this is an update.
     if (isEqual(lookup.result, prevVersion)) {
       if (newVersion.h.d) {
         that._log.debug2('delete', newVersion.h);
         store.delete(id);
-        // handle errors with tr.onabort
+        // handle errors with tx.onabort
       } else {
         that._log.debug2('put', newVersion.b);
         store.put(newVersion.b, id);
-        // handle errors with tr.onabort
+        // handle errors with tx.onabort
       }
+    } else if (isEqual(lookup.result, newVersion)) {
+      // In some cases, i.e. if the user reloaded in the middle of this routine, a
+      // new version might have been saved in the store but not yet in the DAG
+      // (since this routine is not atomic and first saves in the store, then in
+      // the DAG). The next time data is asked from the remote it asks for the
+      // last version in the DAG and thus gets a version that is already in the
+      // store. Therefore double check that if the store version is not the
+      // expected previous version, maybe it already equals the new version.
+      that._log.debug2('merge already in store', newVersion.h);
     } else {
       // save in conflicts (let this transaction timeout)
       that._handleConflict(new Error('unexpected local version'), obj);
     }
   };
 
-  // handle lookup errors with tr.onabort
+  // handle lookup errors with tx.onabort
 };
 
 // save an object in the conflict store
@@ -671,24 +785,24 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
   obj.err = origErr.message;
 
   // open a write transaction on the conflict store
-  var tr = this._idbTransaction([this._conflictStore], 'readwrite');
+  var tx = this._idbTransaction([this._conflictStore], 'readwrite');
 
-  tr.onabort = function(ev) {
+  tx.onabort = function(ev) {
     that._log.err('save conflict abort', ev, obj.n.h, origErr);
-    cb(ev.target);
+    cb(tx.error);
   };
 
-  tr.onerror = function(ev) {
+  tx.onerror = function(ev) {
     that._log.err('save conflict error', ev, obj.n.h, origErr);
-    cb(ev.target);
+    cb(tx.error);
   };
 
-  tr.oncomplete = function() {
+  tx.oncomplete = function() {
     that._log.notice('conflict saved %j', obj.n.h);
     cb();
   };
 
-  tr.objectStore(this._conflictStore).put(obj);
+  tx.objectStore(this._conflictStore).put(obj);
 };
 </code></pre>
         </article>
@@ -702,7 +816,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sun Jul 31 2016 22:52:53 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 14:14:39 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
