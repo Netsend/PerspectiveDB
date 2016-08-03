@@ -992,7 +992,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line466">line 466</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line474">line 474</a>
     </li></ul></dd>
     
 
@@ -1495,7 +1495,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line446">line 446</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line454">line 454</a>
     </li></ul></dd>
     
 
@@ -1730,7 +1730,7 @@ transfering BSON.
 
     
 
-    <h4 class="name" id="getConflicts"><span class="type-signature"></span>getConflicts<span class="signature">(opts<span class="signature-attributes">opt</span>, next, done)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="getConflicts"><span class="type-signature"></span>getConflicts<span class="signature">(opts<span class="signature-attributes">opt</span>, next, done<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
 
     
 
@@ -1801,7 +1801,7 @@ transfering BSON.
 
             
 
-            <td class="description last">createReadStream options</td>
+            <td class="description last">idb-readable-stream options</td>
         </tr>
 
     
@@ -1832,16 +1832,174 @@ transfering BSON.
 
             
 
-            <td class="description last">iterator called with conflict key, conflict object and
-  a callback to proceed. The proceed callback has the following signature:
-   function(resolved, newVersion, [del])
-     resolved {Boolean} - indicates whether this conflict is resolved and should
-       be deleted from the conflict store or not. If not resolved the other
-       params are not evaluated.
-     newVersion {Object} - is the new version that should be saved in the object
-       store
-     del {Boolean} - is an option to indicate that the new version should be
-       deleted from the object store (and from the conflict store as well)</td>
+            <td class="description last">iterator called with three arguments
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictKey</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">first parameter is the  conflict key</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">second parameter is the conflict object</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>proceed</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">third parameter is a callback to proceed to
+  the next conflict or stop iterating
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>continue</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">call this handler optionally
+  with a boolean to indicate whether to proceed with the next conflict or stop
+  iterating and call the done handler.</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
         </tr>
 
     
@@ -1863,6 +2021,8 @@ transfering BSON.
             
                 <td class="attributes">
                 
+                    &lt;optional><br>
+                
 
                 
 
@@ -1872,7 +2032,69 @@ transfering BSON.
 
             
 
-            <td class="description last">final callback when done iterating</td>
+            <td class="description last">Final callback called when done iterating. Called
+  with one optional argument.
+                <h6>Properties</h6>
+                
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Error</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">first parameter will be an error or null</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+            </td>
         </tr>
 
     
@@ -2923,7 +3145,7 @@ transfering BSON.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 14:14:39 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 14:56:42 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

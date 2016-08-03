@@ -383,12 +383,17 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, newVers
  * Get an iterator over all unresolved conflicts.
  *
  * @param {Object} [opts] - idb-readable-stream options
- * @param {Function} next - iterator called with conflict key, conflict object and
- *   a callback to proceed. The proceed callback has the following signature:
- *     function([continue])
- *       continue {Boolean, default true} - indicate whether to proceed with the
- *         next conflict or stop iterating and call the done handler
- * @param {Function} [done] - final callback when done iterating
+ * @param {Function} next - iterator called with three arguments
+ * @param {Number} next.conflictKey - first parameter is the  conflict key
+ * @param {Object} next.conflictObject - second parameter is the conflict object
+ * @param {Function} next.proceed - third parameter is a callback to proceed to
+ *   the next conflict or stop iterating
+ * @param {Boolean} [next.proceed.continue=true] - call this handler optionally
+ *   with a boolean to indicate whether to proceed with the next conflict or stop
+ *   iterating and call the done handler.
+ * @param {Function} [done] - Final callback called when done iterating. Called
+ *   with one optional argument.
+ * @param {Error} [done.err] - first parameter will be an error or null
  */
 PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts === 'function') {
