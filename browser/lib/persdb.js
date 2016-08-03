@@ -382,18 +382,13 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, newVers
 /**
  * Get an iterator over all unresolved conflicts.
  *
- * @param {Object} [opts]  createReadStream options
- * @param {Function} next  iterator called with conflict key, conflict object and
+ * @param {Object} [opts] - idb-readable-stream options
+ * @param {Function} next - iterator called with conflict key, conflict object and
  *   a callback to proceed. The proceed callback has the following signature:
- *    function(resolved, newVersion, [del])
- *      resolved {Boolean} - indicates whether this conflict is resolved and should
- *        be deleted from the conflict store or not. If not resolved the other
- *        params are not evaluated.
- *      newVersion {Object} - is the new version that should be saved in the object
- *        store
- *      del {Boolean} - is an option to indicate that the new version should be
- *        deleted from the object store (and from the conflict store as well)
- * @param {Function} done  final callback when done iterating
+ *     function([continue])
+ *       continue {Boolean, default true} - indicate whether to proceed with the
+ *         next conflict or stop iterating and call the done handler
+ * @param {Function} [done] - final callback when done iterating
  */
 PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts === 'function') {
@@ -401,20 +396,28 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
     next = opts;
     opts = {};
   }
-  opts = opts || {};
+  opts = xtend({
+    direction: 'prev'
+  }, opts);
+  done = done || noop;
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (typeof next !== 'function') { throw new TypeError('next must be a function'); }
   if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
 
   var that = this;
 
-  var reader = idbReadableStream(this._idb, this._conflictStore);
+  var reader = idbReadableStream(this._idb, this._conflictStore, opts);
   reader.pipe(new Writable({
     objectMode: true,
-    write: function(item, enc, cb) {
-      next(item.key, item.value, function(resolved, newVersion, del) {
-        if (!resolved) { cb(); return; }
-        that.resolveConflict(item.key, newVersion, del).then(cb).catch(cb);
+    write: function(obj, enc, cb) {
+      var writer = this;
+      // pass conflict to caller for resolving
+      next(obj.key, obj.value, function(cont) {
+        if (cont == null || cont) {
+          cb();
+        } else {
+          writer.end(cb);
+        }
       });
     }
   })).on('finish', done).on('error', done);
