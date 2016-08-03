@@ -327,7 +327,7 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
   var that = this;
 
   // fetch the conflict object
-  this._getItem(conflictKey, function(err, conflict) {
+  this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
@@ -426,7 +426,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
 
         that._writeMerge(newMerge, null, function(err) {
           if (err) { cb(err); return; }
-          that._removeItem(that._conflictStore, conflictKey).catch(cb).then(cb);
+          that._removeItem(that._conflictStore, conflictKey, cb);
         });
       } else {
         if (!conflict.err) {
@@ -471,7 +471,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
 
           that._writeMerge(newMerge, null, function(err) {
             if (err) { cb(err); return; }
-            that._removeItem(that._conflictStore, conflictKey).catch(cb).then(cb);
+            that._removeItem(that._conflictStore, conflictKey, cb);
           });
         });
       }
@@ -485,27 +485,26 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
  * @private
  * @param {String} store - name of the object store
  * @param {key} key  key of the conflict object in the conflict store
- * @return {Promise}
+ * @param {Function} cb - first paramter will be an error or null
  */
-PersDB.prototype._removeItem = function _removeItem(store, key) {
+PersDB.prototype._removeItem = function _removeItem(store, key, cb) {
   if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  return new Promise((resolve, reject) => {
-    var tx = this._idbTransaction(store, 'readwrite');
-    tx.objectStore(store).delete(key);
+  var tx = this._idbTransaction(store, 'readwrite');
+  tx.objectStore(store).delete(key);
 
-    tx.onabort = () => {
-      reject(tx.error);
-    };
+  tx.onabort = () => {
+    cb(tx.error);
+  };
 
-    tx.onerror = () => {
-      reject(tx.error);
-    };
+  tx.onerror = () => {
+    cb(tx.error);
+  };
 
-    tx.oncomplete = () => {
-      resolve();
-    }
-  });
+  tx.oncomplete = () => {
+    cb();
+  }
 };
 
 /**
@@ -514,27 +513,27 @@ PersDB.prototype._removeItem = function _removeItem(store, key) {
  * @private
  * @param {String} store - name of the object store
  * @param {key} key - key of the object in the store
- * @return {Promise}
+ * @param {Function} cb - first paramter will be an error or null, second paramter
+ *  will be the item.
  */
-PersDB.prototype._getItem = function _getItem(store, key) {
+PersDB.prototype._getItem = function _getItem(store, key, cb) {
   if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  return new Promise((resolve, reject) => {
-    var tx = this._idbTransaction(store);
-    var req = tx.objectStore(this._conflictStore).get(key);
+  var tx = this._idbTransaction(store);
+  var req = tx.objectStore(this._conflictStore).get(key);
 
-    tx.onabort = () => {
-      reject(tx.error);
-    };
+  tx.onabort = () => {
+    cb(tx.error);
+  };
 
-    tx.onerror = () => {
-      reject(tx.error);
-    };
+  tx.onerror = () => {
+    cb(tx.error);
+  };
 
-    tx.oncomplete = () => {
-      resolve(req.result);
-    }
-  });
+  tx.oncomplete = () => {
+    cb(null, req.result);
+  }
 };
 
 /**
