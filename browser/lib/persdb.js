@@ -316,6 +316,33 @@ PersDB.prototype.del = function del(objectStore, key) {
 };
 
 /**
+ * Get a conflict by conflict key.
+ *
+ * @param {Number} conflictKey - key of the conflict in the conflict store
+ * @param {Function} cb - first argument will be an error or null, second argument
+ *   will be the conflict object. Third argument will be the current version in the
+ *   object store.
+ */
+PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
+  var that = this;
+
+  // fetch the conflict object
+  this._getItem(conflictKey, function(err, conflict) {
+    if (err) { cb(err); return; }
+    if (!conflict) { cb(new Error('conflict not found')); return; }
+
+    var storeName = idbIdOps.objectStoreFromId(conflict.n.h.id);
+    var storeId = idbIdOps.idFromId(conflict.n.h.id);
+
+    that._getItem(storeName, storeId, function(err, storeItem) {
+      if (err) { cb(err); return; }
+
+      cb(null, conflict, storeItem);
+    });
+  });
+};
+
+/**
  * Resolve a conflict by conflict key.
  *
  * If the current local head is the same as toBeResolved, write resolved to the
