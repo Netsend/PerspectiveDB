@@ -356,64 +356,195 @@ PersDB.prototype.del = function del(objectStore, key) {
 /**
  * Resolve a conflict by conflict key.
  *
- * @param {Number} conflictKey  key of the conflict in the conflict collection
- * @param {Object} newVersion  new version of the object to save
- * @param {Boolean} [del]  whether to delete the object from the object store
- * @return {Promise}
+ * If the current local head is the same as toBeResolved, write resolved to the
+ * store and delete from conflict store.
+ *
+ * @param {Number} conflictKey - key of the conflict in the conflict store
+ * @param {Object} toBeResolved - object currently in the object store that should
+ *   be overwritten
+ * @param {Object} resolved - new item that solves given conflict and should
+ *   overwrite the object store
+ * @param {Boolean} [del] - whether or not resolving means deleting from the object
+ *   store
+ * @param {Function} [cb] - first argument will be an error or null
  */
-PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, newVersion, del) {
+PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeResolved, resolved, del, cb) {
+  if (typeof del === 'function') {
+    cb = del;
+    del = false;
+  }
+  if (typeof conflictKey !== 'number') { throw new TypeError('conflictKey must be a number'); }
+  if (toBeResolved == null || typeof toBeResolved !== 'object') { throw new TypeError('toBeResolved must be an object'); }
+  if (resolved == null || typeof resolved !== 'object') { throw new TypeError('resolved must be an object'); }
+  if (del != null &amp;&amp; typeof del !== 'boolean') { throw new TypeError('del must be a boolean'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
   var that = this;
 
-  return new Promise(function(resolve, reject) {
-    // fetch the conflicting object
-    var tr = this._idbTransaction([this._conflictStore], 'readonly');
-    tr.objectStore([this._conflictStore]).get(conflictKey);
+  // fetch the conflict object
+  this._getItem(conflictKey, function(err, conflict) {
+    if (err) { cb(err); return; }
+    if (!conflict) { cb(new Error('conflict not found')); return; }
 
-    tr.onabort = function(ev) {
-      that._log.err('resolve conflict abort', ev, conflictKey, newVersion);
-      reject(ev.target);
-    };
+    var id = conflict.n.h.id;
 
-    tr.onerror = function(ev) {
-      that._log.err('resolve conflict error', ev.error, conflictKey, newVersion);
-      reject(ev.target);
-    };
+    // make sure the local head matches toBeResolved
+    var heads = [];
+    that._mt.getLocalTree().getHeadVersions(id, function(head, next) {
+      heads.push(head);
+      next();
+    }, function(err) {
+      if (err) { cb(err); return; }
+      if (heads.length !== 1) {
+        that._log.err('getConflicts encountered invalid snapshot state: %d heads while one was expected', heads.length);
+        cb(new Error('expected one head'));
+        return;
+      }
+      var head = heads[0];
 
-    // write new merge and delete from conflict store
-    tr.oncomplete = function(ev) {
-      var conflict = ev.result;
-      that._log.debug('conflict resolved %j', conflict.n.h);
-
-      // ensure no conflicts or errors are set
-      conflict.c = null;
-      delete conflict.err;
+      var newVersion = {
+        h: {
+          id: id,
+          v: MergeTree.generateRandomVersion(),
+          pa: [head.h.v] // other parents are determined later on
+        },
+        b: resolved
+      }
 
       if (del) {
-        conflict.n.h.d = true;
+        newVersion.h.d = true;
       }
-      conflict.n.b = newVersion;
 
-      that._writeMerge(conflict, null, function(err) {
-        if (err) { reject(err); return; }
+      if (!isEqual(head.b, toBeResolved)) {
+        that._log.err('getConflicts mismatch between local head and toBeResolved %j %j while processing', head.b, toBeResolved, conflict);
+        cb(new Error('local head and toBeResolved don\'t match'));
+        return;
+      }
 
-        tr = that._idbTransaction([that._conflictStore], 'readwrite');
-        tr.objectStore([that._conflictStore]).del(conflictKey);
+      // differentiate between real merge conflicts on conflicting keys, versus other errors
+      if (conflict.c &amp;&amp; conflict.c.length) {
+        // this was a real merge conflict, so use the remote version as a parent
+        // note: merge conflicts never yield a merged item so conflict.n is always the remote version
+        newVersion.h.pa.push(conflict.n.h.v);
 
-        tr.onabort = function(ev) {
-          that._log.err('resolve conflict cleanup abort', ev, conflictKey, newVersion);
-          reject(ev.target);
+        var newMerge = {
+          n: newVersion,
+          l: head,
+          lcas: conflict.lcas,
+          pe: conflict.pe,
+          c: null
         };
 
-        tr.onerror = function(ev) {
-          that._log.err('resolve conflict cleanup error', ev.error, conflictKey, newVersion);
-          reject(ev.target);
-        };
+        that._writeMerge(newMerge, null, function(err) {
+          if (err) { cb(err); return; }
+          that._removeItem(that._conflictStore, conflictKey).catch(cb).then(cb);
+        });
+      } else {
+        if (!conflict.err) {
+          that._log.warning('conflict objects should either have a "c" key or an "err" key', conflict);
+          throw new Error('expected error key');
+        }
 
-        tr.oncomplete = function() {
-          resolve();
-        };
-      });
+        // check if the conflict version was a locally created merge or already existed in the remote tree
+        // this info is needed for determining the right parents of the resolved item
+        that._mt.getRemoteTree(conflict.pe).getByVersion(conflict.n.h.v, function(err, found) {
+          if (err) { cb(err); return; }
+
+          if (found) { // then this is the other parent
+            newVersion.h.pa.push(conflict.n.h.v);
+          } else { // discard the conflict and create a new merge with the same remote parent
+            // check some invariants
+            if (conflict.n.h._pa.length &lt; 2) { throw new Error('expected conflict to be a merge'); }
+            if (conflict.n.h._pa.length > 2) { throw new Error('only supports merges with two parents'); }
+            if (!conflict.l) { throw new Error('expected a local head'); }
+
+            // determine which of the parents was the local head at the time of conflict
+            var lheadIdx = conflict.n.h.pa.indexOf(conflict.l.h.v);
+            if (lheadIdx === -1) {
+              // invalid merge
+              throw new Error('parent in local tree not found');
+            } else {
+              if (lheadIdx === 1) {
+                newVersion.h.pa.push(conflict.n.h.pa[0]);
+              } else {
+                newVersion.h.pa.push(conflict.n.h.pa[1]);
+              }
+            }
+          }
+
+          var newMerge = {
+            n: newVersion,
+            l: head,
+            lcas: conflict.lcas,
+            pe: conflict.pe,
+            c: null
+          };
+
+          that._writeMerge(newMerge, null, function(err) {
+            if (err) { cb(err); return; }
+            that._removeItem(that._conflictStore, conflictKey).catch(cb).then(cb);
+          });
+        });
+      }
+    });
+  });
+};
+
+/**
+ * Remove an item from store by key.
+ *
+ * @private
+ * @param {String} store - name of the object store
+ * @param {key} key  key of the conflict object in the conflict store
+ * @return {Promise}
+ */
+PersDB.prototype._removeItem = function _removeItem(store, key) {
+  if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
+
+  return new Promise((resolve, reject) => {
+    var tx = this._idbTransaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+
+    tx.onabort = () => {
+      reject(tx.error);
     };
+
+    tx.onerror = () => {
+      reject(tx.error);
+    };
+
+    tx.oncomplete = () => {
+      resolve();
+    }
+  });
+};
+
+/**
+ * Get an item from store by key.
+ *
+ * @private
+ * @param {String} store - name of the object store
+ * @param {key} key - key of the object in the store
+ * @return {Promise}
+ */
+PersDB.prototype._getItem = function _getItem(store, key) {
+  if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
+
+  return new Promise((resolve, reject) => {
+    var tx = this._idbTransaction(store);
+    var req = tx.objectStore(this._conflictStore).get(key);
+
+    tx.onabort = () => {
+      reject(tx.error);
+    };
+
+    tx.onerror = () => {
+      reject(tx.error);
+    };
+
+    tx.oncomplete = () => {
+      resolve(req.result);
+    }
   });
 };
 
@@ -446,8 +577,6 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (typeof next !== 'function') { throw new TypeError('next must be a function'); }
   if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
-
-  var that = this;
 
   var reader = idbReadableStream(this._idb, this._conflictStore, opts);
   reader.pipe(new Writable({
@@ -824,7 +953,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 14:56:42 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 17:25:11 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
