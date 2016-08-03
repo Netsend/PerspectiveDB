@@ -409,8 +409,6 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof next !== 'function') { throw new TypeError('next must be a function'); }
   if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
 
-  var that = this;
-
   var reader = idbReadableStream(this._idb, this._conflictStore, opts);
   reader.pipe(new Writable({
     objectMode: true,
