@@ -669,8 +669,8 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   this._log.debug2('_writeMerge', storeName, newVersion.h);
 
   // open a rw transaction on the object store
-  var tr = this._idbTransaction([storeName], 'readwrite');
-  var store = tr.objectStore(storeName);
+  var tx = this._idbTransaction([storeName], 'readwrite');
+  var store = tx.objectStore(storeName);
 
   // make sure the keypath of this object store is known
   if (!this._keyPaths.hasOwnProperty(storeName)) {
@@ -686,7 +686,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     newVersion.b[this._keyPaths[storeName]] = id;
   }
 
-  tr.oncomplete = function(ev) {
+  tx.oncomplete = function(ev) {
     that._log.debug2('_writeMerge success', ev);
     that._localWriter.write(obj, function(err) {
       if (err) { cb(err); return; }
@@ -695,14 +695,14 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     });
   };
 
-  tr.onabort = function(ev) {
+  tx.onabort = function(ev) {
     that._log.warning('_writeMerge abort', ev);
-    that._handleConflict(tr.error, obj, cb);
+    that._handleConflict(tx.error, obj, cb);
   };
 
-  tr.onerror = function(ev) {
+  tx.onerror = function(ev) {
     that._log.warning('_writeMerge error', ev);
-    that._handleConflict(tr.error, obj, cb);
+    that._handleConflict(tx.error, obj, cb);
   };
 
   // fetch current version and ensure there are no local changes
@@ -714,11 +714,11 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
       if (newVersion.h.d) {
         that._log.debug2('delete', newVersion.h);
         store.delete(id);
-        // handle errors with tr.onabort
+        // handle errors with tx.onabort
       } else {
         that._log.debug2('put', newVersion.b);
         store.put(newVersion.b, id);
-        // handle errors with tr.onabort
+        // handle errors with tx.onabort
       }
     } else if (isEqual(lookup.result, newVersion)) {
       // In some cases, i.e. if the user reloaded in the middle of this routine, a
@@ -735,7 +735,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
     }
   };
 
-  // handle lookup errors with tr.onabort
+  // handle lookup errors with tx.onabort
 };
 
 // save an object in the conflict store
@@ -747,22 +747,22 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
   obj.err = origErr.message;
 
   // open a write transaction on the conflict store
-  var tr = this._idbTransaction([this._conflictStore], 'readwrite');
+  var tx = this._idbTransaction([this._conflictStore], 'readwrite');
 
-  tr.onabort = function(ev) {
+  tx.onabort = function(ev) {
     that._log.err('save conflict abort', ev, obj.n.h, origErr);
-    cb(ev.target);
+    cb(tx.error);
   };
 
-  tr.onerror = function(ev) {
+  tx.onerror = function(ev) {
     that._log.err('save conflict error', ev, obj.n.h, origErr);
-    cb(ev.target);
+    cb(tx.error);
   };
 
-  tr.oncomplete = function() {
+  tx.oncomplete = function() {
     that._log.notice('conflict saved %j', obj.n.h);
     cb();
   };
 
-  tr.objectStore(this._conflictStore).put(obj);
+  tx.objectStore(this._conflictStore).put(obj);
 };
