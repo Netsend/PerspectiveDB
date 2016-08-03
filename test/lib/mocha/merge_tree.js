@@ -35,6 +35,13 @@ var dbPath = tmpdir() + '/test_merge_tree';
 
 var BSON = new bson.BSONPure.BSON();
 
+function cloneItem(item) {
+  // clone object to prevent side effects on the header
+  var copy = xtend(item);
+  copy.h = xtend(item.h);
+  return copy;
+}
+
 // open database
 before(function(done) {
   logger({ console: true, mask: logger.DEBUG }, function(err, l) {
@@ -721,13 +728,12 @@ describe('MergeTree', function() {
 
     it('item1 in stree', function(done) {
       var stree = new Tree(db, sname, { vSize: 3, log: silence });
-      stree.write(item1, done);
+      stree.write(cloneItem(item1), done);
     });
 
     it('should merge one item with the local database', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -736,33 +742,22 @@ describe('MergeTree', function() {
         i++;
         should.deepEqual(obj, {
           n: item1,
-          o: null,
-          c: null
+          l: null,
+          lcas: [],
+          c: null,
+          pe: sname
         });
       });
 
       rs.on('end', function() {
         should.strictEqual(i, 1);
-
-        // inspect stage
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          should.deepEqual(item, item1);
-        });
-        r.on('end', function() {
-          should.strictEqual(i, 1);
-          should.strictEqual(j, 1);
-          done();
-        });
+        done();
       });
     });
 
     it('should be the same as previous run (idempotence)', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -771,38 +766,27 @@ describe('MergeTree', function() {
         i++;
         should.deepEqual(obj, {
           n: item1,
-          o: null,
-          c: null
+          l: null,
+          lcas: [],
+          c: null,
+          pe: sname
         });
       });
 
       rs.on('end', function() {
         should.strictEqual(i, 1);
-
-        // inspect stage
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          should.deepEqual(item, item1);
-        });
-        r.on('end', function() {
-          should.strictEqual(i, 1);
-          should.strictEqual(j, 1);
-          done();
-        });
+        done();
       });
     });
 
     it('item2 in stree', function(done) {
       var tree = new Tree(db, sname, { vSize: 3, log: silence });
-      tree.write(item2, done);
+      tree.write(cloneItem(item2), done);
     });
 
     it('should merge ff with current head in local', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -812,45 +796,32 @@ describe('MergeTree', function() {
         if (i === 1) {
           should.deepEqual(obj, {
             n: item1,
-            o: null,
-            c: null
+            l: null,
+            lcas: [],
+            c: null,
+            pe: sname
           });
         }
         if (i > 1) {
           should.deepEqual(obj, {
             n: item2,
-            o: null,
-            c: null
+            l: null,
+            lcas: [],
+            c: null,
+            pe: sname
           });
         }
       });
 
       rs.on('end', function() {
         should.strictEqual(i, 2);
-
-        // inspect staging
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          if (j === 1) {
-            should.deepEqual(item, item1);
-          }
-          if (j > 1) {
-            should.deepEqual(item, item2);
-          }
-        });
-        r.on('end', function() {
-          should.strictEqual(j, 2);
-          done();
-        });
+        done();
       });
     });
 
     it('should be the same as previous run (idempotence)', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -860,55 +831,42 @@ describe('MergeTree', function() {
         if (i === 1) {
           should.deepEqual(obj, {
             n: item1,
-            o: null,
-            c: null
+            l: null,
+            c: null,
+            lcas: [],
+            pe: sname
           });
         }
         if (i > 1) {
           should.deepEqual(obj, {
             n: item2,
-            o: null,
-            c: null
+            l: null,
+            c: null,
+            lcas: [],
+            pe: sname
           });
         }
       });
 
       rs.on('end', function() {
         should.strictEqual(i, 2);
-
-        // inspect staging
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          if (j === 1) {
-            should.deepEqual(item, item1);
-          }
-          if (j > 1) {
-            should.deepEqual(item, item2);
-          }
-        });
-        r.on('end', function() {
-          should.strictEqual(j, 2);
-          done();
-        });
+        done();
       });
     });
 
     it('item3 in stree', function(done) {
       var tree = new Tree(db, sname, { vSize: 3, log: silence });
-      tree.write(item3, done);
+      tree.write(cloneItem(item3), done);
     });
 
     it('litem1 in local', function(done) {
       var tree = new Tree(db, localName, { vSize: 3, log: silence });
-      tree.write(litem1, done);
+      tree.write(cloneItem(litem1), done);
     });
 
     it('should update last by perspective to sitem1, copy 2 and 3 to stage and merge stage with local head', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -917,43 +875,31 @@ describe('MergeTree', function() {
         i++;
         if (i === 1) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 1 }, b: { more: 'body' } },
-            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },                  b: { some: 'body' } },
-            c: null
+            n: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } },
+            l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },            b: { some: 'body' } },
+            c: null,
+            lcas: ['Aaaa'],
+            pe: sname
           });
         }
         if (i > 1) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
-            o: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },                  b: { some: 'body' } },
-            c: null
+            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } },
+            l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },            b: { some: 'body' } },
+            c: null,
+            lcas: ['Aaaa'],
+            pe: sname
           });
         }
       });
 
       rs.on('end', function() {
         should.strictEqual(i, 2);
-
-        // inspect staging
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          if (j === 1) {
-            should.deepEqual(item, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 1 }, b: { more: 'body' } }); // has h.i from stage
-          }
-          if (j > 1) {
-            should.deepEqual(item, { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } }); // has h.i from stage
-          }
-        });
-        r.on('end', function() {
-          should.strictEqual(j, 2);
-          // should have updated last version in local by fast-forward of item1 from stree
-          mt._local.lastByPerspective(sname, 'base64', function(err, v) {
-            if (err) { throw err; }
-            should.strictEqual(v, 'Aaaa');
-            done();
-          });
+        // should have updated last version in local by fast-forward of item1 from stree
+        mt._local.lastByPerspective(sname, 'base64', function(err, v) {
+          if (err) { throw err; }
+          should.strictEqual(v, 'Aaaa');
+          done();
         });
       });
     });
@@ -966,7 +912,6 @@ describe('MergeTree', function() {
     it('should update last by perspective to sitem2, copy 3 to stage and merge stage with local head', function(done) {
       var opts = { local: localName, stage: stageName, vSize: 3, log: silence, perspectives: [sname] };
       var mt = new MergeTree(db, opts);
-      var stage = mt._stage;
 
       var i = 0;
       var rs = mt.startMerge({ tail: false });
@@ -975,9 +920,11 @@ describe('MergeTree', function() {
         i++;
         if (i > 0) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'], i: 2 }, b: { more: 'body', more2: 'body' } }, // h.i is from stage
-            o: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }, b: { more: 'body' } },
-            c: null
+            n: { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'] }, b: { more: 'body', more2: 'body' } }, // h.i is from stage
+            l: { h: { id: 'XI', v: 'Bbbb', pa: ['Aaaa'], i: 2 }  , b: { more: 'body' } },
+            c: null,
+            lcas: ['Aaaa'],
+            pe: sname
           });
         }
       });
@@ -985,34 +932,19 @@ describe('MergeTree', function() {
       rs.on('end', function() {
         should.strictEqual(i, 1);
 
-        // inspect staging
-        var j = 0;
-        var r = stage.insertionOrderStream();
-        r.on('data', function(item) {
-          j++;
-          if (j === 1) {
-            should.deepEqual(item, { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 1 }, b: { more2: 'body' } }); //  h.i is from stage
-          }
-          if (i > 1) {
-            should.deepEqual(item, { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more: 'body', more2: 'body' } });
-          }
-        });
-        r.on('end', function() {
-          should.strictEqual(j, 2);
-          // should have updated last version in local by fast-forward of item1 from stree
-          mt._local.lastByPerspective(sname, 'base64', function(err, v) {
-            if (err) { throw err; }
-            should.strictEqual(v, 'Bbbb');
+        // should have updated last version in local by fast-forward of item1 from stree
+        mt._local.lastByPerspective(sname, 'base64', function(err, v) {
+          if (err) { throw err; }
+          should.strictEqual(v, 'Bbbb');
 
-            mt.stats(function(err, stats) {
-              if (err) { throw err; }
-              should.deepEqual(stats, {
-                local: { heads: { count: 1, conflict: 0, deleted: 0 } },
-                stage: { heads: { count: 1, conflict: 0, deleted: 0 } },
-                'startMerge_foo': { heads: { count: 2, conflict: 0, deleted: 0 } }
-              });
-              done();
+          mt.stats(function(err, stats) {
+            if (err) { throw err; }
+            should.deepEqual(stats, {
+              local: { heads: { count: 1, conflict: 0, deleted: 0 } },
+              stage: { heads: { count: 0, conflict: 0, deleted: 0 } },
+              'startMerge_foo': { heads: { count: 2, conflict: 0, deleted: 0 } }
             });
+            done();
           });
         });
       });
@@ -1463,10 +1395,16 @@ describe('MergeTree', function() {
       var i3 = xtend(oitem3); // set perspective on the item
       i3.h = xtend(i3.h, { pe: pe });
       lws.on('error', function(err) {
-        should.strictEqual(err.message, 'not a merge of the existing local head');
+        should.strictEqual(err.message, 'not a valid new item');
         done();
       });
-      lws.write({ n: i3, l: null, lcas: [] });
+      lws.write({
+        n: i3,
+        l: null,
+        lcas: [],
+        c: null,
+        pe: pe
+      });
     });
 
     describe('merge with a remote', function() {
