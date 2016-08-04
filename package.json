@@ -44,12 +44,13 @@
     "xtend": "^4.0.1"
   },
   "devDependencies": {
-    "through2": "^2.0.0",
-    "stream-array": "^1.1.1",
     "chroot": "^1.0.2",
     "mocha": "^2.3.0",
     "rimraf": "^2.4.2",
-    "should": "^1.2.2"
+    "should": "^1.2.2",
+    "stream-array": "^1.1.1",
+    "tape": "^4.6.0",
+    "through2": "^2.0.0"
   },
   "repository": {
     "type": "git",
