@@ -138,11 +138,10 @@ util.inherits(PersDB, EE);
 module.exports = global.PersDB = PersDB;
 
 /**
- * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded is
- * handled. The snapshot and conflict store must exist or otherwise the
- * upgradeIfNeeded option must be used. The conflict store must have autoIncrement
- * set. Furthermore, don't start writing to any object store until the call back is
- * called with the pdb instance.
+ * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded
+ * is handled and both the conflict and snapshot store exist. The conflict store
+ * must have autoIncrement set. Furthermore, don't start writing to any object
+ * store until the call back is called with the pdb instance.
  *
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must
@@ -164,17 +163,12 @@ module.exports = global.PersDB = PersDB;
  * @param {Object} [opts]
  * @param {Boolean} opts.watch=false  automatically watch changes to all object
  *   stores using ES6 Proxy
- * @param {Boolean} opts.upgradeIfNeeded=false  automatically create the snapshot
- *  and conflict store if they don't exist. This will increment the database
- *  version and closes the passed in idb database. A newly opened idb instance will
- *  be provided to the callback.
  * @param {String} opts.snapshotStore=_pdb  name of the object store used
  *   internally for saving new versions
  * @param {String} opts.conflictStore=_conflicts  name of the object store used
  *   internally for saving conflicts
  * @param {Function} cb  first paramter will be an error or null, second paramter
- *  will be the PersDB instance, third parameter will be a new IndexedDB instance
- *  if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).
+ *  will be the PersDB instance
  */
 PersDB.createNode = function createNode(idb, opts, cb) {
   if (typeof opts === 'function') {
@@ -199,146 +193,49 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
   var conflictStoreExists = idb.objectStoreNames.contains(conflictStore);
 
-  if (!opts.upgradeIfNeeded) {
-    if (!snapshotStoreExists) {
-      throw new Error('snapshot store does not exist and opts.upgradeIfNeeded is false');
-    }
-    if (!conflictStoreExists) {
-      throw new Error('conflict store does not exist and opts.upgradeIfNeeded is false');
-    }
+  if (!snapshotStoreExists) {
+    throw new Error('snapshot store does not exist');
+  }
+  if (!conflictStoreExists) {
+    throw new Error('conflict store does not exist');
   }
 
-  var tasks = [];
-  if (opts.upgradeIfNeeded && !snapshotStoreExists) {
-    tasks.push(function(cb2) {
-      idb.close();
-      var req = indexedDB.open(idb.name, ++idb.version);
-
-      req.onerror = function(ev) {
-        cb2(ev.target.error);
-      };
-
-      req.onupgradeneeded = function() {
-        req.result.createObjectStore(snapshotStore);
-      };
-
-      req.onsuccess = function() {
-        // set new idb object
-        idb = req.result;
-        cb2();
-      };
-    });
-  }
-
-  if (opts.upgradeIfNeeded && !conflictStoreExists) {
-    tasks.push(function(cb2) {
-      idb.close();
-      var req = indexedDB.open(idb.name, ++idb.version);
-
-      req.onerror = function(ev) {
-        cb2(ev.target.error);
-      };
-
-      req.onupgradeneeded = function() {
-        req.result.createObjectStore(conflictStore, { autoIncrement: true });
-      };
-
-      req.onsuccess = function() {
-        // set new idb object
-        idb = req.result;
-        cb2();
-      };
-    });
+  // check if the conflict store has the auto increment property set
+  if (!idb.transaction(conflictStore).objectStore(conflictStore).autoIncrement) {
+    throw new Error('conflict store must have auto increment set');
   }
 
   // pass the opened database
+  var ldb = level(idb.name, {
+    storeName: snapshotStore,
+    idb: idb, // pass the opened database instance
+    keyEncoding: 'binary',
+    valueEncoding: 'none',
+    asBuffer: false,
+    reopenOnTimeout: true
+  });
+
   var pdb;
-  tasks.push(function(cb2) {
-    var ldb = level(idb.name, {
-      storeName: snapshotStore,
-      idb: idb, // pass the opened database instance
-      keyEncoding: 'binary',
-      valueEncoding: 'none',
-      asBuffer: false,
-      reopenOnTimeout: true
-    });
+  try {
     pdb = new PersDB(idb, ldb, opts);
+  } catch(err) {
+    cb(err);
+    return;
+  }
 
-    // auto-merge remote versions (use a writable stream to enable backpressure)
-    pdb._mt.startMerge().pipe(new Writable({
-      objectMode: true,
-      write: pdb._writeMerge.bind(pdb)
-    }));
+  // auto-merge remote versions (use a writable stream to enable backpressure)
+  pdb._mt.startMerge().pipe(new Writable({
+    objectMode: true,
+    write: pdb._writeMerge.bind(pdb)
+  }));
 
-    if (opts.watch) {
-      // transparently track IndexedDB updates using proxy module
-      var reservedStores = [snapshotStore, conflictStore];
-      proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
-    }
+  if (opts.hasOwnProperty('watch') && opts.watch) {
+    // transparently track IndexedDB updates using proxy module
+    var reservedStores = [snapshotStore, conflictStore];
+    proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
+  }
 
-    // check if the conflict store has the auto increment property set
-    if (!idb.transaction(conflictStore).objectStore(conflictStore).autoIncrement) {
-      throw new Error('conflict store must have auto increment set');
-    }
-    process.nextTick(cb2);
-  });
-
-  async.series(tasks, function(err) {
-    if (err) { cb(err); return; }
-    cb(null, pdb, idb);
-  });
-};
-
-/**
- * Insert or update an item in a store by key.
- *
- * @todo make atomic
- *
- * @param {String} objectStore - name of the store
- * @param {mixed} key - key of the item to update
- * @param {mixed} item - item contents
- * @return {Promise}
- */
-PersDB.prototype.put = function put(objectStore, key, item) {
-  // should use something very much like this.writeMerge
-  throw new Error('not implemented yet');
-
-  var id = idbIdOps.generateId(objectStore, key);
-  return new Promise((resolve, reject) => {
-    this._localWriter.write({
-      n: {
-        h: { id: id },
-        b: item
-      }
-    }, (err) => {
-      err ? reject(err) : resolve();
-    });
-  });
-};
-
-/**
- * Delete an item by key.
- *
- * @todo make atomic
- *
- * @param {String} objectStore - name of the store
- * @param {mixed} key - key of the item to update
- * @return {Promise}
- */
-PersDB.prototype.del = function del(objectStore, key) {
-  // should use something very much like this.writeMerge
-  throw new Error('not implemented yet');
-
-  var id = idbIdOps.generateId(objectStore, key);
-  return new Promise((resolve, reject) => {
-    this._localWriter.write({
-      n: {
-        h: { id: id, d: true }
-      }
-    }, (err) =>  {
-      err ? reject(err) : resolve();
-    });
-  });
+  cb(null, pdb);
 };
 
 /**
@@ -957,7 +854,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
   };
 
   tx.oncomplete = function() {
-    that._log.notice('conflict saved %j', obj.n.h);
+    that._log.notice('conflict saved', obj);
     cb();
   };
 
