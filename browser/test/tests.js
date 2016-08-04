@@ -2,20 +2,29 @@
 
 var test = require('tape');
 
-var recreateDb = require('./idb.js').recreateDb;
+var idb = require('./idb.js');
+var dropDb = idb.dropDb;
+var recreateDb = idb.recreateDb;
 
 var PersDB = require('../lib/persdb.js');
 
 // create some stores
-var stores = {
-  customers: { keyPath: 'email' },
-  employees: {},
-  _pdb: {},
-  _conflicts: { autoIncrement: true }
+var opts = {
+  stores: {
+    customers: { keyPath: 'email' },
+    employees: {},
+    _pdb: {},
+    _conflicts: { autoIncrement: true }
+  },
+  fixtures: {
+    customers: [
+      { email: 'test@example.com' },
+    ]
+  }
 }
 
 // ensure an empty database exists
-recreateDb('PersDB', { stores: stores }, function(err, db) {
+recreateDb('PersDB', opts, function(err, db) {
   if (err) throw err;
 
   test('PersDB.createNode', function(t) {
@@ -29,5 +38,24 @@ recreateDb('PersDB', { stores: stores }, function(err, db) {
       t.error(err);
       t.ok(pdb);
     });
+  });
+
+  test('pdb.resolveConflict', function(t) {
+    var opts = {
+      snapshotStore: '_pdb',
+      conflictStore: '_conflicts'
+    }
+    PersDB.createNode(db, opts, (err, pdb) => {
+      t.plan(2);
+
+      t.error(err);
+      t.ok(pdb);
+    });
+  });
+
+  // cleanup db
+  test.onFinish(function() {
+    db.close();
+    dropDb('PersDB', function() {})
   });
 });

@@ -11,6 +11,7 @@ function dropDb(name, cb) {
 }
 
 // opts.stores => { storeName: storeCreationOpts } }
+// opts.fixtures => { storeName: [] } }
 // cb(err, db)
 function createDb(name, opts, cb) {
   if (typeof opts === 'function') {
@@ -36,7 +37,28 @@ function createDb(name, opts, cb) {
     }
   }
 
-  req.onsuccess = () => cb(null, req.result);
+  req.onsuccess = () => {
+    var db = req.result;
+
+    // load fixtures if any
+    var fixtures = Object.keys(opts.fixtures || {});
+    if (fixtures.length) {
+      var tx = db.transaction(fixtures, 'readwrite');
+
+      fixtures.forEach(function(storeName) {
+        var store = tx.objectStore(storeName);
+        opts.fixtures[storeName].forEach(function(obj) {
+          store.put(obj);
+        });
+      });
+
+      tx.onabort = () => cb(tx.error);
+      tx.onerror = () => cb(tx.error);
+      tx.oncomplete = () => cb(null, db);
+    } else {
+      cb(null, db);
+    }
+  };
   req.onerror = () => cb(req.error);
 }
 
