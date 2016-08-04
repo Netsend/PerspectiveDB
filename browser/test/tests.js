@@ -28,12 +28,13 @@ recreateDb('PersDB', opts, function(err, db) {
   if (err) throw err;
 
   test('PersDB.createNode', function(t) {
+    t.plan(2);
+
     var opts = {
       snapshotStore: '_pdb',
       conflictStore: '_conflicts'
     }
     PersDB.createNode(db, opts, (err, pdb) => {
-      t.plan(2);
 
       t.error(err);
       t.ok(pdb);
@@ -41,19 +42,23 @@ recreateDb('PersDB', opts, function(err, db) {
   });
 
   test('pdb.resolveConflict', function(t) {
-    var opts = {
-      snapshotStore: '_pdb',
-      conflictStore: '_conflicts'
-    }
-    PersDB.createNode(db, opts, (err, pdb) => {
-      t.plan(2);
+    // first create a pdb node to test with
+    t.plan(3);
 
+    // use default opts
+    var pdb;
+    PersDB.createNode(db, (err, p) => {
       t.error(err);
-      t.ok(pdb);
+      t.ok(p);
+      pdb = p;
+    });
+
+    t.test('pdb.resolveConflict', function(st) {
+      st.end();
     });
   });
 
-  // cleanup db
+  // drop db
   test.onFinish(function() {
     db.close();
     dropDb('PersDB', function() {})

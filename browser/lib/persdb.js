@@ -156,10 +156,15 @@ module.exports = global.PersDB = PersDB;
  *  if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).
  */
 PersDB.createNode = function createNode(idb, opts, cb) {
-  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-
+  if (typeof opts === 'function') {
+    cb = opts;
+    opts = {};
+  }
   if (opts == null) { opts = {}; }
+
+  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   if (opts.hasOwnProperty('watch') && opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
   if (opts.upgradeIfNeeded != null && typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
