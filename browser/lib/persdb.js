@@ -79,6 +79,11 @@ var Writable = stream.Writable;
  */
 
 /**
+ * @callback stderrCb
+ * @param {Error|null} err - error or null
+ */
+
+/**
  * Use {@link PersDB.createNode} to create a new instance. Don't use new PersDB directly.
  *
  * @class PersDB
@@ -275,13 +280,13 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
  * store and delete from conflict store.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
- * @param {Object} toBeResolved - object currently in the object store that should
+ * @param {mixed} toBeResolved - object currently in the object store that should
  *   be overwritten
  * @param {Object} resolved - new item that solves given conflict and should
  *   overwrite the object store
  * @param {Boolean} [del] - whether or not resolving means deleting from the object
  *   store
- * @param {Function} [cb] - first argument will be an error or null
+ * @param {stderrCb} cb - gets one parameter
  */
 PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeResolved, resolved, del, cb) {
   if (typeof del === 'function') {
@@ -289,7 +294,6 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
     del = false;
   }
   if (typeof conflictKey !== 'number') { throw new TypeError('conflictKey must be a number'); }
-  if (toBeResolved == null || typeof toBeResolved !== 'object') { throw new TypeError('toBeResolved must be an object'); }
   if (resolved == null || typeof resolved !== 'object') { throw new TypeError('resolved must be an object'); }
   if (del != null && typeof del !== 'boolean') { throw new TypeError('del must be a boolean'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
@@ -297,7 +301,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
   var that = this;
 
   // fetch the conflict object
-  this._getItem(conflictKey, function(err, conflict) {
+  this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
@@ -305,7 +309,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
 
     // make sure the local head matches toBeResolved
     var heads = [];
-    that._mt.getLocalTree().getHeadVersions(id, function(head, next) {
+    that._mt.getLocalTree().getHeads({ id: id }, function(head, next) {
       heads.push(head);
       next();
     }, function(err) {

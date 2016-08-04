@@ -17,13 +17,14 @@ var conflict1 = {
       pa: []
     },
     b: {
-      eamil: 'john@example.com'
+      email: 'john@example.com'
     }
   },
   l: null,
   c: null,
   lcas: [],
-  err: null
+  pe: 'remote1',
+  err: 'some rando'
 };
 var conflict2 = {
   n: {
@@ -33,13 +34,14 @@ var conflict2 = {
       pa: []
     },
     b: {
-      eamil: 'jane@example.com'
+      email: 'jane@example.com'
     }
   },
   l: null,
   c: null,
   lcas: [],
-  err: null
+  pe: 'remote2',
+  err: 'unexpected local head'
 };
 
 // create some stores
@@ -155,6 +157,61 @@ recreateDb('PersDB', opts, function(err, db) {
           st.end()
         });
       });
+    });
+  });
+
+  test('pdb.resolveConflict', function(t) {
+    // first create a pdb node to test with
+    t.plan(3);
+
+    PersDB.createNode(db, pdbOpts, (err, pdb) => {
+      if (err) throw err;
+
+      // create one version in the local tree for conflict2
+      var item = {
+        n: {
+          h: {
+            id: 'customers\x01jane',
+          },
+          b: {
+            email: 'jane@example.com',
+            start: true
+          }
+        }
+      };
+      pdb._localWriter.write(item);
+
+      t.test('resolve err if conflict can\'t be found', function(st) {
+        pdb.resolveConflict(0, undefined, { some: true }, function(err) {
+          st.equal(err.message, 'conflict not found');
+          st.end()
+        });
+      });
+
+      t.test('resolve err if conflict not in local tree', function(st) {
+        pdb.resolveConflict(1, undefined, { some: true }, function(err) {
+          st.equal(err.message, 'expected one head');
+          st.end()
+        });
+      });
+
+      t.test('resolve err if toBeResolved does not match current local head', function(st) {
+        pdb.resolveConflict(2, undefined, { some: true }, function(err) {
+          st.equal(err.message, 'local head and toBeResolved don\'t match');
+          st.end()
+        });
+      });
+
+      /*
+      TODO: create remote tree "remote2" with the right version
+      t.test('resolve', function(st) {
+        pdb.resolveConflict(2, item.n.b, { some: true }, function(err) {
+          console.log(err);
+          st.error(err);
+          st.end()
+        });
+      });
+      */
     });
   });
 
