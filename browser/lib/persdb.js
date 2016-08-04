@@ -544,15 +544,15 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 /**
  * Get an iterator over all unresolved conflicts.
  *
- * @param {Object} [opts] - idb-readable-stream options
+ * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
  * @param {Function} next - iterator called with three arguments
  * @param {Number} next.conflictKey - first parameter is the  conflict key
  * @param {Object} next.conflictObject - second parameter is the conflict object
  * @param {Function} next.proceed - third parameter is a callback to proceed to
  *   the next conflict or stop iterating
- * @param {Boolean} [next.proceed.continue=true] - call this handler optionally
- *   with a boolean to indicate whether to proceed with the next conflict or stop
- *   iterating and call the done handler.
+ * @param {Boolean|Error} [next.proceed.continue=true] - call this handler
+ *   optionally with a boolean or error to indicate whether to proceed with the
+ *   next conflict or stop iterating and call the done handler.
  * @param {Function} [done] - Final callback called when done iterating. Called
  *   with one optional argument.
  * @param {Error} [done.err] - first parameter will be an error or null
@@ -564,7 +564,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
     opts = {};
   }
   opts = xtend({
-    direction: 'prev'
+    direction: 'next'
   }, opts);
   done = done || noop;
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
@@ -572,20 +572,25 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
 
   var reader = idbReadableStream(this._idb, this._conflictStore, opts);
-  reader.pipe(new Writable({
+  var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      var writer = this;
       // pass conflict to caller for resolving
       next(obj.key, obj.value, function(cont) {
+        if (cont instanceof Error) {
+          cont = false;
+        }
         if (cont == null || cont) {
           cb();
         } else {
-          writer.end(cb);
+          reader.pause();
+          writer.end();
+          cb();
         }
       });
     }
-  })).on('finish', done).on('error', done);
+  });
+  reader.pipe(writer).on('finish', done).on('error', done);
 };
 
 /**
