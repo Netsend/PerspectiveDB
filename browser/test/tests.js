@@ -133,7 +133,7 @@ recreateDb('PersDB', opts, function(err, db) {
 
   test('pdb.getConflict', function(t) {
     // first create a pdb node to test with
-    t.plan(1);
+    t.plan(2);
 
     PersDB.createNode(db, pdbOpts, (err, pdb) => {
       if (err) throw err;
@@ -142,6 +142,15 @@ recreateDb('PersDB', opts, function(err, db) {
         pdb.getConflict(1, function(err, conflict, current) {
           st.error(err);
           st.deepEqual(conflict, conflict1);
+          st.deepEqual(current, undefined);
+          st.end()
+        });
+      });
+
+      t.test('get non-existing conflict', function(st) {
+        pdb.getConflict(0, function(err, conflict, current) {
+          st.equal(err.message, 'conflict not found');
+          st.deepEqual(conflict, undefined);
           st.deepEqual(current, undefined);
           st.end()
         });
