@@ -86,8 +86,6 @@ recreateDb('PersDB', opts, function(err, db) {
       if (err) throw err;
 
       t.test('list all', function(st) {
-        st.plan(6);
-
         var i = 0;
         pdb.getConflicts(function next(conflictKey, conflictObject, proceed) {
           i++;
@@ -112,8 +110,6 @@ recreateDb('PersDB', opts, function(err, db) {
       });
 
       t.test('don\'t proceed', function(st) {
-        st.plan(4);
-
         var i = 0;
         pdb.getConflicts(function next(conflictKey, conflictObject, proceed) {
           i++;
@@ -143,8 +139,6 @@ recreateDb('PersDB', opts, function(err, db) {
       if (err) throw err;
 
       t.test('get existing conflict', function(st) {
-        st.plan(2);
-
         pdb.getConflict(1, function(err, conflict, current) {
           st.error(err);
           st.deepEqual(conflict, conflict1);
