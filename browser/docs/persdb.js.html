@@ -21,7 +21,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#del">del</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#put">put</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul><h3><a href="global.html">Global</a></h3>
 </nav>
 
 <div id="main">
@@ -80,6 +80,27 @@ var filterIdbStore = require('../../hooks/core/filter_idb_store');
 var Writable = stream.Writable;
 
 /**
+ * @typedef {Object} PersDB~snapshot
+ * @property {Object} h - header
+ * @property {mixed} h.id - id
+ * @property {String} h.v - version
+ * @property {String[]} h.pa - parent versions
+ * @property {Number} [h.i] - local increment
+ * @property {String} [h.pe] - perspective, remote this version originated from
+ * @property {Object} b - body
+ * @property {Object} [m] - meta info for application specific purposes
+ */
+
+/**
+ * @typedef {Object} PersDB~mergeObject
+ * @property {PersDB~snapshot} n - new version
+ * @property {PersDB~snapshot} l - previous version
+ * @property {String[]} lcas - lowest common ancestors of n and l
+ * @property {String[]} [c] - conflicting keys
+ * @property {Object} [err] - error, if another error occurred while merging
+ */
+
+/**
  * @event PersDB#data
  * @param {Object} obj
  * @param {String} obj.store - name of the object store
@@ -93,6 +114,11 @@ var Writable = stream.Writable;
  * @param {?Object} obj.new - new version, is null on delete
  * @param {?Object} obj.prev - previous version, is null on insert
  * @param {?Array} obj.conflicts - array with conflicting key names
+ */
+
+/**
+ * @callback stderrCb
+ * @param {Error|null} err - error or null
  */
 
 /**
@@ -155,11 +181,10 @@ util.inherits(PersDB, EE);
 module.exports = global.PersDB = PersDB;
 
 /**
- * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded is
- * handled. The snapshot and conflict store must exist or otherwise the
- * upgradeIfNeeded option must be used. The conflict store must have autoIncrement
- * set. Furthermore, don't start writing to any object store until the call back is
- * called with the pdb instance.
+ * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded
+ * is handled and both the conflict and snapshot store exist. The conflict store
+ * must have autoIncrement set. Furthermore, don't start writing to any object
+ * store until the call back is called with the pdb instance.
  *
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must
@@ -181,25 +206,25 @@ module.exports = global.PersDB = PersDB;
  * @param {Object} [opts]
  * @param {Boolean} opts.watch=false  automatically watch changes to all object
  *   stores using ES6 Proxy
- * @param {Boolean} opts.upgradeIfNeeded=false  automatically create the snapshot
- *  and conflict store if they don't exist. This will increment the database
- *  version and closes the passed in idb database. A newly opened idb instance will
- *  be provided to the callback.
  * @param {String} opts.snapshotStore=_pdb  name of the object store used
  *   internally for saving new versions
  * @param {String} opts.conflictStore=_conflicts  name of the object store used
  *   internally for saving conflicts
  * @param {Function} cb  first paramter will be an error or null, second paramter
- *  will be the PersDB instance, third parameter will be a new IndexedDB instance
- *  if snapshot and conflict stores have been created (see opts.upgradeIfNeeded).
+ *  will be the PersDB instance
  */
 PersDB.createNode = function createNode(idb, opts, cb) {
-  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
-
+  if (typeof opts === 'function') {
+    cb = opts;
+    opts = {};
+  }
   if (opts == null) { opts = {}; }
-  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
-  if (opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
+  if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
+  if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  if (opts.hasOwnProperty('watch') &amp;&amp; opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
   if (opts.upgradeIfNeeded != null &amp;&amp; typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
   if (opts.snapshotStore != null &amp;&amp; typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
   if (opts.conflictStore != null &amp;&amp; typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
@@ -211,155 +236,62 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
   var conflictStoreExists = idb.objectStoreNames.contains(conflictStore);
 
-  if (!opts.upgradeIfNeeded) {
-    if (!snapshotStoreExists) {
-      throw new Error('snapshot store does not exist and opts.upgradeIfNeeded is false');
-    }
-    if (!conflictStoreExists) {
-      throw new Error('conflict store does not exist and opts.upgradeIfNeeded is false');
-    }
+  if (!snapshotStoreExists) {
+    throw new Error('snapshot store does not exist');
+  }
+  if (!conflictStoreExists) {
+    throw new Error('conflict store does not exist');
   }
 
-  var tasks = [];
-  if (opts.upgradeIfNeeded &amp;&amp; !snapshotStoreExists) {
-    tasks.push(function(cb2) {
-      idb.close();
-      var req = indexedDB.open(idb.name, ++idb.version);
-
-      req.onerror = function(ev) {
-        cb2(ev.target.error);
-      };
-
-      req.onupgradeneeded = function() {
-        req.result.createObjectStore(snapshotStore);
-      };
-
-      req.onsuccess = function() {
-        // set new idb object
-        idb = req.result;
-        cb2();
-      };
-    });
-  }
-
-  if (opts.upgradeIfNeeded &amp;&amp; !conflictStoreExists) {
-    tasks.push(function(cb2) {
-      idb.close();
-      var req = indexedDB.open(idb.name, ++idb.version);
-
-      req.onerror = function(ev) {
-        cb2(ev.target.error);
-      };
-
-      req.onupgradeneeded = function() {
-        req.result.createObjectStore(conflictStore, { autoIncrement: true });
-      };
-
-      req.onsuccess = function() {
-        // set new idb object
-        idb = req.result;
-        cb2();
-      };
-    });
+  // check if the conflict store has the auto increment property set
+  if (!idb.transaction(conflictStore).objectStore(conflictStore).autoIncrement) {
+    throw new Error('conflict store must have auto increment set');
   }
 
   // pass the opened database
+  var ldb = level(idb.name, {
+    storeName: snapshotStore,
+    idb: idb, // pass the opened database instance
+    keyEncoding: 'binary',
+    valueEncoding: 'none',
+    asBuffer: false,
+    reopenOnTimeout: true
+  });
+
   var pdb;
-  tasks.push(function(cb2) {
-    var ldb = level(idb.name, {
-      storeName: snapshotStore,
-      idb: idb, // pass the opened database instance
-      keyEncoding: 'binary',
-      valueEncoding: 'none',
-      asBuffer: false,
-      reopenOnTimeout: true
-    });
+  try {
     pdb = new PersDB(idb, ldb, opts);
+  } catch(err) {
+    cb(err);
+    return;
+  }
 
-    // auto-merge remote versions (use a writable stream to enable backpressure)
-    pdb._mt.startMerge().pipe(new Writable({
-      objectMode: true,
-      write: pdb._writeMerge.bind(pdb)
-    }));
+  // auto-merge remote versions (use a writable stream to enable backpressure)
+  pdb._mt.startMerge().pipe(new Writable({
+    objectMode: true,
+    write: pdb._writeMerge.bind(pdb)
+  }));
 
-    if (opts.watch) {
-      // transparently track IndexedDB updates using proxy module
-      var reservedStores = [snapshotStore, conflictStore];
-      proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
-    }
+  if (opts.hasOwnProperty('watch') &amp;&amp; opts.watch) {
+    // transparently track IndexedDB updates using proxy module
+    var reservedStores = [snapshotStore, conflictStore];
+    proxy(idb, pdb._getHandlers(), { exclude: reservedStores });
+  }
 
-    // check if the conflict store has the auto increment property set
-    if (!idb.transaction(conflictStore).objectStore(conflictStore).autoIncrement) {
-      throw new Error('conflict store must have auto increment set');
-    }
-    process.nextTick(cb2);
-  });
-
-  async.series(tasks, function(err) {
-    if (err) { cb(err); return; }
-    cb(null, pdb, idb);
-  });
+  cb(null, pdb);
 };
 
 /**
- * Insert or update an item in a store by key.
- *
- * @todo make atomic
- *
- * @param {String} objectStore - name of the store
- * @param {mixed} key - key of the item to update
- * @param {mixed} item - item contents
- * @return {Promise}
+ * @callback PersDB~getConflictCb
+ * @param {Error|null} err - error or null
+ * @param {PersDB~mergeObject} conflict - conflicting merge object
+ * @param {Object} current - current version in the object store
  */
-PersDB.prototype.put = function put(objectStore, key, item) {
-  // should use something very much like this.writeMerge
-  throw new Error('not implemented yet');
-
-  var id = idbIdOps.generateId(objectStore, key);
-  return new Promise((resolve, reject) => {
-    this._localWriter.write({
-      n: {
-        h: { id: id },
-        b: item
-      }
-    }, (err) => {
-      err ? reject(err) : resolve();
-    });
-  });
-};
-
-/**
- * Delete an item by key.
- *
- * @todo make atomic
- *
- * @param {String} objectStore - name of the store
- * @param {mixed} key - key of the item to update
- * @return {Promise}
- */
-PersDB.prototype.del = function del(objectStore, key) {
-  // should use something very much like this.writeMerge
-  throw new Error('not implemented yet');
-
-  var id = idbIdOps.generateId(objectStore, key);
-  return new Promise((resolve, reject) => {
-    this._localWriter.write({
-      n: {
-        h: { id: id, d: true }
-      }
-    }, (err) =>  {
-      err ? reject(err) : resolve();
-    });
-  });
-};
-
 /**
  * Get a conflict by conflict key.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
- * @param {Function} cb - first argument will be an error or null, second argument
- *   will be the conflict object. Third argument will be the current version in the
- *   object store.
+ * @param {PersDB~getConflictCb} cb - gets three parameters
  */
 PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
   var that = this;
@@ -374,7 +306,6 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
 
     that._getItem(storeName, storeId, function(err, storeItem) {
       if (err) { cb(err); return; }
-
       cb(null, conflict, storeItem);
     });
   });
@@ -387,13 +318,13 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
  * store and delete from conflict store.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
- * @param {Object} toBeResolved - object currently in the object store that should
+ * @param {mixed} toBeResolved - object currently in the object store that should
  *   be overwritten
  * @param {Object} resolved - new item that solves given conflict and should
  *   overwrite the object store
  * @param {Boolean} [del] - whether or not resolving means deleting from the object
  *   store
- * @param {Function} [cb] - first argument will be an error or null
+ * @param {stderrCb} cb - gets one parameter
  */
 PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeResolved, resolved, del, cb) {
   if (typeof del === 'function') {
@@ -401,7 +332,6 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
     del = false;
   }
   if (typeof conflictKey !== 'number') { throw new TypeError('conflictKey must be a number'); }
-  if (toBeResolved == null || typeof toBeResolved !== 'object') { throw new TypeError('toBeResolved must be an object'); }
   if (resolved == null || typeof resolved !== 'object') { throw new TypeError('resolved must be an object'); }
   if (del != null &amp;&amp; typeof del !== 'boolean') { throw new TypeError('del must be a boolean'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
@@ -409,7 +339,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
   var that = this;
 
   // fetch the conflict object
-  this._getItem(conflictKey, function(err, conflict) {
+  this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
@@ -417,7 +347,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
 
     // make sure the local head matches toBeResolved
     var heads = [];
-    that._mt.getLocalTree().getHeadVersions(id, function(head, next) {
+    that._mt.getLocalTree().getHeads({ id: id }, function(head, next) {
       heads.push(head);
       next();
     }, function(err) {
@@ -577,15 +507,15 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 /**
  * Get an iterator over all unresolved conflicts.
  *
- * @param {Object} [opts] - idb-readable-stream options
+ * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
  * @param {Function} next - iterator called with three arguments
  * @param {Number} next.conflictKey - first parameter is the  conflict key
  * @param {Object} next.conflictObject - second parameter is the conflict object
  * @param {Function} next.proceed - third parameter is a callback to proceed to
  *   the next conflict or stop iterating
- * @param {Boolean} [next.proceed.continue=true] - call this handler optionally
- *   with a boolean to indicate whether to proceed with the next conflict or stop
- *   iterating and call the done handler.
+ * @param {Boolean|Error} [next.proceed.continue=true] - call this handler
+ *   optionally with a boolean or error to indicate whether to proceed with the
+ *   next conflict or stop iterating and call the done handler.
  * @param {Function} [done] - Final callback called when done iterating. Called
  *   with one optional argument.
  * @param {Error} [done.err] - first parameter will be an error or null
@@ -597,7 +527,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
     opts = {};
   }
   opts = xtend({
-    direction: 'prev'
+    direction: 'next'
   }, opts);
   done = done || noop;
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
@@ -605,20 +535,25 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof done !== 'function') { throw new TypeError('done must be a function'); }
 
   var reader = idbReadableStream(this._idb, this._conflictStore, opts);
-  reader.pipe(new Writable({
+  var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      var writer = this;
       // pass conflict to caller for resolving
       next(obj.key, obj.value, function(cont) {
+        if (cont instanceof Error) {
+          cont = false;
+        }
         if (cont == null || cont) {
           cb();
         } else {
-          writer.end(cb);
+          reader.pause();
+          writer.end();
+          cb();
         }
       });
     }
-  })).on('finish', done).on('error', done);
+  });
+  reader.pipe(writer).on('finish', done).on('error', done);
 };
 
 /**
@@ -961,7 +896,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
   };
 
   tx.oncomplete = function() {
-    that._log.notice('conflict saved %j', obj.n.h);
+    that._log.notice('conflict saved', obj);
     cb();
   };
 
@@ -979,7 +914,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Wed Aug 03 2016 18:01:24 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Thu Aug 04 2016 21:43:55 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
