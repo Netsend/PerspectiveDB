@@ -42,6 +42,27 @@ var filterIdbStore = require('../../hooks/core/filter_idb_store');
 var Writable = stream.Writable;
 
 /**
+ * @typedef {Object} PersDB~snapshot
+ * @property {Object} h - header
+ * @property {mixed} h.id - id
+ * @property {String} h.v - version
+ * @property {String[]} h.pa - parent versions
+ * @property {Number} [h.i] - local increment
+ * @property {String} [h.pe] - perspective, remote this version originated from
+ * @property {Object} b - body
+ * @property {Object} [m] - meta info for application specific purposes
+ */
+
+/**
+ * @typedef {Object} PersDB~mergeObject
+ * @property {PersDB~snapshot} n - new version
+ * @property {PersDB~snapshot} l - previous version
+ * @property {String[]} lcas - lowest common ancestors of n and l
+ * @property {String[]} [c] - conflicting keys
+ * @property {Object} [err] - error, if another error occurred while merging
+ */
+
+/**
  * @event PersDB#data
  * @param {Object} obj
  * @param {String} obj.store - name of the object store
@@ -321,12 +342,16 @@ PersDB.prototype.del = function del(objectStore, key) {
 };
 
 /**
+ * @callback PersDB~getConflictCb
+ * @param {Error|null} err - error or null
+ * @param {PersDB~mergeObject} conflict - conflicting merge object
+ * @param {Object} current - current version in the object store
+ */
+/**
  * Get a conflict by conflict key.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
- * @param {Function} cb - first argument will be an error or null, second argument
- *   will be the conflict object. Third argument will be the current version in the
- *   object store.
+ * @param {PersDB~getConflictCb} cb - gets three parameters
  */
 PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
   var that = this;
@@ -341,7 +366,6 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
 
     that._getItem(storeName, storeId, function(err, storeItem) {
       if (err) { cb(err); return; }
-
       cb(null, conflict, storeItem);
     });
   });
