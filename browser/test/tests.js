@@ -10,15 +10,33 @@ var PersDB = require('../lib/persdb.js');
 
 // create two conflict fixtures
 var conflict1 = {
-  n: {},
-  l: {},
+  n: {
+    h: {
+      id: 'customers\x01john',
+      v: 'Aaaa',
+      pa: []
+    },
+    b: {
+      eamil: 'john@example.com'
+    }
+  },
+  l: null,
   c: null,
   lcas: [],
   err: null
 };
 var conflict2 = {
-  n: {},
-  l: {},
+  n: {
+    h: {
+      id: 'customers\x01jane',
+      v: 'Aaaa',
+      pa: []
+    },
+    b: {
+      eamil: 'jane@example.com'
+    }
+  },
+  l: null,
   c: null,
   lcas: [],
   err: null
@@ -112,6 +130,26 @@ recreateDb('PersDB', opts, function(err, db) {
           st.error(err);
           st.equal(i, 1);
           st.end();
+        });
+      });
+    });
+  });
+
+  test('pdb.getConflict', function(t) {
+    // first create a pdb node to test with
+    t.plan(1);
+
+    PersDB.createNode(db, pdbOpts, (err, pdb) => {
+      if (err) throw err;
+
+      t.test('get existing conflict', function(st) {
+        st.plan(2);
+
+        pdb.getConflict(1, function(err, conflict, current) {
+          st.error(err);
+          st.deepEqual(conflict, conflict1);
+          st.deepEqual(current, undefined);
+          st.end()
         });
       });
     });
