@@ -161,7 +161,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   if (opts == null) { opts = {}; }
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
 
-  if (opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
+  if (opts.hasOwnProperty('watch') && opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
   if (opts.upgradeIfNeeded != null && typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
   if (opts.snapshotStore != null && typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
   if (opts.conflictStore != null && typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
