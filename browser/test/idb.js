@@ -54,7 +54,6 @@ function createDb(name, opts, cb) {
         } else { // assume this is an object, use the object keys
           Object.keys(opts.fixtures[storeName]).forEach(function(key) {
             var obj = opts.fixtures[storeName][key];
-            console.log(obj, key);
             store.put(obj, key);
           });
         }
