@@ -758,7 +758,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  */
 PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (obj.c && obj.c.length) {
-    that._handleConflict(new Error('upstream merge conflict'), obj, cb);
+    this._handleConflict(null, obj, cb);
     return;
   }
 
@@ -839,7 +839,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
       // expected previous version, maybe it already equals the new version.
       that._log.debug2('merge already in store', newVersion.h);
     } else {
-      // save in conflicts (let this transaction timeout)
+      // save in conflict store (let this transaction timeout)
       that._handleConflict(new Error('unexpected local version'), obj);
     }
   };
@@ -848,30 +848,45 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 };
 
 // save an object in the conflict store
-PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
+PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
   cb = cb || noop;
 
-  var that = this;
+  var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
+  var storeId = idbIdOps.idFromId(obj.n.h.id);
 
-  obj.err = origErr.message;
+  // convert to publicly documented structure
+  var conflictObject = {
+    id: req.result,
+    store: storeName,
+    key: storeId,
+    new: obj.n && obj.n.b,
+    prev: obj.l && obj.l.b,
+    conflict: obj.c || [],
+    remote: obj.pe,
+    lcas: obj.lcas
+  };
+  if (err) {
+    conflictObject.err = err.message;
+  }
 
   // open a write transaction on the conflict store
   var tx = this._idbTransaction([this._conflictStore], 'readwrite');
 
-  tx.onabort = function(ev) {
-    that._log.err('save conflict abort', ev, obj.n.h, origErr);
+  tx.onabort = () => {
+    this._log.err('save conflict abort', tx.error, obj.n.h, err);
     cb(tx.error);
   };
 
-  tx.onerror = function(ev) {
-    that._log.err('save conflict error', ev, obj.n.h, origErr);
+  tx.onerror = () => {
+    this._log.err('save conflict error', tx.error, obj.n.h, err);
     cb(tx.error);
   };
 
-  tx.oncomplete = function() {
-    that._log.notice('conflict saved', obj);
+  var req = tx.objectStore(this._conflictStore).put(conflictObject);
+
+  tx.oncomplete = () => {
+    this._log.notice('conflict saved', conflictObject);
     cb();
+    this.emit('conflict', conflictObject);
   };
-
-  tx.objectStore(this._conflictStore).put(obj);
 };
