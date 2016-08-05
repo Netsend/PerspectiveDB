@@ -3,17 +3,17 @@
 var test = require('tape');
 
 var idb = require('./idb.js');
+var PersDB = require('../lib/persdb.js');
+
 var dropDb = idb.dropDb;
 var recreateDb = idb.recreateDb;
-
-var PersDB = require('../lib/persdb.js');
 
 // create two conflict fixtures
 var conflict1 = {
   n: {
     h: {
       id: 'customers\x01john',
-      v: 'Aaaa',
+      v: 'Aaaaaaaa',
       pa: []
     },
     b: {
@@ -30,7 +30,7 @@ var conflict2 = {
   n: {
     h: {
       id: 'customers\x01jane',
-      v: 'Aaaa',
+      v: 'Aaaaaaaa',
       pa: []
     },
     b: {
@@ -47,25 +47,30 @@ var conflict2 = {
 // create some stores
 var opts = {
   stores: {
-    customers: { keyPath: 'email' },
+    customers: {},
     employees: {},
     _pdb: {},
     _conflicts: { autoIncrement: true }
   },
   fixtures: {
-    customers: [
-      { email: 'test@example.com' },
-    ],
+    customers: {
+      jane: { email: 'test@example.com' }
+    },
     _conflicts: [conflict1, conflict2]
   }
-}
+};
 
 var conflictStore = '_conflicts';
 
 var pdbOpts = {
   snapshotStore: '_pdb',
-  conflictStore: conflictStore
-}
+  conflictStore: conflictStore,
+  startMerge: false,
+  mergeTree: {
+    perspectives: ['remote1', 'remote2']
+  }
+};
+
 // ensure an empty database exists
 recreateDb('PersDB', opts, function(err, db) {
   if (err) throw err;
@@ -145,7 +150,7 @@ recreateDb('PersDB', opts, function(err, db) {
           st.error(err);
           st.deepEqual(conflict, conflict1);
           st.deepEqual(current, undefined);
-          st.end()
+          st.end();
         });
       });
 
@@ -154,70 +159,15 @@ recreateDb('PersDB', opts, function(err, db) {
           st.equal(err.message, 'conflict not found');
           st.deepEqual(conflict, undefined);
           st.deepEqual(current, undefined);
-          st.end()
+          st.end();
         });
       });
-    });
-  });
-
-  test('pdb.resolveConflict', function(t) {
-    // first create a pdb node to test with
-    t.plan(3);
-
-    PersDB.createNode(db, pdbOpts, (err, pdb) => {
-      if (err) throw err;
-
-      // create one version in the local tree for conflict2
-      var item = {
-        n: {
-          h: {
-            id: 'customers\x01jane',
-          },
-          b: {
-            email: 'jane@example.com',
-            start: true
-          }
-        }
-      };
-      pdb._localWriter.write(item);
-
-      t.test('resolve err if conflict can\'t be found', function(st) {
-        pdb.resolveConflict(0, undefined, { some: true }, function(err) {
-          st.equal(err.message, 'conflict not found');
-          st.end()
-        });
-      });
-
-      t.test('resolve err if conflict not in local tree', function(st) {
-        pdb.resolveConflict(1, undefined, { some: true }, function(err) {
-          st.equal(err.message, 'expected one head');
-          st.end()
-        });
-      });
-
-      t.test('resolve err if toBeResolved does not match current local head', function(st) {
-        pdb.resolveConflict(2, undefined, { some: true }, function(err) {
-          st.equal(err.message, 'local head and toBeResolved don\'t match');
-          st.end()
-        });
-      });
-
-      /*
-      TODO: create remote tree "remote2" with the right version
-      t.test('resolve', function(st) {
-        pdb.resolveConflict(2, item.n.b, { some: true }, function(err) {
-          console.log(err);
-          st.error(err);
-          st.end()
-        });
-      });
-      */
     });
   });
 
   // drop db
   test.onFinish(function() {
     db.close();
-    dropDb('PersDB', function() {})
+    dropDb('PersDB', function() {});
   });
 });
