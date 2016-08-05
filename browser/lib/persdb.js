@@ -170,8 +170,11 @@ module.exports = global.PersDB = PersDB;
  *   stores using ES6 Proxy
  * @param {String} opts.snapshotStore=_pdb  name of the object store used
  *   internally for saving new versions
+ * @param {Boolean} opts.startMerge=true  automatically start merging remotes
+ *   internally for saving new versions
  * @param {String} opts.conflictStore=_conflicts  name of the object store used
  *   internally for saving conflicts
+ * @param {Object} opts.mergeTree  MergeTree options
  * @param {Function} cb  first paramter will be an error or null, second paramter
  *  will be the PersDB instance
  */
@@ -180,14 +183,15 @@ PersDB.createNode = function createNode(idb, opts, cb) {
     cb = opts;
     opts = {};
   }
-  if (opts == null) { opts = {}; }
+  opts = xtend({
+    startMerge: true
+  }, opts);
 
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   if (opts.hasOwnProperty('watch') && opts.watch != null && typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.upgradeIfNeeded != null && typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
   if (opts.snapshotStore != null && typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
   if (opts.conflictStore != null && typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
@@ -229,10 +233,12 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   }
 
   // auto-merge remote versions (use a writable stream to enable backpressure)
-  pdb._mt.startMerge().pipe(new Writable({
-    objectMode: true,
-    write: pdb._writeMerge.bind(pdb)
-  }));
+  if (opts.startMerge) {
+    pdb._mt.startMerge().pipe(new Writable({
+      objectMode: true,
+      write: pdb._writeMerge.bind(pdb)
+    }));
+  }
 
   if (opts.hasOwnProperty('watch') && opts.watch) {
     // transparently track IndexedDB updates using proxy module
