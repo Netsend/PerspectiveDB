@@ -11,7 +11,7 @@ function dropDb(name, cb) {
 }
 
 // opts.stores => { storeName: storeCreationOpts } }
-// opts.fixtures => { storeName: [] } }
+// opts.fixtures => { storeName: []|{} } }
 // cb(err, db)
 function createDb(name, opts, cb) {
   if (typeof opts === 'function') {
@@ -47,9 +47,17 @@ function createDb(name, opts, cb) {
 
       fixtures.forEach(function(storeName) {
         var store = tx.objectStore(storeName);
-        opts.fixtures[storeName].forEach(function(obj) {
-          store.put(obj);
-        });
+        if (Array.isArray(opts.fixtures[storeName])) {
+          opts.fixtures[storeName].forEach(function(obj) {
+            store.put(obj);
+          });
+        } else { // assume this is an object, use the object keys
+          Object.keys(opts.fixtures[storeName]).forEach(function(key) {
+            var obj = opts.fixtures[storeName][key];
+            console.log(obj, key);
+            store.put(obj, key);
+          });
+        }
       });
 
       tx.onabort = () => cb(tx.error);
