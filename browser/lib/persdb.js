@@ -54,33 +54,33 @@ var Writable = stream.Writable;
  */
 
 /**
- * @typedef {Object} PersDB~mergeObject
- * @property {PersDB~snapshot} n - new version
- * @property {PersDB~snapshot} l - previous version
- * @property {String[]} lcas - lowest common ancestors of n and l
- * @property {String[]} [c] - conflicting keys
- * @property {Object} [err] - error, if another error occurred while merging
+ * @typedef {Object} PersDB~conflictObject
+ * @property {Number} id - conflict id
+ * @property {String} store - name of the object store
+ * @property {mixed} key - key of the object in the object store
+ * @property {?Object} new - new version, undefined on delete
+ * @property {?Object} prev - previous version, undefined on insert
+ * @property {String} remote - remote the new version originated from
+ * @property {String[]} conflict - array with conflicting key names
+ * @property {String[]} lcas - lowest common ancestors of "new" and "prev"
+ * @property {String} [error] - error message if something else occurred
  */
 
 /**
  * @event PersDB#data
  * @param {Object} obj
  * @param {String} obj.store - name of the object store
- * @param {?Object} obj.new - new version, is null on delete
- * @param {?Object} obj.prev - previous version, is null on insert
+ * @param {?Object} obj.new - new version, undefined on delete
+ * @param {?Object} obj.prev - previous version, undefined on insert
  */
 /**
  * @event PersDB#conflict
- * @param {Object} obj
- * @param {String} obj.store - name of the object store
- * @param {?Object} obj.new - new version, is null on delete
- * @param {?Object} obj.prev - previous version, is null on insert
- * @param {?Array} obj.conflicts - array with conflicting key names
+ * @param {PersDB~conflictObject} obj - conflict object
  */
 
 /**
- * @callback stderrCb
- * @param {Error|null} err - error or null
+ * @callback PersDB~stderrCb
+ * @param {Error} [err]
  */
 
 /**
@@ -251,9 +251,9 @@ PersDB.createNode = function createNode(idb, opts, cb) {
 
 /**
  * @callback PersDB~getConflictCb
- * @param {Error|null} err - error or null
- * @param {PersDB~mergeObject} conflict - conflicting merge object
- * @param {Object} current - current version in the object store
+ * @param {Error} [err]
+ * @param {PersDB~conflictObject} conflict - conflict object
+ * @param {mixed} current - object currently in the object store
  */
 /**
  * Get a conflict by conflict key.
@@ -473,20 +473,25 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 };
 
 /**
+ * @callback PersDB~getConflictsProceedCb
+ * @param {Boolean|Error} [continue=true] - call this handler optionally with a
+ *   boolean or error to indicate whether to proceed with the next conflict or stop
+ *   iterating
+ */
+/**
+ * @callback PersDB~getConflictsCb
+ * @param {Number} conflictKey - id of the conflict in the conflict store
+ * @param {PersDB~conflictObject} conflictObject - conflict object
+ * @param {PersDB~getConflictsProceedCb} proceed - callback to proceed to the next
+ *   conflict or stop iterating
+ */
+/**
  * Get an iterator over all unresolved conflicts.
  *
  * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
- * @param {Function} next - iterator called with three arguments
- * @param {Number} next.conflictKey - first parameter is the  conflict key
- * @param {Object} next.conflictObject - second parameter is the conflict object
- * @param {Function} next.proceed - third parameter is a callback to proceed to
- *   the next conflict or stop iterating
- * @param {Boolean|Error} [next.proceed.continue=true] - call this handler
- *   optionally with a boolean or error to indicate whether to proceed with the
- *   next conflict or stop iterating and call the done handler.
- * @param {Function} [done] - Final callback called when done iterating. Called
- *   with one optional argument.
- * @param {Error} [done.err] - first parameter will be an error or null
+ * @param {PersDB~getConflictsCb} next - iterator called with three parameters
+ * @param {PersDB~stderrCb} [done] - final callback called when done iterating or
+ *   when iterating is discontinued
  */
 PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts === 'function') {
