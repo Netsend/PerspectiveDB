@@ -21,7 +21,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul><h3><a href="global.html">Global</a></h3>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -103,7 +103,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line86">line 86</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line84">line 84</a>
     </li></ul></dd>
     
 
@@ -358,6 +358,36 @@ the contents of any object store.
 
         <tr>
             
+                <td class="name"><code>startMerge</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">automatically start merging remotes
+  internally for saving new versions</td>
+        </tr>
+
+    
+
+        <tr>
+            
                 <td class="name"><code>conflictStore</code></td>
             
 
@@ -375,13 +405,40 @@ the contents of any object store.
             
                 <td class="default">
                 
-                    _conflicts
+                    conflict
                 
                 </td>
             
 
             <td class="description last">name of the object store used
-  internally for saving conflicts</td>
+  internally for saving a conflict</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>mergeTree</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                </td>
+            
+
+            <td class="description last">MergeTree options</td>
         </tr>
 
     
@@ -461,7 +518,7 @@ the contents of any object store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line178">line 178</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line179">line 179</a>
     </li></ul></dd>
     
 
@@ -958,7 +1015,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line564">line 564</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line578">line 578</a>
     </li></ul></dd>
     
 
@@ -1461,7 +1518,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line544">line 544</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line558">line 558</a>
     </li></ul></dd>
     
 
@@ -1640,7 +1697,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line258">line 258</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line266">line 266</a>
     </li></ul></dd>
     
 
@@ -1755,7 +1812,7 @@ transfering BSON.
             <td class="type">
             
                 
-<span class="param-type">function</span>
+<span class="param-type"><a href="PersDB.html#~getConflictsCb">PersDB~getConflictsCb</a></span>
 
 
             
@@ -1773,177 +1830,7 @@ transfering BSON.
 
             
 
-            <td class="description last">iterator called with three arguments
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>conflictKey</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Number</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">first parameter is the  conflict key</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>conflictObject</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">second parameter is the conflict object</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>proceed</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">function</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">third parameter is a callback to proceed to
-  the next conflict or stop iterating
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-        <th>Default</th>
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>continue</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Boolean</span>
-|
-
-<span class="param-type">Error</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-                <td class="default">
-                
-                    true
-                
-                </td>
-            
-
-            <td class="description last">call this handler
-  optionally with a boolean or error to indicate whether to proceed with the
-  next conflict or stop iterating and call the done handler.</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
+            <td class="description last">iterator called with three parameters</td>
         </tr>
 
     
@@ -1956,7 +1843,7 @@ transfering BSON.
             <td class="type">
             
                 
-<span class="param-type">function</span>
+<span class="param-type"><a href="PersDB.html#~stderrCb">PersDB~stderrCb</a></span>
 
 
             
@@ -1976,69 +1863,8 @@ transfering BSON.
 
             
 
-            <td class="description last">Final callback called when done iterating. Called
-  with one optional argument.
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>err</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Error</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">first parameter will be an error or null</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
+            <td class="description last">final callback called when done iterating or
+  when iterating is discontinued</td>
         </tr>
 
     
@@ -2079,7 +1905,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line485">line 485</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line500">line 500</a>
     </li></ul></dd>
     
 
@@ -2117,10 +1943,12 @@ transfering BSON.
 
 
 <div class="description">
-    Resolve a conflict by conflict key.
+    Resolve a conflict by conflict key. "resolved" is treated as a new version and
+is written to the object store if the current version in the object store
+matches "toBeResolved".
 
-If the current local head is the same as toBeResolved, write resolved to the
-store and delete from conflict store.
+The version in the object store and the current local head must match
+toBeResolved, this means the local tree must be consistent.
 </div>
 
 
@@ -2293,7 +2121,7 @@ store and delete from conflict store.
             <td class="type">
             
                 
-<span class="param-type"><a href="global.html#stderrCb">stderrCb</a></span>
+<span class="param-type"><a href="PersDB.html#~stderrCb">PersDB~stderrCb</a></span>
 
 
             
@@ -2311,7 +2139,7 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">gets one parameter</td>
+            <td class="description last"></td>
         </tr>
 
     
@@ -2352,7 +2180,7 @@ store and delete from conflict store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line291">line 291</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line302">line 302</a>
     </li></ul></dd>
     
 
@@ -2386,183 +2214,7 @@ store and delete from conflict store.
 
         
                 
-
-    
-
-    <h4 class="name" id="~getConflictCb"><span class="type-signature"></span>getConflictCb<span class="signature">(err, conflict, current)</span><span class="type-signature"></span></h4>
-
-    
-
-
-
-
-
-
-
-
-
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>err</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Error</span>
-|
-
-<span class="param-type">null</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">error or null</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>conflict</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type"><a href="PersDB.html#~mergeObject">PersDB~mergeObject</a></span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">conflicting merge object</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>current</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">current version in the object store</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-
-
-
-
-
-<dl class="details">
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-
-    
-    <dt class="tag-source">Source:</dt>
-    <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line246">line 246</a>
-    </li></ul></dd>
-    
-
-    
-
-    
-
-    
-</dl>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-            
-                
-<h4 class="name" id="~mergeObject">mergeObject</h4>
+<h4 class="name" id="~conflictObject">conflictObject</h4>
 
 
 
@@ -2611,13 +2263,13 @@ store and delete from conflict store.
 
         <tr>
             
-                <td class="name"><code>n</code></td>
+                <td class="name"><code>store</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="PersDB.html#~snapshot">PersDB~snapshot</a></span>
+<span class="param-type">String</span>
 
 
             
@@ -2633,20 +2285,20 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">new version</td>
+            <td class="description last">name of the object store</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>l</code></td>
+                <td class="name"><code>key</code></td>
             
 
             <td class="type">
             
                 
-<span class="param-type"><a href="PersDB.html#~snapshot">PersDB~snapshot</a></span>
+<span class="param-type">mixed</span>
 
 
             
@@ -2662,74 +2314,14 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">previous version</td>
+            <td class="description last">key of the object in the object store</td>
         </tr>
 
     
 
         <tr>
             
-                <td class="name"><code>lcas</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array.&lt;String></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">lowest common ancestors of n and l</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>c</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array.&lt;String></span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-                    &lt;optional><br>
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">conflicting keys</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>err</code></td>
+                <td class="name"><code>new</code></td>
             
 
             <td class="type">
@@ -2744,6 +2336,126 @@ store and delete from conflict store.
             
                 <td class="attributes">
                 
+
+                
+                    &lt;nullable><br>
+                
+                </td>
+            
+
+            
+
+            <td class="description last">new version, undefined on delete</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>prev</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Object</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                    &lt;nullable><br>
+                
+                </td>
+            
+
+            
+
+            <td class="description last">previous version, undefined on insert</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>remote</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">remote the new version originated from</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>conflict</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Array.&lt;String></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">array with conflicting key names</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>error</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">String</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
                     &lt;optional><br>
                 
 
@@ -2753,7 +2465,7 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">error, if another error occurred while merging</td>
+            <td class="description last">error message if something else occurred</td>
         </tr>
 
     
@@ -2802,6 +2514,533 @@ store and delete from conflict store.
 
     
 </dl>
+
+
+
+
+
+
+            
+                
+
+    
+
+    <h4 class="name" id="~getConflictCb"><span class="type-signature"></span>getConflictCb<span class="signature">(err<span class="signature-attributes">opt</span>, conflict, current)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Error</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>conflict</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="PersDB.html#~conflictObject">PersDB~conflictObject</a></span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">conflict object</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>current</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">mixed</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">object currently in the object store</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line254">line 254</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+
+    
+
+    <h4 class="name" id="~getConflictsCb"><span class="type-signature"></span>getConflictsCb<span class="signature">(conflictKey, conflictObject, next)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictKey</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">id of the conflict in the conflict store</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>conflictObject</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="PersDB.html#~conflictObject">PersDB~conflictObject</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">conflict object</td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>next</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type"><a href="PersDB.html#~getConflictsProceedCb">PersDB~getConflictsProceedCb</a></span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last">callback to proceed to the next
+  conflict or stop iterating</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line485">line 485</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
+                
+
+    
+
+    <h4 class="name" id="~getConflictsProceedCb"><span class="type-signature"></span>getConflictsProceedCb<span class="signature">(continue<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>continue</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Boolean</span>
+|
+
+<span class="param-type">Error</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+                <td class="default">
+                
+                    true
+                
+                </td>
+            
+
+            <td class="description last">call this handler optionally with a
+  boolean or error to indicate whether to proceed to the next item or stop
+  iterating</td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line479">line 479</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -3173,6 +3412,145 @@ store and delete from conflict store.
 
 
             
+                
+
+    
+
+    <h4 class="name" id="~stderrCb"><span class="type-signature"></span>stderrCb<span class="signature">(err<span class="signature-attributes">opt</span>)</span><span class="type-signature"></span></h4>
+
+    
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+        <th>Attributes</th>
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>err</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Error</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+                    &lt;optional><br>
+                
+
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line79">line 79</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            
     
 
     
@@ -3228,7 +3606,7 @@ store and delete from conflict store.
             <td class="type">
             
                 
-<span class="param-type">Object</span>
+<span class="param-type"><a href="PersDB.html#~conflictObject">PersDB~conflictObject</a></span>
 
 
             
@@ -3238,165 +3616,7 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">
-                <h6>Properties</h6>
-                
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-        <th>Attributes</th>
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>store</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">String</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">name of the object store</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>new</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-                    &lt;nullable><br>
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">new version, is null on delete</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>prev</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Object</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-                    &lt;nullable><br>
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">previous version, is null on insert</td>
-        </tr>
-
-    
-
-        <tr>
-            
-                <td class="name"><code>conflicts</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Array</span>
-
-
-            
-            </td>
-
-            
-                <td class="attributes">
-                
-
-                
-                    &lt;nullable><br>
-                
-
-                
-                </td>
-            
-
-            
-
-            <td class="description last">array with conflicting key names</td>
-        </tr>
-
-    
-    </tbody>
-</table>
-
-            </td>
+            <td class="description last">conflict object</td>
         </tr>
 
     
@@ -3437,7 +3657,7 @@ store and delete from conflict store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line72">line 72</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line74">line 74</a>
     </li></ul></dd>
     
 
@@ -3608,7 +3828,7 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">new version, is null on delete</td>
+            <td class="description last">new version, undefined on delete</td>
         </tr>
 
     
@@ -3641,7 +3861,7 @@ store and delete from conflict store.
 
             
 
-            <td class="description last">previous version, is null on insert</td>
+            <td class="description last">previous version, undefined on insert</td>
         </tr>
 
     
@@ -3689,7 +3909,7 @@ store and delete from conflict store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line65">line 65</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line67">line 67</a>
     </li></ul></dd>
     
 
@@ -3729,7 +3949,7 @@ store and delete from conflict store.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Thu Aug 04 2016 21:43:55 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Aug 06 2016 00:58:04 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

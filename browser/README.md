@@ -78,7 +78,7 @@ Note that a build can be created by using browserify, see *Development* for inst
 
 ## API
 
-The API documentation can be found under [docs](https://netsend.nl/persdb/docs/).
+The API documentation can be found under [doc](https://netsend.nl/persdb/doc/).
 
 
 ## Development

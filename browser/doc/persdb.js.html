@@ -21,7 +21,7 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul><h3><a href="global.html">Global</a></h3>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
@@ -92,33 +92,31 @@ var Writable = stream.Writable;
  */
 
 /**
- * @typedef {Object} PersDB~mergeObject
- * @property {PersDB~snapshot} n - new version
- * @property {PersDB~snapshot} l - previous version
- * @property {String[]} lcas - lowest common ancestors of n and l
- * @property {String[]} [c] - conflicting keys
- * @property {Object} [err] - error, if another error occurred while merging
+ * @typedef {Object} PersDB~conflictObject
+ * @property {String} store - name of the object store
+ * @property {mixed} key - key of the object in the object store
+ * @property {?Object} new - new version, undefined on delete
+ * @property {?Object} prev - previous version, undefined on insert
+ * @property {String} remote - remote the new version originated from
+ * @property {String[]} conflict - array with conflicting key names
+ * @property {String} [error] - error message if something else occurred
  */
 
 /**
  * @event PersDB#data
  * @param {Object} obj
  * @param {String} obj.store - name of the object store
- * @param {?Object} obj.new - new version, is null on delete
- * @param {?Object} obj.prev - previous version, is null on insert
+ * @param {?Object} obj.new - new version, undefined on delete
+ * @param {?Object} obj.prev - previous version, undefined on insert
  */
 /**
  * @event PersDB#conflict
- * @param {Object} obj
- * @param {String} obj.store - name of the object store
- * @param {?Object} obj.new - new version, is null on delete
- * @param {?Object} obj.prev - previous version, is null on insert
- * @param {?Array} obj.conflicts - array with conflicting key names
+ * @param {PersDB~conflictObject} obj - conflict object
  */
 
 /**
- * @callback stderrCb
- * @param {Error|null} err - error or null
+ * @callback PersDB~stderrCb
+ * @param {Error} [err]
  */
 
 /**
@@ -155,7 +153,7 @@ function PersDB(idb, ldb, opts) {
   this._opts = opts;
   this._connections = {};
   this._snapshotStore = opts.snapshotStore || '_pdb';
-  this._conflictStore = opts.conflictStore || '_conflicts';
+  this._conflictStore = opts.conflictStore || 'conflict';
 
   this._stores = {}; // enable fast store lookup
   for (var i = 0; i &lt; idb.objectStoreNames.length; i++) {
@@ -208,8 +206,11 @@ module.exports = global.PersDB = PersDB;
  *   stores using ES6 Proxy
  * @param {String} opts.snapshotStore=_pdb  name of the object store used
  *   internally for saving new versions
- * @param {String} opts.conflictStore=_conflicts  name of the object store used
- *   internally for saving conflicts
+ * @param {Boolean} opts.startMerge=true  automatically start merging remotes
+ *   internally for saving new versions
+ * @param {String} opts.conflictStore=conflict  name of the object store used
+ *   internally for saving a conflict
+ * @param {Object} opts.mergeTree  MergeTree options
  * @param {Function} cb  first paramter will be an error or null, second paramter
  *  will be the PersDB instance
  */
@@ -218,19 +219,20 @@ PersDB.createNode = function createNode(idb, opts, cb) {
     cb = opts;
     opts = {};
   }
-  if (opts == null) { opts = {}; }
+  opts = xtend({
+    startMerge: true
+  }, opts);
 
   if (idb == null || typeof idb !== 'object') { throw new TypeError('idb must be an object'); }
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   if (opts.hasOwnProperty('watch') &amp;&amp; opts.watch != null &amp;&amp; typeof opts.watch !== 'boolean') { throw new TypeError('opts.watch must be a boolean'); }
-  if (opts.upgradeIfNeeded != null &amp;&amp; typeof opts.upgradeIfNeeded !== 'boolean') { throw new TypeError('opts.upgradeIfNeeded must be a boolean'); }
   if (opts.snapshotStore != null &amp;&amp; typeof opts.snapshotStore !== 'string') { throw new TypeError('opts.snapshotStore must be a string'); }
   if (opts.conflictStore != null &amp;&amp; typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
   var snapshotStore = opts.snapshotStore || '_pdb';
-  var conflictStore = opts.conflictStore || '_conflicts';
+  var conflictStore = opts.conflictStore || 'conflict';
 
   // ensure the snapshot and conflict stores exist
   var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
@@ -267,10 +269,12 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   }
 
   // auto-merge remote versions (use a writable stream to enable backpressure)
-  pdb._mt.startMerge().pipe(new Writable({
-    objectMode: true,
-    write: pdb._writeMerge.bind(pdb)
-  }));
+  if (opts.startMerge) {
+    pdb._mt.startMerge().pipe(new Writable({
+      objectMode: true,
+      write: pdb._writeMerge.bind(pdb)
+    }));
+  }
 
   if (opts.hasOwnProperty('watch') &amp;&amp; opts.watch) {
     // transparently track IndexedDB updates using proxy module
@@ -281,11 +285,15 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   cb(null, pdb);
 };
 
+PersDB.prototype.close = function close(cb) {
+  this._mt.stopMerge(cb);
+}
+
 /**
  * @callback PersDB~getConflictCb
- * @param {Error|null} err - error or null
- * @param {PersDB~mergeObject} conflict - conflicting merge object
- * @param {Object} current - current version in the object store
+ * @param {Error} [err]
+ * @param {PersDB~conflictObject} conflict - conflict object
+ * @param {mixed} current - object currently in the object store
  */
 /**
  * Get a conflict by conflict key.
@@ -304,18 +312,21 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
     var storeName = idbIdOps.objectStoreFromId(conflict.n.h.id);
     var storeId = idbIdOps.idFromId(conflict.n.h.id);
 
+    // get the current item in the object store
     that._getItem(storeName, storeId, function(err, storeItem) {
       if (err) { cb(err); return; }
-      cb(null, conflict, storeItem);
+      cb(null, PersDB._convertConflict(conflict), storeItem);
     });
   });
 };
 
 /**
- * Resolve a conflict by conflict key.
+ * Resolve a conflict by conflict key. "resolved" is treated as a new version and
+ * is written to the object store if the current version in the object store
+ * matches "toBeResolved".
  *
- * If the current local head is the same as toBeResolved, write resolved to the
- * store and delete from conflict store.
+ * The version in the object store and the current local head must match
+ * toBeResolved, this means the local tree must be consistent.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
  * @param {mixed} toBeResolved - object currently in the object store that should
@@ -324,7 +335,7 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
  *   overwrite the object store
  * @param {Boolean} [del] - whether or not resolving means deleting from the object
  *   store
- * @param {stderrCb} cb - gets one parameter
+ * @param {PersDB~stderrCb} cb
  */
 PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeResolved, resolved, del, cb) {
   if (typeof del === 'function') {
@@ -337,6 +348,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
   var that = this;
+  var error;
 
   // fetch the conflict object
   this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
@@ -344,105 +356,103 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
     var id = conflict.n.h.id;
+    var storeName = idbIdOps.objectStoreFromId(id);
+    var storeId = idbIdOps.idFromId(id);
 
-    // make sure the local head matches toBeResolved
-    var heads = [];
-    that._mt.getLocalTree().getHeads({ id: id }, function(head, next) {
-      heads.push(head);
-      next();
-    }, function(err) {
+    // fetch the current version in the object store
+    that._getItem(storeName, storeId, function(err, storeItem) {
       if (err) { cb(err); return; }
-      if (heads.length !== 1) {
-        that._log.err('getConflicts encountered invalid snapshot state: %d heads while one was expected', heads.length);
-        cb(new Error('expected one head'));
-        return;
-      }
-      var head = heads[0];
 
-      var newVersion = {
-        h: {
-          id: id,
-          v: MergeTree.generateRandomVersion(),
-          pa: [head.h.v] // other parents are determined later on
-        },
-        b: resolved
-      }
-
-      if (del) {
-        newVersion.h.d = true;
-      }
-
-      if (!isEqual(head.b, toBeResolved)) {
-        that._log.err('getConflicts mismatch between local head and toBeResolved %j %j while processing', head.b, toBeResolved, conflict);
-        cb(new Error('local head and toBeResolved don\'t match'));
+      if (!isEqual(storeItem, toBeResolved)) {
+        error = new Error('toBeResolved mismatch');
+        that._log.err('resolveConflict %s: %j %j while processing', error, storeItem, toBeResolved, conflict);
+        cb(error);
         return;
       }
 
-      // differentiate between real merge conflicts on conflicting keys, versus other errors
-      if (conflict.c &amp;&amp; conflict.c.length) {
-        // this was a real merge conflict, so use the remote version as a parent
-        // note: merge conflicts never yield a merged item so conflict.n is always the remote version
-        newVersion.h.pa.push(conflict.n.h.v);
+      // get the current local head, if any, and make sure it matches toBeResolved as well
+      var lheads = [];
+      that._mt.getLocalTree().getHeads({ id: id }, function(lhead, next) {
+        lheads.push(lhead);
+        next();
+      }, function(err) {
+        if (err) { cb(err); return; }
+        if (lheads.length > 1) {
+          error = new Error('expected at most one local head');
+          that._log.err('resolveConflict encountered invalid snapshot state: %s, %d', error, lheads.length);
+          cb(error);
+          return;
+        }
+        var lhead = lheads[0];
+        var lheadBody = lhead &amp;&amp; lhead.b;
 
-        var newMerge = {
-          n: newVersion,
-          l: head,
-          lcas: conflict.lcas,
-          pe: conflict.pe,
-          c: null
-        };
-
-        that._writeMerge(newMerge, null, function(err) {
-          if (err) { cb(err); return; }
-          that._removeItem(that._conflictStore, conflictKey, cb);
-        });
-      } else {
-        if (!conflict.err) {
-          that._log.warning('conflict objects should either have a "c" key or an "err" key', conflict);
-          throw new Error('expected error key');
+        if (!isEqual(lheadBody, toBeResolved)) {
+          error = new Error('local head and toBeResolved don\'t match');
+          that._log.err('resolveConflict %s: %j %j while processing', error, lheadBody, toBeResolved, conflict);
+          cb(error);
+          return;
         }
 
-        // check if the conflict version was a locally created merge or already existed in the remote tree
-        // this info is needed for determining the right parents of the resolved item
+        // determine parents (local and remote versions)
+        var parents = {};
+        if (lhead) {
+          parents[lhead.h.v] = true;
+        }
+        // the conflicting merge was either locally merged or directly from a remote (fast-forward)
         that._mt.getRemoteTree(conflict.pe).getByVersion(conflict.n.h.v, function(err, found) {
           if (err) { cb(err); return; }
 
-          if (found) { // then this is the other parent
-            newVersion.h.pa.push(conflict.n.h.v);
-          } else { // discard the conflict and create a new merge with the same remote parent
+          if (found) { // then this is the remote parent
+            parents[found.h.v] = true;
+          } else { // this is a locally created merge and at least one of the two parents must be the remote parent
             // check some invariants
-            if (conflict.n.h._pa.length &lt; 2) { throw new Error('expected conflict to be a merge'); }
-            if (conflict.n.h._pa.length > 2) { throw new Error('only supports merges with two parents'); }
-            if (!conflict.l) { throw new Error('expected a local head'); }
+            if (conflict.n.h.pa.length &lt; 2) { throw new Error('expected conflict to be a merge'); }
+            if (conflict.n.h.pa.length > 2) { throw new Error('only supports merges with two parents'); }
 
-            // determine which of the parents was the local head at the time of conflict
-            var lheadIdx = conflict.n.h.pa.indexOf(conflict.l.h.v);
-            if (lheadIdx === -1) {
+            // determine which of the parents was from the remote at the time of conflict
+            var headIdx = conflict.n.h.pa.indexOf(conflict.l.h.v);
+            if (headIdx === -1) {
               // invalid merge
-              throw new Error('parent in local tree not found');
+              error = new Error('parent in local tree could not be determined');
+              that._log.err('resolveConflict encountered unexpected conflict object: %s', error, conflict);
+              cb(error);
+              return;
             } else {
-              if (lheadIdx === 1) {
-                newVersion.h.pa.push(conflict.n.h.pa[0]);
+              if (headIdx === 1) {
+                parents[conflict.n.h.pa[0]] = true;
               } else {
-                newVersion.h.pa.push(conflict.n.h.pa[1]);
+                parents[conflict.n.h.pa[1]] = true;
               }
             }
           }
 
+          var newVersion = {
+            h: {
+              id: id,
+              v: MergeTree.generateRandomVersion(),
+              pa: Object.keys(parents)
+            },
+            b: resolved
+          }
+          if (del) {
+            newVersion.h.d = true;
+          }
+
           var newMerge = {
             n: newVersion,
-            l: head,
+            l: lhead,
             lcas: conflict.lcas,
             pe: conflict.pe,
             c: null
           };
 
+        that._log.err('veeeeeeet', head, newMerge);
           that._writeMerge(newMerge, null, function(err) {
             if (err) { cb(err); return; }
             that._removeItem(that._conflictStore, conflictKey, cb);
           });
         });
-      }
+      });
     });
   });
 };
@@ -505,20 +515,25 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 };
 
 /**
+ * @callback PersDB~getConflictsProceedCb
+ * @param {Boolean|Error} [continue=true] - call this handler optionally with a
+ *   boolean or error to indicate whether to proceed to the next item or stop
+ *   iterating
+ */
+/**
+ * @callback PersDB~getConflictsCb
+ * @param {Number} conflictKey - id of the conflict in the conflict store
+ * @param {PersDB~conflictObject} conflictObject - conflict object
+ * @param {PersDB~getConflictsProceedCb} next - callback to proceed to the next
+ *   conflict or stop iterating
+ */
+/**
  * Get an iterator over all unresolved conflicts.
  *
  * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
- * @param {Function} next - iterator called with three arguments
- * @param {Number} next.conflictKey - first parameter is the  conflict key
- * @param {Object} next.conflictObject - second parameter is the conflict object
- * @param {Function} next.proceed - third parameter is a callback to proceed to
- *   the next conflict or stop iterating
- * @param {Boolean|Error} [next.proceed.continue=true] - call this handler
- *   optionally with a boolean or error to indicate whether to proceed with the
- *   next conflict or stop iterating and call the done handler.
- * @param {Function} [done] - Final callback called when done iterating. Called
- *   with one optional argument.
- * @param {Error} [done.err] - first parameter will be an error or null
+ * @param {PersDB~getConflictsCb} next - iterator called with three parameters
+ * @param {PersDB~stderrCb} [done] - final callback called when done iterating or
+ *   when iterating is discontinued
  */
 PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts === 'function') {
@@ -538,8 +553,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      // pass conflict to caller for resolving
-      next(obj.key, obj.value, function(cont) {
+      next(obj.key, PersDB._convertConflict(obj.value), function(cont) {
         if (cont instanceof Error) {
           cont = false;
         }
@@ -785,7 +799,7 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  */
 PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (obj.c &amp;&amp; obj.c.length) {
-    that._handleConflict(new Error('upstream merge conflict'), obj, cb);
+    this._handleConflict(null, obj, cb);
     return;
   }
 
@@ -866,7 +880,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
       // expected previous version, maybe it already equals the new version.
       that._log.debug2('merge already in store', newVersion.h);
     } else {
-      // save in conflicts (let this transaction timeout)
+      // save in conflict store (let this transaction timeout)
       that._handleConflict(new Error('unexpected local version'), obj);
     }
   };
@@ -875,32 +889,53 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 };
 
 // save an object in the conflict store
-PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
+PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
   cb = cb || noop;
 
-  var that = this;
-
-  obj.err = origErr.message;
-
+  if (err) {
+    obj.err = err.message;
+  }
   // open a write transaction on the conflict store
   var tx = this._idbTransaction([this._conflictStore], 'readwrite');
 
-  tx.onabort = function(ev) {
-    that._log.err('save conflict abort', ev, obj.n.h, origErr);
+  tx.onabort = () => {
+    this._log.err('save conflict abort', tx.error, obj.n.h, err);
     cb(tx.error);
   };
 
-  tx.onerror = function(ev) {
-    that._log.err('save conflict error', ev, obj.n.h, origErr);
+  tx.onerror = () => {
+    this._log.err('save conflict error', tx.error, obj.n.h, err);
     cb(tx.error);
   };
 
-  tx.oncomplete = function() {
-    that._log.notice('conflict saved', obj);
+  tx.oncomplete = () => {
+    this._log.notice('conflict saved', obj);
     cb();
+    this.emit('conflict', PersDB._convertConflict(obj));
   };
 
   tx.objectStore(this._conflictStore).put(obj);
+};
+
+// convert a conflict object to the publicly documented structure
+PersDB._convertConflict = function _convertConflict(obj) {
+  var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
+  var storeId = idbIdOps.idFromId(obj.n.h.id);
+
+  var conflictObject = {
+    store: storeName,
+    key: storeId,
+    new: obj.n &amp;&amp; obj.n.b,
+    prev: obj.l &amp;&amp; obj.l.b,
+    conflict: obj.c || [],
+    remote: obj.pe
+  };
+
+  if (obj.err) {
+    conflictObject.error = obj.err;
+  }
+
+  return conflictObject;
 };
 </code></pre>
         </article>
@@ -914,7 +949,7 @@ PersDB.prototype._handleConflict = function _handleConflict(origErr, obj, cb) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Thu Aug 04 2016 21:43:55 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Aug 06 2016 00:58:04 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
