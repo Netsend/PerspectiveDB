@@ -55,14 +55,12 @@ var Writable = stream.Writable;
 
 /**
  * @typedef {Object} PersDB~conflictObject
- * @property {Number} id - conflict id
  * @property {String} store - name of the object store
  * @property {mixed} key - key of the object in the object store
  * @property {?Object} new - new version, undefined on delete
  * @property {?Object} prev - previous version, undefined on insert
  * @property {String} remote - remote the new version originated from
  * @property {String[]} conflict - array with conflicting key names
- * @property {String[]} lcas - lowest common ancestors of "new" and "prev"
  * @property {String} [error] - error message if something else occurred
  */
 
@@ -249,6 +247,10 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   cb(null, pdb);
 };
 
+PersDB.prototype.close = function close(cb) {
+  this._mt.stopMerge(cb);
+}
+
 /**
  * @callback PersDB~getConflictCb
  * @param {Error} [err]
@@ -272,9 +274,10 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
     var storeName = idbIdOps.objectStoreFromId(conflict.n.h.id);
     var storeId = idbIdOps.idFromId(conflict.n.h.id);
 
+    // get the current item in the object store
     that._getItem(storeName, storeId, function(err, storeItem) {
       if (err) { cb(err); return; }
-      cb(null, conflict, storeItem);
+      cb(null, PersDB._convertConflict(conflict), storeItem);
     });
   });
 };
@@ -475,14 +478,14 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 /**
  * @callback PersDB~getConflictsProceedCb
  * @param {Boolean|Error} [continue=true] - call this handler optionally with a
- *   boolean or error to indicate whether to proceed with the next conflict or stop
+ *   boolean or error to indicate whether to proceed to the next item or stop
  *   iterating
  */
 /**
  * @callback PersDB~getConflictsCb
  * @param {Number} conflictKey - id of the conflict in the conflict store
  * @param {PersDB~conflictObject} conflictObject - conflict object
- * @param {PersDB~getConflictsProceedCb} proceed - callback to proceed to the next
+ * @param {PersDB~getConflictsProceedCb} next - callback to proceed to the next
  *   conflict or stop iterating
  */
 /**
@@ -511,8 +514,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      // pass conflict to caller for resolving
-      next(obj.key, obj.value, function(cont) {
+      next(obj.key, PersDB._convertConflict(obj.value), function(cont) {
         if (cont instanceof Error) {
           cont = false;
         }
@@ -851,24 +853,9 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
   cb = cb || noop;
 
-  var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
-  var storeId = idbIdOps.idFromId(obj.n.h.id);
-
-  // convert to publicly documented structure
-  var conflictObject = {
-    id: req.result,
-    store: storeName,
-    key: storeId,
-    new: obj.n && obj.n.b,
-    prev: obj.l && obj.l.b,
-    conflict: obj.c || [],
-    remote: obj.pe,
-    lcas: obj.lcas
-  };
   if (err) {
-    conflictObject.err = err.message;
+    obj.err = err.message;
   }
-
   // open a write transaction on the conflict store
   var tx = this._idbTransaction([this._conflictStore], 'readwrite');
 
@@ -882,11 +869,32 @@ PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
     cb(tx.error);
   };
 
-  var req = tx.objectStore(this._conflictStore).put(conflictObject);
-
   tx.oncomplete = () => {
-    this._log.notice('conflict saved', conflictObject);
+    this._log.notice('conflict saved', obj);
     cb();
-    this.emit('conflict', conflictObject);
+    this.emit('conflict', PersDB._convertConflict(obj));
   };
+
+  tx.objectStore(this._conflictStore).put(obj);
+};
+
+// convert a conflict object to the publicly documented structure
+PersDB._convertConflict = function _convertConflict(obj) {
+  var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
+  var storeId = idbIdOps.idFromId(obj.n.h.id);
+
+  var conflictObject = {
+    store: storeName,
+    key: storeId,
+    new: obj.n && obj.n.b,
+    prev: obj.l && obj.l.b,
+    conflict: obj.c || [],
+    remote: obj.pe
+  };
+
+  if (obj.err) {
+    conflictObject.error = obj.err;
+  }
+
+  return conflictObject;
 };
