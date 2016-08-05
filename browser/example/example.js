@@ -9,7 +9,7 @@ req.onupgradeneeded = (ev) => {
 
   // needed for PersDB
   db.createObjectStore('_pdb')
-  db.createObjectStore('_conflicts', { autoIncrement: true })
+  db.createObjectStore('conflict', { autoIncrement: true })
 }
 
 req.onsuccess = (ev) => {
@@ -20,7 +20,7 @@ req.onsuccess = (ev) => {
   var opts = {
     watch: true,
     snapshotStore: '_pdb',
-    conflictStore: '_conflicts'
+    conflictStore: 'conflict'
   }
   PersDB.createNode(db, opts, (err, pdb) => {
     if (err) throw err

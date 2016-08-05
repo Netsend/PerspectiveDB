@@ -117,7 +117,7 @@ function PersDB(idb, ldb, opts) {
   this._opts = opts;
   this._connections = {};
   this._snapshotStore = opts.snapshotStore || '_pdb';
-  this._conflictStore = opts.conflictStore || '_conflicts';
+  this._conflictStore = opts.conflictStore || 'conflict';
 
   this._stores = {}; // enable fast store lookup
   for (var i = 0; i < idb.objectStoreNames.length; i++) {
@@ -172,8 +172,8 @@ module.exports = global.PersDB = PersDB;
  *   internally for saving new versions
  * @param {Boolean} opts.startMerge=true  automatically start merging remotes
  *   internally for saving new versions
- * @param {String} opts.conflictStore=_conflicts  name of the object store used
- *   internally for saving conflicts
+ * @param {String} opts.conflictStore=conflict  name of the object store used
+ *   internally for saving a conflict
  * @param {Object} opts.mergeTree  MergeTree options
  * @param {Function} cb  first paramter will be an error or null, second paramter
  *  will be the PersDB instance
@@ -196,7 +196,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   if (opts.conflictStore != null && typeof opts.conflictStore !== 'string') { throw new TypeError('opts.conflictStore must be a string'); }
 
   var snapshotStore = opts.snapshotStore || '_pdb';
-  var conflictStore = opts.conflictStore || '_conflicts';
+  var conflictStore = opts.conflictStore || 'conflict';
 
   // ensure the snapshot and conflict stores exist
   var snapshotStoreExists = idb.objectStoreNames.contains(snapshotStore);
