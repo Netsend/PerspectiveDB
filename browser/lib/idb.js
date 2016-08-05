@@ -32,7 +32,7 @@ function get(db, storeName, key, cb) {
   if (typeof storeName !== 'string') { throw new TypeError('storeName must be a string'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  var tx = db(storeName);
+  var tx = db.transaction(storeName);
   var req = tx.objectStore(storeName).get(key);
 
   tx.onabort = () => cb(tx.error);
@@ -61,7 +61,7 @@ function put(db, storeName, value, key, cb) {
   // key is optional
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  var tx = db(storeName);
+  var tx = db.transaction(storeName);
   var req = tx.objectStore(storeName).put(value, key);
 
   tx.onabort = () => cb(tx.error);
@@ -84,7 +84,7 @@ function del(db, storeName, key, cb) {
   if (typeof storeName !== 'string') { throw new TypeError('storeName must be a string'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  var tx = db(storeName);
+  var tx = db.transaction(storeName);
   var req = tx.objectStore(storeName).delete(key);
 
   tx.onabort = () => cb(tx.error);
