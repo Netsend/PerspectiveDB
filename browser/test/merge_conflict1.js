@@ -165,18 +165,10 @@ function runTests(test, idbc, PersDB, cb) {
         });
       });
 
-      // drop db
-      test.onFinish(function() {
-        db.close();
-        dropDb('PersDB', cb);
-      });
+      test('pdb.resolveConflict', function(t) {
+        PersDB.createNode(db, pdbOpts, (err, pdb) => {
+          t.error(err);
 
-    /*
-    test('pdb.resolveConflict', function(t) {
-
-      // first create a pdb node to test with
-
-        if (err) throw err;
           t.test('resolve err if conflict can\'t be found', function(st) {
             pdb.resolveConflict(0, undefined, { some: true }, function(err) {
               st.equal(err.message, 'conflict not found');
@@ -185,23 +177,38 @@ function runTests(test, idbc, PersDB, cb) {
           });
 
           t.test('resolve err if toBeResolved does not match current local head', function(st) {
-            pdb.resolveConflict(2, undefined, { some: true }, function(err) {
+            pdb.resolveConflict(1, undefined, { some: true }, function(err) {
               st.equal(err.message, 'toBeResolved mismatch');
               st.end()
             });
           });
 
           t.test('resolve', function(st) {
-            //pdb.resolveConflict(2, mtFixtures.aRemote[0].b, { some: true }, function(err) {
-            pdb.resolveConflict(2, undefined, { some: true }, function(err) {
-              console.log(err);
+            pdb.resolveConflict(1, versionB, { g: true }, function(err) {
               st.error(err);
-              st.end()
+
+              // check if the conflict is removed
+              idb.get(db, conflictStore, 1, function(err, conflict) {
+                st.error(err);
+                st.equal(conflict, undefined);
+
+                // check if the new version is saved in the object store
+                idb.get(db, 'customers', 'foo', function(err, item) {
+                  st.error(err);
+                  st.deepEqual(item, { g: true });
+                  st.end()
+                });
+              });
             });
           });
         });
       });
-    */
+
+      // drop db
+      test.onFinish(function() {
+        db.close();
+        dropDb('PersDB', cb);
+      });
     });
   });
 }
