@@ -232,10 +232,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
 
   // auto-merge remote versions (use a writable stream to enable backpressure)
   if (opts.startMerge) {
-    pdb._mt.startMerge().pipe(new Writable({
-      objectMode: true,
-      write: pdb._writeMerge.bind(pdb)
-    }));
+    pdb.startMerge();
   }
 
   if (opts.hasOwnProperty('watch') && opts.watch) {
@@ -247,9 +244,22 @@ PersDB.createNode = function createNode(idb, opts, cb) {
   cb(null, pdb);
 };
 
-PersDB.prototype.close = function close(cb) {
+// start merge
+PersDB.prototype.startMerge = function startMerge() {
+  this._mt.startMerge().pipe(new Writable({
+    objectMode: true,
+    write: this._writeMerge.bind(this)
+  }));
+};
+
+// stop merge
+PersDB.prototype.stopMerge = function stopMerge(cb) {
   this._mt.stopMerge(cb);
-}
+};
+
+PersDB.prototype.close = function close(cb) {
+  this.stopMerge(cb);
+};
 
 /**
  * @callback PersDB~getConflictCb
