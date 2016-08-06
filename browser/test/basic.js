@@ -92,12 +92,12 @@ function runTests(idb, PersDB, cb) {
 
         t.test('list all conflicts with the public properties', function(st) {
           var i = 0;
-          pdb.getConflicts(function next(conflictKey, conflictObject, proceed) {
+          pdb.getConflicts(function next(conflictObject, proceed) {
             i++;
             switch (i) {
             case 1:
-              st.equal(conflictKey, 1);
               st.deepEqual(conflictObject, {
+                id: 1,
                 store: 'customers',
                 key: 'john',
                 new: { email: 'john@example.com' },
@@ -108,8 +108,8 @@ function runTests(idb, PersDB, cb) {
               });
               break;
             case 2:
-              st.equal(conflictKey, 2);
               st.deepEqual(conflictObject, {
+                id: 2,
                 store: 'customers',
                 key: 'jane',
                 new: { email: 'jane@example.com' },
@@ -132,12 +132,12 @@ function runTests(idb, PersDB, cb) {
 
         t.test('don\'t proceed', function(st) {
           var i = 0;
-          pdb.getConflicts(function next(conflictKey, conflictObject, proceed) {
+          pdb.getConflicts(function next(conflictObject, proceed) {
             i++;
             switch (i) {
             case 1:
-              st.equal(conflictKey, 1);
               st.deepEqual(conflictObject, {
+                id: 1,
                 store: 'customers',
                 key: 'john',
                 new: { email: 'john@example.com' },
@@ -171,6 +171,7 @@ function runTests(idb, PersDB, cb) {
           pdb.getConflict(1, function(err, conflict, current) {
             st.error(err);
             st.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'john',
               new: { email: 'john@example.com' },

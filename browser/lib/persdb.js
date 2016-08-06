@@ -55,6 +55,7 @@ var Writable = stream.Writable;
 
 /**
  * @typedef {Object} PersDB~conflictObject
+ * @property {Number} id - conflict id
  * @property {String} store - name of the object store
  * @property {mixed} key - key of the object in the object store
  * @property {?Object} new - new version, undefined on delete
@@ -275,21 +276,21 @@ PersDB.prototype.close = function close(cb) {
  * back. Otherwise make sure updates to the object stores are done exclusively
  * using PersDB~put and PersDB~get.
  *
- * @param {Number} conflictKey - key of the conflict in the conflict store
+ * @param {Number} conflictId - key of the conflict in the conflict store
  * @param {PersDB~getConflictCb} cb - gets three parameters
  */
-PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
+PersDB.prototype.getConflict = function getConflict(conflictId, cb) {
   var that = this;
 
   // fetch the conflict object
-  this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
+  this._getItem(this._conflictStore, conflictId, function(err, conflict) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
     // get the current local head
     that._mt.getLocalHead(conflict.n.h.id, function(err, head) {
       if (err) { cb(err); return; }
-      cb(null, PersDB._convertConflict(conflict), head && head.b);
+      cb(null, PersDB._convertConflict(conflictId, conflict), head && head.b);
     });
   });
 };
@@ -303,7 +304,7 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
  * back. Otherwise make sure updates to the object stores are done exclusively
  * using PersDB~put and PersDB~get.
  *
- * @param {Number} conflictKey - key of the conflict in the conflict store
+ * @param {Number} conflictId - key of the conflict in the conflict store
  * @param {mixed} toBeResolved - object currently in the object store that should
  *   be overwritten
  * @param {Object} resolved - new item that solves given conflict and should
@@ -312,12 +313,12 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
  *   store
  * @param {PersDB~stderrCb} cb
  */
-PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeResolved, resolved, del, cb) {
+PersDB.prototype.resolveConflict = function resolveConflict(conflictId, toBeResolved, resolved, del, cb) {
   if (typeof del === 'function') {
     cb = del;
     del = false;
   }
-  if (typeof conflictKey !== 'number') { throw new TypeError('conflictKey must be a number'); }
+  if (typeof conflictId !== 'number') { throw new TypeError('conflictId must be a number'); }
   if (resolved == null || typeof resolved !== 'object') { throw new TypeError('resolved must be an object'); }
   if (del != null && typeof del !== 'boolean') { throw new TypeError('del must be a boolean'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
@@ -326,7 +327,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
   var error;
 
   // fetch the conflict object
-  this._getItem(this._conflictStore, conflictKey, function(err, conflict) {
+  this._getItem(this._conflictStore, conflictId, function(err, conflict) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
@@ -399,7 +400,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
 
         that._writeMerge(newMerge, null, function(err) {
           if (err) { cb(err); return; }
-          that._removeItem(that._conflictStore, conflictKey, cb);
+          that._removeItem(that._conflictStore, conflictId, cb);
         });
       });
     });
@@ -471,7 +472,6 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
  */
 /**
  * @callback PersDB~getConflictsCb
- * @param {Number} conflictKey - id of the conflict in the conflict store
  * @param {PersDB~conflictObject} conflictObject - conflict object
  * @param {PersDB~getConflictsProceedCb} next - callback to proceed to the next
  *   conflict or stop iterating
@@ -480,7 +480,7 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
  * Get an iterator over all unresolved conflicts.
  *
  * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
- * @param {PersDB~getConflictsCb} next - iterator called with three parameters
+ * @param {PersDB~getConflictsCb} next - iterator called with two parameters
  * @param {PersDB~stderrCb} [done] - final callback called when done iterating or
  *   when iterating is discontinued
  */
@@ -502,7 +502,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      next(obj.key, PersDB._convertConflict(obj.value), function(cont) {
+      next(PersDB._convertConflict(obj.key, obj.value), function(cont) {
         if (cont instanceof Error) {
           cont = false;
         }
@@ -857,21 +857,22 @@ PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
     cb(tx.error);
   };
 
+  var req = tx.objectStore(this._conflictStore).put(obj);
+
   tx.oncomplete = () => {
     this._log.notice('conflict saved', obj);
     cb();
-    this.emit('conflict', PersDB._convertConflict(obj));
+    this.emit('conflict', PersDB._convertConflict(req.result, obj));
   };
-
-  tx.objectStore(this._conflictStore).put(obj);
 };
 
 // convert a conflict object to the publicly documented structure
-PersDB._convertConflict = function _convertConflict(obj) {
+PersDB._convertConflict = function _convertConflict(id, obj) {
   var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
   var storeId = idbIdOps.idFromId(obj.n.h.id);
 
   var conflictObject = {
+    id: id,
     store: storeName,
     key: storeId,
     new: obj.n && obj.n.b,

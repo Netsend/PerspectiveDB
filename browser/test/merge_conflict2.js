@@ -86,6 +86,7 @@ function runTests(idbc, PersDB, cb) {
 
           pdb.on('conflict', function(conflict) {
             t.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'foo',
               new: versionC,
@@ -127,10 +128,10 @@ function runTests(idbc, PersDB, cb) {
           t.error(err);
 
           var i = 0;
-          pdb.getConflicts(function(conflictKey, conflict, next) {
+          pdb.getConflicts(function(conflict, next) {
             i++;
-            t.equal(conflictKey, 1);
             t.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'foo',
               new: versionC,
@@ -179,10 +180,10 @@ function runTests(idbc, PersDB, cb) {
 
                 // check if the old conflict is removed, and a new one saved because of mismatch with the local head
                 var i = 0;
-                pdb.getConflicts(function(conflictKey, conflict, next) {
+                pdb.getConflicts(function(conflict, next) {
                   i++;
-                  st.equal(conflictKey, 2);
                   st.deepEqual(conflict, {
+                    id: 2,
                     store: 'customers',
                     key: 'foo',
                     new: { g: true },

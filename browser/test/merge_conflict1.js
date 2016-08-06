@@ -79,6 +79,7 @@ function runTests(idbc, PersDB, cb) {
 
           pdb.on('conflict', function(conflict) {
             t.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'foo',
               new: versionC,
@@ -122,6 +123,7 @@ function runTests(idbc, PersDB, cb) {
           pdb.getConflict(1, function(err, conflict, current) {
             t.error(err);
             t.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'foo',
               new: versionC,
@@ -144,10 +146,10 @@ function runTests(idbc, PersDB, cb) {
           t.error(err);
 
           var i = 0;
-          pdb.getConflicts(function(conflictKey, conflict, next) {
+          pdb.getConflicts(function(conflict, next) {
             i++;
-            t.equal(conflictKey, 1);
             t.deepEqual(conflict, {
+              id: 1,
               store: 'customers',
               key: 'foo',
               new: versionC,
