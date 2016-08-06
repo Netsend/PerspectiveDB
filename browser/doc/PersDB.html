@@ -103,7 +103,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line84">line 84</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line85">line 85</a>
     </li></ul></dd>
     
 
@@ -518,7 +518,7 @@ the contents of any object store.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line179">line 179</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line180">line 180</a>
     </li></ul></dd>
     
 
@@ -1015,7 +1015,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line578">line 578</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line565">line 565</a>
     </li></ul></dd>
     
 
@@ -1518,7 +1518,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line558">line 558</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line545">line 545</a>
     </li></ul></dd>
     
 
@@ -1574,14 +1574,19 @@ transfering BSON.
 
     
 
-    <h4 class="name" id="getConflict"><span class="type-signature"></span>getConflict<span class="signature">(conflictKey, cb)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="getConflict"><span class="type-signature"></span>getConflict<span class="signature">(conflictId, cb)</span><span class="type-signature"></span></h4>
 
     
 
 
 
 <div class="description">
-    Get a conflict by conflict key.
+    Get a conflict by conflict key, includes the last known version.
+
+Note: discrepancies between the local head and the version in the object store,
+must be treated as bugs. If using the "watch" option, then please report them
+back. Otherwise make sure updates to the object stores are done exclusively
+using PersDB~put and PersDB~get.
 </div>
 
 
@@ -1617,7 +1622,7 @@ transfering BSON.
 
         <tr>
             
-                <td class="name"><code>conflictKey</code></td>
+                <td class="name"><code>conflictId</code></td>
             
 
             <td class="type">
@@ -1697,7 +1702,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line266">line 266</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line282">line 282</a>
     </li></ul></dd>
     
 
@@ -1830,7 +1835,7 @@ transfering BSON.
 
             
 
-            <td class="description last">iterator called with three parameters</td>
+            <td class="description last">iterator called with two parameters</td>
         </tr>
 
     
@@ -1905,7 +1910,7 @@ transfering BSON.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line500">line 500</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line487">line 487</a>
     </li></ul></dd>
     
 
@@ -1936,7 +1941,7 @@ transfering BSON.
 
     
 
-    <h4 class="name" id="resolveConflict"><span class="type-signature"></span>resolveConflict<span class="signature">(conflictKey, toBeResolved, resolved, del<span class="signature-attributes">opt</span>, cb)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="resolveConflict"><span class="type-signature"></span>resolveConflict<span class="signature">(conflictId, toBeResolved, resolved, del<span class="signature-attributes">opt</span>, cb)</span><span class="type-signature"></span></h4>
 
     
 
@@ -1944,11 +1949,12 @@ transfering BSON.
 
 <div class="description">
     Resolve a conflict by conflict key. "resolved" is treated as a new version and
-is written to the object store if the current version in the object store
-matches "toBeResolved".
+is written to the object store if the current local head matches "toBeResolved".
 
-The version in the object store and the current local head must match
-toBeResolved, this means the local tree must be consistent.
+Note: discrepancies between the local head and the version in the object store,
+must be treated as bugs. If using the "watch" option, then please report them
+back. Otherwise make sure updates to the object stores are done exclusively
+using PersDB~put and PersDB~get.
 </div>
 
 
@@ -1986,7 +1992,7 @@ toBeResolved, this means the local tree must be consistent.
 
         <tr>
             
-                <td class="name"><code>conflictKey</code></td>
+                <td class="name"><code>conflictId</code></td>
             
 
             <td class="type">
@@ -2180,7 +2186,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line302">line 302</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line316">line 316</a>
     </li></ul></dd>
     
 
@@ -2259,6 +2265,35 @@ toBeResolved, this means the local tree must be consistent.
     </thead>
 
     <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>id</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">Number</span>
+
+
+            
+            </td>
+
+            
+                <td class="attributes">
+                
+
+                
+                </td>
+            
+
+            
+
+            <td class="description last">conflict id</td>
+        </tr>
+
     
 
         <tr>
@@ -2654,7 +2689,7 @@ toBeResolved, this means the local tree must be consistent.
 
             
 
-            <td class="description last">object currently in the object store</td>
+            <td class="description last">current local head</td>
         </tr>
 
     
@@ -2695,7 +2730,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line254">line 254</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line265">line 265</a>
     </li></ul></dd>
     
 
@@ -2726,7 +2761,7 @@ toBeResolved, this means the local tree must be consistent.
 
     
 
-    <h4 class="name" id="~getConflictsCb"><span class="type-signature"></span>getConflictsCb<span class="signature">(conflictKey, conflictObject, next)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="~getConflictsCb"><span class="type-signature"></span>getConflictsCb<span class="signature">(conflictObject, next)</span><span class="type-signature"></span></h4>
 
     
 
@@ -2761,29 +2796,6 @@ toBeResolved, this means the local tree must be consistent.
     </thead>
 
     <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>conflictKey</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">Number</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">id of the conflict in the conflict store</td>
-        </tr>
-
     
 
         <tr>
@@ -2869,7 +2881,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line485">line 485</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line473">line 473</a>
     </li></ul></dd>
     
 
@@ -3021,7 +3033,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line479">line 479</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line467">line 467</a>
     </li></ul></dd>
     
 
@@ -3524,7 +3536,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line79">line 79</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line80">line 80</a>
     </li></ul></dd>
     
 
@@ -3657,7 +3669,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line74">line 74</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line75">line 75</a>
     </li></ul></dd>
     
 
@@ -3909,7 +3921,7 @@ toBeResolved, this means the local tree must be consistent.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line67">line 67</a>
+        <a href="persdb.js.html">persdb.js</a>, <a href="persdb.js.html#line68">line 68</a>
     </li></ul></dd>
     
 
@@ -3949,7 +3961,7 @@ toBeResolved, this means the local tree must be consistent.
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Aug 06 2016 00:58:04 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Aug 06 2016 18:15:47 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>
