@@ -5,7 +5,9 @@
 // 2. test if the conflict object is saved in the conflict object store
 // 3. do some tests with resolving if 1 and 2 succeed
 
-function runTests(test, idbc, PersDB, cb) {
+function runTests(idbc, PersDB, cb) {
+  var test = require('tape');
+
   var idb = require('../lib/idb.js');
   var prepareMT = require('./prepare_merge_tree.js');
 

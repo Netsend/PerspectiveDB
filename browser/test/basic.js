@@ -1,6 +1,8 @@
 'use strict';
 
-function runTests(test, idb, PersDB, cb) {
+function runTests(idb, PersDB, cb) {
+  var test = require('tape');
+
   var dropDb = idb.dropDb;
   var recreateDb = idb.recreateDb;
 
