@@ -1,6 +1,6 @@
 'use strict';
 
-// Test a genuine merge conflict on object keys:
+// Test a merge conflict because the object store is not consistent with the DAG:
 // 1. test if it yields a conflict event
 // 2. test if the conflict object is saved in the conflict object store
 // 3. do some tests with resolving if 1 and 2 succeed
@@ -15,6 +15,7 @@ function runTests(test, idbc, PersDB, cb) {
   var conflictStore = 'conflict';
 
   var pdbOpts = {
+    startMerge: false,
     snapshotStore: '_pdb',
     conflictStore: conflictStore,
     mergeTree: {
@@ -25,12 +26,16 @@ function runTests(test, idbc, PersDB, cb) {
   // create a local tree:
   // A <-- B
 
+  // let the object store contain not B but another version D (inconsistent with the local tree)
+
   // and a remote tree with conflicting changes:
   // A <-- C
+
 
   var versionA = { same: 'something' }
   var versionB = { same: 'something else' }
   var versionC = { same: 'not something else' }
+  var versionD = { a: 'missed update' }
 
   // these are versions that should be saved within the merge tree
   var mtFixtures = {
@@ -58,7 +63,7 @@ function runTests(test, idbc, PersDB, cb) {
     },
     data: {
       customers: {
-        foo: versionB
+        foo: versionD
       }
     }
   };
@@ -71,9 +76,11 @@ function runTests(test, idbc, PersDB, cb) {
     prepareMT(db, mtFixtures, function(err) {
       if (err) throw err;
 
-      test('pdb with startMerge default', function(t) {
+      test('pdb emit merge conflict', function(t) {
         PersDB.createNode(db, pdbOpts, (err, pdb) => {
           t.error(err);
+
+          pdb.startMerge();
 
           pdb.on('conflict', function(conflict) {
             t.deepEqual(conflict, {
@@ -109,30 +116,6 @@ function runTests(test, idbc, PersDB, cb) {
             c: ['same'],
             lcas: ['Aaaaaaaa'],
             pe: 'aRemote'
-          });
-        });
-      });
-
-      test('pdb.getConflict to get this conflict', function(t) {
-        PersDB.createNode(db, pdbOpts, (err, pdb) => {
-          t.error(err);
-
-          pdb.getConflict(1, function(err, conflict, current) {
-            t.error(err);
-            t.deepEqual(conflict, {
-              store: 'customers',
-              key: 'foo',
-              new: versionC,
-              prev: versionB,
-              conflict: ['same'],
-              remote: 'aRemote'
-            });
-            t.deepEqual(current, versionB);
-
-            pdb.close(function(err) {
-              t.error(err);
-              t.end();
-            });
           });
         });
       });
@@ -177,26 +160,43 @@ function runTests(test, idbc, PersDB, cb) {
           });
 
           t.test('resolve err if toBeResolved does not match current local head', function(st) {
-            pdb.resolveConflict(1, undefined, { some: true }, function(err) {
+            pdb.resolveConflict(1, versionD, { g: true }, function(err) {
               st.equal(err.message, 'local head and toBeResolved don\'t match');
               st.end()
             });
           });
 
-          t.test('resolve', function(st) {
+          t.test('resolve with new conflict because of object store mismatch', function(st) {
             pdb.resolveConflict(1, versionB, { g: true }, function(err) {
               st.error(err);
 
-              // check if the conflict is removed
-              idb.get(db, conflictStore, 1, function(err, conflict) {
+              // check if the version in the object store is not blindly overwritten
+              idb.get(db, 'customers', 'foo', function(err, item) {
                 st.error(err);
-                st.equal(conflict, undefined);
+                st.deepEqual(item, versionD);
 
-                // check if the new version is saved in the object store
-                idb.get(db, 'customers', 'foo', function(err, item) {
+                // check if the old conflict is removed, and a new one saved because of mismatch with the local head
+                var i = 0;
+                pdb.getConflicts(function(conflictKey, conflict, next) {
+                  i++;
+                  st.equal(conflictKey, 2);
+                  st.deepEqual(conflict, {
+                    store: 'customers',
+                    key: 'foo',
+                    new: { g: true },
+                    prev: versionB,
+                    conflict: [],
+                    remote: 'aRemote',
+                    error: 'unexpected local version'
+                  });
+                  next();
+                }, function(err) {
                   st.error(err);
-                  st.deepEqual(item, { g: true });
-                  st.end()
+                  st.equal(i, 1);
+                  pdb.close(function(err) {
+                    st.error(err);
+                    st.end();
+                  });
                 });
               });
             });

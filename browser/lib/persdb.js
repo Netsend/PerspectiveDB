@@ -265,10 +265,15 @@ PersDB.prototype.close = function close(cb) {
  * @callback PersDB~getConflictCb
  * @param {Error} [err]
  * @param {PersDB~conflictObject} conflict - conflict object
- * @param {mixed} current - object currently in the object store
+ * @param {mixed} current - current local head
  */
 /**
- * Get a conflict by conflict key.
+ * Get a conflict by conflict key, includes the last known version.
+ *
+ * Note: discrepancies between the local head and the version in the object store,
+ * must be treated as bugs. If using the "watch" option, then please report them
+ * back. Otherwise make sure updates to the object stores are done exclusively
+ * using PersDB~put and PersDB~get.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
  * @param {PersDB~getConflictCb} cb - gets three parameters
@@ -281,24 +286,22 @@ PersDB.prototype.getConflict = function getConflict(conflictKey, cb) {
     if (err) { cb(err); return; }
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
-    var storeName = idbIdOps.objectStoreFromId(conflict.n.h.id);
-    var storeId = idbIdOps.idFromId(conflict.n.h.id);
-
-    // get the current item in the object store
-    that._getItem(storeName, storeId, function(err, storeItem) {
+    // get the current local head
+    that._mt.getLocalHead(conflict.n.h.id, function(err, head) {
       if (err) { cb(err); return; }
-      cb(null, PersDB._convertConflict(conflict), storeItem);
+      cb(null, PersDB._convertConflict(conflict), head && head.b);
     });
   });
 };
 
 /**
  * Resolve a conflict by conflict key. "resolved" is treated as a new version and
- * is written to the object store if the current version in the object store
- * matches "toBeResolved".
+ * is written to the object store if the current local head matches "toBeResolved".
  *
- * The version in the object store and the current local head must match
- * toBeResolved, this means the local tree must be consistent.
+ * Note: discrepancies between the local head and the version in the object store,
+ * must be treated as bugs. If using the "watch" option, then please report them
+ * back. Otherwise make sure updates to the object stores are done exclusively
+ * using PersDB~put and PersDB~get.
  *
  * @param {Number} conflictKey - key of the conflict in the conflict store
  * @param {mixed} toBeResolved - object currently in the object store that should
@@ -328,100 +331,75 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictKey, toBeRes
     if (!conflict) { cb(new Error('conflict not found')); return; }
 
     var id = conflict.n.h.id;
-    var storeName = idbIdOps.objectStoreFromId(id);
-    var storeId = idbIdOps.idFromId(id);
 
-    // fetch the current version in the object store
-    that._getItem(storeName, storeId, function(err, storeItem) {
+    // get the current local head, if any, and make sure it matches toBeResolved
+    that._mt.getLocalHead(id, function(err, lhead) {
       if (err) { cb(err); return; }
+      var lheadBody = lhead && lhead.b;
 
-      if (!isEqual(storeItem, toBeResolved)) {
-        error = new Error('toBeResolved mismatch');
-        that._log.err('resolveConflict %s: %j %j while processing', error, storeItem, toBeResolved, conflict);
+      if (!isEqual(lheadBody, toBeResolved)) {
+        error = new Error('local head and toBeResolved don\'t match');
+        that._log.err('resolveConflict %s: %j %j while processing', error, lheadBody, toBeResolved, conflict);
         cb(error);
         return;
       }
 
-      // get the current local head, if any, and make sure it matches toBeResolved as well
-      var lheads = [];
-      that._mt.getLocalTree().getHeads({ id: id }, function(lhead, next) {
-        lheads.push(lhead);
-        next();
-      }, function(err) {
+      // determine parents (local and remote versions)
+      var parents = {};
+      if (lhead) {
+        parents[lhead.h.v] = true;
+      }
+      // the conflicting merge was either locally merged or directly from a remote (fast-forward)
+      that._mt.getRemoteTree(conflict.pe).getByVersion(conflict.n.h.v, function(err, found) {
         if (err) { cb(err); return; }
-        if (lheads.length > 1) {
-          error = new Error('expected at most one local head');
-          that._log.err('resolveConflict encountered invalid snapshot state: %s, %d', error, lheads.length);
-          cb(error);
-          return;
-        }
-        var lhead = lheads[0];
-        var lheadBody = lhead && lhead.b;
 
-        if (!isEqual(lheadBody, toBeResolved)) {
-          error = new Error('local head and toBeResolved don\'t match');
-          that._log.err('resolveConflict %s: %j %j while processing', error, lheadBody, toBeResolved, conflict);
-          cb(error);
-          return;
-        }
+        if (found) { // then this is the remote parent
+          parents[found.h.v] = true;
+        } else { // this is a locally created merge and at least one of the two parents must be the remote parent
+          // check some invariants
+          if (conflict.n.h.pa.length < 2) { throw new Error('expected conflict to be a merge'); }
+          if (conflict.n.h.pa.length > 2) { throw new Error('only supports merges with two parents'); }
 
-        // determine parents (local and remote versions)
-        var parents = {};
-        if (lhead) {
-          parents[lhead.h.v] = true;
-        }
-        // the conflicting merge was either locally merged or directly from a remote (fast-forward)
-        that._mt.getRemoteTree(conflict.pe).getByVersion(conflict.n.h.v, function(err, found) {
-          if (err) { cb(err); return; }
-
-          if (found) { // then this is the remote parent
-            parents[found.h.v] = true;
-          } else { // this is a locally created merge and at least one of the two parents must be the remote parent
-            // check some invariants
-            if (conflict.n.h.pa.length < 2) { throw new Error('expected conflict to be a merge'); }
-            if (conflict.n.h.pa.length > 2) { throw new Error('only supports merges with two parents'); }
-
-            // determine which of the parents was from the remote at the time of conflict
-            var headIdx = conflict.n.h.pa.indexOf(conflict.l.h.v);
-            if (headIdx === -1) {
-              // invalid merge
-              error = new Error('parent in local tree could not be determined');
-              that._log.err('resolveConflict encountered unexpected conflict object: %s', error, conflict);
-              cb(error);
-              return;
+          // determine which of the parents was from the remote at the time of conflict
+          var headIdx = conflict.n.h.pa.indexOf(conflict.l.h.v);
+          if (headIdx === -1) {
+            // invalid merge
+            error = new Error('parent in local tree could not be determined');
+            that._log.err('resolveConflict encountered unexpected conflict object: %s', error, conflict);
+            cb(error);
+            return;
+          } else {
+            if (headIdx === 1) {
+              parents[conflict.n.h.pa[0]] = true;
             } else {
-              if (headIdx === 1) {
-                parents[conflict.n.h.pa[0]] = true;
-              } else {
-                parents[conflict.n.h.pa[1]] = true;
-              }
+              parents[conflict.n.h.pa[1]] = true;
             }
           }
+        }
 
-          var newVersion = {
-            h: {
-              id: id,
-              v: MergeTree.generateRandomVersion(),
-              pa: Object.keys(parents)
-            },
-            b: resolved
-          }
-          if (del) {
-            newVersion.h.d = true;
-          }
+        var newVersion = {
+          h: {
+            id: id,
+            v: MergeTree.generateRandomVersion(),
+            pa: Object.keys(parents)
+          },
+          b: resolved
+        }
+        if (del) {
+          newVersion.h.d = true;
+        }
 
-          var newMerge = {
-            n: newVersion,
-            l: lhead,
-            lcas: conflict.lcas,
-            pe: conflict.pe,
-            c: null
-          };
+        var newMerge = {
+          n: newVersion,
+          l: lhead,
+          lcas: conflict.lcas,
+          pe: conflict.pe,
+          c: null
+        };
 
-          that._writeMerge(newMerge, null, function(err) {
-            if (err) { cb(err); return; }
-            that._removeItem(that._conflictStore, conflictKey, cb);
-          });
+        that._writeMerge(newMerge, null, function(err) {
+          if (err) { cb(err); return; }
+          that._removeItem(that._conflictStore, conflictKey, cb);
         });
       });
     });
