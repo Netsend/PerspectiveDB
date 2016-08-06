@@ -821,7 +821,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   lookup.onsuccess = function() {
     // The current item in the store is expected to match the previous version,
     // since this is an update.
-    if (isEqual(lookup.result, prevVersion)) {
+    if (isEqual(lookup.result, prevVersion.b)) {
       if (newVersion.h.d) {
         that._log.debug2('delete', newVersion.h);
         store.delete(id);
@@ -839,7 +839,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
       // last version in the DAG and thus gets a version that is already in the
       // store. Therefore double check that if the store version is not the
       // expected previous version, maybe it already equals the new version.
-      that._log.debug2('merge already in store', newVersion.h);
+      that._log.notice('merge already in store', newVersion.h);
     } else {
       // save in conflict store (let this transaction timeout)
       that._handleConflict(new Error('unexpected local version'), obj);
