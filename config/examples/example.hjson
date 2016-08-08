@@ -5,8 +5,8 @@ chroot: /var/empty
 log: {
   console: true
   level: debug
-  file: /var/log/persdb.log
-  error: /var/log/persdb-error.log
+  file: /var/log/pdb.log
+  error: /var/log/pdb-error.log
 }
 
 # uncomment the following to enable the WebSocket server, this is only needed
@@ -20,7 +20,7 @@ log: {
 #  #port: 3344                  # this is the default
 #}
 
-# uncomment the following to enable communication with other PersDB servers,
+# uncomment the following to enable communication with other PerspectiveDB servers,
 # this must be done over an SSH tunnel
 #tunnels: [
 # Tunnel processes
@@ -39,7 +39,7 @@ dbs: [
     name: mydb
     user: pdblevel
     group: pdblevel
-    chroot: /srv/persdb/mydb
+    chroot: /srv/pdb/mydb
 #    source: {                 # uncomment this section to enable the mongo
 #                              # adapter and mirror with a mongdb collection
 #      url: mongodb://127.0.0.1:27017/pdb

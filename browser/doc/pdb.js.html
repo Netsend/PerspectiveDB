@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>persdb.js - Documentation</title>
+    <title>pdb.js - Documentation</title>
 
     <script src="scripts/prettify/prettify.js"></script>
     <script src="scripts/prettify/lang-css.js"></script>
@@ -21,12 +21,12 @@
 <label for="nav-trigger" class="overlay"></label>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PersDB.html">PersDB</a><ul class='methods'><li data-type='method'><a href="PersDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PersDB.html#connect">connect</a></li><li data-type='method'><a href="PersDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PersDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PersDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PersDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PersDB.html#event:conflict">conflict</a></li><li><a href="PersDB.html#event:data">data</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="PerspectiveDB.html">PerspectiveDB</a><ul class='methods'><li data-type='method'><a href="PerspectiveDB.html#.createNode">createNode</a></li><li data-type='method'><a href="PerspectiveDB.html#connect">connect</a></li><li data-type='method'><a href="PerspectiveDB.html#createReadStream">createReadStream</a></li><li data-type='method'><a href="PerspectiveDB.html#getConflict">getConflict</a></li><li data-type='method'><a href="PerspectiveDB.html#getConflicts">getConflicts</a></li><li data-type='method'><a href="PerspectiveDB.html#resolveConflict">resolveConflict</a></li></ul></li></ul><h3>Events</h3><ul><li><a href="PerspectiveDB.html#event:conflict">conflict</a></li><li><a href="PerspectiveDB.html#event:data">data</a></li></ul>
 </nav>
 
 <div id="main">
     
-    <h1 class="page-title">persdb.js</h1>
+    <h1 class="page-title">pdb.js</h1>
     
 
     
@@ -39,19 +39,19 @@
             <pre class="prettyprint source linenums"><code>/**
  * Copyright 2015, 2016 Netsend.
  *
- * This file is part of PersDB.
+ * This file is part of PerspectiveDB.
  *
- * PersDB is free software: you can redistribute it and/or modify it under the
+ * PerspectiveDB is free software: you can redistribute it and/or modify it under the
  * terms of the GNU Affero General Public License as published by the Free Software
  * Foundation, either version 3 of the License, or (at your option) any later
  * version.
  *
- * PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
+ * PerspectiveDB is distributed in the hope that it will be useful, but WITHOUT ANY
  * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
  * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
  *
  * You should have received a copy of the GNU Affero General Public License along
- * with PersDB. If not, see &lt;https://www.gnu.org/licenses/>.
+ * with PerspectiveDB. If not, see &lt;https://www.gnu.org/licenses/>.
  */
 
 'use strict';
@@ -80,7 +80,7 @@ var filterIdbStore = require('../../hooks/core/filter_idb_store');
 var Writable = stream.Writable;
 
 /**
- * @typedef {Object} PersDB~snapshot
+ * @typedef {Object} PerspectiveDB~snapshot
  * @property {Object} h - header
  * @property {mixed} h.id - id
  * @property {String} h.v - version
@@ -92,7 +92,7 @@ var Writable = stream.Writable;
  */
 
 /**
- * @typedef {Object} PersDB~conflictObject
+ * @typedef {Object} PerspectiveDB~conflictObject
  * @property {Number} id - conflict id
  * @property {String} store - name of the object store
  * @property {mixed} key - key of the object in the object store
@@ -104,31 +104,31 @@ var Writable = stream.Writable;
  */
 
 /**
- * @event PersDB#data
+ * @event PerspectiveDB#data
  * @param {Object} obj
  * @param {String} obj.store - name of the object store
  * @param {?Object} obj.new - new version, undefined on delete
  * @param {?Object} obj.prev - previous version, undefined on insert
  */
 /**
- * @event PersDB#conflict
- * @param {PersDB~conflictObject} obj - conflict object
+ * @event PerspectiveDB#conflict
+ * @param {PerspectiveDB~conflictObject} obj - conflict object
  */
 
 /**
- * @callback PersDB~stderrCb
+ * @callback PerspectiveDB~stderrCb
  * @param {Error} [err]
  */
 
 /**
- * Use {@link PersDB.createNode} to create a new instance. Don't use new PersDB directly.
+ * Use {@link PerspectiveDB.createNode} to create a new instance. Don't use new PerspectiveDB directly.
  *
- * @class PersDB
+ * @class PerspectiveDB
  *
- * @fires PersDB#data
- * @fires PersDB#conflict
+ * @fires PerspectiveDB#data
+ * @fires PerspectiveDB#conflict
  */
-function PersDB(idb, ldb, opts) {
+function PerspectiveDB(idb, ldb, opts) {
   EE.call(this, opts);
 
   var that = this;
@@ -175,12 +175,12 @@ function PersDB(idb, ldb, opts) {
   this._idbTransaction = idb.transaction.bind(idb);
 }
 
-util.inherits(PersDB, EE);
+util.inherits(PerspectiveDB, EE);
 
-module.exports = global.PersDB = PersDB;
+module.exports = global.PerspectiveDB = PerspectiveDB;
 
 /**
- * Create a new {@link PersDB} instance. Make sure idb is opened and upgradeneeded
+ * Create a new {@link PerspectiveDB} instance. Make sure idb is opened and upgradeneeded
  * is handled and both the conflict and snapshot store exist. The conflict store
  * must have autoIncrement set. Furthermore, don't start writing to any object
  * store until the call back is called with the pdb instance.
@@ -188,7 +188,7 @@ module.exports = global.PersDB = PersDB;
  * If opts.watch is used, then add, put and delete operations on any of the object
  * stores are automatically detected. Note that for watch to work, ES6 Proxy must
  * be supported by the browser (i.e. Firefox 18+ or Chrome 49+). If watch is not
- * used, {@link PersDB#put} and {@link PersDB#del} must be used in order to modify
+ * used, {@link PerspectiveDB#put} and {@link PerspectiveDB#del} must be used in order to modify
  * the contents of any object store.
  *
  * @example:
@@ -196,7 +196,7 @@ module.exports = global.PersDB = PersDB;
  *   var db = ev.target.result
  *   var opts = { watch: true }
  *
- *   PersDB.createNode(db, opts).then(pdb => {
+ *   PerspectiveDB.createNode(db, opts).then(pdb => {
  *     pdb.connect({ ... })
  *   }).catch(err => console.error(err))
  * })
@@ -213,9 +213,9 @@ module.exports = global.PersDB = PersDB;
  *   internally for saving a conflict
  * @param {Object} opts.mergeTree  MergeTree options
  * @param {Function} cb  first paramter will be an error or null, second paramter
- *  will be the PersDB instance
+ *  will be the PerspectiveDB instance
  */
-PersDB.createNode = function createNode(idb, opts, cb) {
+PerspectiveDB.createNode = function createNode(idb, opts, cb) {
   if (typeof opts === 'function') {
     cb = opts;
     opts = {};
@@ -263,7 +263,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
 
   var pdb;
   try {
-    pdb = new PersDB(idb, ldb, opts);
+    pdb = new PerspectiveDB(idb, ldb, opts);
   } catch(err) {
     cb(err);
     return;
@@ -284,7 +284,7 @@ PersDB.createNode = function createNode(idb, opts, cb) {
 };
 
 // start merge
-PersDB.prototype.startMerge = function startMerge() {
+PerspectiveDB.prototype.startMerge = function startMerge() {
   this._mt.startMerge().pipe(new Writable({
     objectMode: true,
     write: this._writeMerge.bind(this)
@@ -292,18 +292,18 @@ PersDB.prototype.startMerge = function startMerge() {
 };
 
 // stop merge
-PersDB.prototype.stopMerge = function stopMerge(cb) {
+PerspectiveDB.prototype.stopMerge = function stopMerge(cb) {
   this._mt.stopMerge(cb);
 };
 
-PersDB.prototype.close = function close(cb) {
+PerspectiveDB.prototype.close = function close(cb) {
   this.stopMerge(cb);
 };
 
 /**
- * @callback PersDB~getConflictCb
+ * @callback PerspectiveDB~getConflictCb
  * @param {Error} [err]
- * @param {PersDB~conflictObject} conflict - conflict object
+ * @param {PerspectiveDB~conflictObject} conflict - conflict object
  * @param {mixed} current - current local head
  */
 /**
@@ -312,12 +312,12 @@ PersDB.prototype.close = function close(cb) {
  * Note: discrepancies between the local head and the version in the object store,
  * must be treated as bugs. If using the "watch" option, then please report them
  * back. Otherwise make sure updates to the object stores are done exclusively
- * using PersDB~put and PersDB~get.
+ * using PerspectiveDB~put and PerspectiveDB~get.
  *
  * @param {Number} conflictId - key of the conflict in the conflict store
- * @param {PersDB~getConflictCb} cb - gets three parameters
+ * @param {PerspectiveDB~getConflictCb} cb - gets three parameters
  */
-PersDB.prototype.getConflict = function getConflict(conflictId, cb) {
+PerspectiveDB.prototype.getConflict = function getConflict(conflictId, cb) {
   var that = this;
 
   // fetch the conflict object
@@ -328,7 +328,7 @@ PersDB.prototype.getConflict = function getConflict(conflictId, cb) {
     // get the current local head
     that._mt.getLocalHead(conflict.n.h.id, function(err, head) {
       if (err) { cb(err); return; }
-      cb(null, PersDB._convertConflict(conflictId, conflict), head &amp;&amp; head.b);
+      cb(null, PerspectiveDB._convertConflict(conflictId, conflict), head &amp;&amp; head.b);
     });
   });
 };
@@ -340,7 +340,7 @@ PersDB.prototype.getConflict = function getConflict(conflictId, cb) {
  * Note: discrepancies between the local head and the version in the object store,
  * must be treated as bugs. If using the "watch" option, then please report them
  * back. Otherwise make sure updates to the object stores are done exclusively
- * using PersDB~put and PersDB~get.
+ * using PerspectiveDB~put and PerspectiveDB~get.
  *
  * @param {Number} conflictId - key of the conflict in the conflict store
  * @param {mixed} toBeResolved - object currently in the object store that should
@@ -349,9 +349,9 @@ PersDB.prototype.getConflict = function getConflict(conflictId, cb) {
  *   overwrite the object store
  * @param {Boolean} [del] - whether or not resolving means deleting from the object
  *   store
- * @param {PersDB~stderrCb} cb
+ * @param {PerspectiveDB~stderrCb} cb
  */
-PersDB.prototype.resolveConflict = function resolveConflict(conflictId, toBeResolved, resolved, del, cb) {
+PerspectiveDB.prototype.resolveConflict = function resolveConflict(conflictId, toBeResolved, resolved, del, cb) {
   if (typeof del === 'function') {
     cb = del;
     del = false;
@@ -453,7 +453,7 @@ PersDB.prototype.resolveConflict = function resolveConflict(conflictId, toBeReso
  * @param {key} key  key of the conflict object in the conflict store
  * @param {Function} cb - first paramter will be an error or null
  */
-PersDB.prototype._removeItem = function _removeItem(store, key, cb) {
+PerspectiveDB.prototype._removeItem = function _removeItem(store, key, cb) {
   if (typeof store !== 'string') { throw new TypeError('store must be a string'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
@@ -482,7 +482,7 @@ PersDB.prototype._removeItem = function _removeItem(store, key, cb) {
  * @param {Function} cb - first paramter will be an error or null, second paramter
  *  will be the item.
  */
-PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
+PerspectiveDB.prototype._getItem = function _getItem(storeName, key, cb) {
   if (typeof storeName !== 'string') { throw new TypeError('storeName must be a string'); }
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
@@ -503,26 +503,26 @@ PersDB.prototype._getItem = function _getItem(storeName, key, cb) {
 };
 
 /**
- * @callback PersDB~getConflictsProceedCb
+ * @callback PerspectiveDB~getConflictsProceedCb
  * @param {Boolean|Error} [continue=true] - call this handler optionally with a
  *   boolean or error to indicate whether to proceed to the next item or stop
  *   iterating
  */
 /**
- * @callback PersDB~getConflictsCb
- * @param {PersDB~conflictObject} conflictObject - conflict object
- * @param {PersDB~getConflictsProceedCb} next - callback to proceed to the next
+ * @callback PerspectiveDB~getConflictsCb
+ * @param {PerspectiveDB~conflictObject} conflictObject - conflict object
+ * @param {PerspectiveDB~getConflictsProceedCb} next - callback to proceed to the next
  *   conflict or stop iterating
  */
 /**
  * Get an iterator over all unresolved conflicts.
  *
  * @param {Object} [opts] - @see {@link https://github.com/timkuijsten/node-idb-readable-stream} options
- * @param {PersDB~getConflictsCb} next - iterator called with two parameters
- * @param {PersDB~stderrCb} [done] - final callback called when done iterating or
+ * @param {PerspectiveDB~getConflictsCb} next - iterator called with two parameters
+ * @param {PerspectiveDB~stderrCb} [done] - final callback called when done iterating or
  *   when iterating is discontinued
  */
-PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
+PerspectiveDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   if (typeof opts === 'function') {
     done = next;
     next = opts;
@@ -540,7 +540,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
   var writer = new Writable({
     objectMode: true,
     write: function(obj, enc, cb) {
-      next(PersDB._convertConflict(obj.key, obj.value), function(cont) {
+      next(PerspectiveDB._convertConflict(obj.key, obj.value), function(cont) {
         if (cont instanceof Error) {
           cont = false;
         }
@@ -580,7 +580,7 @@ PersDB.prototype.getConflicts = function getConflicts(opts, next, done) {
  * @return {stream.Readable}
  * @see {@link https://nodejs.org/api/stream.html#stream_class_stream_readable}
  */
-PersDB.prototype.createReadStream = function createReadStream(opts) {
+PerspectiveDB.prototype.createReadStream = function createReadStream(opts) {
   return this._mt.createReadStream(opts);
 };
 
@@ -600,7 +600,7 @@ PersDB.prototype.createReadStream = function createReadStream(opts) {
  * @param {Number} [remote.port=3344] - port of the remote WebSocket server
  * @return {Promise}
  */
-PersDB.prototype.connect = function connect(remote) {
+PerspectiveDB.prototype.connect = function connect(remote) {
   if (remote == null || typeof remote !== 'object') { throw new TypeError('remote must be an object'); }
   if (!remote.name || typeof remote.name !== 'string') { throw new TypeError('remote.name must be a string'); }
   if (!remote.host || typeof remote.host !== 'string') { throw new TypeError('remote.host must be a string'); }
@@ -704,7 +704,7 @@ PersDB.prototype.connect = function connect(remote) {
   });
 };
 
-PersDB.prototype.disconnect = function disconnect(cb) {
+PerspectiveDB.prototype.disconnect = function disconnect(cb) {
   var that = this;
   async.each(Object.keys(this._connections), function(connId, cb2) {
     that._log.info('closing %s', connId);
@@ -714,7 +714,7 @@ PersDB.prototype.disconnect = function disconnect(cb) {
   }, cb);
 };
 
-PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
+PerspectiveDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, err) {
   this._log.err('connection error with %s: %s', connId, err);
   conn &amp;&amp; conn.close();
 };
@@ -726,7 +726,7 @@ PersDB.prototype._connErrorHandler = function _connErrorHandler(conn, connId, er
  * @private
  * @return {Object}
  */
-PersDB.prototype._getHandlers = function _getHandlers() {
+PerspectiveDB.prototype._getHandlers = function _getHandlers() {
   var that = this;
 
   // pre and post handlers for objectStore.add, put, delete and clear
@@ -781,10 +781,10 @@ PersDB.prototype._getHandlers = function _getHandlers() {
  * @todo make the operations atomic.
  *
  * @private
- * @fires PersDB#data
- * @fires PersDB#conflict
+ * @fires PerspectiveDB#data
+ * @fires PerspectiveDB#conflict
  */
-PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
+PerspectiveDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   if (obj.c &amp;&amp; obj.c.length) {
     this._handleConflict(null, obj, cb);
     return;
@@ -876,7 +876,7 @@ PersDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
 };
 
 // save an object in the conflict store
-PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
+PerspectiveDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
   cb = cb || noop;
 
   if (err) {
@@ -900,12 +900,12 @@ PersDB.prototype._handleConflict = function _handleConflict(err, obj, cb) {
   tx.oncomplete = () => {
     this._log.notice('conflict saved', obj);
     cb();
-    this.emit('conflict', PersDB._convertConflict(req.result, obj));
+    this.emit('conflict', PerspectiveDB._convertConflict(req.result, obj));
   };
 };
 
 // convert a conflict object to the publicly documented structure
-PersDB._convertConflict = function _convertConflict(id, obj) {
+PerspectiveDB._convertConflict = function _convertConflict(id, obj) {
   var storeName = idbIdOps.objectStoreFromId(obj.n.h.id);
   var storeId = idbIdOps.idFromId(obj.n.h.id);
 
@@ -937,7 +937,7 @@ PersDB._convertConflict = function _convertConflict(id, obj) {
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Sat Aug 06 2016 18:15:47 GMT+0200 (CEST) using the Minami theme.
+    Documentation generated by <a href="https://github.com/jsdoc3/jsdoc">JSDoc 3.4.0</a> on Mon Aug 08 2016 16:30:15 GMT+0200 (CEST) using the Minami theme.
 </footer>
 
 <script>prettyPrint();</script>

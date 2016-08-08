@@ -1,5 +1,5 @@
 {
-  "name": "PersBD",
+  "name": "PerspectiveDB",
   "version": "0.0.6",
   "author": {
     "name": "Tim Kuijsten",
@@ -54,14 +54,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/Netsend/persdb.git"
+    "url": "git://github.com/Netsend/PerspectiveDB.git"
   },
-  "bugs": "https://github.com/Netsend/persdb/issues",
+  "bugs": "https://github.com/Netsend/PerspectiveDB/issues",
   "bin": {
-    "persdb": "./bin/persdb"
+    "pdb": "./bin/pdb"
   },
   "scripts": {
     "test": "mocha ./test",
-    "generate-docs": "jsdoc -d browser/doc -t doc-theme-minami browser/lib/persdb.js"
+    "generate-docs": "jsdoc -d browser/doc -t doc-theme-minami browser/lib/pdb.js"
   }
 }

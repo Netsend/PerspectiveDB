@@ -1,4 +1,4 @@
-# PersDB-browser
+# PerspectiveDB-browser
 
 Track changes to IndexedDB object stores and sync with peers over a WebSocket.
 
@@ -7,22 +7,22 @@ Track changes to IndexedDB object stores and sync with peers over a WebSocket.
 
 Create the stores *customers* and *employees* and sync with a peer at example.com.
 
-Include a [build](https://netsend.nl/persdb/build.js) in your html so that the global PersDB is set:
+Include a [build](https://netsend.nl/PerspectiveDB/build.js) in your html so that the global PerspectiveDB is set:
 ```html
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
-<title>PersDB example</title>
+<title>PerspectiveDB example</title>
 </head>
 <body>
-<script type="text/javascript" src="https://netsend.nl/persdb/build.js"></script>
+<script type="text/javascript" src="https://netsend.nl/PerspectiveDB/build.js"></script>
 <script type="text/javascript" src="example.js"></script>
 </body>
 </html>
 ```
 
-[example.js](https://github.com/Netsend/persdb/blob/master/browser/example/example.js) looks as follows:
+[example.js](https://github.com/Netsend/PerspectiveDB/blob/master/browser/example/example.js) looks as follows:
 ```js
 // open an IndexedDB instance as usual
 var req = indexedDB.open('MyDB')
@@ -33,7 +33,7 @@ req.onupgradeneeded = (ev) => {
   db.createObjectStore('customers', { keyPath: 'email' })
   db.createObjectStore('employees')
 
-  // needed for PersDB
+  // needed for PerspectiveDB
   db.createObjectStore('_pdb')
   db.createObjectStore('conflict', { autoIncrement: true })
 }
@@ -41,14 +41,14 @@ req.onupgradeneeded = (ev) => {
 req.onsuccess = (ev) => {
   var db = ev.target.result
 
-  // Initiate PersDB with this database. Use watch mode to automatically track
+  // Initiate PerspectiveDB with this database. Use watch mode to automatically track
   // changes. This requires support for ES6 Proxy (Firefox 18+ or Chrome 49+).
   var opts = {
     watch: true,
     snapshotStore: '_pdb',
     conflictStore: 'conflict'
   }
-  PersDB.createNode(db, opts, (err, pdb) => {
+  PerspectiveDB.createNode(db, opts, (err, pdb) => {
     if (err) throw err
 
     // connect to a remote peer at wss://example.com
@@ -78,7 +78,7 @@ Note that a build can be created by using browserify, see *Development* for inst
 
 ## API
 
-The API documentation can be found under [doc](https://netsend.nl/persdb/doc/).
+The API documentation can be found under [doc](https://netsend.nl/PerspectiveDB/doc/).
 
 
 ## Development
@@ -88,7 +88,7 @@ automatically create a build after each source change.
 
 ```shell
 $ npm i
-$ watchify browser/lib/persdb.js -o browser/build.js
+$ watchify browser/lib/pdb.js -o browser/build.js
 ```
 
 Quickly wipe all IndexedDBs in all your Firefox profiles on OS X:
@@ -103,16 +103,16 @@ For instructions on how to start a websocket server, see the main readme.
 
 Copyright 2015, 2016 Netsend.
 
-This file is part of PersDB.
+This file is part of PerspectiveDB.
 
-PersDB is free software: you can redistribute it and/or modify it under the
+PerspectiveDB is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version.
 
-PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
+PerspectiveDB is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License along
-with PersDB. If not, see <https://www.gnu.org/licenses/>.
+with PerspectiveDB. If not, see <https://www.gnu.org/licenses/>.

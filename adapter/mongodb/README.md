@@ -16,7 +16,7 @@ master = true
 oplogSize = 2000
 ```
 
-In your PersDB config file, add the `source` key to the database you want to
+In your PerspectiveDB config file, add the `source` key to the database you want to
 connect with a mongodb collection. I.e. connect db foo with mongodb pdb.test3:
 ```
 dbs: [
