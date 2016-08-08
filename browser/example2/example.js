@@ -357,7 +357,7 @@ function main(db, pdb) {
 }
 
 if (typeof config !== 'object') { throw new Error('make sure config is set'); }
-if (typeof PersDB !== 'function') { throw new Error('make sure PersDB is loaded'); }
+if (typeof PerspectiveDB !== 'function') { throw new Error('make sure PerspectiveDB is loaded'); }
 
 // open db and write an object
 var req = indexedDB.open('MyTestDatabase');
@@ -365,12 +365,12 @@ var req = indexedDB.open('MyTestDatabase');
 req.onsuccess = function(ev) {
   var db = ev.target.result;
 
-  // start PersDB
+  // start PerspectiveDB
   var opts = {
     name: 'demo',
     perspectives: [config],
   };
-  var pdb = new PersDB(db, opts);
+  var pdb = new PerspectiveDB(db, opts);
   main(db, pdb);
 };
 

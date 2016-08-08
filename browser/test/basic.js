@@ -67,7 +67,7 @@ function setup(test, idbTools) {
   };
 
   test('recreate db', function(t) {
-    idbTools.recreateDb('PersDB', opts, function(err, db) {
+    idbTools.recreateDb('PerspectiveDB', opts, function(err, db) {
       t.error(err);
       idb = db;
       t.end();
@@ -75,11 +75,11 @@ function setup(test, idbTools) {
   });
 }
 
-function all(test, idbTools, PersDB) {
-  test('PersDB.createNode', function(t) {
+function all(test, idbTools, PerspectiveDB) {
+  test('PerspectiveDB.createNode', function(t) {
     t.plan(2);
 
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       t.error(err);
       t.ok(pdb);
     });
@@ -89,7 +89,7 @@ function all(test, idbTools, PersDB) {
     // first create a pdb node to test with
     t.plan(2);
 
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       if (err) throw err;
 
       t.test('list all conflicts with the public properties', function(st) {
@@ -166,7 +166,7 @@ function all(test, idbTools, PersDB) {
     // first create a pdb node to test with
     t.plan(2);
 
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       if (err) throw err;
 
       t.test('get existing conflict', function(st) {
@@ -202,16 +202,16 @@ function all(test, idbTools, PersDB) {
 function teardown(test, idbTools) {
   test('close and drop idb', function(t) {
     idb.close();
-    idbTools.dropDb('PersDB', function(err) {
+    idbTools.dropDb('PerspectiveDB', function(err) {
       t.error(err);
       t.end();
     });
   });
 }
 
-function run(test, idbTools, PersDB) {
+function run(test, idbTools, PerspectiveDB) {
   setup(test, idbTools);
-  all(test, idbTools, PersDB);
+  all(test, idbTools, PerspectiveDB);
   teardown(test, idbTools);
 }
 

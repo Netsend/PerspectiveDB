@@ -7,7 +7,7 @@ req.onupgradeneeded = (ev) => {
   db.createObjectStore('customers', { keyPath: 'email' })
   db.createObjectStore('employees')
 
-  // needed for PersDB
+  // needed for PerspectiveDB
   db.createObjectStore('_pdb')
   db.createObjectStore('conflict', { autoIncrement: true })
 }
@@ -15,14 +15,14 @@ req.onupgradeneeded = (ev) => {
 req.onsuccess = (ev) => {
   var db = ev.target.result
 
-  // Initiate PersDB with this database. Use watch mode to automatically track
+  // Initiate PerspectiveDB with this database. Use watch mode to automatically track
   // changes. This requires support for ES6 Proxy (Firefox 18+ or Chrome 49+).
   var opts = {
     watch: true,
     snapshotStore: '_pdb',
     conflictStore: 'conflict'
   }
-  PersDB.createNode(db, opts, (err, pdb) => {
+  PerspectiveDB.createNode(db, opts, (err, pdb) => {
     if (err) throw err
 
     // connect to a remote peer at wss://example.com

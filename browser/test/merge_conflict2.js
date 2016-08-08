@@ -67,7 +67,7 @@ function setup(test, idbTools) {
   };
 
   test('recreate db', function(t) {
-    idbTools.recreateDb('PersDB', opts, function(err, db) {
+    idbTools.recreateDb('PerspectiveDB', opts, function(err, db) {
       t.error(err);
       idb = db;
       // prepare merge tree
@@ -79,9 +79,9 @@ function setup(test, idbTools) {
   });
 }
 
-function all(test, idbTools, PersDB) {
+function all(test, idbTools, PerspectiveDB) {
   test('pdb emit merge conflict', function(t) {
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       t.error(err);
 
       pdb.startMerge();
@@ -126,7 +126,7 @@ function all(test, idbTools, PersDB) {
   });
 
   test('use getConflicts to get this conflict', function(t) {
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       t.error(err);
 
       var i = 0;
@@ -154,7 +154,7 @@ function all(test, idbTools, PersDB) {
   });
 
   test('pdb.resolveConflict', function(t) {
-    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+    PerspectiveDB.createNode(idb, pdbOpts, (err, pdb) => {
       t.error(err);
 
       t.test('resolve err if conflict can\'t be found', function(st) {
@@ -213,16 +213,16 @@ function all(test, idbTools, PersDB) {
 function teardown(test, idbTools) {
   test('close and drop idb', function(t) {
     idb.close();
-    idbTools.dropDb('PersDB', function(err) {
+    idbTools.dropDb('PerspectiveDB', function(err) {
       t.error(err);
       t.end();
     });
   });
 }
 
-function run(test, idbTools, PersDB) {
+function run(test, idbTools, PerspectiveDB) {
   setup(test, idbTools);
-  all(test, idbTools, PersDB);
+  all(test, idbTools, PerspectiveDB);
   teardown(test, idbTools);
 }
 

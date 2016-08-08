@@ -3,8 +3,8 @@
 var test = require('tape');
 
 var idbTools = require('../lib/idb_tools.js');
-var PersDB = require('../lib/persdb.js');
+var PerspectiveDB = require('../lib/persdb.js');
 
-require('./basic').run(test, idbTools, PersDB);
-require('./merge_conflict1').run(test, idbTools, PersDB);
-require('./merge_conflict2').run(test, idbTools, PersDB);
+require('./basic').run(test, idbTools, PerspectiveDB);
+require('./merge_conflict1').run(test, idbTools, PerspectiveDB);
+require('./merge_conflict2').run(test, idbTools, PerspectiveDB);
