@@ -44,7 +44,7 @@ var tasks = [];
 var tasks2 = [];
 
 var cons, silence;
-var chroot = '/var/persdb';
+var chroot = '/var/pdb';
 var user = 'pdblevel';
 var group = 'pdblevel';
 var dbPath = '/test_db_exec_root';
@@ -480,7 +480,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -625,7 +625,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -864,7 +864,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -986,7 +986,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {

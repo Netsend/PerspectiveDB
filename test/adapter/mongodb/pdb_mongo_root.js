@@ -50,10 +50,10 @@ var tasks2 = [];
 
 var db, coll1, coll2, coll3, conflictColl;
 var cons, silence;
-var chroot = '/var/persdb';
-var dbPath1 = '/test1_persdb_mongo_root'; // match with config files
-var dbPath2 = '/test2_persdb_mongo_root'; // match with config files
-var dbPath3 = '/test3_persdb_mongo_root'; // match with config files
+var chroot = '/var/pdb';
+var dbPath1 = '/test1_pdb_mongo_root'; // match with config files
+var dbPath2 = '/test2_pdb_mongo_root'; // match with config files
+var dbPath3 = '/test3_pdb_mongo_root'; // match with config files
 
 // open loggers and setup db connection
 tasks.push(function(done) {
@@ -188,7 +188,7 @@ tasks.push(function(done) {
       assert(/client connected 127.0.0.1-/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test1_persdb_source_mongo.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test1_pdb_source_mongo.hjson'], opts);
 });
 
 // test with non-empty collection and empty leveldb. save new object in collection, update and then spawn db
@@ -267,7 +267,7 @@ tasks.push(function(done) {
       if (err) { throw err; }
       coll2.update({ _id: 'foo' }, { $set: { test: true } }, function(err) {
         if (err) { throw err; }
-        spawn([__dirname + '/../../../bin/persdb', __dirname + '/test2_persdb_source_mongo.hjson'], opts);
+        spawn([__dirname + '/../../../bin/pdb', __dirname + '/test2_pdb_source_mongo.hjson'], opts);
       });
     });
   });
@@ -415,7 +415,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test3_persdb_source_mongo.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test3_pdb_source_mongo.hjson'], opts);
 });
 
 async.series(tasks, function(err) {

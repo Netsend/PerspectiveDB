@@ -76,7 +76,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should require msg.port to be a number
@@ -104,7 +104,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should disconnect after receiving more than 1024 bytes of data without newlines
@@ -160,7 +160,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should not parse objects larger than max length
@@ -209,7 +209,7 @@ tasks.push(function(done) {
       assert(/Error: more than maxBytes received/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should pass auth request to parent
@@ -248,7 +248,7 @@ tasks.push(function(done) {
     onExit: done
   };
 
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should start a secure websocket server and pass auth request to parent
@@ -318,7 +318,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/preauth_exec', __dirname + '/test_pdb.hjson'], opts);
 });
 
 async.series(tasks, function(err) {

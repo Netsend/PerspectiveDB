@@ -17,8 +17,8 @@ log: {
 
 dbs: [{
   name: someDb
-  chroot: /var/persdb
-  path: /test2_persdb_mongo_root
+  chroot: /var/pdb
+  path: /test2_pdb_mongo_root
   mergeTree: {
     vSize: 3
     autoMergeInterval: 1000  # Milliseconds between auto processing items

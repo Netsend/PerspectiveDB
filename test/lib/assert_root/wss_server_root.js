@@ -91,7 +91,7 @@ tasks.push(function(done) {
       assert(/msg.log must be an object/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should require msg.key to not be group or world readable or writable
@@ -120,7 +120,7 @@ tasks.push(function(done) {
       assert(/msg.key should not be group or world readable or writable/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should require msg.cert, key and dhparam to exist
@@ -149,7 +149,7 @@ tasks.push(function(done) {
       assert(/Error: ENOENT: no such file or directory, open 'foo'/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should chroot and listen
@@ -180,7 +180,7 @@ tasks.push(function(done) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should chroot, connect and do websocket handshake and proxy to the proxyPort
@@ -226,7 +226,7 @@ tasks.push(function(done) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should proxy data request back to websocket client
@@ -287,7 +287,7 @@ tasks.push(function(done) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should proxy data request + BSON response back to websocket client in two separate writes
@@ -371,7 +371,7 @@ tasks.push(function(done) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should proxy data request + BSON response back to websocket client in one write (check pipe(ls) unpipe(ls))
@@ -455,7 +455,7 @@ tasks2.push(function(done) {
       assert(/wss changed root to \/var\/empty and user:group to _pdbnull:_pdbnull/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../lib/wss_server', __dirname + '/test_pdb.hjson'], opts);
 });
 
 async.series(tasks, function(err) {

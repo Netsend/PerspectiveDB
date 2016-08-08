@@ -22,8 +22,8 @@ autoProcessInterval: 100
 
 dbs: [{
   name: someDb
-  chroot: /var/persdb
-  path: /test_persdb_root
+  chroot: /var/pdb
+  path: /test_pdb_root
   perspectives: [
     {
       name: someClient

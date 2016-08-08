@@ -54,8 +54,8 @@ var tasks = [];
 var tasks2 = [];
 
 var cons, silence;
-var chroot = '/var/persdb';
-var dbPath = '/test_persdb_root';
+var chroot = '/var/pdb';
+var dbPath = '/test_pdb_root';
 
 // open loggers
 tasks.push(function(done) {
@@ -94,7 +94,7 @@ tasks.push(function(done) {
       assert(/client connected 127.0.0.1-/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb.hjson'], opts);
 });
 
 // should try to start a WSS server and if this fails because of missing attributes (key, cert, dhparam) automatically shutdown
@@ -106,7 +106,7 @@ tasks.push(function(done) {
       assert(/msg.key must be a non-empty string/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_wrong_config.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_wrong_config.hjson'], opts);
 });
 
 // should start a WSS server, test by connecting with wss client
@@ -126,7 +126,7 @@ tasks.push(function(done) {
       assert(/-127.0.0.1-1235: end \(no binary data received\)/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because of empty data request
@@ -152,7 +152,7 @@ tasks.push(function(done) {
       assert(/-127.0.0.1-1234 invalid auth request/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because db name does not exist in config
@@ -182,7 +182,7 @@ tasks.push(function(done) {
       assert(/_verifyAuthRequest no config found for db: baz invalid credentials/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because username does not exist in config
@@ -212,7 +212,7 @@ tasks.push(function(done) {
       assert(/_verifyAuthRequest no users or import \/ export config found someDb invalid credentials/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and disconnect because password is incorrect
@@ -242,7 +242,7 @@ tasks.push(function(done) {
       assert(/_verifyAuthRequest someDb someClient invalid credentials/.test(stderr));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and send a data request that signals no data is expected (no import key in config)
@@ -278,7 +278,7 @@ tasks.push(function(done) {
       assert(/successfully authenticated "someClient"/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
 });
 
 // should start a WSS server, and send a data request that signals data is expected (import true)
@@ -308,14 +308,14 @@ tasks.push(function(done) {
   }
 
   var opts = {
-    config: 'test_persdb_wss_import.hjson',
+    config: 'test_pdb_wss_import.hjson',
     onSpawn: onSpawn,
     onExit: done,
     testStdout: function(stdout) {
       assert(/successfully authenticated "someClient"/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_import.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + but disconnect because no export is configured and data is requested
@@ -357,7 +357,7 @@ tasks.push(function(done) {
       assert(/data requested but no export configured/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_import.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + two BSON items
@@ -407,7 +407,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -439,7 +439,7 @@ tasks.push(function(done) {
     onSpawn: onSpawn,
     onExit: onExit,
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_import_export.hjson'], opts);
 });
 
 // should start a WSS server, and accept a data request + one BSON item, and send previously saved items (depends on previous test)
@@ -503,7 +503,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/persdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -539,7 +539,7 @@ tasks.push(function(done) {
     onSpawn: onSpawn,
     onExit: onExit,
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_wss_import_export.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_import_export.hjson'], opts);
 });
 
 // test native client via TCP server, loop perspectives and see if merge procedures fire off
@@ -558,7 +558,7 @@ tasks.push(function(done) {
       assert(/t:otherClient createReadStream open reader/.test(stdout));
     }
   };
-  spawn([__dirname + '/../../../bin/persdb', __dirname + '/test_persdb_with_client.hjson'], opts);
+  spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_with_client.hjson'], opts);
 });
 
 async.series(tasks, function(err) {

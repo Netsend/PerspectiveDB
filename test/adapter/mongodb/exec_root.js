@@ -106,7 +106,7 @@ tasks.push(function(done) {
     }
   };
 
-  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts);
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_pdb_source_mongo.hjson'], opts);
 });
 
 // should ask for last version over version control channel (fd 7)
@@ -166,7 +166,7 @@ tasks.push(function(done) {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
   };
 
-  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_pdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 // should send a new version based on an oplog update
@@ -257,7 +257,7 @@ tasks.push(function(done) {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
   };
 
-  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_pdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 // should save a merge in the conflict collection if the local head does not match the item in the collection
@@ -359,7 +359,7 @@ tasks.push(function(done) {
     stdio: ['pipe', 'pipe', 'pipe', 'ipc', null, null, 'pipe', 'pipe']
   };
 
-  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_persdb_source_mongo.hjson'], opts, spawnOpts);
+  spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_pdb_source_mongo.hjson'], opts, spawnOpts);
 });
 
 async.series(tasks, function(err) {
