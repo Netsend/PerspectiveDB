@@ -21,7 +21,7 @@
 var level = require('level-packager')(require('leveldown'));
 
 function openDb(config) {
-  var chroot = config.chroot || '/var/persdb';
+  var chroot = config.chroot || '/var/pdb';
   var data = config.data || '/data';
 
   // ensure leading slash in data path

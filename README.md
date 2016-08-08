@@ -1,4 +1,4 @@
-# PersDB
+# PerspectiveDB
 
 *multi-master replication with transformations*
 
@@ -108,7 +108,7 @@ to run the example in [browser/example](https://github.com/Netsend/PerspectiveDB
 ## SSH tunnels
 
 In order to communicate with external hosts an SSH tunnel must be used.
-Different tunnels can be setup by PersDB. For those familiar, this works just
+Different tunnels can be setup by PerspectiveDB. For those familiar, this works just
 like the `ssh -L` command. Say PerspectiveDB runs on pdb.example.com. Then the
 following is an example of a tunnel to the machine at mongodb.example.com. Every
 connection on pdb.example.com to 127.0.0.1:1337 will be tunneled to
@@ -126,19 +126,19 @@ tunnels: [
 ```
 
 Two things are important: the identity of the remote host, and the idenity of
-PersDB. The identity of the remote host is listed under the key `fingerprint`.
+PerspectiveDB. The identity of the remote host is listed under the key `fingerprint`.
 It's a base64 encoded sha256 hash of the identity of the remote party. It can be
 achieved by running `ssh-keygen -E sha256 -lf /etc/ssh/ssh_host_rsa_key.pub` on
 mongodb.example.com (-E is supported since ssh 6.9). If the public key of
 mongodb.example.com is located in some other file (i.e. your known_hosts), then
 `ssh-keygen -E sha256 -lf ~/.ssh/known_hosts` can be run.
 
-The identity of PersDB is listed under the key `key`. It is a private key on
+The identity of PerspectiveDB is listed under the key `key`. It is a private key on
 pdb.example.com. Currently only RSA keys without a password are supported. A
 new one can be created as follows:
 `ssh-keygen -t rsa -f /home/john/.ssh/myidentity.key`. Leave the password empty.
 
-A tunnel can be used by anyone on the machine, not only PersDB. To use a tunnel
+A tunnel can be used by anyone on the machine, not only PerspectiveDB. To use a tunnel
 with the mongodb adapter and connect to the database somedb on
 mongodb.example.com one can use something like:
 ```
@@ -165,16 +165,16 @@ collection. See adapter/mongodb/README.md for further instructions.
 
 Copyright 2012-2016 Netsend.
 
-This file is part of PersDB.
+This file is part of PerspectiveDB.
 
-PersDB is free software: you can redistribute it and/or modify it under the
+PerspectiveDB is free software: you can redistribute it and/or modify it under the
 terms of the GNU Affero General Public License as published by the Free Software
 Foundation, either version 3 of the License, or (at your option) any later
 version.
 
-PersDB is distributed in the hope that it will be useful, but WITHOUT ANY
+PerspectiveDB is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
 PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License along
-with PersDB. If not, see <https://www.gnu.org/licenses/>.
+with PerspectiveDB. If not, see <https://www.gnu.org/licenses/>.

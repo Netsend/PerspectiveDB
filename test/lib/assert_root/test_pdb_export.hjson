@@ -1,6 +1,6 @@
-# PersDB settings.
+# PerspectiveDB settings.
 
-# The strategy used for options in default.hjson shipped with PersDB is
+# The strategy used for options in default.hjson shipped with PerspectiveDB is
 # to specify options with their default value where possible, but leave them
 # commented. Uncommented options override the default value.
 
