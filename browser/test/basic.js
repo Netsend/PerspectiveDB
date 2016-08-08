@@ -1,13 +1,10 @@
 'use strict';
 
-function runTests(idb, PersDB, cb) {
-  var test = require('tape');
+var idb, pdbOpts, conflict1, conflict2, conflictStore;
 
-  var dropDb = idb.dropDb;
-  var recreateDb = idb.recreateDb;
-
+function setup(test, idbTools) {
   // create two conflict fixtures
-  var conflict1 = {
+  conflict1 = {
     n: {
       h: {
         id: 'customers\x01john',
@@ -24,7 +21,7 @@ function runTests(idb, PersDB, cb) {
     pe: 'remote1',
     err: 'some rando'
   };
-  var conflict2 = {
+  conflict2 = {
     n: {
       h: {
         id: 'customers\x01jane',
@@ -58,9 +55,9 @@ function runTests(idb, PersDB, cb) {
     }
   };
 
-  var conflictStore = '_conflicts';
+  conflictStore = '_conflicts';
 
-  var pdbOpts = {
+  pdbOpts = {
     snapshotStore: '_pdb',
     conflictStore: conflictStore,
     startMerge: false,
@@ -69,108 +66,39 @@ function runTests(idb, PersDB, cb) {
     }
   };
 
-  // ensure an empty database exists
-  recreateDb('PersDB', opts, function(err, db) {
-    if (err) throw err;
-
-
-    test('PersDB.createNode', function(t) {
-      t.plan(2);
-
-      PersDB.createNode(db, pdbOpts, (err, pdb) => {
-        t.error(err);
-        t.ok(pdb);
-      });
+  test('recreate db', function(t) {
+    idbTools.recreateDb('PersDB', opts, function(err, db) {
+      t.error(err);
+      idb = db;
+      t.end();
     });
+  });
+}
 
-    test('pdb.getConflicts', function(t) {
-      // first create a pdb node to test with
-      t.plan(2);
+function all(test, idbTools, PersDB) {
+  test('PersDB.createNode', function(t) {
+    t.plan(2);
 
-      PersDB.createNode(db, pdbOpts, (err, pdb) => {
-        if (err) throw err;
-
-        t.test('list all conflicts with the public properties', function(st) {
-          var i = 0;
-          pdb.getConflicts(function next(conflictObject, proceed) {
-            i++;
-            switch (i) {
-            case 1:
-              st.deepEqual(conflictObject, {
-                id: 1,
-                store: 'customers',
-                key: 'john',
-                new: { email: 'john@example.com' },
-                prev: null,
-                conflict: [],
-                remote: 'remote1',
-                error: 'some rando'
-              });
-              break;
-            case 2:
-              st.deepEqual(conflictObject, {
-                id: 2,
-                store: 'customers',
-                key: 'jane',
-                new: { email: 'jane@example.com' },
-                prev: null,
-                conflict: [],
-                remote: 'remote2',
-                error: 'unexpected local head'
-              });
-              break;
-            default:
-              throw new Error('unexpected');
-            }
-            proceed();
-          }, function(err) {
-            st.error(err);
-            st.equal(i, 2);
-            st.end();
-          });
-        });
-
-        t.test('don\'t proceed', function(st) {
-          var i = 0;
-          pdb.getConflicts(function next(conflictObject, proceed) {
-            i++;
-            switch (i) {
-            case 1:
-              st.deepEqual(conflictObject, {
-                id: 1,
-                store: 'customers',
-                key: 'john',
-                new: { email: 'john@example.com' },
-                prev: null,
-                conflict: [],
-                remote: 'remote1',
-                error: 'some rando'
-              });
-              break;
-            default:
-              throw new Error('unexpected');
-            }
-            proceed(false);
-          }, function(err) {
-            st.error(err);
-            st.equal(i, 1);
-            st.end();
-          });
-        });
-      });
+    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+      t.error(err);
+      t.ok(pdb);
     });
+  });
 
-    test('pdb.getConflict', function(t) {
-      // first create a pdb node to test with
-      t.plan(2);
+  test('pdb.getConflicts', function(t) {
+    // first create a pdb node to test with
+    t.plan(2);
 
-      PersDB.createNode(db, pdbOpts, (err, pdb) => {
-        if (err) throw err;
+    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+      if (err) throw err;
 
-        t.test('get existing conflict', function(st) {
-          pdb.getConflict(1, function(err, conflict, current) {
-            st.error(err);
-            st.deepEqual(conflict, {
+      t.test('list all conflicts with the public properties', function(st) {
+        var i = 0;
+        pdb.getConflicts(function next(conflictObject, proceed) {
+          i++;
+          switch (i) {
+          case 1:
+            st.deepEqual(conflictObject, {
               id: 1,
               store: 'customers',
               key: 'john',
@@ -180,28 +108,111 @@ function runTests(idb, PersDB, cb) {
               remote: 'remote1',
               error: 'some rando'
             });
-            st.deepEqual(current, undefined);
-            st.end();
-          });
+            break;
+          case 2:
+            st.deepEqual(conflictObject, {
+              id: 2,
+              store: 'customers',
+              key: 'jane',
+              new: { email: 'jane@example.com' },
+              prev: null,
+              conflict: [],
+              remote: 'remote2',
+              error: 'unexpected local head'
+            });
+            break;
+          default:
+            throw new Error('unexpected');
+          }
+          proceed();
+        }, function(err) {
+          st.error(err);
+          st.equal(i, 2);
+          st.end();
         });
+      });
 
-        t.test('get non-existing conflict', function(st) {
-          pdb.getConflict(0, function(err, conflict, current) {
-            st.equal(err.message, 'conflict not found');
-            st.deepEqual(conflict, undefined);
-            st.deepEqual(current, undefined);
-            st.end();
-          });
+      t.test('don\'t proceed', function(st) {
+        var i = 0;
+        pdb.getConflicts(function next(conflictObject, proceed) {
+          i++;
+          switch (i) {
+          case 1:
+            st.deepEqual(conflictObject, {
+              id: 1,
+              store: 'customers',
+              key: 'john',
+              new: { email: 'john@example.com' },
+              prev: null,
+              conflict: [],
+              remote: 'remote1',
+              error: 'some rando'
+            });
+            break;
+          default:
+            throw new Error('unexpected');
+          }
+          proceed(false);
+        }, function(err) {
+          st.error(err);
+          st.equal(i, 1);
+          st.end();
         });
       });
     });
+  });
 
-    // drop db
-    test.onFinish(function() {
-      db.close();
-      dropDb('PersDB', cb);
+  test('pdb.getConflict', function(t) {
+    // first create a pdb node to test with
+    t.plan(2);
+
+    PersDB.createNode(idb, pdbOpts, (err, pdb) => {
+      if (err) throw err;
+
+      t.test('get existing conflict', function(st) {
+        pdb.getConflict(1, function(err, conflict, current) {
+          st.error(err);
+          st.deepEqual(conflict, {
+            id: 1,
+            store: 'customers',
+            key: 'john',
+            new: { email: 'john@example.com' },
+            prev: null,
+            conflict: [],
+            remote: 'remote1',
+            error: 'some rando'
+          });
+          st.deepEqual(current, undefined);
+          st.end();
+        });
+      });
+
+      t.test('get non-existing conflict', function(st) {
+        pdb.getConflict(0, function(err, conflict, current) {
+          st.equal(err.message, 'conflict not found');
+          st.deepEqual(conflict, undefined);
+          st.deepEqual(current, undefined);
+          st.end();
+        });
+      });
     });
   });
 }
 
-module.exports = runTests;
+function teardown(test, idbTools) {
+  test('close and drop idb', function(t) {
+    idb.close();
+    idbTools.dropDb('PersDB', function(err) {
+      t.error(err);
+      t.end();
+    });
+  });
+}
+
+function run(test, idbTools, PersDB) {
+  setup(test, idbTools);
+  all(test, idbTools, PersDB);
+  teardown(test, idbTools);
+}
+
+module.exports = { run };
