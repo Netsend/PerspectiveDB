@@ -338,7 +338,7 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
   }, opts);
   if (typeof opts.bson === 'boolean') { mongoOpts.raw = opts.bson; }
 
-  this._log.debug('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
+  this._log.debug2('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
 
   return this._oplogColl.find(selector, mongoOpts);
 };
