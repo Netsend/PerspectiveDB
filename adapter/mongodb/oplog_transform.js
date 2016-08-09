@@ -149,6 +149,7 @@ OplogTransform.prototype.startStream = function startStream() {
     that._or.once('end', function() {
       that._log.debug2('ot startStream end of tailable oplog cursor');
       that._or.unpipe(that);
+      that._or = null;
       if (reopen && !that._stop) {
         that._reopenOplog = setTimeout(function() {
           openOplog(opts, reopen);
@@ -223,11 +224,12 @@ OplogTransform.prototype.close = function close(cb) {
 
   var that = this;
 
-  if (this._or && !this._or.isClosed()) {
-    this._log.info('ot oplogReader close cursor');
-    if (this._reopenOplog) {
-      clearTimeout(this._reopenOplog);
-    }
+  if (this._reopenOplog) {
+    this._log.info('ot oplogReader cancel opening new oplog reader');
+    clearTimeout(this._reopenOplog);
+  }
+  if (this._or) { // expect this does only exist if an oplog reader is not ended
+    this._log.info('ot oplogReader close reader');
     // wait for end so that the killed cursor is unregistered within the driver (prevents MongoError: server 127.0.0.1:27017 sockets closed)
     this._or.once('end', function() {
       that.end(cb);
