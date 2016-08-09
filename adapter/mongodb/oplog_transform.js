@@ -147,7 +147,7 @@ OplogTransform.prototype.startStream = function startStream() {
       return;
     });
     that._or.once('end', function() {
-      that._log.notice('ot startStream end of tailable oplog cursor');
+      that._log.debug2('ot startStream end of tailable oplog cursor');
       that._or.unpipe(that);
       if (reopen && !that._stop) {
         that._reopenOplog = setTimeout(function() {
@@ -336,7 +336,7 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
   }, opts);
   if (typeof opts.bson === 'boolean') { mongoOpts.raw = opts.bson; }
 
-  this._log.info('ot oplogReader offset: %s %s, selector: %j, opts: %j', opts.offset, opts.includeOffset ? 'include' : 'exclude', selector, mongoOpts);
+  this._log.debug('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
 
   return this._oplogColl.find(selector, mongoOpts);
 };
