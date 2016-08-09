@@ -24,9 +24,6 @@ dbs: [{
     autoMergeInterval: 1000  # Milliseconds between auto processing items
   },
   source: {
-    oplogTransformOpts: {
-      awaitData: false // speedup tests
-    },
     url: mongodb://127.0.0.1:27019/pdb
     coll: test2
     #dbUser: bar
@@ -39,7 +36,6 @@ dbs: [{
       passdb: secrets.hjson
       import: true
       export: true
-      tailRetry: 400
     }
   ]
 }]
