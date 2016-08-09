@@ -156,20 +156,6 @@ describe('OplogTransform', function() {
       (function() { ot._oplogReader({ includeOffset: '' }); }).should.throw('opts.includeOffset must be a boolean');
     });
 
-    it('should require opts.tailable to be a boolean', function() {
-      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, [], { log: silence });
-      (function() { ot._oplogReader({ tailable: '' }); }).should.throw('opts.tailable must be a boolean');
-    });
-
-    it('should require opts.tailableRetryInterval to be a number', function() {
-      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo.bar', controlWrite, controlRead, [], { log: silence });
-      (function() { ot._oplogReader({ tailableRetryInterval: '' }); }).should.throw('opts.tailableRetryInterval must be a number');
-    });
-
     it('should construct and start reading', function(done) {
       var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
@@ -236,30 +222,6 @@ describe('OplogTransform', function() {
       });
 
       or.resume();
-    });
-
-    it('should tail and not manually close', function(done) {
-      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, [], { log: silence });
-      var or = ot._oplogReader({ offset: offset, tailable: true, awaitData: false });
-
-      var closeCalled = false;
-      or.on('end', function() {
-        should.strictEqual(closeCalled, true);
-        done();
-      });
-
-      var i = 0;
-      or.on('data', function() {
-        i++;
-        if (i >= 2) {
-          setTimeout(function() {
-            closeCalled = true;
-            or.close();
-          }, 20);
-        }
-      });
     });
 
     it('should exclude offset by default', function(done) {
@@ -555,7 +517,7 @@ describe('OplogTransform', function() {
     it('should process new oplog items on collection insert', function(done) {
       var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, [], { log: silence, awaitData: false });
+      var ot = new OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, [], { log: silence });
       ot.startStream();
 
       // expect a request for the last item in the DAG

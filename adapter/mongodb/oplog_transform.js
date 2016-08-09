@@ -178,7 +178,7 @@ OplogTransform.prototype.startStream = function startStream() {
         that._lastTs = offset;
 
         // handle new oplog items via this._transform
-        openOplog(xtend(that._opts, { bson: false, tailable: true }), true);
+        openOplog(xtend(that._opts, { bson: false }), true);
       });
     } else {
       // expect the last version in the DAG with an oplog offset
@@ -198,7 +198,7 @@ OplogTransform.prototype.startStream = function startStream() {
       that._lastTs = offset;
 
       // handle new oplog items via this._transform
-      openOplog(xtend(that._opts, { bson: false, tailable: true }), true);
+      openOplog(xtend(that._opts, { bson: false }), true);
     }
   });
 
@@ -291,14 +291,13 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
  * Read oplog, scoped to the namespace.
  *
  * @param {Object} [opts]  object containing optional parameters
+ * @return {mongodb.Cursor} the result of find which is a mongodb cursor
  *
  * opts:
  *   filter {Object}  extra filter to apply apart from namespace
  *   offset {Object}  mongodb.Timestamp to start at
  *   bson {Boolean, default true}  whether to return raw bson or parsed objects
  *   includeOffset {Boolean, default false}  whether to include or exclude offset
- *   tailable {Boolean, default false}  whether or not to keep the cursor open and follow the oplog
- *   tailableRetryInterval {Number, default 1000}  set tailableRetryInterval
  */
 OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
   if (opts == null) opts = {};
@@ -307,8 +306,6 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
   if (opts.offset != null && typeof opts.offset !== 'object') { throw new TypeError('opts.offset must be an object'); }
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.includeOffset != null && typeof opts.includeOffset !== 'boolean') { throw new TypeError('opts.includeOffset must be a boolean'); }
-  if (opts.tailable != null && typeof opts.tailable !== 'boolean') { throw new TypeError('opts.tailable must be a boolean'); }
-  if (opts.tailableRetryInterval != null && typeof opts.tailableRetryInterval !== 'number') { throw new TypeError('opts.tailableRetryInterval must be a number'); }
 
   // setup CursorStream
   var selector = { ns: this._ns };
@@ -325,9 +322,6 @@ OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
 
   var mongoOpts = xtend({
     raw: true,
-    tailable: false,
-    tailableRetryInterval: 1000,
-    awaitData: true,
     sort: { '$natural': 1 },
     comment: 'oplog_reader'
   }, opts);

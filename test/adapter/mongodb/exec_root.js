@@ -231,10 +231,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
         coll: collectionName,
-        url: config.url,
-        oplogTransformOpts: {
-          awaitData: false // speedup tests
-        }
+        url: config.url
       });
       break;
     case 'listen':
@@ -269,10 +266,7 @@ tasks.push(function(done) {
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
         coll: collectionName2,
-        url: config.url,
-        oplogTransformOpts: {
-          awaitData: false // speedup tests
-        }
+        url: config.url
       });
       break;
     case 'listen':
