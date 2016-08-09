@@ -135,6 +135,8 @@ module.exports = OplogTransform;
 OplogTransform.prototype.startStream = function startStream() {
   var that = this;
 
+  this._reopenOplog;
+
   // handle new oplog items via this._transform, use this._lastTs as offset
   function openOplog(opts, reopen) {
     that._log.debug2('ot startStream opening tailable oplog cursor after %s', that._lastTs);
@@ -147,7 +149,11 @@ OplogTransform.prototype.startStream = function startStream() {
     that._or.once('end', function() {
       that._log.notice('ot startStream end of tailable oplog cursor');
       that._or.unpipe(that);
-      if (reopen && !that._stop) { openOplog(opts, reopen); }
+      if (reopen && !that._stop) {
+        that._reopenOplog = setTimeout(function() {
+          openOplog(opts, reopen);
+        }, 1000);
+      }
     });
     that._or.pipe(that, { end: false });
   }
@@ -219,6 +225,9 @@ OplogTransform.prototype.close = function close(cb) {
 
   if (this._or && !this._or.isClosed()) {
     this._log.info('ot oplogReader close cursor');
+    if (this._reopenOplog) {
+      clearTimeout(this._reopenOplog);
+    }
     // wait for end so that the killed cursor is unregistered within the driver (prevents MongoError: server 127.0.0.1:27017 sockets closed)
     this._or.once('end', function() {
       that.end(cb);
