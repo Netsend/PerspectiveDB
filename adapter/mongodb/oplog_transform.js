@@ -23,17 +23,19 @@
 var stream = require('stream');
 var util = require('util');
 
+var async = require('async');
 var bson = require('bson');
 var BSONStream = require('bson-stream');
 var xtend = require('xtend');
 
+var binsearch = require('../../lib/binsearch').inArray;
 var isEqual = require('../../lib/is_equal');
 var findAndDelete = require('./find_and_delete');
+var noop = require('../../lib/noop');
 
 var BSON = new bson.BSONPure.BSON();
 var Transform = stream.Transform;
-
-var noop = function() {};
+var Writable = stream.Writable;
 
 /**
  * OplogTransform
@@ -42,7 +44,8 @@ var noop = function() {};
  *
  * @param {Object} oplogDb  connection to the oplog database
  * @param {String} oplogCollName  oplog collection name
- * @param {String} ns  namespace of the database.collection to follow
+ * @param {String} dbName  database to follow
+ * @param {mongodb.Collection[]} collections  track these collections
  * @param {Object} controlWrite  request stream to ask for latest versions
  * @param {Object} controlRead  response stream to recieve latest versions
  * @param {Object} expected  Array with new objects that were updated by this
@@ -51,25 +54,21 @@ var noop = function() {};
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
- *   tmpCollName {String, default _pdbtmp.[ns]}  temporary collection
+ *   tmpCollName {String, default _pdbtmp}  temporary collection
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
  *       console.error by default.
  */
-function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, expected, opts) {
+function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrite, controlRead, expected, opts) {
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
-  if (!ns || typeof ns !== 'string') { throw new TypeError('ns must be a non-empty string'); }
+  if (!dbName || typeof dbName !== 'string') { throw new TypeError('dbName must be a non-empty string'); }
+  if (!Array.isArray(collections) || !collections.length) { throw new TypeError('collections must be a non-empty array'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
   if (!Array.isArray(expected)) { throw new TypeError('expected must be an array'); }
   if (opts != null && typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
-
-  var nsParts = ns.split('.');
-  if (nsParts.length < 2) { throw new TypeError('ns must contain at least two parts'); }
-  if (!nsParts[0].length) { throw new TypeError('ns must contain a database name'); }
-  if (!nsParts[1].length) { throw new TypeError('ns must contain a collection name'); }
 
   Transform.call(this, xtend(opts, { objectMode: true }));
 
@@ -77,18 +76,25 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, e
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.log != null && typeof opts.log !== 'object') { throw new TypeError('opts.log must be an object'); }
 
-  this._databaseName = nsParts[0];
-  this._collectionName = nsParts.slice(1).join('.');
+  this._databaseName = dbName;
 
   this._oplogColl = oplogDb.collection(oplogCollName);
-  this._ns = ns;
+  // create all name spaces
+  this._ns = [];
+  collections.forEach(collection => this._ns.push(dbName + '.' + collection.collectionName));
+  this._ns.sort(); // sort so binary searches can be used
+  //
+  // map collection names by namespace
+  this._collectionMap = {};
+  collections.forEach(collection => this._collectionMap[dbName + '.' + collection.collectionName] = collection.collectionName);
+
   this._expected = expected;
   this._opts = xtend({
-    bson: false,
+    bson: false
   }, opts);
 
   this._db = oplogDb.db(this._databaseName);
-  this._coll = this._db.collection(this._collectionName);
+  this._collections = collections;
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -96,7 +102,7 @@ function OplogTransform(oplogDb, oplogCollName, ns, controlWrite, controlRead, e
   // expect bson on the response stream
   this._controlRead = controlRead.pipe(new BSONStream());
 
-  this._tmpCollection = this._db.collection('_pdbtmp.' + ns);
+  this._tmpCollection = this._db.collection('_pdbtmp');
 
   this._log = opts.log || {
     emerg:   console.error,
@@ -140,7 +146,7 @@ OplogTransform.prototype.startStream = function startStream() {
   // handle new oplog items via this._transform, use this._lastTs as offset
   function openOplog(opts, reopen) {
     that._log.debug2('ot startStream opening tailable oplog cursor after %s', that._lastTs);
-    that._or = that._oplogReader(xtend({ offset: that._lastTs }, opts));
+    that._or = that._oplogReader(that._lastTs, opts);
     // proxy error
     that._or.once('error', function(err) {
       that.emit('error', err);
@@ -246,13 +252,18 @@ OplogTransform.prototype.close = function close(cb) {
  *
  * @param {mixed} id  the id to use, must contain a toString method if not a string
  */
-OplogTransform.prototype._createUpstreamId = function _createUpstreamId(id) {
+OplogTransform.prototype._createUpstreamId = function _createUpstreamId(ns, id) {
   if (Object.prototype.toString(id) === '[object Object]') { id = id.toString(); } // convert ObjectIDs and other objects to strings
-  return this._collectionName + '\x01' + id;
+  var collectionName = this._collectionMap[ns];
+  if (!collectionName) {
+    this._log.err('ot _createUpstreamId invalid collection name %s for id %s', ns, id);
+    throw new Error('invalid collection name');
+  }
+  return collectionName + '\x01' + id;
 }
 
 /**
- * Bootstrap, read all documents from the collection.
+ * Bootstrap, read all documents from the all tracked collections.
  *
  * @param {Function} cb  first item will be an error object, second item will be an
  *                       oplog timestamp that must be used as offset.
@@ -262,14 +273,48 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
 
   var that = this;
 
-  // use current last offset and send every object in the collection upstream
+  // use current last offset and send every object in the collections upstream
   this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
     if (err) { cb(err); return; }
     if (!oplogItem) { cb(new Error('no oplog item found')); return; }
 
-    that._log.notice('ot bootstrap collection');
+    var bootstrapped = [];
 
-    var s = that._coll.find({}, {
+    // bootstrap all collections
+    async.eachSeries(that._collections, function(collection, cb2) {
+      that._bootstrapColl(oplogItem.ts, collection, function(err, offset) {
+        if (err) { cb2(err); return; }
+        bootstrapped.push(collection.collectionName);
+        // zip up
+        that._zipUp(offset, bootstrapped, cb2);
+      });
+    }, function(err) {
+      if (err) { cb(err); return; }
+      cb(null, oplogItem.ts);
+    });
+  });
+};
+
+/**
+ * Bootstrap, read all documents from the given collection.
+ *
+ * @param {mongodb.Collection} collection  collection to bootstrap
+ * @param {Function} cb  first item will be an error object or null, second item
+ *   the last timestamp in the oplog before the bootstrap started.
+ */
+OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var that = this;
+
+  this._log.notice('ot bootstrapColl');
+
+  // use current last offset and send every object in the collections upstream
+  this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+    if (err) { cb(err); return; }
+    if (!oplogItem) { cb(new Error('no oplog item found')); return; }
+
+    var s = coll.find({}, {
       comment: 'bootstrap_oplog_reader',
       sort: { _id: true }
     });
@@ -284,7 +329,7 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
         cb2(null, {
           o: item,
           ts: oplogItem.ts,
-          ns: that._ns,
+          ns: that._databaseName + '.' + coll.collectionName,
           op: 'i'
         });
       }
@@ -299,33 +344,62 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
 };
 
 /**
- * Read oplog, scoped to the namespace.
+ * Zip up, read all documents in the oplog from the given collections starting at
+ * the given offset up until the latest oplog item.
  *
+ * @param {mongodb.Timestamp} offset  timestamp
+ * @param {String[]} collectionNames  collections to process
+ * @param {Function} cb  first item will be an error object or null, second item
+ *   the last timestamp in the oplog when ended.
+ */
+OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
+  collectionNames.sort();
+
+  var that = this;
+  var lastTs = offset;
+  this._oplogReader(offset, xtend({ bson: false })).pipe(new Writable({
+    objectMode: true,
+    write: function(oplogItem, enc, cb2) {
+      lastTs = oplogItem.ts;
+      // check if this item belongs to one of the tracked collections
+      if (!binsearch(collectionNames, oplogItem.ns)) {
+        cb2();
+        return;
+      }
+      that.write(oplogItem, cb2);
+    }
+  })).on('end', function() {
+    cb(null, lastTs);
+  }).on('error', cb);
+};
+
+/**
+ * Read oplog.
+ *
+ * @param {mongodb.Timestamp} offset  where to start reading the oplog
  * @param {Object} [opts]  object containing optional parameters
  * @return {mongodb.Cursor} the result of find which is a mongodb cursor
  *
  * opts:
  *   filter {Object}  extra filter to apply apart from namespace
- *   offset {Object}  mongodb.Timestamp to start at
  *   bson {Boolean, default true}  whether to return raw bson or parsed objects
  *   includeOffset {Boolean, default false}  whether to include or exclude offset
  */
-OplogTransform.prototype._oplogReader = function _oplogReader(opts) {
+OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
+  if (offset == null || typeof offset !== 'object') { throw new TypeError('offset must be an object'); }
+
   if (opts == null) opts = {};
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (opts.filter != null && typeof opts.filter !== 'object') { throw new TypeError('opts.filter must be an object'); }
-  if (opts.offset != null && typeof opts.offset !== 'object') { throw new TypeError('opts.offset must be an object'); }
   if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.includeOffset != null && typeof opts.includeOffset !== 'boolean') { throw new TypeError('opts.includeOffset must be a boolean'); }
 
   // setup CursorStream
-  var selector = { ns: this._ns };
-  if (opts.offset) {
-    if (opts.includeOffset) {
-      selector.ts = { $gte: opts.offset };
-    } else {
-      selector.ts = { $gt: opts.offset };
-    }
+  var selector = {};
+  if (opts.includeOffset) {
+    selector.ts = { $gte: offset };
+  } else {
+    selector.ts = { $gt: offset };
   }
   if (opts.filter) {
     selector = { $and: [selector, opts.filter] };
@@ -365,6 +439,12 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
   }
 
   this._lastTs = oplogItem.ts;
+
+  // check if this item belongs to one of the tracked collections
+  if (!binsearch(this._ns, oplogItem.ns)) {
+    cb();
+    return;
+  }
 
   // determine the type of operator
   var operator = oplogItem.op;
@@ -534,7 +614,7 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
   var opts = this._opts;
 
   process.nextTick(function() {
-    var upstreamId = that._createUpstreamId(oplogItem.o._id);
+    var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
     // copy without b._id (not saved in level)
@@ -591,7 +671,7 @@ OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateM
   });
 
   // ask for last version of this id
-  var upstreamId = this._createUpstreamId(oplogItem.o2._id);
+  var upstreamId = this._createUpstreamId(oplogItem.ns, oplogItem.o2._id);
   this._controlWrite.write(JSON.stringify({ id: upstreamId }) + '\n');
 };
 
@@ -620,7 +700,7 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
   var that = this;
   var opts = this._opts;
   process.nextTick(function() {
-    var upstreamId = that._createUpstreamId(oplogItem.o._id);
+    var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
 
     // check if this is a confirmation by the adapter or a third party update
     var obj = findAndDelete(that._expected, function(item) {
