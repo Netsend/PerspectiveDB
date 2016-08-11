@@ -995,7 +995,7 @@ describe('OplogTransform', function() {
       should.strictEqual(OplogTransform._invalidOplogItem({ op: 'd', ts: 'a', o: 'b', ns: 'c' }), '');
     });
     it('should not be valid if op is not u, i or d', function() {
-      should.strictEqual(OplogTransform._invalidOplogItem({ op: 'a', ts: 'a', o: 'b', ns: 'c' }), 'invalid item.op');
+      should.strictEqual(OplogTransform._invalidOplogItem({ op: 'a', ts: 'a', o: 'b', ns: 'c' }), 'unknown item.op');
     });
   });
 });

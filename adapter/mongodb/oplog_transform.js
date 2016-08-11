@@ -432,25 +432,27 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
 OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
-  this._lastTs = oplogItem.ts;
+  var msg = OplogTransform._invalidOplogItem(oplogItem);
+  if (msg) {
+    // use timestamp and return if op is unknown
+    if (msg === 'unknown item.op') {
+      this._lastTs = oplogItem.ts;
+      process.nextTick(cb);
+      return;
+    }
 
-  // return if op == "n", some sort of oplog heartbeat
-  if (oplogItem.op === 'n') {
-    cb();
-    return;
-  }
-
-  if (OplogTransform._invalidOplogItem(oplogItem)) {
-    this._log.err('ot _transform invalid oplog item: %j', oplogItem);
+    this._log.err('ot _transform invalid oplog item: %s %j', msg, oplogItem);
     process.nextTick(function() {
       cb(new Error('invalid oplogItem'));
     });
     return;
   }
 
+  this._lastTs = oplogItem.ts;
+
   // check if this item belongs to one of the tracked collections
   if (!binsearch(this._ns, oplogItem.ns)) {
-    cb();
+    process.nextTick(cb);
     return;
   }
 
@@ -744,14 +746,14 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
  */
 OplogTransform._invalidOplogItem = function _invalidOplogItem(item) {
   // check if all fields are present
-  if (!item)    { return 'missing item'; }
-  if (!item.o)  { return 'missing item.o'; }
-  if (!item.ts) { return 'missing item.ts'; }
-  if (!item.ns) { return 'missing item.ns'; }
-  if (!item.op) { return 'missing item.op'; }
+  if (!item || item == null || typeof item !== 'object') { return 'missing item'; }
+  if (!item.hasOwnProperty('o'))  { return 'missing item.o'; }
+  if (!item.hasOwnProperty('ts')) { return 'missing item.ts'; }
+  if (!item.hasOwnProperty('ns')) { return 'missing item.ns'; }
+  if (!item.hasOwnProperty('op')) { return 'missing item.op'; }
 
   // ignore if operation is not "i", "u" or "d"
-  if (item.op !== 'i' && item.op !== 'u' && item.op !== 'd') { return 'invalid item.op'; }
+  if (item.op !== 'i' && item.op !== 'u' && item.op !== 'd') { return 'unknown item.op'; }
 
   return '';
 };
