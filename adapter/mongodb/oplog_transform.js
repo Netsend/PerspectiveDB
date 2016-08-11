@@ -360,7 +360,7 @@ OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
   this._oplogReader(offset, xtend({ bson: false })).pipe(new Writable({
     objectMode: true,
     write: function(oplogItem, enc, cb2) {
-      that._log.debug('ot zipUp item %s', oplogItem);
+      that._log.debug('ot zipUp item %j', oplogItem);
       lastTs = oplogItem.ts;
       // check if this item belongs to one of the tracked collections
       if (!binsearch(collectionNames, oplogItem.ns)) {
