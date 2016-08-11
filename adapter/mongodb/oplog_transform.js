@@ -287,7 +287,6 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
     });
   }, function(err) {
     if (err) { cb(err); return; }
-    that._log.debug('ot bootstrapping done (offset: %s)', lastOffset);
     cb(null, lastOffset);
   });
 };
@@ -354,7 +353,6 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
 OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
   collectionNames.sort();
 
-  this._log.debug('ot zipUp %j %s', collectionNames, offset);
   var that = this;
   var lastTs = offset;
   this._oplogReader(offset, xtend({ bson: false })).pipe(new Writable({
@@ -370,7 +368,6 @@ OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
       that.write(oplogItem, cb2);
     }
   })).on('finish', function() {
-    that._log.debug('ot zipUp finish %s', lastTs);
     cb(null, lastTs);
   }).on('error', cb);
 };
