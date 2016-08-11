@@ -137,7 +137,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        coll: collectionName,
+        collections: [collectionName],
         url: config.url
       });
       break;
@@ -230,7 +230,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        coll: collectionName,
+        collections: [collectionName],
         url: config.url
       });
       break;
@@ -265,7 +265,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: logger.DEBUG2 },
-        coll: collectionName2,
+        collections: [collectionName2],
         url: config.url
       });
       break;

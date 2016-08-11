@@ -54,6 +54,21 @@ var MongoClient = mongodb.MongoClient;
 var ObjectID = mongodb.ObjectID;
 
 /**
+ * Determine collection by splitting h.id on the first 0x01
+ *
+ * @param {Object} header  pdb DAG header
+ * @return {String|false} name of the collection or false if none found
+ */
+function getMongoColl(h) {
+  var res = h.id.split('\x01', 2);
+  if (res.length !== 2)
+    return false;
+  if (!res[0]) // if falsy
+    return false;
+  return res[0];
+}
+
+/**
  * Determine id for mongodb. Try to get m._id, split h.id on 0x01 or just get h.id
  * without processing as a last resort.
  *
@@ -120,7 +135,7 @@ function getMongoId(obj) {
  */
 
 // globals
-var ot, coll, db, log; // used after receiving the log configuration
+var ot, db, log; // used after receiving the log configuration
 
 /**
  * Start oplog transformer:
@@ -129,21 +144,28 @@ var ot, coll, db, log; // used after receiving the log configuration
  *
  * @param {mongodb.Db} oplogDb  connection to the oplog database
  * @param {String} oplogCollName  oplog collection name, defaults to oplog.$main
- * @param {String} ns  namespace of the database.collection to follow
+ * @param {String} dbName  database to follow
+ * @param {mongodb.Collection[]} collections  track these collections
  * @param {Object} versionControl  version control channel
  * @param {Object} dataChannel  data channel
- * @param {String} conflictColl  conflict collection
+ * @param {mongodb.Collection} conflictCollection  conflict collection
  * @param {Object} [opts]
  *
  * Options:
  *   any OplogTransform options
  */
-function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflictColl, opts) {
+function start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, opts) {
+  // create a hash of collections by collection name
+  var collectionMap = {};
+  collections.forEach(function(collection) {
+    collectionMap[collection.collectionName] = collection;
+  });
+
   // track newly written versions so that new oplog items can be recognized correctly as a confirmation
   var expected = [];
 
   log.debug2('start oplog transform...');
-  ot = new OplogTransform(oplogDb, oplogCollName, ns, versionControl, versionControl, expected, xtend(opts, {
+  ot = new OplogTransform(oplogDb, oplogCollName, dbName, collections, versionControl, versionControl, expected, xtend(opts, {
     log: log,
     bson: true
   }));
@@ -158,7 +180,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
     if (~['delete failed', 'insert failed', 'update failed'].indexOf(obj.err)) {
       obj.errCode = 'adapterQueryFailed';
     }
-    conflictColl.insert(obj, function(err, r) {
+    conflictCollection.insert(obj, function(err, r) {
       if (err || !r.insertedCount) {
         log.err('could not save conflicting object %s %j, original error %s', err, obj.n.h, origErr);
         cb(err);
@@ -191,6 +213,19 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
       // Because the find queries are done using all attributes, this only happens if the third party added a key, not when
       // an existing key is updated or deleted.
       // This can only be solved if the update query somehow can specify that no other keys must exist in the document.
+      var collName = getMongoColl(obj.n.h);
+      if (!collName) {
+        log.notice('collection could not be determined');
+        handleConflict(new Error('could not determine collection'), obj, cb);
+        return;
+      }
+      var coll = collectionMap[collName];
+      if (!coll) {
+        log.debug('item belongs to unknown collection: %s', collName);
+        handleConflict(new Error('unknown collection'), obj, cb);
+        return;
+      }
+
       var mongoId = getMongoId(obj);
       coll.find({ _id: mongoId }).limit(1).next(function(err, doc) {
         if (err) { handleConflict(err, obj, cb); return; }
@@ -274,7 +309,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
  * {
  *   log:            {Object}      // log configuration
  *   url:            {String}      // mongodb connection string
- *   coll:           {String}      // collection name
+ *   [collections]:  {String|Array} // collection name or names
  *   [dbUser]:       {String}      // user to read the collection
  *   [oplogDbUser]:  {String}      // user to read the oplog database collection
  *   [secrets]:      {Object}      // object containing the passwords for dbUser
@@ -282,7 +317,7 @@ function start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflict
  *   [authDb]:       {String}      // authDb database, defaults to db from url
  *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
  *   [conflictDb]:   {String}      // conflict database, defaults to db from url
- *   [conflictColl]: {String}      // conflict collection, defaults to "conflicts"
+ *   [conflictCollection]: {String, default conflicts}  // conflict collection
  *   [oplogDb]:      {String}      // oplog database, defaults to local
  *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
  *   [oplogTransformOpts]: {Object} // any oplog transform options
@@ -297,15 +332,15 @@ process.once('message', function(msg) {
   if (msg == null || typeof msg !== 'object') { throw new TypeError('msg must be an object'); }
   if (msg.log == null || typeof msg.log !== 'object') { throw new TypeError('msg.log must be an object'); }
   if (!msg.url || typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
-  if (!msg.coll || typeof msg.coll !== 'string') { throw new TypeError('msg.coll must be a non-empty string'); }
 
+  if (msg.collections && typeof msg.collections !== 'string' && !Array.isArray(msg.collections)) { throw new TypeError('msg.collections must be an array or a non-empty string'); }
   if (msg.dbUser != null && typeof msg.dbUser !== 'string') { throw new TypeError('msg.dbUser must be a string'); }
   if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
   if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
   if (msg.authDb != null && typeof msg.authDb !== 'string') { throw new TypeError('msg.authDb must be a non-empty string'); }
   if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
   if (msg.conflictDb != null && typeof msg.conflictDb !== 'string') { throw new TypeError('msg.conflictDb must be a non-empty string'); }
-  if (msg.conflictColl != null && typeof msg.conflictColl !== 'string') { throw new TypeError('msg.conflictColl must be a non-empty string'); }
+  if (msg.conflictCollection != null && typeof msg.conflictCollection !== 'string') { throw new TypeError('msg.conflictCollection must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.oplogTransformOpts != null && typeof msg.oplogTransformOpts !== 'object') { throw new TypeError('msg.oplogTransformOpts must be an object'); }
@@ -320,11 +355,14 @@ process.once('message', function(msg) {
   var dbName = parsedUrl.pathname.slice(1); // strip prefixed "/"
   if (!dbName) { throw new Error('url must contain a database name'); }
 
-  var collName = msg.coll;
-  var ns = dbName + '.' + collName;
+  var ns = dbName;
+  var collNames = msg.collections || [];
+  if (typeof collNames === 'string') {
+    collNames = [collNames];
+  }
 
   var conflictDb = msg.conflictDb || dbName;
-  var conflictColl = msg.conflictColl || 'conflicts';
+  var conflictCollection = msg.conflictCollection || 'conflicts';
 
   programName = 'mongodb ' + ns;
 
@@ -430,15 +468,29 @@ process.once('message', function(msg) {
         });
       }
 
-      // setup coll
+      // setup collections if none given
+      if (!collNames.length) {
+        startupTasks.push(function(cb) {
+          db.collections(function(err, collections) {
+            if (err) { cb(err); return; }
+            collNames = collections.map(coll => coll.collectionName);
+            cb();
+          });
+        });
+      }
+
+      // open each collection
+      var collections = [];
       startupTasks.push(function(cb) {
-        coll = db.collection(collName);
+        collNames.forEach(function(collection) {
+          collections.push(db.collection(collection));
+        });
         process.nextTick(cb);
       });
 
       // setup conflict coll
       startupTasks.push(function(cb) {
-        conflictColl = db.db(conflictDb).collection(conflictColl);
+        conflictCollection = db.db(conflictDb).collection(conflictCollection);
         process.nextTick(cb);
       });
 
@@ -521,7 +573,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, ns, dataChannel, versionControl, conflictColl, msg.oplogTransformOpts);
+        start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, msg.oplogTransformOpts);
       });
 
       // ignore kill signals
