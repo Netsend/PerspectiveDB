@@ -436,8 +436,8 @@ process.once('message', function(msg) {
           if (dbc.databaseName !== dbName) { cb(new Error('connected to the wrong database')); return; }
 
           log.debug2('connected %s', msg.url);
+          // setup dbs
           db = dbc;
-          // setup oplog db
           oplogDb = db.db(oplogDbName);
           cb();
         });
@@ -448,9 +448,13 @@ process.once('message', function(msg) {
         startupTasks.push(function(cb) {
           var authDbName = msg.authDb || dbName;
           var authDb = db.db(authDbName);
-          log.debug('auth to %s as %s', authDbName, dbUser);
+          log.debug('auth as %s on %s for %s', dbUser, authDbName, dbName);
           authDb.authenticate(dbUser, dbPass, function(err) {
-            if (err) { log.err('auth to %s as %s failed: %s', authDbName, dbUser, err); cb(err); return; }
+            if (err) {
+              log.err('auth as %s on %s for %s failed: %s', dbUser, authDbName, dbName, err);
+              cb(err);
+              return;
+            }
             cb();
           });
         });
@@ -460,10 +464,14 @@ process.once('message', function(msg) {
       if (oplogDbUser) {
         startupTasks.push(function(cb) {
           var authDbName = msg.oplogAuthDb || 'admin';
-          log.debug('auth oplog to %s as %s', authDbName, oplogDbUser);
+          log.debug('auth oplog as %s on %s for %s', oplogDbUser, authDbName, oplogDbName);
           var authDb = db.db(authDbName);
           authDb.authenticate(oplogDbUser, oplogDbPass, function(err) {
-            if (err) { log.err('auth to %s as %s failed: %s', authDbName, oplogDbUser, err); cb(err); return; }
+            if (err) {
+              log.err('auth oplog as %s on %s for %s failed: %s', oplogDbUser, authDbName, oplogDbName, err);
+              cb(err);
+              return;
+            }
             cb();
           });
         });
@@ -478,6 +486,12 @@ process.once('message', function(msg) {
             var blacklist = ['system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
             collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
+
+            if (!collNames.length) {
+              log.err('no collections found');
+              cb(new Error('no collections found'));
+              return;
+            }
             cb();
           });
         });
