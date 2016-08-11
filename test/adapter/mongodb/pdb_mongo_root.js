@@ -80,21 +80,24 @@ tasks.push(function(done) {
 
                 db = dbc;
 
-                coll1 = db.collection('test1');
-                coll2 = db.collection('test2');
-                coll3 = db.collection('test3');
-                conflictColl = db.collection('conflicts'); // default conflict collection
-
-                // ensure empty collections
-                coll1.remove(function(err) {
+                // ensure an empty database and recreate collections
+                db.dropDatabase(function(err) {
                   if (err) { throw err; }
-                  coll2.remove(function(err) {
+
+                  db.createCollection(collectionName1, function(err, coll) {
                     if (err) { throw err; }
-                    coll3.remove(function(err) {
+                    coll1 = coll;
+                    db.createCollection(collectionName2, function(err, coll) {
                       if (err) { throw err; }
-                      conflictColl.remove(function(err) {
+                      coll2 = coll;
+                      db.createCollection(collectionName3, function(err, coll) {
                         if (err) { throw err; }
-                        done();
+                        coll3 = coll;
+                        db.createCollection('conflicts', function(err, coll) { // default conflict collection
+                          if (err) { throw err; }
+                          conflictColl = coll;
+                          done();
+                        });
                       });
                     });
                   });

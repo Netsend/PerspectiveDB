@@ -102,7 +102,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   // expect bson on the response stream
   this._controlRead = controlRead.pipe(new BSONStream());
 
-  this._tmpCollection = this._db.collection('_pdbtmp');
+  this._tmpCollection = this._db.collection(opts.tmpCollName || '_pdbtmp');
 
   this._log = opts.log || {
     emerg:   console.error,
@@ -145,7 +145,6 @@ OplogTransform.prototype.startStream = function startStream() {
 
   // handle new oplog items via this._transform, use this._lastTs as offset
   function openOplog(opts, reopen) {
-    that._log.debug2('ot startStream opening tailable oplog cursor after %s', that._lastTs);
     that._or = that._oplogReader(that._lastTs, opts);
     // proxy error
     that._or.once('error', function(err) {
@@ -181,8 +180,6 @@ OplogTransform.prototype.startStream = function startStream() {
     // ensure this._lastTs
     if (!Object.keys(obj).length) {
       // no data in leveldb yet
-      that._log.notice('ot startStream bootstrap first');
-
       that._bootstrap(function(err, offset) {
         if (err) {
           that.emit('error', err);
@@ -273,25 +270,25 @@ OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
 
   var that = this;
 
-  // use current last offset and send every object in the collections upstream
-  this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
-    if (err) { cb(err); return; }
-    if (!oplogItem) { cb(new Error('no oplog item found')); return; }
+  var lastOffset;
+  var bootstrapped = [];
 
-    var bootstrapped = [];
-
-    // bootstrap all collections
-    async.eachSeries(that._collections, function(collection, cb2) {
-      that._bootstrapColl(oplogItem.ts, collection, function(err, offset) {
+  // bootstrap all collections
+  async.eachSeries(that._collections, function(collection, cb2) {
+    that._bootstrapColl(collection, function(err, newTs) {
+      if (err) { cb2(err); return; }
+      bootstrapped.push(collection.collectionName);
+      // zip up
+      that._zipUp(newTs, bootstrapped, function(err, newTs) {
         if (err) { cb2(err); return; }
-        bootstrapped.push(collection.collectionName);
-        // zip up
-        that._zipUp(offset, bootstrapped, cb2);
+        lastOffset = newTs;
+        cb2();
       });
-    }, function(err) {
-      if (err) { cb(err); return; }
-      cb(null, oplogItem.ts);
     });
+  }, function(err) {
+    if (err) { cb(err); return; }
+    that._log.debug('ot bootstrapping done (offset: %s)', lastOffset);
+    cb(null, lastOffset);
   });
 };
 
@@ -307,8 +304,6 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
 
   var that = this;
 
-  this._log.notice('ot bootstrapColl');
-
   // use current last offset and send every object in the collections upstream
   this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
     if (err) { cb(err); return; }
@@ -319,27 +314,31 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
       sort: { _id: true }
     });
 
+    var collName = coll.collectionName;
+
     var i = 0;
     var transformer = new Transform({
       objectMode: true,
       transform: function(item, enc, cb2) {
         i++;
+        that._log.debug2('ot _bootstrapColl item: %j', item);
 
         // enclose item in an oplog like item
         cb2(null, {
           o: item,
           ts: oplogItem.ts,
-          ns: that._databaseName + '.' + coll.collectionName,
+          ns: that._databaseName + '.' + collName,
           op: 'i'
         });
       }
     });
-    s.pipe(transformer).pipe(that, { end: false });
 
     transformer.on('end', function() {
-      that._log.notice('ot bootstrapped %d items', i);
+      that._log.debug('ot bootstrapped %s %d items (since: %s)', collName, i, oplogItem.ts);
       cb(null, oplogItem.ts);
     });
+
+    s.pipe(transformer).pipe(that, { end: false });
   });
 };
 
@@ -355,11 +354,13 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
 OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
   collectionNames.sort();
 
+  this._log.debug('ot zipUp %j %s', collectionNames, offset);
   var that = this;
   var lastTs = offset;
   this._oplogReader(offset, xtend({ bson: false })).pipe(new Writable({
     objectMode: true,
     write: function(oplogItem, enc, cb2) {
+      that._log.debug('ot zipUp item %s', oplogItem);
       lastTs = oplogItem.ts;
       // check if this item belongs to one of the tracked collections
       if (!binsearch(collectionNames, oplogItem.ns)) {
@@ -368,7 +369,8 @@ OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
       }
       that.write(oplogItem, cb2);
     }
-  })).on('end', function() {
+  })).on('finish', function() {
+    that._log.debug('ot zipUp finish %s', lastTs);
     cb(null, lastTs);
   }).on('error', cb);
 };
@@ -430,6 +432,14 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
 OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
   if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
 
+  this._lastTs = oplogItem.ts;
+
+  // return if op == "n", some sort of oplog heartbeat
+  if (oplogItem.op === 'n') {
+    cb();
+    return;
+  }
+
   if (OplogTransform._invalidOplogItem(oplogItem)) {
     this._log.err('ot _transform invalid oplog item: %j', oplogItem);
     process.nextTick(function() {
@@ -437,8 +447,6 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     });
     return;
   }
-
-  this._lastTs = oplogItem.ts;
 
   // check if this item belongs to one of the tracked collections
   if (!binsearch(this._ns, oplogItem.ns)) {
@@ -464,7 +472,7 @@ OplogTransform.prototype._transform = function _transform(oplogItem, enc, cb) {
     operator = 'uf';
   }
 
-  this._log.debug('ot _transform oplog item: %s, %s, %s', oplogItem.ts, oplogItem.op, oplogItem.o._id);
+  this._log.debug2('ot _transform oplog item: %j', oplogItem);
 
   switch (operator) {
   case 'i':

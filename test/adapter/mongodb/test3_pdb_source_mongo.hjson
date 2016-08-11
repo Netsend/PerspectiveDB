@@ -10,7 +10,7 @@
 
 log: {
   console: true
-  level: debug
+  level: debug2
 }
 
 # DBs
@@ -25,7 +25,7 @@ dbs: [{
   },
   source: {
     url: mongodb://127.0.0.1:27019/pdb
-    coll: test3
+    collections: test3
     #dbUser: bar
     #oplogDbUser: bar
     #passdb: "secrets.hjson"

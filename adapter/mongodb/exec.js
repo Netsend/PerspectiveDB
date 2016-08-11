@@ -360,6 +360,7 @@ process.once('message', function(msg) {
   if (typeof collNames === 'string') {
     collNames = [collNames];
   }
+  var oplogTransformOpts = xtend({}, msg.oplogTransformOpts);
 
   var conflictDb = msg.conflictDb || dbName;
   var conflictCollection = msg.conflictCollection || 'conflicts';
@@ -473,6 +474,9 @@ process.once('message', function(msg) {
         startupTasks.push(function(cb) {
           db.collections(function(err, collections) {
             if (err) { cb(err); return; }
+            // blacklist system.indexes collection
+            var blacklist = ['system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
+            collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
             cb();
           });
@@ -573,7 +577,7 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, msg.oplogTransformOpts);
+        start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, oplogTransformOpts);
       });
 
       // ignore kill signals
