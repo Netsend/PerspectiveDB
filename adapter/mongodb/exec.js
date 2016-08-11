@@ -309,7 +309,7 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
  * {
  *   log:            {Object}      // log configuration
  *   url:            {String}      // mongodb connection string
- *   [collections]:  {String|Array} // collection name or names
+ *   collections:  {String|Array}  // collection name or names
  *   [dbUser]:       {String}      // user to read the collection
  *   [oplogDbUser]:  {String}      // user to read the oplog database collection
  *   [secrets]:      {Object}      // object containing the passwords for dbUser
@@ -333,7 +333,7 @@ process.once('message', function(msg) {
   if (msg.log == null || typeof msg.log !== 'object') { throw new TypeError('msg.log must be an object'); }
   if (!msg.url || typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
 
-  if (msg.collections && typeof msg.collections !== 'string' && !Array.isArray(msg.collections)) { throw new TypeError('msg.collections must be an array or a non-empty string'); }
+  if (typeof msg.collections !== 'string' && !Array.isArray(msg.collections)) { throw new TypeError('msg.collections must be an array or a non-empty string'); }
   if (msg.dbUser != null && typeof msg.dbUser !== 'string') { throw new TypeError('msg.dbUser must be a string'); }
   if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
   if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
@@ -359,6 +359,9 @@ process.once('message', function(msg) {
   var collNames = msg.collections || [];
   if (typeof collNames === 'string') {
     collNames = [collNames];
+  }
+  if (!collNames.length) {
+    throw new Error('specify which collections to track');
   }
   var oplogTransformOpts = xtend({}, msg.oplogTransformOpts);
 
@@ -477,6 +480,7 @@ process.once('message', function(msg) {
         });
       }
 
+      /* for now, only support the user specifying which connections to track
       // setup collections if none given
       if (!collNames.length) {
         startupTasks.push(function(cb) {
@@ -487,15 +491,11 @@ process.once('message', function(msg) {
             collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
 
-            if (!collNames.length) {
-              log.err('no collections found');
-              cb(new Error('no collections found'));
-              return;
-            }
             cb();
           });
         });
       }
+      */
 
       // open each collection
       var collections = [];

@@ -25,7 +25,7 @@ dbs: [
     ...
     source: {
       url: mongodb://127.0.0.1:27017/pdb
-      coll: test3
+      collections: [test3]
       #dbUser: bar
       #oplogDbUser: bar
       #passdb: "secrets.hjson"
@@ -36,3 +36,7 @@ dbs: [
 
 A full example is given in config/examples/example.hjson. Make sure to specify
 mongo auth credentials if they are needed.
+
+Note: it is currently not supported to add collections after the database is
+initialized. If you want to add extra collections after the database is
+bootstrapped, you have to delete the existing pdb database and start over.

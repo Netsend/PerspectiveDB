@@ -148,7 +148,7 @@ dbs: [
     ...
     source: {
       url: mongodb://127.0.0.1:1337/somedb
-      coll: tyres
+      collections: [tyres]
     }
   }
 ]

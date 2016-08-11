@@ -41,9 +41,9 @@ dbs: [
     group: pdblevel
     chroot: /srv/pdb/mydb
 #    source: {                 # uncomment this section to enable the mongo
-#                              # adapter and mirror with a mongdb collection
+#                              # adapter and mirror with some mongdb collections
 #      url: mongodb://127.0.0.1:27017/pdb
-#      coll: test3
+#      collections: [test1, test3]
 #      #dbUser: bar
 #      #oplogDbUser: bar
 #      #secrets: "secrets.hjson"
