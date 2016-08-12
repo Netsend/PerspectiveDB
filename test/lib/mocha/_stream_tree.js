@@ -240,6 +240,61 @@ describe('StreamTree', function() {
     t.write(item4, done);
   });
 
+  it('should stream over all items', function(done) {
+    var t = new Tree(db, name, { vSize: 3, log: silence });
+    var i = 0;
+    var s = new StreamTree(t);
+    s.on('data', function(obj) {
+      switch (++i) {
+      case 1:
+        should.deepEqual(obj, item1);
+        break;
+      case 2:
+        should.deepEqual(obj, item2);
+        break;
+      case 3:
+        should.deepEqual(obj, item3);
+        break;
+      case 4:
+        should.deepEqual(obj, item4);
+        break;
+      default:
+        throw new Error('unexpected item');
+      }
+    });
+
+    s.on('end', function() {
+      should.strictEqual(i, 4);
+      done();
+    });
+  });
+
+  it('should stream over all items in reverse with limit', function(done) {
+    var t = new Tree(db, name, { vSize: 3, log: silence });
+    var i = 0;
+    var s = new StreamTree(t, {
+      reverse: true,
+      limit: 2
+    });
+    s.on('data', function(obj) {
+      switch (++i) {
+      case 1:
+        should.deepEqual(obj, item4);
+        break;
+      case 2:
+        should.deepEqual(obj, item3);
+        break;
+      default:
+        throw new Error('unexpected item');
+      }
+    });
+
+    s.on('end', function() {
+      should.strictEqual(i, 2);
+      done();
+    });
+  });
+
   it('should stream over DAG foo only (item4)', function(done) {
     var t = new Tree(db, name, { vSize: 3, log: silence });
     var i = 0;
