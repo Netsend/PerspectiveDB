@@ -988,6 +988,49 @@ describe('Tree', function() {
     });
   });
 
+  describe('incrementKey', function() {
+    it('should work with a zero byte buffer', function() {
+      var key = new Buffer([]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), '');
+    });
+
+    it('should increment 0', function() {
+      var key = new Buffer([0]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), '01');
+    });
+
+    it('should increment 254', function() {
+      var key = new Buffer([254]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), 'ff');
+    });
+
+    it('should err on overflow', function() {
+      var key = new Buffer([255]);
+      (function() { Tree.incrementKey(key); }).should.throw('overflow');
+    });
+
+    it('should increment 0, 255', function() {
+      var key = new Buffer([0, 255]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), '0100');
+    });
+
+    it('should increment 0, 255, 255', function() {
+      var key = new Buffer([0, 255, 255]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), '010000');
+    });
+
+    it('should increment 0, 254, 255', function() {
+      var key = new Buffer([0, 254, 255]);
+      var nkey = Tree.incrementKey(key);
+      should.strictEqual(nkey.toString('hex'), '00ff00');
+    });
+  });
+
   describe('getHeadKeyRange', function() {
     describe('no id', function() {
       it('should work with a zero byte name', function() {
