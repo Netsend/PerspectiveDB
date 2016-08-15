@@ -1238,6 +1238,18 @@ describe('Tree', function() {
   describe('createHeadReadStream', function() {
     var name = 'createHeadReadStream';
 
+    var item1 = { h: { id: 'XI', v: 'Aaaa',  i: 1, pa: [] },       b: { some: 'data' } };
+    var item2 = { h: { id: 'XI', v: 'Bbbb',  i: 2, pa: ['Aaaa'] }, b: { some: 'more' } };
+    var item3 = { h: { id: 'XI', v: 'Dddd',  i: 3, pa: ['Aaaa'] }, b: { some: 'other' } };
+    var item4 = { h: { id: 'foo', v: 'Eeee', i: 4, pa: [] },      b: { som3: 'other' } };
+    var items = [item1, item2, item3, item4];
+
+    it('should require opts.first to match vSize', function() {
+      // configure 2 bytes and call with 3 bytes (base64)
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      (function() { t.insertionOrderStream({ first: 'a' }, function() { }, function() { }); }).should.throw('opts.first must be the same size as the configured vSize');
+    });
+
     it('should require opts to be an object', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       (function() { t.createHeadReadStream(0); }).should.throw('opts must be an object');
@@ -1252,6 +1264,107 @@ describe('Tree', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
       var s = t.createHeadReadStream();
       should.ok(s.readable);
+    });
+
+    it('should insert all four items', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      t.write(items, done);
+    });
+
+    it('should iterate over heads only', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createHeadReadStream();
+      var i = 0;
+      s.on('data', function(item) {
+        switch (i++) {
+        case 0:
+          should.deepEqual(item, item2);
+          break
+        case 1:
+          should.deepEqual(item, item3);
+          break
+        case 2:
+          should.deepEqual(item, item4);
+          break
+        default:
+          throw new Error('shouldn\'t come here');
+        }
+      });
+      s.on('end', function() {
+        should.equal(i, 3);
+        done();
+      });
+    });
+
+    it('should iterate over heads by id', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createHeadReadStream({
+        id: 'XI'
+      });
+      var i = 0;
+      s.on('data', function(item) {
+        switch (i++) {
+        case 0:
+          should.deepEqual(item, item2);
+          break
+        case 1:
+          should.deepEqual(item, item3);
+          break
+        default:
+          throw new Error('shouldn\'t come here');
+        }
+      });
+      s.on('end', function() {
+        should.equal(i, 2);
+        done();
+      });
+    });
+
+    it('should iterate over heads in reverse by id and limit', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createHeadReadStream({
+        id: 'XI',
+        reverse: true,
+        limit: 1
+      });
+      var i = 0;
+      s.on('data', function(item) {
+        switch (i++) {
+        case 0:
+          should.deepEqual(item, item3);
+          break
+        default:
+          throw new Error('shouldn\'t come here');
+        }
+      });
+      s.on('end', function() {
+        should.equal(i, 1);
+        done();
+      });
+    });
+
+    it('should iterate over heads by prefix', function(done) {
+      var t = new Tree(db, name, { vSize: 3, log: silence });
+      var s = t.createHeadReadStream({
+        prefix: 'X'
+      });
+      var i = 0;
+      s.on('data', function(item) {
+        switch (i++) {
+        case 0:
+          should.deepEqual(item, item2);
+          break
+        case 1:
+          should.deepEqual(item, item3);
+          break
+        default:
+          throw new Error('shouldn\'t come here');
+        }
+      });
+      s.on('end', function() {
+        should.equal(i, 2);
+        done();
+      });
     });
   });
 
