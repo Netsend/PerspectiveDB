@@ -51,10 +51,11 @@ program
 var configFile = program.args[0] || __dirname + '/../local/config/pdb.hjson';
 var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
 
-if (program.number === '0') {
-  program.number = Infinity;
+var limit = program.number;
+if (limit === '0') {
+  limit = Infinity;
 } else {
-  program.number = Number(program.number) || 10;
+  limit = Number(limit) || 10;
 }
 
 // format merge tree stats
@@ -154,14 +155,16 @@ function printTree(mt, tree, cb) {
   var writable = new Writable({
     objectMode: true,
     write: function(item, enc, cb2) {
-      counter++;
+      if (counter++ === limit) {
+        rw.unpipe(writable);
+        rw.end();
+        writable.end();
+        cb2();
+        return;
+      }
 
       if (!program.diff || !item.h.pa.length) {
         console.log(fmtItem(item));
-
-        if (counter >= program.number) {
-          rw.end();
-        }
         cb2();
         return;
       }
@@ -183,10 +186,6 @@ function printTree(mt, tree, cb) {
         if (err) { cb2(err); return; }
 
         console.log(fmtItem(item, parents));
-
-        if (counter >= program.number) {
-          rw.end();
-        }
         cb2();
       });
     }
