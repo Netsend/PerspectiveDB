@@ -1,0 +1,49 @@
+# PerspectiveDB settings.
+
+# The strategy used for options in default.hjson shipped with PerspectiveDB is
+# to specify options with their default value where possible, but leave them
+# commented. Uncommented options override the default value.
+
+# Main
+
+#user: _pdbnull
+#group: _pdbnull
+#chroot: /var/empty
+
+log: {
+  console: true
+  level: debug
+}
+
+# Milliseconds between auto processing items
+autoProcessInterval: 100
+
+# DBs
+
+dbs: [{
+  name: someDb
+  chroot: /var/pdb
+  path: /test_pdb_root
+  mergeTree: {
+    vSize: 3,
+  },
+  perspectives: [
+    {
+      name: someClient
+      passdb: passdb.hjson
+      export: {
+        hide: ["someOtherKey"]
+        filter: { someKey: "someVal" }
+      }
+    }
+  ]
+}]
+
+port: 1234
+
+wss: {
+  cert: cert.pem
+  key: key.pem
+  dhparam: dhparam.pem
+  port: 1235
+}
