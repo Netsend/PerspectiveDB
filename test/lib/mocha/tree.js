@@ -328,24 +328,9 @@ describe('Tree', function() {
         (function() { Tree.parseKey(b); }).should.throw('i must be at least one byte');
       });
 
-      it('should err if i is bigger than specified length', function() {
-        var b = new Buffer('0000010000010000', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('expected no bytes after i');
-      });
-
-      it('should err if i is smaller than specified length (1)', function() {
-        var b = new Buffer('000001000001', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
-      });
-
-      it('should err if i is smaller than specified length (2)', function() {
-        var b = new Buffer('00000100000200', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
-      });
-
       describe('i 1,', function() {
         it('name 0, id 0', function() {
-          var b = new Buffer('00000100000100', 'hex');
+          var b = new Buffer('000001000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -356,7 +341,7 @@ describe('Tree', function() {
         });
 
         it('name 1, id 0', function() {
-          var b = new Buffer('0161000100000100', 'hex');
+          var b = new Buffer('01610001000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([97]),
@@ -367,7 +352,7 @@ describe('Tree', function() {
         });
 
         it('name 0, id 1', function() {
-          var b = new Buffer('0000010160000100', 'hex');
+          var b = new Buffer('00000160000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -378,7 +363,7 @@ describe('Tree', function() {
         });
 
         it('name 1, id 1', function() {
-          var b = new Buffer('016000010159000100', 'hex');
+          var b = new Buffer('0160000159000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([96]),
@@ -392,7 +377,7 @@ describe('Tree', function() {
 
       describe('i 3,', function() {
         it('name 0, id 0', function() {
-          var b = new Buffer('000001000003235761', 'hex');
+          var b = new Buffer('0000010003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -403,7 +388,7 @@ describe('Tree', function() {
         });
 
         it('name 3, id 0', function() {
-          var b = new Buffer('032357610001000003235761', 'hex');
+          var b = new Buffer('0323576100010003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([35, 87, 97]),
@@ -414,7 +399,7 @@ describe('Tree', function() {
         });
 
         it('name 0, id 3', function() {
-          var b = new Buffer('000001032357600003235761', 'hex');
+          var b = new Buffer('0000012357600003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -425,7 +410,7 @@ describe('Tree', function() {
         });
 
         it('name 3, id 3', function() {
-          var b = new Buffer('032357600001032357590003235761', 'hex');
+          var b = new Buffer('0323576000012357590003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([35, 87, 96]),
@@ -437,7 +422,7 @@ describe('Tree', function() {
       });
 
       it('should decode id to "hex" string', function() {
-        var b = new Buffer('0000030144000100', 'hex');
+        var b = new Buffer('00000344000100', 'hex');
         var obj = Tree.parseKey(b, { decodeId: 'hex' });
         should.deepEqual(obj, {
           name: new Buffer([]),
@@ -448,7 +433,7 @@ describe('Tree', function() {
       });
 
       it('should decode id to "base64" string', function() {
-        var b = new Buffer('0000030144000100', 'hex');
+        var b = new Buffer('00000344000100', 'hex');
         var obj = Tree.parseKey(b, { decodeId: 'base64' });
         should.deepEqual(obj, {
           name: new Buffer([]),
@@ -527,28 +512,28 @@ describe('Tree', function() {
 
     describe('headkey', function() {
       it('should err if v length is zero', function() {
-        var b = new Buffer('000003000000', 'hex');
+        var b = new Buffer('0000030000', 'hex');
         (function() { Tree.parseKey(b); }).should.throw('v must be at least one byte');
       });
 
       it('should err if v is bigger than specified length', function() {
-        var b = new Buffer('0000030000010000', 'hex');
+        var b = new Buffer('00000300010000', 'hex');
         (function() { Tree.parseKey(b); }).should.throw('expected no bytes after v');
       });
 
       it('should err if v is smaller than specified length (1)', function() {
-        var b = new Buffer('000003000001', 'hex');
+        var b = new Buffer('0000030001', 'hex');
         (function() { Tree.parseKey(b); }).should.throw('index out of range');
       });
 
       it('should err if v is smaller than specified length (2)', function() {
-        var b = new Buffer('00000300000200', 'hex');
+        var b = new Buffer('000003000200', 'hex');
         (function() { Tree.parseKey(b); }).should.throw('index out of range');
       });
 
       describe('v 1,', function() {
         it('name 0, id 0', function() {
-          var b = new Buffer('00000300000100', 'hex');
+          var b = new Buffer('000003000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -559,7 +544,7 @@ describe('Tree', function() {
         });
 
         it('name 1, id 0', function() {
-          var b = new Buffer('0161000300000100', 'hex');
+          var b = new Buffer('01610003000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([97]),
@@ -570,7 +555,7 @@ describe('Tree', function() {
         });
 
         it('name 0, id 1', function() {
-          var b = new Buffer('0000030160000100', 'hex');
+          var b = new Buffer('00000360000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -581,7 +566,7 @@ describe('Tree', function() {
         });
 
         it('name 1, id 1', function() {
-          var b = new Buffer('016000030159000100', 'hex');
+          var b = new Buffer('0160000359000100', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([96]),
@@ -594,7 +579,7 @@ describe('Tree', function() {
 
       describe('v 3,', function() {
         it('name 0, id 0', function() {
-          var b = new Buffer('000003000003235761', 'hex');
+          var b = new Buffer('0000030003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -605,7 +590,7 @@ describe('Tree', function() {
         });
 
         it('name 3, id 0', function() {
-          var b = new Buffer('032357610003000003235761', 'hex');
+          var b = new Buffer('0323576100030003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([35, 87, 97]),
@@ -616,7 +601,7 @@ describe('Tree', function() {
         });
 
         it('name 0, id 3', function() {
-          var b = new Buffer('000003032357600003235761', 'hex');
+          var b = new Buffer('0000032357600003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer(0),
@@ -627,7 +612,7 @@ describe('Tree', function() {
         });
 
         it('name 3, id 3', function() {
-          var b = new Buffer('032357600003032357590003235761', 'hex');
+          var b = new Buffer('0323576000032357590003235761', 'hex');
           var obj = Tree.parseKey(b);
           should.deepEqual(obj, {
             name: new Buffer([35, 87, 96]),
@@ -1064,22 +1049,22 @@ describe('Tree', function() {
       it('should work with a zero byte name', function() {
         var t = new Tree(db, '');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '00000301cb00');
-        should.strictEqual(p.e.toString('hex'), '00000301cb00ff');
+        should.strictEqual(p.s.toString('hex'), '000003cb00');
+        should.strictEqual(p.e.toString('hex'), '000003cb00ff');
       });
 
       it('should work with a single byte name', function() {
         var t = new Tree(db, 'a');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '0161000301cb00');
-        should.strictEqual(p.e.toString('hex'), '0161000301cb00ff');
+        should.strictEqual(p.s.toString('hex'), '01610003cb00');
+        should.strictEqual(p.e.toString('hex'), '01610003cb00ff');
       });
 
       it('should work with a multi byte name', function() {
         var t = new Tree(db, 'abc');
         var p = t.getHeadKeyRange(new Buffer('cb', 'hex'));
-        should.strictEqual(p.s.toString('hex'), '03616263000301cb00');
-        should.strictEqual(p.e.toString('hex'), '03616263000301cb00ff');
+        should.strictEqual(p.s.toString('hex'), '036162630003cb00');
+        should.strictEqual(p.e.toString('hex'), '036162630003cb00ff');
       });
     });
   });
@@ -1112,63 +1097,63 @@ describe('Tree', function() {
       it('should work with a zero byte name', function() {
         var t = new Tree(db, '');
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
-        should.strictEqual(p.s.toString('hex'), '00000101cb00');
-        should.strictEqual(p.e.toString('hex'), '00000101cb00ff');
+        should.strictEqual(p.s.toString('hex'), '000001cb00');
+        should.strictEqual(p.e.toString('hex'), '000001cb00ff');
       });
 
       it('should work with a single byte name', function() {
         var t = new Tree(db, 'a');
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
-        should.strictEqual(p.s.toString('hex'), '0161000101cb00');
-        should.strictEqual(p.e.toString('hex'), '0161000101cb00ff');
+        should.strictEqual(p.s.toString('hex'), '01610001cb00');
+        should.strictEqual(p.e.toString('hex'), '01610001cb00ff');
       });
 
       it('should work with a multi byte name', function() {
         var t = new Tree(db, 'abc');
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex') });
-        should.strictEqual(p.s.toString('hex'), '03616263000101cb00');
-        should.strictEqual(p.e.toString('hex'), '03616263000101cb00ff');
+        should.strictEqual(p.s.toString('hex'), '036162630001cb00');
+        should.strictEqual(p.e.toString('hex'), '036162630001cb00ff');
       });
 
       it('should work with a zero byte name and minI', function() {
         var t = new Tree(db, '', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 8 });
-        should.strictEqual(p.s.toString('hex'), '00000101cb00020008');
-        should.strictEqual(p.e.toString('hex'), '00000101cb00ff');
+        should.strictEqual(p.s.toString('hex'), '000001cb00020008');
+        should.strictEqual(p.e.toString('hex'), '000001cb00ff');
       });
 
       it('should work with a zero byte name and maxI', function() {
         var t = new Tree(db, '', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), maxI: 8 });
-        should.strictEqual(p.s.toString('hex'), '00000101cb00');
-        should.strictEqual(p.e.toString('hex'), '00000101cb00020008ff');
+        should.strictEqual(p.s.toString('hex'), '000001cb00');
+        should.strictEqual(p.e.toString('hex'), '000001cb00020008ff');
       });
 
       it('should work with a zero byte name, minI and maxI', function() {
         var t = new Tree(db, '', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 7, maxI: 8 });
-        should.strictEqual(p.s.toString('hex'), '00000101cb00020007');
-        should.strictEqual(p.e.toString('hex'), '00000101cb00020008ff');
+        should.strictEqual(p.s.toString('hex'), '000001cb00020007');
+        should.strictEqual(p.e.toString('hex'), '000001cb00020008ff');
       });
       it('should work with a single byte name and minI', function() {
         var t = new Tree(db, 'a', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 8 });
-        should.strictEqual(p.s.toString('hex'), '0161000101cb00020008');
-        should.strictEqual(p.e.toString('hex'), '0161000101cb00ff');
+        should.strictEqual(p.s.toString('hex'), '01610001cb00020008');
+        should.strictEqual(p.e.toString('hex'), '01610001cb00ff');
       });
 
       it('should work with a single byte name and maxI', function() {
         var t = new Tree(db, 'a', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), maxI: 8 });
-        should.strictEqual(p.s.toString('hex'), '0161000101cb00');
-        should.strictEqual(p.e.toString('hex'), '0161000101cb00020008ff');
+        should.strictEqual(p.s.toString('hex'), '01610001cb00');
+        should.strictEqual(p.e.toString('hex'), '01610001cb00020008ff');
       });
 
       it('should work with a single byte name, minI and maxI', function() {
         var t = new Tree(db, 'a', { iSize: 2 });
         var p = t.getDsKeyRange({ id: new Buffer('cb', 'hex'), minI: 7, maxI: 8 });
-        should.strictEqual(p.s.toString('hex'), '0161000101cb00020007');
-        should.strictEqual(p.e.toString('hex'), '0161000101cb00020008ff');
+        should.strictEqual(p.s.toString('hex'), '01610001cb00020007');
+        should.strictEqual(p.e.toString('hex'), '01610001cb00020008ff');
       });
     });
   });
@@ -2836,17 +2821,17 @@ describe('Tree', function() {
 
     it('should transform a string type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._composeHeadKey('foo', 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b6579000303666f6f0003616263');
+      t._composeHeadKey('foo', 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b65790003666f6f0003616263');
     });
 
     it('should transform a function type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._composeHeadKey(function() { return true; }, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b657900031c66756e6374696f6e202829207b2072657475726e20747275653b207d0003616263');
+      t._composeHeadKey(function() { return true; }, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b6579000366756e6374696f6e202829207b2072657475726e20747275653b207d0003616263');
     });
 
     it('should transform a boolean type id into a buffer and pad base64 v to 3 bytes', function() {
       var t = new Tree(db, name, { vSize: 3, log: silence });
-      t._composeHeadKey(true, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b6579000304747275650003616263');
+      t._composeHeadKey(true, 'YWJj').toString('hex').should.equal('0f5f636f6d706f7365486561644b65790003747275650003616263');
     });
   });
 
@@ -2922,24 +2907,24 @@ describe('Tree', function() {
 
     it('should transform a string type id into a buffer and pad i to a lbeint', function() {
       var t = new Tree(db, name, { log: silence });
-      t._composeDsKey('foo', 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000103666f6f0006000000000101');
+      t._composeDsKey('foo', 257).toString('hex').should.equal('0d5f636f6d706f736544734b65790001666f6f0006000000000101');
     });
 
     it('should transform a function type id into a buffer and pad i to a lbeint', function() {
       var t = new Tree(db, name, { log: silence });
-      t._composeDsKey(function() { return true; }, 257).toString('hex').should.equal('0d5f636f6d706f736544734b657900011c66756e6374696f6e202829207b2072657475726e20747275653b207d0006000000000101');
+      t._composeDsKey(function() { return true; }, 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000166756e6374696f6e202829207b2072657475726e20747275653b207d0006000000000101');
     });
 
     it('should transform a boolean type id into a buffer and pad i to a lbeint', function() {
       var t = new Tree(db, name);
       // prefix is data\u0000_composeDsKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._composeDsKey(true, 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000104747275650006000000000101');
+      t._composeDsKey(true, 257).toString('hex').should.equal('0d5f636f6d706f736544734b65790001747275650006000000000101');
     });
 
     it('should accept buffer type id', function() {
       var t = new Tree(db, name);
       // prefix is data\u0000_composeDsKey\u0000 which is 64617461005f6765744461746153746f72654b657900
-      t._composeDsKey(new Buffer('true'), 257).toString('hex').should.equal('0d5f636f6d706f736544734b6579000104747275650006000000000101');
+      t._composeDsKey(new Buffer('true'), 257).toString('hex').should.equal('0d5f636f6d706f736544734b65790001747275650006000000000101');
     });
   });
 

@@ -21,26 +21,28 @@ shorthand for repetition (e.g. ("\x01"*2) is "\x01\x01"). When used as a unary
 operator, * means that the repetition can occur 0 or more times.
 
 key     ::=  name subkey ""         any key is a name followed by a subkey
-name    ::=  string                 name of the key space
+name    ::=  sstring                name of the key space
 subkey  ::=
           |  "\x01" id ival         dskey, data store key
           |  "\x02" ival            ikey, i index key
           |  "\x03" id version      headkey, head index key
           |  "\x04" version         vkey, version index key
-          |  "\x05" string          uskey, user store key
+          |  "\x05" sstring         uskey, user store key
 ival    ::=  lbeint                 i value, monotonically increasing number
 id      ::=  string                 used to identify data store values
-pe      ::=  string                 name of a perspective
 version ::=  lbeint                 version number
-lbeint  ::=  byte (byte*)           Large int - The byte is the number of bytes
-                                    in (byte*). The (byte*) is one to 254 bytes
-                                    written that should be interpreted as an
-                                    unsigned integer in big endian format.
-string  ::=  byte (byte*) "\x00"    String - The byte is the number bytes in the
-                                    (byte*) + 1 (for the trailing '\x00'). The
-                                    (byte*) is zero or more ASCII encoded
-                                    characters and must not contain '\x00' or
-                                    '\x01' bytes.
+lbeint  ::=  byte (byte*)           Large int - byte is the number of bytes in
+                                    (byte*) (max 254). (byte*) should be
+                                    interpreted as an unsigned integer in big
+                                    endian format.
+sstring ::=  byte (byte*) "\x00"    Size string - byte is the number of bytes in
+                                    (byte*) (max 254). (byte*) is zero or more
+                                    ASCII encoded characters excluding '\x00'.
+                                    The string is ended with a trailing '\x00'
+                                    byte.
+string  ::=  (byte*) "\x00"         String - (byte*) is zero or more ASCII
+                                    encoded characters excluding '\x00'. The
+                                    string is ended with a trailing '\x00' byte.
 opts    ::=  byte                   option bits, single byte:
                                       0x01 = conflict, when a merge with this
                                       item failed
