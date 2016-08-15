@@ -954,6 +954,75 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
+// should support prefixFirst for head lookup (depends on 3 items in database by previous tests);
+tasks.push(function(done) {
+  // start an echo server that can receive auth requests and sends some BSON data
+  var host = '127.0.0.1';
+  var port = 1234;
+  var pe = 'baz';
+
+  // lookup the item from the previous test
+  function onSpawn(child) {
+    // start server for head lookup channel
+    var headLookupServer = net.createServer(function(conn) {
+      // do a head lookup for "abd"
+      conn.write(JSON.stringify({ prefixFirst: 'a'}) + '\n');
+
+      // expect the head from previous tests
+      conn.pipe(new BSONStream()).on('data', function(item) {
+        assert.deepEqual(item, {
+          h: { id: 'abd', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 2 },
+          b: { some: 'other' }
+        });
+        conn.end();
+      });
+
+      conn.on('close', function() {
+        headLookupServer.close(function() {
+          child.send({ type: 'kill' });
+        });
+      });
+    }).listen(port, host);
+  }
+
+  var vSize = 3;
+
+  function onMessage(msg, child) {
+    switch(msg) {
+    case 'init':
+      child.send({
+        log: { console: true, mask: 7 },
+        path: dbPath,
+        name: 'test_dbe_root',
+        user: user,
+        group: group,
+        chroot: chroot,
+        mergeTree: {
+          vSize: vSize
+        }
+      });
+      break;
+    case 'listen':
+      // setup head lookup channel
+      var s = net.createConnection(port, host, function() {
+        child.send({
+          type: 'headLookup'
+        }, s);
+      });
+      break;
+    default:
+      throw new Error('unknown state');
+    }
+  }
+
+  var opts = {
+    onExit: done,
+    onSpawn: onSpawn,
+    onMessage: onMessage
+  };
+  spawn([__dirname + '/../../../lib/db_exec'], opts);
+});
+
 // should accept a new local data channel request and write data to the local tree
 tasks.push(function(done) {
   // start an echo server that can receive auth requests and sends some BSON data
