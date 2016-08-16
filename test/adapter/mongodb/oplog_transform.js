@@ -474,7 +474,7 @@ describe('OplogTransform', function() {
         if (!obj) { throw new Error('expected version request'); } // end reached
 
         // expect a request for the last version of any id
-        should.deepEqual(obj, { id: null });
+        should.deepEqual(obj, {});
         done();
       });
     });
@@ -493,7 +493,7 @@ describe('OplogTransform', function() {
       var ls = new LDJSONStream();
       controlWrite.pipe(ls).on('readable', function() {
         var obj = ls.read();
-        should.deepEqual(obj, { id: null });
+        should.deepEqual(obj, {});
 
         // send back a fake DAG item without a timestamp
         var dagItem = {
@@ -519,31 +519,31 @@ describe('OplogTransform', function() {
       var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence });
       ot.startStream();
 
-      // expect a request for the last item in the DAG
+      // expect a request for the last item in the DAG and for the prefix
       // and later a request for oplog insert item
+      var dagItem = {
+        h: { id: collectionName + '\x01some', v: 'Aaaaaa', pa: [] },
+        m: { _op: lastOplogTs },
+        b: { foo: 'bar' }
+      };
       var i = 0;
       var ls = new LDJSONStream();
       controlWrite.pipe(ls).on('readable', function() {
-        i++;
         var obj = ls.read();
 
-        if (i === 1) {
-          should.deepEqual(obj, { id: null });
-
+        switch (i++) {
+        case 0:
+          should.deepEqual(obj, {});
           // send back a fake DAG item with the timestamp of the last oplog item
-          var dagItem = {
-            h: { id: collectionName + '\x01some', v: 'Aaaaaa', pa: [] },
-            m: { _op: lastOplogTs },
-            b: { foo: 'bar' }
-          };
           controlRead.write(BSON.serialize(dagItem));
-        }
-
-        if (i === 2) {
-          should.deepEqual(obj, { id: 'foo' });
-
-          // send back a fake DAG item as if there is non-existing yet
-          controlRead.write(BSON.serialize({}));
+          break;
+        case 1:
+          should.deepEqual(obj, { prefixFirst: coll.collectionName + '\x01' });
+          // send back a fake DAG item with the timestamp of the last oplog item
+          controlRead.write(BSON.serialize(dagItem));
+          break;
+        default:
+          throw new Error('unexpected');
         }
       });
 
@@ -552,6 +552,7 @@ describe('OplogTransform', function() {
         if (!obj) { return; }
 
         var ts = obj.n.m._op;
+        should.equal(i, 2);
         should.strictEqual(lastOplogTs.lessThan(ts), true);
         should.deepEqual(obj, {
           n: {

@@ -307,25 +307,27 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
 /**
  * Expect one init request (request that contains config)
  * {
- *   log:            {Object}      // log configuration
- *   url:            {String}      // mongodb connection string
- *   collections:  {String|Array}  // collection name or names
- *   [dbUser]:       {String}      // user to read the collection
- *   [oplogDbUser]:  {String}      // user to read the oplog database collection
- *   [secrets]:      {Object}      // object containing the passwords for dbUser
- *                                 // and oplogDbUser
- *   [authDb]:       {String}      // authDb database, defaults to db from url
- *   [oplogAuthDb]:  {String}      // oplog authDb database, defaults to admin
- *   [conflictDb]:   {String}      // conflict database, defaults to db from url
- *   [conflictCollection]: {String, default conflicts}  // conflict collection
- *   [oplogDb]:      {String}      // oplog database, defaults to local
- *   [oplogColl]:    {String}      // oplog collection, defaults to oplog.$main
- *   [oplogTransformOpts]: {Object} // any oplog transform options
- *   [chroot]:       {String}      // defaults to /var/empty
- *   [user]:         {String}      // system user to run this process, defaults to
- *                                 // "_pdbnull"
- *   [group]:        {String}      // system group to run this process, defaults to
- *                                 // "_pdbnull"
+ *   log:            {Object}         log configuration
+ *   url:            {String}         mongodb connection string
+ *   [collections]:  {String|Array}   collection name or names, default to all
+ *                                    collections in the database except the mongo
+ *                                    system collections
+ *   [dbUser]:       {String}         user to read the collection
+ *   [oplogDbUser]:  {String}         user to read the oplog database collection
+ *   [secrets]:      {Object}         object containing the passwords for dbUser
+ *                                    and oplogDbUser
+ *   [authDb]:       {String}         authDb database, defaults to db from url
+ *   [oplogAuthDb]:  {String}         oplog authDb database, defaults to admin
+ *   [conflictDb]:   {String}         conflict database, defaults to db from url
+ *   [conflictCollection]: {String, default conflicts}     conflict collection
+ *   [oplogDb]:      {String}         oplog database, defaults to local
+ *   [oplogColl]:    {String}         oplog collection, defaults to oplog.$main
+ *   [oplogTransformOpts]: {Object}    any oplog transform options
+ *   [chroot]:       {String}         defaults to /var/empty
+ *   [user]:         {String}         system user to run this process, defaults to
+ *                                    "_pdbnull"
+ *   [group]:        {String}         system group to run this process, defaults to
+ *                                    "_pdbnull"
  * }
  */
 process.once('message', function(msg) {
@@ -333,7 +335,7 @@ process.once('message', function(msg) {
   if (msg.log == null || typeof msg.log !== 'object') { throw new TypeError('msg.log must be an object'); }
   if (!msg.url || typeof msg.url !== 'string') { throw new TypeError('msg.url must be a non-empty string'); }
 
-  if (typeof msg.collections !== 'string' && !Array.isArray(msg.collections)) { throw new TypeError('msg.collections must be an array or a non-empty string'); }
+  if (msg.collections != null && typeof msg.collections !== 'string' && !Array.isArray(msg.collections)) { throw new TypeError('msg.collections must be an array or a non-empty string'); }
   if (msg.dbUser != null && typeof msg.dbUser !== 'string') { throw new TypeError('msg.dbUser must be a string'); }
   if (msg.oplogDbUser != null && typeof msg.oplogDbUser !== 'string') { throw new TypeError('msg.oplogDbUser must be a string'); }
   if (msg.secrets != null && typeof msg.secrets !== 'object') { throw new TypeError('msg.secrets must be an object'); }
@@ -359,9 +361,6 @@ process.once('message', function(msg) {
   var collNames = msg.collections || [];
   if (typeof collNames === 'string') {
     collNames = [collNames];
-  }
-  if (!collNames.length) {
-    throw new Error('specify which collections to track');
   }
   var oplogTransformOpts = xtend({}, msg.oplogTransformOpts);
 
@@ -480,24 +479,21 @@ process.once('message', function(msg) {
         });
       }
 
-      /* for now, only support the user specifying which connections to track
-      // setup collections if none given
+      // default to all collections if none given
       if (!collNames.length) {
         startupTasks.push(function(cb) {
           db.collections(function(err, collections) {
             if (err) { cb(err); return; }
-            // blacklist system.indexes collection
+            // blacklist mongo system collections
             var blacklist = ['system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
             collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
-
             cb();
           });
         });
       }
-      */
 
-      // open each collection
+      // open each collection for local use
       var collections = [];
       startupTasks.push(function(cb) {
         collNames.forEach(function(collection) {
@@ -591,7 +587,9 @@ process.once('message', function(msg) {
         }
 
         process.send('listen');
-        start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, oplogTransformOpts);
+        start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, xtend({
+          conflicts: conflictCollection
+        }, oplogTransformOpts));
       });
 
       // ignore kill signals

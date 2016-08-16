@@ -109,10 +109,10 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../adapter/mongodb/exec', __dirname + '/test1_pdb_source_mongo.hjson'], opts);
 });
 
-// should ask for last version over version control channel (fd 7)
+// should ask for last version in general and per collection over version control channel (fd 7)
 tasks.push(function(done) {
-  var validRequest = false;
 
+  var i = 0;
   function onSpawn(child) {
     var versionControl = child.stdio[7];
 
@@ -122,12 +122,19 @@ tasks.push(function(done) {
     versionControl.pipe(ls);
 
     ls.on('data', function(data) {
-      assert.deepEqual(data, {
-        id: null
-      });
-      validRequest = true;
-
-      child.send({ type: 'kill' });
+      switch (i++) {
+      case 0:
+        assert.deepEqual(data, {});
+        versionControl.write(BSON.serialize({}));
+        break;
+      case 1:
+        assert.deepEqual(data, { prefixFirst: collectionName + '\x01' });
+        versionControl.write(BSON.serialize({}));
+        child.send({ type: 'kill' });
+        break;
+      default:
+        throw new Error('unexpected');
+      }
     });
   }
 
@@ -150,7 +157,7 @@ tasks.push(function(done) {
   }
 
   function onExit() {
-    assert.strictEqual(validRequest, true);
+    assert.strictEqual(i, 2);
     done();
   }
 
@@ -172,6 +179,7 @@ tasks.push(function(done) {
 // should send a new version based on an oplog update
 tasks.push(function(done) {
   var i = 0;
+  var j = 0;
   function onSpawn(child) {
     var dataChannel = child.stdio[6];
     var versionControl = child.stdio[7];
@@ -191,36 +199,56 @@ tasks.push(function(done) {
           b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
         }
       });
-      i++;
+      j++;
       child.send({ type: 'kill' });
     });
 
     // expect version requests in ld-json format
+    var lastTs;
     versionControl.pipe(new LDJSONStream()).on('data', function(data) {
-      // expect a request for the last version in the DAG
-      assert.deepEqual(data, { id: null });
+      switch (i++) {
+      case 0:
+        // expect a request for the last version in the DAG
+        assert.deepEqual(data, {});
+        // send response with last timestamp in oplog
+        oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+          if (err) { throw err; }
 
-      // send response with last timestamp in oplog
-      oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
-        if (err) { throw err; }
+          lastTs = oplogItem.ts;
+
+          versionControl.write(BSON.serialize({
+            h: { id: collectionName + '\x01foo' },
+            m: { _op: lastTs, _id: 'foo' },
+            b: {}
+          }));
+
+          // and insert an item into the collection
+          // this should make the process emit a new version on the data channel
+          coll1.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
+            if (err) { throw err; }
+          });
+        });
+        break;
+      case 1:
+        // expect a request for any head of this collection
+        assert.deepEqual(data, { prefixFirst: collectionName + '\x01' });
 
         versionControl.write(BSON.serialize({
           h: { id: collectionName + '\x01foo' },
-          m: { _op: oplogItem.ts, _id: 'foo' },
+          m: { _op: lastTs, _id: 'foo' },
           b: {}
         }));
 
-        // and insert an item into the collection
-        // this should make the process emit a new version on the data channel
-        coll1.insertOne({ _id: 'foo', bar: 'baz' }, function(err) {
-          if (err) { throw err; }
-        });
-      });
+        break;
+      default:
+        throw new Error('unexpected');
+      }
     });
   }
 
   function onExit() {
-    assert.strictEqual(i, 1);
+    assert.strictEqual(i, 2);
+    assert.strictEqual(j, 1);
     done();
   }
 
@@ -274,66 +302,75 @@ tasks.push(function(done) {
       var versionControl = child.stdio[7];
       var pe = 'baz';
 
-      // expect one version request (for the last version in the DAG)
+      // send something to prevent bootstrapping an empty tree
+      var future = new Timestamp(0, (new Date()).getTime() / 1000 + 1); // in the future so no oplog items exist yet
+      var lastItem = BSON.serialize({
+        h: { id: collectionName2 + '\x01qux' },
+        m: { _op: future, _id: 'qux' },
+        b: {}
+      });
+
+      // expect a global and a prefixed head lookup
       var i = 0;
       versionControl.pipe(new LDJSONStream()).on('data', function(data) {
-        i++;
-        assert.equal(i, 1);
-        assert.deepEqual(data, { id: null });
+        switch (i++) {
+        case 0:
+          assert.deepEqual(data, {});
+          versionControl.write(lastItem);
+          break;
+        case 1:
+          assert.deepEqual(data, { prefixFirst: collectionName2 + '\x01' });
+          versionControl.write(lastItem, function(err) {
+            if (err) { throw err; }
 
-        // send something to prevent bootstrapping an empty tree
-        var future = new Timestamp(0, (new Date()).getTime() / 1000 + 1); // in the future so no oplog items exist yet
-        versionControl.write(BSON.serialize({
-          h: { id: collectionName2 + '\x01qux' },
-          m: { _op: future, _id: 'qux' },
-          b: {}
-        }), function(err) {
-          if (err) { throw err; }
-
-          // real test starts here
-          // the presumed merge/delete item
-          dataChannel.write(BSON.serialize({
-            n: {
-              h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
-              b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
-            },
-            l: null,
-            lcas: [],
-            pe: pe,
-            c: null
-          }), function(err) {
-            // wait a while and inspect collections
-            setTimeout(function() {
-              if (err) { throw err; }
-
-              // collection itself should be empty
-              coll2.find({}).toArray(function(err, items) {
+            // real test starts here
+            // the presumed merge/delete item
+            dataChannel.write(BSON.serialize({
+              n: {
+                h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
+                b: { bar: 'baz' } // should not send _id to pdb in the body, only in .h and .m
+              },
+              l: null,
+              lcas: [],
+              pe: pe,
+              c: null
+            }), function(err) {
+              // wait a while and inspect collections
+              setTimeout(function() {
                 if (err) { throw err; }
-                assert.strictEqual(items.length, 0);
 
-                // conflict collection should contain the just sent item with a delete error
-                conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+                // collection itself should be empty
+                coll2.find({}).toArray(function(err, items) {
                   if (err) { throw err; }
+                  assert.strictEqual(items.length, 0);
 
-                  assert.strictEqual(items.length, 1);
-                  delete items[0]._id; // delete object id
-                  assert.deepEqual(items, [{
-                    n: {
-                      h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
-                      b: { bar: 'baz' }
-                    },
-                    l: null,
-                    lcas: [],
-                    pe: pe,
-                    c: null,
-                    err: 'local head expected' // delete error
-                  }]);
-                  child.send({ type: 'kill' });
+                  // conflict collection should contain the just sent item with a delete error
+                  conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
+                    if (err) { throw err; }
+
+                    assert.strictEqual(items.length, 1);
+                    delete items[0]._id; // delete object id
+                    assert.deepEqual(items, [{
+                      n: {
+                        h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
+                        b: { bar: 'baz' }
+                      },
+                      l: null,
+                      lcas: [],
+                      pe: pe,
+                      c: null,
+                      err: 'local head expected' // delete error
+                    }]);
+                    child.send({ type: 'kill' });
+                  });
                 });
-              });
-            }, 100);
+              }, 100);
+            });
           });
-        });
+          break;
+        default:
+          throw new Error('unexpected');
+        }
       });
       break;
     default:

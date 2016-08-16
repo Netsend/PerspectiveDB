@@ -26,6 +26,7 @@ var util = require('util');
 var async = require('async');
 var bson = require('bson');
 var BSONStream = require('bson-stream');
+var mongodb = require('mongodb');
 var xtend = require('xtend');
 
 var binsearch = require('../../lib/binsearch').inArray;
@@ -34,6 +35,7 @@ var findAndDelete = require('./find_and_delete');
 var noop = require('../../lib/noop');
 
 var BSON = new bson.BSONPure.BSON();
+var Timestamp = mongodb.Timestamp;
 var Transform = stream.Transform;
 var Writable = stream.Writable;
 
@@ -54,7 +56,13 @@ var Writable = stream.Writable;
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
- *   tmpCollName {String, default _pdbtmp}  temporary collection
+ *   conflicts {mongodb.Collection, defaults to conflicts}  collection to monitor
+ *     for conflicts
+ *   blacklist {String[]}  collections to not track, takes precedence over
+ *     collections, by default contains the mongo system collections and the tmp
+ *     and conflict collection
+ *   tmpStorage {String, default _pdbtmp}  temporary collection to compute update
+ *     modifiers
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
@@ -79,14 +87,6 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   this._databaseName = dbName;
 
   this._oplogColl = oplogDb.collection(oplogCollName);
-  // create all name spaces
-  this._ns = [];
-  collections.forEach(collection => this._ns.push(dbName + '.' + collection.collectionName));
-  this._ns.sort(); // sort so binary searches can be used
-  //
-  // map collection names by namespace
-  this._collectionMap = {};
-  collections.forEach(collection => this._collectionMap[dbName + '.' + collection.collectionName] = collection.collectionName);
 
   this._expected = expected;
   this._opts = xtend({
@@ -94,7 +94,6 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   }, opts);
 
   this._db = oplogDb.db(this._databaseName);
-  this._collections = collections;
 
   // write ld-json to the request stream
   this._controlWrite = controlWrite;
@@ -102,7 +101,25 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   // expect bson on the response stream
   this._controlRead = controlRead.pipe(new BSONStream());
 
-  this._tmpCollection = this._db.collection(opts.tmpCollName || '_pdbtmp');
+  this._conflicts = opts.conflicts || this._db.collection('conflicts');
+  this._tmpStorage = this._db.collection(opts.tmpStorage || '_pdbtmp');
+
+  // blacklist mongo system collections
+  this._blacklist = opts.blacklist || ['system.profile', 'system.indexes', this._tmpStorage.collectionName, this._conflicts.collectionName];
+
+  // exclude blacklisted collections
+  this._collections = collections.filter(coll => !~this._blacklist.indexOf(coll.collectionName));
+
+  // set ns and collection map by namespace
+  this._ns = [];
+  this._collectionMap = {};
+
+  this._collections.forEach(collection => {
+    this._ns.push(this._databaseName + '.' + collection.collectionName);
+    this._collectionMap[this._databaseName + '.' + collection.collectionName] = collection.collectionName;
+  });
+
+  this._ns.sort(); // sort so binary searches can be used
 
   this._log = opts.log || {
     emerg:   console.error,
@@ -140,6 +157,7 @@ module.exports = OplogTransform;
  */
 OplogTransform.prototype.startStream = function startStream() {
   var that = this;
+  var error;
 
   this._reopenOplog;
 
@@ -164,57 +182,22 @@ OplogTransform.prototype.startStream = function startStream() {
     that._or.pipe(that, { end: false });
   }
 
-  // listen for response, expect it to be the last stored version
-  this._controlRead.once('readable', function() {
-    var obj = that._controlRead.read();
-    if (!obj) {
-      // eof, request stream closed
-      that._log.notice('ot startStream control read stream closed before opening the oplog');
+  this._boot(function(err, offset) {
+    if (err) {
+      that.emit('error', err);
       return;
     }
-
-    that._log.debug('ot startStream last version %j', obj.h);
-
-    that.emit('lastVersion', obj);
-
-    // ensure this._lastTs
-    if (!Object.keys(obj).length) {
-      // no data in leveldb yet
-      that._bootstrap(function(err, offset) {
-        if (err) {
-          that.emit('error', err);
-          return;
-        }
-        that._lastTs = offset;
-
-        // handle new oplog items via this._transform
-        openOplog(xtend(that._opts, { bson: false }), true);
-      });
-    } else {
-      // expect the last version in the DAG with an oplog offset
-      var offset, err;
-      try {
-        err = new Error('unable to determine offset');
-        offset = obj.m._op;
-        if (!offset) {
-          throw err;
-        }
-      } catch(e) {
-        that._log.err('ot startStream %j %j', err, e);
-        that.emit('error', err);
-        return;
-      }
-
-      that._lastTs = offset;
-
-      // handle new oplog items via this._transform
-      openOplog(xtend(that._opts, { bson: false }), true);
+    if (!offset) {
+      error = new Error('could not determine oplog offset');
+      that._log.err('ot startStream %s', error);
+      that.emit('error', error);
+      return;
     }
-  });
+    that._lastTs = offset;
 
-  // ask for last version (not id restricted)
-  // write version requests in ld-json
-  this._controlWrite.write(JSON.stringify({ id: null }) + '\n');
+    // handle new oplog items via this._transform
+    openOplog({ bson: false }, true);
+  });
 };
 
 /**
@@ -245,6 +228,108 @@ OplogTransform.prototype.close = function close(cb) {
 };
 
 /**
+ * Make sure all collections are up to date with the latest oplog item, set name
+ * spaces and collection maps.
+ *
+ * 1. Get the last known oplog item processed.
+ * 2. For each collection, make sure it is bootstrapped
+ * 3. zip up all collections with their offsets until the latest oplog item and
+ *    proceed from there
+ */
+OplogTransform.prototype._boot = function _boot(cb) {
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var that = this;
+
+  var tasks = [];
+
+  // lookup last known offset in the tree, if any
+  var lastOffset;
+  tasks.push(function(cb2) {
+    that._controlRead.once('readable', function() {
+      var head = that._controlRead.read();
+      if (Object.keys(head).length) {
+        try {
+          lastOffset = head.m._op;
+        } catch(err) {
+          that.emit('error', new Error('unable to determine offset'));
+        }
+      }
+      that._log.debug2('ot _boot lastOffset %s', lastOffset);
+      cb2();
+    });
+    // ask for last version in the tree
+    that._controlWrite.write(JSON.stringify({}) + '\n');
+  });
+
+  // make sure all collections have an offset, bootstrap if not
+  var offsetColl = {};
+  tasks.push(function(cb2) {
+    async.eachSeries(that._collections, function(collection, cb3) {
+      that._prefixExists(collection.collectionName + '\x01', function(err, exists) {
+        if (err) { cb3(err); return; }
+
+        // assume it is up to date, if boot procedures are not interupted, this is the case
+        if (exists) {
+          // if there exists a prefix in the tree, assume a last known offset could be determined
+          offsetColl[lastOffset.toString()] = collection;
+          cb3();
+          return;
+        }
+
+        // else bootstrap this collection
+        that._bootstrapColl(collection, function(err, newTs) {
+          if (err) { cb3(err); return; }
+          offsetColl[newTs.toString()] = collection;
+          cb3();
+        });
+      });
+    }, cb2);
+  });
+
+  // finally zip all up
+  tasks.push(function(cb2) {
+    that._log.debug2('ot _boot tracked collections %j', that._ns);
+    that._zipUp(offsetColl, function(err, offset) {
+      if (err) { cb2(err); return; }
+      lastOffset = offset;
+      cb2();
+    });
+  });
+
+  async.series(tasks, function(err) {
+    if (err) { cb(err); return; }
+    cb(null, lastOffset);
+  });
+};
+
+// lookup any head for the given prefix
+OplogTransform.prototype._prefixExists = function _prefixExists(prefix, cb) {
+  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
+
+  var that = this;
+  var error;
+
+  this._controlRead.once('readable', function() {
+    var obj = that._controlRead.read();
+    if (!obj) {
+      // eof, request stream closed
+      error = new Error('control read stream closed');
+      that._log.err('ot _prefixExists %s', error);
+      cb(error);
+      return;
+    }
+
+    that._log.debug('ot _prefixExists %j', obj);
+    cb(null, !!Object.keys(obj).length);
+  });
+
+  // ask for a head by prefix to see if there is any head at all for the given collection
+  // write version requests in ld-json
+  this._controlWrite.write(JSON.stringify({ prefixFirst: prefix }) + '\n');
+};
+
+/**
  * Create an id for upstream based on the collection name and id.
  *
  * @param {mixed} id  the id to use, must contain a toString method if not a string
@@ -258,38 +343,6 @@ OplogTransform.prototype._createUpstreamId = function _createUpstreamId(ns, id) 
   }
   return collectionName + '\x01' + id;
 }
-
-/**
- * Bootstrap, read all documents from the all tracked collections.
- *
- * @param {Function} cb  first item will be an error object, second item will be an
- *                       oplog timestamp that must be used as offset.
- */
-OplogTransform.prototype._bootstrap = function _bootstrap(cb) {
-  if (typeof cb !== 'function') { throw new TypeError('cb must be a function'); }
-
-  var that = this;
-
-  var lastOffset;
-  var bootstrapped = [];
-
-  // bootstrap all collections
-  async.eachSeries(that._collections, function(collection, cb2) {
-    that._bootstrapColl(collection, function(err, newTs) {
-      if (err) { cb2(err); return; }
-      bootstrapped.push(collection.collectionName);
-      // zip up
-      that._zipUp(newTs, bootstrapped, function(err, newTs) {
-        if (err) { cb2(err); return; }
-        lastOffset = newTs;
-        cb2();
-      });
-    });
-  }, function(err) {
-    if (err) { cb(err); return; }
-    cb(null, lastOffset);
-  });
-};
 
 /**
  * Bootstrap, read all documents from the given collection.
@@ -350,25 +403,39 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
  * @param {Function} cb  first item will be an error object or null, second item
  *   the last timestamp in the oplog when ended.
  */
-OplogTransform.prototype._zipUp = function _zipUp(offset, collectionNames, cb) {
-  collectionNames.sort();
+OplogTransform.prototype._zipUp = function _zipUp(offsetCollections, cb) {
+  // sort timestamps
+  var timestamps = Object.keys(offsetCollections).sort();
+
+  // start with first collection and lowest timestamp
+  var offset = Timestamp.fromString(timestamps[0]);
+
+  // list of namespaces that are currently tracked
+  var zipping = [];
+  zipping.push(this._databaseName + '.' + offsetCollections[timestamps.shift()].collectionName);
 
   var that = this;
-  var lastTs = offset;
-  this._oplogReader(offset, xtend({ bson: false })).pipe(new Writable({
+  this._oplogReader(offset, { bson: false }).pipe(new Writable({
     objectMode: true,
     write: function(oplogItem, enc, cb2) {
-      that._log.debug('ot zipUp item %j', oplogItem);
-      lastTs = oplogItem.ts;
+      // record last seen
+      offset = oplogItem.ts;
+
+      var ts = offset.toString();
+      while (ts >= timestamps[0])
+        zipping.push(that._databaseName + '.' + offsetCollections[timestamps.shift()].collectionName);
+
       // check if this item belongs to one of the tracked collections
-      if (!binsearch(collectionNames, oplogItem.ns)) {
+      if (!oplogItem.ns || !~zipping.indexOf(oplogItem.ns)) {
         cb2();
         return;
       }
+      that._log.debug('ot zipUp new item %j', oplogItem);
+
       that.write(oplogItem, cb2);
     }
   })).on('finish', function() {
-    cb(null, lastTs);
+    cb(null, offset);
   }).on('error', cb);
 };
 
@@ -546,7 +613,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
   dagItem.b._id = dagItem.m._id;
 
   // save the previous head and apply the update modifiers to get the new version of the doc
-  that._tmpCollection.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
+  that._tmpStorage.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
     if (err) { cb(err); return; }
 
     if (result.modifiedCount !== 1) {
@@ -559,7 +626,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
     // update the just created copy
     that._log.info('ot _createNewVersionByUpdateDoc selector %j', selector);
 
-    that._tmpCollection.findOneAndUpdate(selector, oplogItem.o, { returnOriginal: false }, function(err, result) {
+    that._tmpStorage.findOneAndUpdate(selector, oplogItem.o, { returnOriginal: false }, function(err, result) {
       if (err) {
         that._log.err('ot _createNewVersionByUpdateDoc', err);
         cb(err);
@@ -574,7 +641,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
       var newObj = result.value;
 
       // remove object from collection
-      that._tmpCollection.deleteOne(selector, function(err, result) {
+      that._tmpStorage.deleteOne(selector, function(err, result) {
         if (err || result.deletedCount !== 1) {
           that._log.err('ot _createNewVersionByUpdateDoc remove update ', err, result);
           cb(err);

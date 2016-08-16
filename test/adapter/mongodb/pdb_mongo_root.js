@@ -253,7 +253,7 @@ tasks.push(function(done) {
             });
           });
         });
-      }, 1000);
+      }, 1200);
     },
     onExit: done,
     echoOut: false,
@@ -277,7 +277,7 @@ tasks.push(function(done) {
 });
 
 // test with empty collection and empty leveldb. spawn db, then save new objects in level via remote
-// because the merge handler only passes old confirmed objects, the fast-forward from foo Aaaa to Bbbb
+// because the merge handler only passes locally confirmed objects, the fast-forward from foo Aaaa to Bbbb
 // should be saved in conflicts.
 tasks.push(function(done) {
   var opts = {
@@ -324,7 +324,7 @@ tasks.push(function(done) {
             }, 800);
           });
         });
-      }, 1000);
+      }, 1200);
     },
     onExit: function(err) {
       if (err) { throw err; }
@@ -412,6 +412,7 @@ tasks.push(function(done) {
         });
       });
     },
+    echoOut: false,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
       assert(/client connected 127.0.0.1-/.test(stdout));
