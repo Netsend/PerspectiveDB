@@ -688,31 +688,31 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
   var that = this;
   var opts = this._opts;
 
+  var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
+
+  // check if this is a confirmation by the adapter or a third party update
+  // copy without b._id (not saved in level)
+  var copy = xtend(oplogItem.o);
+  delete copy._id;
+
+  var obj = findAndDelete(that._expected, function(item) {
+    return item.n.h.id === upstreamId && isEqual(copy, item.n.b);
+  });
+
+  if (obj) {
+    that._log.debug2('ot _applyOplogFullDoc ACK %j (%d)', obj.n.h, that._expected.length);
+  } else {
+    that._log.debug2('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
+    obj = {
+      n: {
+        h: { id: upstreamId },
+        b: copy
+      }
+    };
+  }
+  obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
+
   process.nextTick(function() {
-    var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
-
-    // check if this is a confirmation by the adapter or a third party update
-    // copy without b._id (not saved in level)
-    var copy = xtend(oplogItem.o);
-    delete copy._id;
-
-    var obj = findAndDelete(that._expected, function(item) {
-      return item.n.h.id === upstreamId && isEqual(copy, item.n.b);
-    });
-
-    if (obj) {
-      that._log.debug2('ot _applyOplogFullDoc ACK %j (%d)', obj.n.h, that._expected.length);
-    } else {
-      that._log.debug2('ot _applyOplogFullDoc NEW %s (%d)', oplogItem.o._id, that._expected.length);
-      obj = {
-        n: {
-          h: { id: upstreamId },
-          b: copy
-        }
-      };
-    }
-    obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
-
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };
