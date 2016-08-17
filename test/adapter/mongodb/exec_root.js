@@ -191,7 +191,7 @@ tasks.push(function(done) {
 
       var ts = obj.n.m._op;
       var now = new Timestamp(0, (new Date()).getTime() / 1000);
-      assert.strictEqual(ts.greaterThan(now), true);
+      assert.strictEqual(ts.greaterThanOrEqual(now), true);
       assert.deepEqual(obj, {
         n: {
           h: { id: collectionName + '\x01foo' },

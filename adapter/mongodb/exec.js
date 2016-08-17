@@ -571,12 +571,10 @@ process.once('message', function(msg) {
         shuttingDown = true;
         log.debug('shutting down...');
 
-        // disconnect from parent
-        process.disconnect();
-
         async.series(shutdownTasks, function(err) {
           if (err) { log.err('shutdown error', err); }
           log.debug('shutdown complete');
+          // XXX: somehow, if using a tailable cursor with awaitData in oplogReader the process wait a couple of seconds before it exits
         });
       }
 

@@ -89,9 +89,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   this._oplogColl = oplogDb.collection(oplogCollName);
 
   this._expected = expected;
-  this._opts = xtend({
-    bson: false
-  }, opts);
+  this._opts = xtend(opts);
 
   this._db = oplogDb.db(this._databaseName);
 
@@ -162,10 +160,14 @@ OplogTransform.prototype.startStream = function startStream() {
   this._reopenOplog;
 
   // handle new oplog items via this._transform, use this._lastTs as offset
-  function openOplog(opts, reopen) {
-    that._or = that._oplogReader(that._lastTs, opts);
+  function openOplog(reopen) {
+    that._or = that._oplogReader(that._lastTs, { tailable: true, awaitData: true });
     // proxy error
     that._or.once('error', function(err) {
+      // workaround shutdown mongo errors
+      if (that._stop && err.message === 'cursor does not exist, was killed or timed out') {
+        return;
+      }
       that.emit('error', err);
       return;
     });
@@ -175,7 +177,7 @@ OplogTransform.prototype.startStream = function startStream() {
       that._or = null;
       if (reopen && !that._stop) {
         that._reopenOplog = setTimeout(function() {
-          openOplog(opts, reopen);
+          openOplog(reopen);
         }, 1000);
       }
     });
@@ -196,7 +198,7 @@ OplogTransform.prototype.startStream = function startStream() {
     that._lastTs = offset;
 
     // handle new oplog items via this._transform
-    openOplog({ bson: false }, true);
+    openOplog(true);
   });
 };
 
@@ -415,7 +417,7 @@ OplogTransform.prototype._zipUp = function _zipUp(offsetCollections, cb) {
   zipping.push(this._databaseName + '.' + offsetCollections[timestamps.shift()].collectionName);
 
   var that = this;
-  this._oplogReader(offset, { bson: false }).pipe(new Writable({
+  this._oplogReader(offset).pipe(new Writable({
     objectMode: true,
     write: function(oplogItem, enc, cb2) {
       // record last seen
@@ -448,7 +450,7 @@ OplogTransform.prototype._zipUp = function _zipUp(offsetCollections, cb) {
  *
  * opts:
  *   filter {Object}  extra filter to apply apart from namespace
- *   bson {Boolean, default true}  whether to return raw bson or parsed objects
+ *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   includeOffset {Boolean, default false}  whether to include or exclude offset
  */
 OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
@@ -472,7 +474,6 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
   }
 
   var mongoOpts = xtend({
-    raw: true,
     sort: { '$natural': 1 },
     comment: 'oplog_reader'
   }, opts);
