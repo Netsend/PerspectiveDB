@@ -789,29 +789,30 @@ OplogTransform.prototype._applyOplogDeleteItem = function _applyOplogDeleteItem(
 
   var that = this;
   var opts = this._opts;
+
+  var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
+
+  // check if this is a confirmation by the adapter or a third party update
+  var obj = findAndDelete(that._expected, function(item) {
+    return item.n.h.id === upstreamId && item.n.h.d;
+  });
+
+  if (obj) {
+    that._log.debug2('ot _applyOplogDeleteItem ACK %j (%d)', obj.n.h, that._expected.length);
+  } else {
+    that._log.debug2('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
+    obj = {
+      n: {
+        h: {
+          id: upstreamId,
+          d: true,
+        },
+      }
+    };
+  }
+  obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
+
   process.nextTick(function() {
-    var upstreamId = that._createUpstreamId(oplogItem.ns, oplogItem.o._id);
-
-    // check if this is a confirmation by the adapter or a third party update
-    var obj = findAndDelete(that._expected, function(item) {
-      return item.n.h.id === upstreamId && item.n.h.d;
-    });
-
-    if (obj) {
-      that._log.debug2('ot _applyOplogDeleteItem ACK %j (%d)', obj.n.h, that._expected.length);
-    } else {
-      that._log.debug2('ot _applyOplogDeleteItem NEW %s (%d)', oplogItem.o._id, that._expected.length);
-      obj = {
-        n: {
-          h: {
-            id: upstreamId,
-            d: true,
-          },
-        }
-      };
-    }
-    obj.n.m = { _op: oplogItem.ts, _id: oplogItem.o._id };
-
     cb(null, opts.bson ? BSON.serialize(obj) : obj);
   });
 };

@@ -128,7 +128,7 @@ tasks.push(function(done) {
         versionControl.write(BSON.serialize({}));
         break;
       case 1:
-        assert.deepEqual(data, { prefixFirst: collectionName + '\x01' });
+        assert.deepEqual(data, { prefixExists: collectionName + '\x01' });
         versionControl.write(BSON.serialize({}));
         child.send({ type: 'kill' });
         break;
@@ -231,7 +231,7 @@ tasks.push(function(done) {
         break;
       case 1:
         // expect a request for any head of this collection
-        assert.deepEqual(data, { prefixFirst: collectionName + '\x01' });
+        assert.deepEqual(data, { prefixExists: collectionName + '\x01' });
 
         versionControl.write(BSON.serialize({
           h: { id: collectionName + '\x01foo' },
@@ -319,7 +319,7 @@ tasks.push(function(done) {
           versionControl.write(lastItem);
           break;
         case 1:
-          assert.deepEqual(data, { prefixFirst: collectionName2 + '\x01' });
+          assert.deepEqual(data, { prefixExists: collectionName2 + '\x01' });
           versionControl.write(lastItem, function(err) {
             if (err) { throw err; }
 

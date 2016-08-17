@@ -27,7 +27,6 @@ var should = require('should');
 var mongodb = require('mongodb');
 var Timestamp = mongodb.Timestamp;
 var MongoClient = mongodb.MongoClient;
-var BSONStream = require('bson-stream');
 var bson = require('bson');
 var LDJSONStream = require('ld-jsonstream');
 var through2 = require('through2');
@@ -91,8 +90,8 @@ describe('OplogTransform', function() {
       (function() { new OplogTransform(oplogDb, oplogCollName, ''); }).should.throw('dbName must be a non-empty string');
     });
 
-    it('should require collections to be a non-empty array', function() {
-      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo', []); }).should.throw('collections must be a non-empty array');
+    it('should require collections to be an array', function() {
+      (function() { new OplogTransform(oplogDb, oplogCollName, 'foo', ''); }).should.throw('collections must be an array');
     });
 
     it('should require controlWrite to be an object', function() {
@@ -175,7 +174,7 @@ describe('OplogTransform', function() {
       var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence });
       var or = ot._oplogReader(offset);
       var i = 0;
-      or.pipe(new BSONStream()).on('data', function(obj) {
+      or.on('data', function(obj) {
         should.strictEqual(obj.op, 'i');
         should.strictEqual(obj.ns, 'test_oplog_transform.foo');
         i++;
@@ -538,7 +537,7 @@ describe('OplogTransform', function() {
           controlRead.write(BSON.serialize(dagItem));
           break;
         case 1:
-          should.deepEqual(obj, { prefixFirst: coll.collectionName + '\x01' });
+          should.deepEqual(obj, { prefixExists: coll.collectionName + '\x01' });
           // send back a fake DAG item with the timestamp of the last oplog item
           controlRead.write(BSON.serialize(dagItem));
           break;
