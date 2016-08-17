@@ -328,7 +328,7 @@ OplogTransform.prototype._prefixExists = function _prefixExists(prefix, cb) {
 
   // ask for a head by prefix to see if there is any head at all for the given collection
   // write version requests in ld-json
-  this._controlWrite.write(JSON.stringify({ prefixFirst: prefix }) + '\n');
+  this._controlWrite.write(JSON.stringify({ prefixExists: prefix }) + '\n');
 };
 
 /**
