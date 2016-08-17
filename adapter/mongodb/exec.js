@@ -493,7 +493,7 @@ process.once('message', function(msg) {
           db.collections(function(err, collections) {
             if (err) { cb(err); return; }
             // blacklist mongo system collections
-            var blacklist = ['system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
+            var blacklist = ['system.users', 'system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
             collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
             cb();

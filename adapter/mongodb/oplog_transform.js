@@ -72,7 +72,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   if (oplogDb == null || typeof oplogDb !== 'object') { throw new TypeError('oplogDb must be an object'); }
   if (!oplogCollName || typeof oplogCollName !== 'string') { throw new TypeError('oplogCollName must be a non-empty string'); }
   if (!dbName || typeof dbName !== 'string') { throw new TypeError('dbName must be a non-empty string'); }
-  if (!Array.isArray(collections) || !collections.length) { throw new TypeError('collections must be a non-empty array'); }
+  if (!Array.isArray(collections)) { throw new TypeError('collections must be an array'); }
   if (controlWrite == null || typeof controlWrite !== 'object') { throw new TypeError('controlWrite must be an object'); }
   if (controlRead == null || typeof controlRead !== 'object') { throw new TypeError('controlRead must be an object'); }
   if (!Array.isArray(expected)) { throw new TypeError('expected must be an array'); }
@@ -103,7 +103,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   this._tmpStorage = this._db.collection(opts.tmpStorage || '_pdbtmp');
 
   // blacklist mongo system collections
-  this._blacklist = opts.blacklist || ['system.profile', 'system.indexes', this._tmpStorage.collectionName, this._conflicts.collectionName];
+  this._blacklist = opts.blacklist || ['system.users', 'system.profile', 'system.indexes', this._tmpStorage.collectionName, this._conflicts.collectionName];
 
   // exclude blacklisted collections
   this._collections = collections.filter(coll => !~this._blacklist.indexOf(coll.collectionName));
@@ -415,6 +415,14 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
 OplogTransform.prototype._zipUp = function _zipUp(offsetCollections, cb) {
   // sort timestamps
   var timestamps = Object.keys(offsetCollections).sort();
+
+  if (!timestamps.length) {
+    process.nextTick(function() {
+      var offset =  new Timestamp(0, (new Date()).getTime() / 1000);
+      cb(null, offset);
+    });
+    return;
+  }
 
   // start with first collection and lowest timestamp
   var offset = Timestamp.fromString(timestamps[0]);
