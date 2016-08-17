@@ -136,6 +136,7 @@ function getMongoId(obj) {
 
 // globals
 var ot, db, log; // used after receiving the log configuration
+var noCollectionWhitelist; // automatically create new collections
 
 /**
  * Start oplog transformer:
@@ -221,9 +222,15 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
       }
       var coll = collectionMap[collName];
       if (!coll) {
-        log.debug('item belongs to unknown collection: %s', collName);
-        handleConflict(new Error('unknown collection'), obj, cb);
-        return;
+        if (noCollectionWhitelist) {
+          // add new collection
+          coll = db.collection(collName);
+          collectionMap[collName] = coll;
+        } else {
+          log.debug('item belongs to unspecified collection: %s', collName);
+          handleConflict(new Error('unspecified collection'), obj, cb);
+          return;
+        }
       }
 
       var mongoId = getMongoId(obj);
@@ -481,6 +488,7 @@ process.once('message', function(msg) {
 
       // default to all collections if none given
       if (!collNames.length) {
+        noCollectionWhitelist = true;
         startupTasks.push(function(cb) {
           db.collections(function(err, collections) {
             if (err) { cb(err); return; }

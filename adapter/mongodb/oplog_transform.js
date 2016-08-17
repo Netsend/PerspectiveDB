@@ -138,6 +138,13 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
 util.inherits(OplogTransform, Transform);
 module.exports = OplogTransform;
 
+// add collection to accept and track
+OplogTransform.prototype.addCollection = function addCollection(collection) {
+  this._ns.push(this._databaseName + '.' + collection.collectionName);
+  this._collectionMap[this._databaseName + '.' + collection.collectionName] = collection.collectionName;
+  this._ns.sort();
+};
+
 /**
  * Ask for last version and start reading the oplog after that. Convert oplog items
  * to new versions.
