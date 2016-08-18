@@ -344,7 +344,7 @@ OplogTransform.prototype._prefixExists = function _prefixExists(prefix, cb) {
  * @param {mixed} id  the id to use, must contain a toString method if not a string
  */
 OplogTransform.prototype._createUpstreamId = function _createUpstreamId(ns, id) {
-  if (Object.prototype.toString(id) === '[object Object]') { id = id.toString(); } // convert ObjectIDs and other objects to strings
+  if (typeof id === 'object') { id = JSON.stringify(id); } // convert ObjectIDs and other objects to strings
   var collectionName = this._collectionMap[ns];
   if (!collectionName) {
     this._log.err('ot _createUpstreamId invalid collection name %s for id %s', ns, id);

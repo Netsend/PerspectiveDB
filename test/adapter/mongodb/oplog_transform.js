@@ -115,6 +115,30 @@ describe('OplogTransform', function() {
     });
   });
 
+  describe('_createUpstreamId', function() {
+    var collectionName = '_createUpstreamId';
+    var ns = databaseName + '.' + collectionName;
+    var coll;
+
+    before(function() {
+      coll = db.collection(collectionName);
+    });
+
+    it('create a valid id for an existing namespace', function() {
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence });
+      should.strictEqual(ot._createUpstreamId(ns, 'baz'), collectionName + '\x01baz');
+    });
+
+    it('create a valid id from an object', function() {
+      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
+      var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence });
+      should.strictEqual(ot._createUpstreamId(ns, { _id: 'baz' }), collectionName + '\x01{"_id":"baz"}');
+    });
+  });
+
   describe('_oplogReader', function() {
     var collectionName = 'foo';
     var ns = databaseName + '.' + collectionName;
