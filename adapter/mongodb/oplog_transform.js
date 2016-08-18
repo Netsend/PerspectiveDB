@@ -61,8 +61,8 @@ var Writable = stream.Writable;
  *   blacklist {String[]}  collections to not track, takes precedence over
  *     collections, by default contains the mongo system collections and the tmp
  *     and conflict collection
- *   tmpStorage {String, default _pdbtmp}  temporary collection to compute update
- *     modifiers
+ *   tmpStorage {mongodb.Collection, default _pdbtmp}  temporary collection to
+ *     compute update modifiers
  *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   log {Object, default console}  log object that contains debug2, debug, info,
  *       notice, warning, err, crit and emerg functions. Uses console.log and
@@ -100,7 +100,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
   this._controlRead = controlRead.pipe(new BSONStream());
 
   this._conflicts = opts.conflicts || this._db.collection('conflicts');
-  this._tmpStorage = this._db.collection(opts.tmpStorage || '_pdbtmp');
+  this._tmpStorage = opts.tmpStorage || this._db.collection('_pdbtmp');
 
   // blacklist mongo system collections
   this._blacklist = opts.blacklist || ['system.users', 'system.profile', 'system.indexes', this._tmpStorage.collectionName, this._conflicts.collectionName];

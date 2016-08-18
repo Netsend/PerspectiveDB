@@ -327,6 +327,8 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
  *   [oplogAuthDb]:  {String}         oplog authDb database, defaults to admin
  *   [conflictDb]:   {String}         conflict database, defaults to db from url
  *   [conflictCollection]: {String, default conflicts}     conflict collection
+ *   [tmpDb]:        {String}         tmp database, defaults to db from url
+ *   [tmpCollection]: {String, default _pdbtmp} tmp collection
  *   [oplogDb]:      {String}         oplog database, defaults to local
  *   [oplogColl]:    {String}         oplog collection, defaults to oplog.$main
  *   [oplogTransformOpts]: {Object}    any oplog transform options
@@ -350,6 +352,8 @@ process.once('message', function(msg) {
   if (msg.oplogAuthDb != null && typeof msg.oplogAuthDb !== 'string') { throw new TypeError('msg.oplogAuthDb must be a non-empty string'); }
   if (msg.conflictDb != null && typeof msg.conflictDb !== 'string') { throw new TypeError('msg.conflictDb must be a non-empty string'); }
   if (msg.conflictCollection != null && typeof msg.conflictCollection !== 'string') { throw new TypeError('msg.conflictCollection must be a non-empty string'); }
+  if (msg.tmpDb != null && typeof msg.tmpDb !== 'string') { throw new TypeError('msg.tmpDb must be a non-empty string'); }
+  if (msg.tmpCollection != null && typeof msg.tmpCollection !== 'string') { throw new TypeError('msg.tmpCollection must be a non-empty string'); }
   if (msg.oplogDb != null && typeof msg.oplogDb !== 'string') { throw new TypeError('msg.oplogDb must be a non-empty string'); }
   if (msg.oplogColl != null && typeof msg.oplogColl !== 'string') { throw new TypeError('msg.oplogColl must be a non-empty string'); }
   if (msg.oplogTransformOpts != null && typeof msg.oplogTransformOpts !== 'object') { throw new TypeError('msg.oplogTransformOpts must be an object'); }
@@ -373,6 +377,9 @@ process.once('message', function(msg) {
 
   var conflictDb = msg.conflictDb || dbName;
   var conflictCollection = msg.conflictCollection || 'conflicts';
+
+  var tmpDb = msg.tmpDb || dbName;
+  var tmpCollection = msg.tmpCollection || '_pdbtmp';
 
   programName = 'mongodb ' + ns;
 
@@ -493,7 +500,7 @@ process.once('message', function(msg) {
           db.collections(function(err, collections) {
             if (err) { cb(err); return; }
             // blacklist mongo system collections
-            var blacklist = ['system.users', 'system.profile', 'system.indexes', oplogTransformOpts.tmpCollName || '_pdbtmp'];
+            var blacklist = ['system.users', 'system.profile', 'system.indexes', conflictCollection, tmpCollection];
             collections = collections.filter(coll => !~blacklist.indexOf(coll.collectionName));
             collNames = collections.map(coll => coll.collectionName);
             cb();
@@ -513,6 +520,12 @@ process.once('message', function(msg) {
       // setup conflict coll
       startupTasks.push(function(cb) {
         conflictCollection = db.db(conflictDb).collection(conflictCollection);
+        process.nextTick(cb);
+      });
+
+      // setup tmp coll
+      startupTasks.push(function(cb) {
+        tmpCollection = db.db(tmpDb).collection(tmpCollection);
         process.nextTick(cb);
       });
 
@@ -594,7 +607,8 @@ process.once('message', function(msg) {
 
         process.send('listen');
         start(oplogDb, oplogCollName, dbName, collections, dataChannel, versionControl, conflictCollection, xtend({
-          conflicts: conflictCollection
+          conflicts: conflictCollection,
+          tmpStorage: tmpCollection
         }, oplogTransformOpts));
       });
 
