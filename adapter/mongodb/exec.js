@@ -76,9 +76,10 @@ function getMongoColl(h) {
  * @return {mixed} id for use in a mongodb collection
  */
 function getMongoId(obj) {
-  var id;
+  var id, nid;
   try {
-    id = obj.n.m._id;
+    // check for original id (if BSON compatible) in meta info
+    return obj.n.m._id;
   } catch (err) {
     // if from a non-mongo perspective, fallback
     id = obj.n.h.id;
@@ -86,7 +87,7 @@ function getMongoId(obj) {
 
   if (typeof id === 'string') {
     // expect zero or one 0x01 byte
-    var nid = id.split('\x01', 2)[1];
+    nid = id.split('\x01', 2)[1];
     if (!nid || !nid.length) {
       nid = id;
     }
@@ -100,6 +101,8 @@ function getMongoId(obj) {
         log.err('could not convert id to object id %s %s', id, err);
       }
     }
+  } else {
+    nid = id;
   }
   return nid;
 }
