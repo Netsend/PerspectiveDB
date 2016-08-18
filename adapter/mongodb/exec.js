@@ -229,6 +229,7 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
           // add new collection
           coll = db.collection(collName);
           collectionMap[collName] = coll;
+          ot.addCollection(coll);
         } else {
           log.debug('item belongs to unspecified collection: %s', collName);
           handleConflict(new Error('unspecified collection'), obj, cb);
