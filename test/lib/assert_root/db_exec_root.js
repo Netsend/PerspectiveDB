@@ -47,7 +47,7 @@ var cons, silence;
 var chroot = '/var/pdb';
 var user = 'pdblevel';
 var group = 'pdblevel';
-var dbPath = '/test_db_exec_root';
+var name = 'test_db_exec_root';
 
 // open loggers
 tasks.push(function(done) {
@@ -61,8 +61,8 @@ tasks.push(function(done) {
       fs.mkdir(chroot, 0o755, function(err) {
         if (err && err.code !== 'EEXIST') { throw err; }
 
-        // remove any pre-existing dbPath
-        rimraf(chroot + dbPath, done);
+        // remove any pre-existing db
+        rimraf(chroot + '/' + name, done);
       });
     });
   });
@@ -78,8 +78,7 @@ tasks.push(function(done) {
       case 'init':
         child.send({
           log: { console: true },
-          path: dbPath,
-          name: 'test_dbe_root',
+          name: name,
         });
         break;
       case 'listen':
@@ -113,11 +112,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
         hookPaths: ['foo', 'bar'],
-        name: 'test_dbe_root',
-        user: user,
-        chroot: chroot
+        name: name,
+        user: user
       });
       break;
     default:
@@ -144,11 +141,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
         hookPaths: ['/some'],
-        name: 'test_dbe_root',
-        user: user,
-        chroot: chroot
+        name: name,
+        user: user
       });
       break;
     case 'listen':
@@ -178,11 +173,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
         hookPaths: ['/var/empty'],
-        name: 'test_dbe_root',
-        user: user,
-        chroot: chroot,
+        name: name,
+        user: user
       });
       break;
     case 'listen':
@@ -207,11 +200,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
         hookPaths: ['/var/empty'],
-        name: 'test_dbe_root',
-        user: user,
-        chroot: chroot,
+        name: name,
+        user: user
       });
       break;
     case 'listen':
@@ -242,8 +233,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         debug: false,
         size: 1,
         perspectives: [{ name: 'foo', import: { hooks: ['a'] } }]
@@ -276,10 +266,8 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
-        name: 'test_dbe_root',
-        user: user,
-        chroot: chroot
+        name: name,
+        user: user
       });
       break;
     case 'listen':
@@ -328,11 +316,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
-        group: group,
-        chroot: chroot
+        group: group
       });
       break;
     case 'listen':
@@ -391,11 +377,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         perspectives: [{ name: 'webclient' }]
       });
       break;
@@ -480,7 +464,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/' + name + '/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -516,11 +500,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         perspectives: perspectives,
         mergeTree: {
           vSize: vSize
@@ -625,7 +607,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/' + name + '/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -663,11 +645,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         perspectives: perspectives,
         mergeTree: {
           vSize: vSize
@@ -763,12 +743,10 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         hookPaths: [__dirname + '/../../../hooks/core'],
         user: user,
         group: group,
-        chroot: chroot,
         perspectives: perspectives,
         mergeTree: {
           vSize: vSize
@@ -864,7 +842,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/' + name + '/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -914,12 +892,10 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         hookPaths: [__dirname + '/../../../hooks/core'],
         user: user,
         group: group,
-        chroot: chroot,
         perspectives: perspectives,
         mergeTree: {
           vSize: vSize
@@ -954,7 +930,7 @@ tasks.push(function(done) {
   spawn([__dirname + '/../../../lib/db_exec'], opts);
 });
 
-// should support prefixFirst for head lookup (depends on 3 items in database by previous tests);
+// should support prefixExists for head lookup (depends on 3 items in database by previous tests);
 tasks.push(function(done) {
   // start an echo server that can receive auth requests and sends some BSON data
   var host = '127.0.0.1';
@@ -965,8 +941,8 @@ tasks.push(function(done) {
   function onSpawn(child) {
     // start server for head lookup channel
     var headLookupServer = net.createServer(function(conn) {
-      // do a head lookup for "abd"
-      conn.write(JSON.stringify({ prefixFirst: 'a'}) + '\n');
+      // do a head lookup for "a"
+      conn.write(JSON.stringify({ prefixExists: 'a'}) + '\n');
 
       // expect the head from previous tests
       conn.pipe(new BSONStream()).on('data', function(item) {
@@ -992,11 +968,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         mergeTree: {
           vSize: vSize
         }
@@ -1055,7 +1029,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/' + name + '/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -1085,11 +1059,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         mergeTree: {
           local: localName,
           vSize: vSize
@@ -1161,11 +1133,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         mergeTree: {
           local: localName,
           vSize: vSize
@@ -1236,11 +1206,9 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true, mask: 7 },
-        path: dbPath,
-        name: 'test_dbe_root',
+        name: name,
         user: user,
         group: group,
-        chroot: chroot,
         mergeTree: {
           local: localName,
           vSize: vSize
@@ -1280,7 +1248,7 @@ async.series(tasks, function(err) {
     if (err) { throw err; }
     silence.close(function(err) {
       if (err) { throw err; }
-      rimraf(chroot + dbPath, function(err) {
+      rimraf(chroot + '/' + name, function(err) {
         if (err) { console.error(err); }
       });
     });

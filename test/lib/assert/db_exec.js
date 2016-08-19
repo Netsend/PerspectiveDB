@@ -23,6 +23,8 @@ var childProcess = require('child_process');
 
 var async = require('async');
 
+var name = 'db_exec';
+
 var tasks = [];
 
 // print line number
@@ -137,7 +139,7 @@ tasks.push(function(done) {
   });
 });
 
-// should fail path is not a string
+// should fail name is not a string
 tasks.push(function(done) {
   console.log('test #%d', lnr());
 
@@ -148,7 +150,7 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/msg.path must be a string/.test(buff.toString()));
+    assert(/msg.name must be a non-empty string/.test(buff.toString()));
     assert.strictEqual(code, 1);
     assert.strictEqual(sig, null);
     done();
@@ -162,7 +164,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: {},
-        path: 1
+        name: 1
       });
       break;
     default:
@@ -197,6 +199,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
+        name: name,
         user: 'test'
       });
       break;
@@ -218,8 +221,8 @@ tasks.push(function(done) {
     buff = Buffer.concat([buff, data]);
   });
   child.on('exit', function(code, sig) {
-    assert(/chroot must be called while running as root/.test(buff.toString()));
-    assert.strictEqual(code, 8);
+    assert(/path creation failed/.test(buff.toString()));
+    assert.strictEqual(code, 5);
     assert.strictEqual(sig, null);
     done();
   });
@@ -232,7 +235,7 @@ tasks.push(function(done) {
     case 'init':
       child.send({
         log: { console: true },
-        path: '.',
+        name: name,
         user: 'pdblevel',
         chroot: '/var/empty'
       });
