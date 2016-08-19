@@ -1,7 +1,9 @@
 # MongoDB adapter
 
+Synchronize PerspectiveDB with mongodb databases.
+
 Features:
-* sync with an existing mongodb collection
+* sync with an existing mongodb database
 * use mongodb as the local perspective
 
 Status: beta
@@ -16,8 +18,8 @@ master = true
 oplogSize = 2000
 ```
 
-In your PerspectiveDB config file, add the `source` key to the database you want to
-connect with a mongodb collection. I.e. connect db foo with mongodb pdb.test3:
+In your PerspectiveDB config file, add the `source` key for the database you
+want to track. I.e. database "pdb" in mongodb:
 ```
 dbs: [
   {
@@ -25,10 +27,6 @@ dbs: [
     ...
     source: {
       url: mongodb://127.0.0.1:27017/pdb
-      collections: [test3]
-      #dbUser: bar
-      #oplogDbUser: bar
-      #passdb: "secrets.hjson"
     }
   }
 ]
@@ -36,7 +34,3 @@ dbs: [
 
 A full example is given in config/examples/example.hjson. Make sure to specify
 mongo auth credentials if they are needed.
-
-Note: it is currently not supported to add collections after the database is
-initialized. If you want to add extra collections after the database is
-bootstrapped, you have to delete the existing pdb database and start over.

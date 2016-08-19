@@ -1,7 +1,9 @@
 # Master process
-user: _pdbnull
-group: _pdbnull
-chroot: /var/empty
+#user: _pdbnull
+#group: _pdbnull
+#chroot: /var/empty
+#dbroot: /var/pdb
+
 log: {
   console: true
   level: debug
@@ -39,14 +41,9 @@ dbs: [
     name: mydb
     user: pdblevel
     group: pdblevel
-    chroot: /srv/pdb/mydb
 #    source: {                 # uncomment this section to enable the mongo
-#                              # adapter and mirror with some mongdb collections
+#                              # adapter and mirror with a mongdb database
 #      url: mongodb://127.0.0.1:27017/pdb
-#      collections: [test1, test3]
-#      #dbUser: bar
-#      #oplogDbUser: bar
-#      #secrets: "secrets.hjson"
 #    }
     perspectives: [{
       name: "john"

@@ -31,14 +31,14 @@ Install npm modules:
 $ npm install
 ```
 
-Ensure /var/empty exists for the chrooted processes:
+Ensure a database root directory exists, i.e. /var/pdb:
 ```
-$ sudo mkdir /var/empty
+$ sudo mkdir /var/pdb
 ```
 
-Ensure database directory exists, i.e. /srv/pdb/mydb:
+Ensure an empty directory exists for chrooted processes, i.e. /var/empty:
 ```
-$ sudo mkdir -p /srv/pdb/mydb
+$ sudo mkdir /var/empty
 ```
 
 Create a dedicated system user for the main process:
@@ -148,17 +148,16 @@ dbs: [
     ...
     source: {
       url: mongodb://127.0.0.1:1337/somedb
-      collections: [tyres]
     }
   }
 ]
 ```
 
 
-## Connecting with MongoDB
+## Mirror a MongoDB database
 
-A special mongodb adapter is included that can be used to track changes in a
-collection. See adapter/mongodb/README.md for further instructions.
+A special mongodb adapter is included that can be used to track changes in
+mongodb. See adapter/mongodb/README.md for further instructions.
 
 
 ## License
