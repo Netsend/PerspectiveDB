@@ -7,6 +7,7 @@
 #user: _pdbnull
 #group: _pdbnull
 #chroot: /var/empty
+dbroot: /var/pdb/test
 
 log: {
   console: true
@@ -16,8 +17,7 @@ log: {
 # DBs
 
 dbs: [{
-  name: someDb
-  path: /test1_pdb_mongo_root
+  name: test1_pdb_source_mongo
   mergeTree: {
     vSize: 3
     autoMergeInterval: 1000  # Milliseconds between auto processing items

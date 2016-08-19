@@ -29,9 +29,10 @@ var net = require('net');
 
 var async = require('async');
 var bson = require('bson');
+var BSONStream = require('bson-stream');
 var LDJSONStream = require('ld-jsonstream');
 var level = require('level-packager')(require('leveldown'));
-var MongoClient = require('mongodb').MongoClient;
+var mongodb = require('mongodb');
 var rimraf = require('rimraf');
 
 var MergeTree = require('../../../lib/merge_tree');
@@ -39,6 +40,7 @@ var logger = require('../../../lib/logger');
 var spawn = require('../../lib/spawn');
 
 var BSON = new bson.BSONPure.BSON();
+var MongoClient = mongodb.MongoClient;
 
 // must match with the hjson config files
 var collectionName1 = 'test1';
@@ -50,10 +52,7 @@ var tasks2 = [];
 
 var db, coll1, coll2, coll3, conflictColl;
 var cons, silence;
-var chroot = '/var/pdb';
-var dbPath1 = '/test1_pdb_mongo_root'; // match with config files
-var dbPath2 = '/test2_pdb_mongo_root'; // match with config files
-var dbPath3 = '/test3_pdb_mongo_root'; // match with config files
+var dbroot = '/var/pdb/test';
 
 // open loggers and setup db connection
 tasks.push(function(done) {
@@ -63,42 +62,33 @@ tasks.push(function(done) {
     logger({ silence: true }, function(err, l) {
       if (err) { throw err; }
       silence = l;
-      // ensure chroot
-      fs.mkdir(chroot, 0o755, function(err) {
-        if (err && err.code !== 'EEXIST') { throw err; }
-
-        // remove any pre-existing dbPath
-        rimraf(chroot + dbPath1, function(err) {
-          if (err) { throw err; }
-          rimraf(chroot + dbPath2, function(err) {
+      // remove any pre-existing db and ensure dbroot
+      rimraf(dbroot, function(err) {
+        if (err) { throw err; }
+        fs.mkdir(dbroot, 0o755, function(err) {
+          if (err && err.code !== 'EEXIST') { throw err; }
+          MongoClient.connect('mongodb://127.0.0.1:27019/pdb', function(err, dbc) {
             if (err) { throw err; }
-            rimraf(chroot + dbPath3, function(err) {
+
+            db = dbc;
+
+            // ensure an empty database and recreate collections
+            db.dropDatabase(function(err) {
               if (err) { throw err; }
 
-              MongoClient.connect('mongodb://127.0.0.1:27019/pdb', function(err, dbc) {
+              db.createCollection(collectionName1, function(err, coll) {
                 if (err) { throw err; }
-
-                db = dbc;
-
-                // ensure an empty database and recreate collections
-                db.dropDatabase(function(err) {
+                coll1 = coll;
+                db.createCollection(collectionName2, function(err, coll) {
                   if (err) { throw err; }
-
-                  db.createCollection(collectionName1, function(err, coll) {
+                  coll2 = coll;
+                  db.createCollection(collectionName3, function(err, coll) {
                     if (err) { throw err; }
-                    coll1 = coll;
-                    db.createCollection(collectionName2, function(err, coll) {
+                    coll3 = coll;
+                    db.createCollection('conflicts', function(err, coll) { // default conflict collection
                       if (err) { throw err; }
-                      coll2 = coll;
-                      db.createCollection(collectionName3, function(err, coll) {
-                        if (err) { throw err; }
-                        coll3 = coll;
-                        db.createCollection('conflicts', function(err, coll) { // default conflict collection
-                          if (err) { throw err; }
-                          conflictColl = coll;
-                          done();
-                        });
-                      });
+                      conflictColl = coll;
+                      done();
                     });
                   });
                 });
@@ -120,7 +110,7 @@ tasks.push(function(done) {
         var authReq = {
           username: 'someClient',
           password: 'somepass',
-          db: 'someDb'
+          db: 'test1_pdb_source_mongo'
         };
         var dataReq = {
           start: true
@@ -128,6 +118,7 @@ tasks.push(function(done) {
 
         var ls = new LDJSONStream({ flush: false, maxDocs: 1 });
 
+        var i = 0;
         var client = net.createConnection(1234, function() {
           // send auth request
           client.write(JSON.stringify(authReq) + '\n');
@@ -154,38 +145,42 @@ tasks.push(function(done) {
             });
 
             // expect data to echo back
-            var i = 0;
-            var vs = [];
-            client.on('readable', function() {
-              var item = client.read();
-              if (!item) { return; }
+            var versions = [];
+            client.pipe(new BSONStream()).on('data', function(item) {
+              versions.push(item.h.v);
 
-              item = BSON.deserialize(item);
-              vs.push(item.h.v);
               if (i === 0) {
-                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: vs[i], pa: [] }, b: {} });
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'foo');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: versions[i], pa: [] }, b: {} });
               }
               if (i === 1) {
-                assert.deepEqual(item, { h: { id: collectionName1 + '\x01bar', v: vs[i], pa: [] }, b: {} });
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'bar');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01bar', v: versions[i], pa: [] }, b: {} });
               }
               if (i > 1) {
-                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: vs[i], pa: [vs[i - 2]] }, b: { test: true } });
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'foo');
+                delete item.m;
+                assert.deepEqual(item, { h: { id: collectionName1 + '\x01foo', v: versions[i], pa: [versions[i - 2]] }, b: { test: true } });
                 client.end();
               }
               i++;
             });
+          });
 
-            client.on('close', function(err) {
-              assert(!err);
-              assert.strictEqual(i, 3);
-              child.kill();
-            });
+          client.on('close', function(err) {
+            assert(!err);
+            assert.strictEqual(i, 3);
+            child.kill();
           });
         });
-      }, 1000);
+      }, 1200);
     },
     onExit: done,
-    echoOut: false,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
       assert(/client connected 127.0.0.1-/.test(stdout));
@@ -203,7 +198,7 @@ tasks.push(function(done) {
         var authReq = {
           username: 'someClient',
           password: 'somepass',
-          db: 'someDb'
+          db: 'test2_pdb_source_mongo'
         };
         var dataReq = {
           start: true
@@ -237,9 +232,15 @@ tasks.push(function(done) {
 
               item = BSON.deserialize(item);
               if (i === 0) {
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'bar');
+                delete item.m;
                 assert.deepEqual(item, { h: { id: collectionName2 + '\x01bar', v: item.h.v, pa: [] }, b: { } });
               }
               if (i > 0) {
+                assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+                assert.equal(item.m._id, 'foo');
+                delete item.m;
                 assert.deepEqual(item, { h: { id: collectionName2 + '\x01foo', v: item.h.v, pa: [] }, b: { test: true } });
                 client.end();
               }
@@ -287,7 +288,7 @@ tasks.push(function(done) {
         var authReq = {
           username: 'someClient',
           password: 'somepass',
-          db: 'someDb'
+          db: 'test3_pdb_source_mongo'
         };
         var dataReq = {
           start: true
@@ -331,7 +332,7 @@ tasks.push(function(done) {
 
       // inspect leveldb
       // open and search in database if items are written, stage is cleared up to Bbbb, versions are correct etc.
-      level(chroot + dbPath3, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+      level(dbroot + '/test3_pdb_source_mongo/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
         if (err) { throw err; }
 
         var pe = 'someClient'; // from config file
@@ -436,15 +437,9 @@ async.series(tasks, function(err) {
       if (err) { throw err; }
       db.close(function(err) {
         if (err) { throw err; }
-        // remove any pre-existing dbPath
-        rimraf(chroot + dbPath1, function(err) {
-          if (err) { throw err; }
-          rimraf(chroot + dbPath2, function(err) {
-            if (err) { throw err; }
-            rimraf(chroot + dbPath3, function(err) {
-              if (err) { console.error(err); }
-            });
-          });
+        // remove any db
+        rimraf(dbroot, function(err) {
+          if (err) { console.error(err); }
         });
       });
     });
