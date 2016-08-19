@@ -54,8 +54,7 @@ var tasks = [];
 var tasks2 = [];
 
 var cons, silence;
-var chroot = '/var/pdb';
-var dbPath = '/test_pdb_root';
+var dbroot = '/var/pdb/test';
 
 // open loggers
 tasks.push(function(done) {
@@ -65,12 +64,13 @@ tasks.push(function(done) {
     logger({ silence: true }, function(err, l) {
       if (err) { throw err; }
       silence = l;
-      // ensure chroot
-      fs.mkdir(chroot, 0o755, function(err) {
-        if (err && err.code !== 'EEXIST') { throw err; }
-
-        // remove any pre-existing dbPath
-        rimraf(chroot + dbPath, done);
+      // remove any pre-existing dbs and ensure dbroot
+      rimraf(dbroot, function(err) {
+        if (err) { throw err; }
+        fs.mkdir(dbroot, 0o755,function(err) {
+          if (err && err.code !== 'EEXIST') { throw err; }
+          done();
+        });
       });
     });
   });
@@ -192,7 +192,7 @@ tasks.push(function(done) {
       var authReq = {
         username: 'foo',
         password: 'bar',
-        db: 'someDb'
+        db: 'test_pdb_wss_export'
       };
 
       var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
@@ -209,7 +209,7 @@ tasks.push(function(done) {
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
-      assert(/_verifyAuthRequest no users or import \/ export config found someDb invalid credentials/.test(stderr));
+      assert(/_verifyAuthRequest no users or import \/ export config found test_pdb_wss_export invalid credentials/.test(stderr));
     }
   };
   spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
@@ -222,7 +222,7 @@ tasks.push(function(done) {
       var authReq = {
         username: 'someClient',
         password: 'bar',
-        db: 'someDb'
+        db: 'test_pdb_wss_export'
       };
 
       var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
@@ -239,7 +239,7 @@ tasks.push(function(done) {
     echoErr: false,
     onExit: done,
     testStderr: function(stderr) {
-      assert(/_verifyAuthRequest someDb someClient invalid credentials/.test(stderr));
+      assert(/_verifyAuthRequest test_pdb_wss_export someClient invalid credentials/.test(stderr));
     }
   };
   spawn([__dirname + '/../../../bin/pdb', __dirname + '/test_pdb_wss_export.hjson'], opts);
@@ -252,7 +252,7 @@ tasks.push(function(done) {
       var authReq = {
         username: 'someClient',
         password: 'somepass',
-        db: 'someDb'
+        db: 'test_pdb_wss_export'
       };
 
       var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
@@ -288,7 +288,7 @@ tasks.push(function(done) {
       var authReq = {
         username: 'someClient',
         password: 'somepass',
-        db: 'someDb'
+        db: 'test_pdb_wss_import'
       };
 
       var client = ws.connect('wss://localhost:1235', wsClientOpts, function() {
@@ -327,7 +327,7 @@ tasks.push(function(done) {
       var authReq = {
         username: pe,
         password: 'somepass',
-        db: 'someDb'
+        db: 'test_pdb_wss_import'
       };
       var dataReq = {
         start: true
@@ -370,7 +370,7 @@ tasks.push(function(done) {
       var authReq = {
         username: pe,
         password: 'somepass',
-        db: 'someDb'
+        db: 'test_pdb_wss_import_export'
       };
       var dataReq = {
         start: true
@@ -407,7 +407,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/test/test_pdb_wss_import_export/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -452,7 +452,7 @@ tasks.push(function(done) {
       var authReq = {
         username: pe,
         password: 'somepass',
-        db: 'someDb'
+        db: 'test_pdb_wss_import_export'
       };
       var dataReq = {
         start: true
@@ -503,7 +503,7 @@ tasks.push(function(done) {
 
   function onExit() {
     // open and search in database if item is written
-    level('/var/pdb' + dbPath, { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
+    level('/var/pdb/test/test_pdb_wss_import_export/data', { keyEncoding: 'binary', valueEncoding: 'binary' }, function(err, db) {
       if (err) { throw err; }
 
       var mt = new MergeTree(db, {
@@ -573,7 +573,7 @@ async.series(tasks, function(err) {
     if (err) { throw err; }
     silence.close(function(err) {
       if (err) { throw err; }
-      rimraf(chroot + dbPath, function(err) {
+      rimraf(dbroot, function(err) {
         if (err) { console.error(err); }
       });
     });

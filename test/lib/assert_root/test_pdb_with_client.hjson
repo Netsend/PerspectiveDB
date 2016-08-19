@@ -9,6 +9,7 @@
 #user: _pdbnull
 #group: _pdbnull
 #chroot: /var/empty
+dbroot: /var/pdb/test
 
 log: {
   console: true
@@ -21,9 +22,7 @@ autoProcessInterval: 100
 # DBs
 
 dbs: [{
-  name: someDb
-  chroot: /var/pdb
-  path: /test_pdb_root
+  name: test_pdb_with_client
   mergeTree: {
     vSize: 3,
   },
@@ -35,9 +34,7 @@ dbs: [{
     }
   ]
 }, {
-  name: otherDb
-  chroot: /var/pdb
-  path: /test_pdb_root2
+  name: anotherDb
   mergeTree: {
     vSize: 3,
   },
@@ -45,7 +42,7 @@ dbs: [{
     {
       name: otherClient
       username: joe
-      database: someDb
+      database: test_pdb_with_client
       secrets: secrets.hjson
       port: 1234
       import: true

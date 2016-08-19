@@ -9,6 +9,7 @@
 #user: _pdbnull
 #group: _pdbnull
 #chroot: /var/empty
+dbroot: /var/pdb/test
 
 log: {
   console: true
@@ -21,9 +22,7 @@ autoProcessInterval: 100
 # DBs
 
 dbs: [{
-  name: someDb
-  chroot: /var/pdb
-  path: /test_pdb_root
+  name: test_pdb_wss_import_export
   mergeTree: {
     vSize: 3,
   },

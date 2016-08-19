@@ -17,7 +17,6 @@ log: {
 
 dbs: [{
   name: someDb
-  chroot: /var/pdb
   path: /test1_pdb_mongo_root
   mergeTree: {
     vSize: 3

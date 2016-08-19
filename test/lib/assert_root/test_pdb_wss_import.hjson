@@ -9,10 +9,11 @@
 #user: _pdbnull
 #group: _pdbnull
 #chroot: /var/empty
+dbroot: /var/pdb/test
 
 log: {
   console: true
-  level: debug
+  level: debug2
 }
 
 # Milliseconds between auto processing items
@@ -21,9 +22,7 @@ autoProcessInterval: 100
 # DBs
 
 dbs: [{
-  name: someDb
-  chroot: /var/pdb
-  path: /test_pdb_root
+  name: test_pdb_wss_import
   mergeTree: {
     vSize: 3,
   },
