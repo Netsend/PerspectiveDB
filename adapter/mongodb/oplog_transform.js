@@ -329,7 +329,7 @@ OplogTransform.prototype._prefixExists = function _prefixExists(prefix, cb) {
       return;
     }
 
-    that._log.debug('ot _prefixExists %j', obj);
+    that._log.debug('ot _prefixExists %j', obj.h);
     cb(null, !!Object.keys(obj).length);
   });
 
