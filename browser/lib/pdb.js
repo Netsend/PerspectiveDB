@@ -809,7 +809,7 @@ PerspectiveDB.prototype._writeMerge = function _writeMerge(obj, enc, cb) {
   lookup.onsuccess = function() {
     // The current item in the store is expected to match the previous version,
     // since this is an update.
-    if (isEqual(lookup.result, prevVersion.b)) {
+    if (isEqual(lookup.result, prevVersion && prevVersion.b)) {
       if (newVersion.h.d) {
         that._log.debug2('delete', newVersion.h);
         store.delete(id);
