@@ -101,7 +101,7 @@ Relative paths are relative to the directory of the config file.
 
 ### Run the web client
 A web client is included in the [browser](https://github.com/Netsend/PerspectiveDB/tree/master/browser)
-directory. Use a local webserver like [http-server](https://www.npmjs.com/package/http-server)
+directory. Use a local webserver like [http-server](https://www.npmjs.com/package/http-server) or `python -m SimpleHTTPServer 8080`
 to run the example in [browser/example](https://github.com/Netsend/PerspectiveDB/tree/master/browser/example).
 
 
