@@ -11,7 +11,7 @@ Features:
 * support for browsers via IndexedDB and WebSockets (see [browser](https://github.com/Netsend/PerspectiveDB/tree/master/browser))
 * support for MongoDB
 
-Status: beta
+Status: alpha
 
 Currently deploying the software into a controlled production environment.
 
