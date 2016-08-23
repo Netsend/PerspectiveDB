@@ -1,5 +1,5 @@
 /**
- * Copyright 2014, 2015, 2015 Netsend.
+ * Copyright 2014, 2015, 2015, 2016 Netsend.
  *
  * This file is part of PerspectiveDB.
  *
@@ -21,6 +21,7 @@
 var should = require('should');
 var rimraf = require('rimraf');
 var level = require('level-packager')(require('leveldown'));
+//var streamify = require('../../../lib/streamify');
 var streamify = require('stream-array');
 
 // wrapper around streamify that supports "reopen" recursively
@@ -218,7 +219,13 @@ describe('_doMerge', function() {
 describe('merge', function() {
   var id = 'foo';
 
-  describe('constructor', function() {
+  function lookup(v, dag, cb) {
+    process.nextTick(() => {
+      cb(null, dag.find(item => v === item.h.v))
+    });
+  }
+
+  xdescribe('constructor', function() {
     it('should require sX to be a stream.Readable', function() {
       (function() { merge(null); }).should.throw('sX must be a stream.Readable');
     });
@@ -313,7 +320,9 @@ describe('merge', function() {
       it('A and A = original A', function(done) {
         var x = streamifier(dA);
         var y = streamifier(dA);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+        function lookupX(v, cb) { lookup(v, dA, cb); }
+        function lookupY(v, cb) { lookup(v, dA, cb); }
+        merge(A, A, x, y, lookupX, lookupY, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Aaaa', pa: [] },
@@ -328,11 +337,12 @@ describe('merge', function() {
         });
       });
 
-
       it('B and C = merge', function(done) {
         var x = streamifier(dB);
         var y = streamifier(dC);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+        function lookupX(v, cb) { lookup(v, dB, cb); }
+        function lookupY(v, cb) { lookup(v, dC, cb); }
+        merge(B, C, x, y, lookupX, lookupY, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Bbbb', 'Cccc'] },
@@ -350,7 +360,9 @@ describe('merge', function() {
       it('E and B = ff to E', function(done) {
         var x = streamifier(dE);
         var y = streamifier(dB);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+        function lookupX(v, cb) { lookup(v, dE, cb); }
+        function lookupY(v, cb) { lookup(v, dB, cb); }
+        merge(E, B, x, y, lookupX, lookupY, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, v: 'Eeee', pa: ['Cccc', 'Bbbb'] },
@@ -375,7 +387,9 @@ describe('merge', function() {
       it('D and E = merge', function(done) {
         var x = streamifier(dD);
         var y = streamifier(dE);
-        merge(x, y, { log: silence }, function(err, mergeX, mergeY) {
+        function lookupX(v, cb) { lookup(v, dD, cb); }
+        function lookupY(v, cb) { lookup(v, dE, cb); }
+        merge(D, E, x, y, lookupX, lookupY, { log: silence }, function(err, mergeX, mergeY) {
           if (err) { throw err; }
           should.deepEqual(mergeX, {
             h: { id: id, pa: ['Dddd', 'Eeee'] },
