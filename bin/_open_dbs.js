@@ -53,6 +53,8 @@ function openDbs(config, opts, iterator, cb) {
   }, opts);
 
   async.eachSeries(config.dbs, function(dbCfg, cb2) {
+    dbCfg.dbroot = config.dbroot;
+
     // map perspective names
     if (dbCfg.perspectives) {
       dbCfg.perspectives = dbCfg.perspectives.map(function(peCfg) {

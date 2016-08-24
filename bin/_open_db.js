@@ -21,8 +21,8 @@
 var level = require('level-packager')(require('leveldown'));
 
 function openDb(config) {
-  var chroot = config.chroot || '/var/pdb';
-  var data = config.data || '/data';
+  var dbroot = config.dbroot || config.chroot || '/var/pdb';
+  var data = config.name + '/data';
 
   // ensure leading slash in data path
   if (data[0] !== '/') {
@@ -30,6 +30,6 @@ function openDb(config) {
   }
 
   // open database
-  return level(chroot + data, { keyEncoding: 'binary', valueEncoding: 'binary' });
+  return level(dbroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' });
 }
 module.exports = openDb;
