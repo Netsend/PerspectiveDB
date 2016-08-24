@@ -220,7 +220,7 @@ PerspectiveDB.createNode = function createNode(idb, opts, cb) {
     keyEncoding: 'binary',
     valueEncoding: 'none',
     asBuffer: false,
-    reopenOnTimeout: true
+    snapshot: false
   });
 
   var pdb;
@@ -491,7 +491,8 @@ PerspectiveDB.prototype.getConflicts = function getConflicts(opts, next, done) {
     opts = {};
   }
   opts = xtend({
-    direction: 'next'
+    direction: 'next',
+    snapshot: false // don't iterate over a snapshot so that backpressure can be used
   }, opts);
   done = done || noop;
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }

@@ -23,7 +23,7 @@
     "crc-32": "^0.2.2",
     "daemon": "^1.1.0",
     "hjson": "^1.7.4",
-    "idb-readable-stream": "https://github.com/timkuijsten/node-idb-readable-stream.git",
+    "idb-readable-stream": "0.0.4",
     "ld-jsonstream": "^0.0.6",
     "level-js": "https://github.com/timkuijsten/level.js.git#idbunwrapper",
     "level-packager": "^1.2.0",
