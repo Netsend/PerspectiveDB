@@ -278,8 +278,7 @@ tasks.push(function(done) {
 });
 
 // test with empty collection and empty leveldb. spawn db, then save new objects in level via remote
-// because the merge handler only passes locally confirmed objects, the fast-forward from foo Aaaa to Bbbb
-// should be saved in conflicts.
+// because the merge handler uses optimistic merging, the fast-forward from foo Aaaa to Bbbb should be no problem
 tasks.push(function(done) {
   var opts = {
     onSpawn: function(child) {
@@ -378,9 +377,15 @@ tasks.push(function(done) {
               delete item.m;
               assert.deepEqual(item, { h: { id: collectionName3 + '\x01bar', v: 'Xxxx', pa: [], pe: pe, i: 2 }, b: { } });
               break;
+            case 3:
+              assert.deepEqual(Object.keys(item.m), ['_op', '_id']);
+              assert.equal(item.m._id, 'foo');
+              delete item.m;
+              assert.deepEqual(item, { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe, i: 3 }, b: { test: true } });
+              break;
             }
           }).on('end', function() {
-            assert.strictEqual(i, 2);
+            assert.strictEqual(i, 3);
 
             db.close();
 
@@ -390,22 +395,13 @@ tasks.push(function(done) {
 
               assert.strictEqual(items.length, 2);
               assert.deepEqual(items[0], { _id: 'bar' });
-              assert.deepEqual(items[1], { _id: 'foo' });
+              assert.deepEqual(items[1], { _id: 'foo', test: true }); // last update of foo
 
-              // inspect the conflict collection, should only contain Bbbb (since the mongo adapter got that before confirming Aaaa so the merge handler sent { n: Bbbb, l: null }
+              // inspect the conflict collection
               conflictColl.find({}, { sort: { _id: 1 } }).toArray(function(err, items) {
                 if (err) { throw err; }
 
-                assert.strictEqual(items.length, 1);
-                delete items[0]._id; // delete object id
-                assert.deepEqual(items, [{
-                  n: { h: { id: collectionName3 + '\x01foo', v: 'Bbbb', pa: ['Aaaa'], pe: pe }, b: { test: true } },
-                  l: null,
-                  lcas: [],
-                  pe: pe,
-                  c: null,
-                  err: 'no item in collection expected'
-                }]);
+                assert.strictEqual(items.length, 0);
                 done();
               });
             });
@@ -413,7 +409,6 @@ tasks.push(function(done) {
         });
       });
     },
-    echoOut: false,
     testStdout: function(stdout) {
       assert(/TCP server bound 127.0.0.1:1234/.test(stdout));
       assert(/client connected 127.0.0.1-/.test(stdout));
