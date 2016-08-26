@@ -37,8 +37,43 @@ describe('streamify', function() {
   it('should iterate over three items in reverse', function(done) {
     var arr = ['a', 'b', 'c'];
     var i = 0;
-    streamify(arr, true).on('data', function(item) {
+    streamify(arr, { reverse: true }).on('data', function(item) {
       assert.equal(item, arr[arr.length - ++i]);
+    }).on('end', function() {
+      assert.equal(i, 3);
+      done();
+    });
+  });
+
+  it('should filter an item', function(done) {
+    var arr = ['a', 'b', 'c'];
+    var i = 0;
+    function filter(item) {
+      return item !== 'b';
+    }
+    streamify(arr, { filter }).on('data', function(item) {
+      switch (i++) {
+      case 0:
+        assert.equal(item, arr[0]);
+        break;
+      case 1:
+        assert.equal(item, arr[2]);
+        break;
+      }
+    }).on('end', function() {
+      assert.equal(i, 2);
+      done();
+    });
+  });
+
+  it('should map items', function(done) {
+    var arr = ['a', 'b', 'c'];
+    var i = 0;
+    function map(item) {
+      return { mapped: item };
+    }
+    streamify(arr, { map }).on('data', function(item) {
+      assert.deepEqual(item, { mapped: arr[i++] });
     }).on('end', function() {
       assert.equal(i, 3);
       done();
