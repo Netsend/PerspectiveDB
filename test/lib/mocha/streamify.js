@@ -18,21 +18,30 @@
 
 'use strict';
 
-var stream = require('stream');
+var assert = require('assert');
 
-// create a PassThrough stream, loaded with data
-function streamify(data, reverse) {
-  var pt = new stream.PassThrough({ objectMode: true });
-  var i;
-  if (reverse)
-    for (i = data.length; i-- > 0;)
-      pt.write(data[i]);
-  else
-    for (i = 0; i < data.length; i++)
-      pt.write(data[i]);
+var streamify = require('../../../lib/streamify');
 
-  pt.end();
-  return pt;
-}
+describe('streamify', function() {
+  it('should iterate over three items', function(done) {
+    var arr = ['a', 'b', 'c'];
+    var i = 0;
+    streamify(arr).on('data', function(item) {
+      assert.equal(item, arr[i++]);
+    }).on('end', function() {
+      assert.equal(i, 3);
+      done();
+    });
+  });
 
-module.exports = streamify;
+  it('should iterate over three items in reverse', function(done) {
+    var arr = ['a', 'b', 'c'];
+    var i = 0;
+    streamify(arr, true).on('data', function(item) {
+      assert.equal(item, arr[arr.length - ++i]);
+    }).on('end', function() {
+      assert.equal(i, 3);
+      done();
+    });
+  });
+});
