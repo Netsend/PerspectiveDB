@@ -554,10 +554,10 @@ PerspectiveDB.prototype.createReadStream = function createReadStream(opts) {
  * @param {Object} remote
  * @param remote.name {String}  local reference to the remote
  * @param remote.host {String}  address of the remote
- * @param remote.db {String}  name of the database on the remote
  * @param {String} remote.username - username of remote account
  * @param {String} remote.password - password of remote account
  * @param {Array} [remote.stores] - limit synchronization to given stores
+ * @param {String} [remote.db=remote.name] - name of the database on the remote
  * @param {Boolean|Object} [remote.import=true] - import changes from remote
  * @param {Boolean|Object} [remote.export=true] - export changes to remote
  * @param {Number} [remote.port=3344] - port of the remote WebSocket server
@@ -567,7 +567,6 @@ PerspectiveDB.prototype.connect = function connect(remote) {
   if (remote == null || typeof remote !== 'object') { throw new TypeError('remote must be an object'); }
   if (!remote.name || typeof remote.name !== 'string') { throw new TypeError('remote.name must be a string'); }
   if (!remote.host || typeof remote.host !== 'string') { throw new TypeError('remote.host must be a string'); }
-  if (!remote.db || typeof remote.db !== 'string') { throw new TypeError('remote.db must be a string'); }
   if (!remote.username || typeof remote.username !== 'string') { throw new TypeError('remote.username must be a string'); }
   if (!remote.password || typeof remote.password !== 'string') { throw new TypeError('remote.password must be a string'); }
 
@@ -579,7 +578,7 @@ PerspectiveDB.prototype.connect = function connect(remote) {
   var authReq = {
     username: remote.username,
     password: remote.password,
-    db: remote.db
+    db: remote.db || remote.name
   };
 
   var port = remote.port || '3344';
