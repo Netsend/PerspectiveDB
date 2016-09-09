@@ -1,0 +1,60 @@
+#!/usr/bin/env node
+
+/**
+ * Copyright 2016 Netsend.
+ *
+ * This file is part of PerspectiveDB.
+ *
+ * PerspectiveDB is free software: you can redistribute it and/or modify it under the
+ * terms of the GNU Affero General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option) any later
+ * version.
+ *
+ * PerspectiveDB is distributed in the hope that it will be useful, but WITHOUT ANY
+ * WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ * PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License along
+ * with PerspectiveDB. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+'use strict';
+
+var fs = require('fs');
+var stream = require('stream');
+
+var async = require('async');
+var program = require('commander');
+
+var MergeTree = require('../lib/merge_tree');
+var noop = require('../lib/noop');
+
+var openDb = require('./_open_db');
+
+var Writable = stream.Writable;
+
+program
+  .version('0.0.1')
+  .usage('perspective <dbpath>')
+  .description('remove perspective: remove all documents in dbpath of a perspective')
+  .option('dbpath defaults to /var/pdb/')
+  .parse(process.argv);
+
+var pe = program.args[0];
+
+if (!pe) {
+  program.help();
+}
+
+function run(db) {
+  var mt = new MergeTree(db, { perspectives: [pe] });
+  mt.rmTree(pe, function(err) {
+    db.close();
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+  });
+}
+
+run(openDb({ dbroot: dbroot });
