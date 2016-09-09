@@ -20,6 +20,10 @@
 
 var level = require('level-packager')(require('leveldown'));
 
+function byPath(path) {
+  return level(path, { keyEncoding: 'binary', valueEncoding: 'binary' });
+}
+
 function openDb(config) {
   var dbroot = config.dbroot || config.chroot || '/var/pdb';
   var data = config.name + '/data';
@@ -30,6 +34,9 @@ function openDb(config) {
   }
 
   // open database
-  return level(dbroot + '/' + data, { keyEncoding: 'binary', valueEncoding: 'binary' });
+  return byPath(dbroot + '/' + data);
 }
+
+openDb.byPath = byPath;
+
 module.exports = openDb;
