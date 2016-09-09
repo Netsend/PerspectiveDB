@@ -297,6 +297,46 @@ describe('Tree', function() {
     });
   });
 
+  describe('getPrefixWithType', function() {
+    var p;
+
+    it('should require name to be a string', function() {
+      (function() { p = Tree.getPrefixWithType({}); }).should.throw('name must be a string');
+    });
+
+    it('should require name to not exceed 254 bytes', function() {
+      var name = '';
+      for (var i = 0; i < 254; i++) {
+        name += 'a';
+      }
+      // trick it with the last character taking two bytes making the total byte length 255
+      name += '\u00bd';
+      (function() { p = Tree.getPrefixWithType(name); }).should.throw('name must not exceed 254 bytes');
+    });
+
+    it('should require type to be a numner', function() {
+      (function() { p = Tree.getPrefixWithType(''); }).should.throw('type must be a number');
+    });
+
+    it('should require type to be >= 0x01', function() {
+      (function() { p = Tree.getPrefixWithType('', 0x00); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
+    });
+
+    it('should require type to be <= 0x05', function() {
+      (function() { p = Tree.getPrefixWithType('', 0x06); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
+    });
+
+    it('should return the right prefix with an empty name', function() {
+      p = Tree.getPrefixWithType('', 0x04);
+      should.strictEqual(p.toString('hex'), new Buffer([0,0,4]).toString('hex'));
+    });
+
+    it('should return the right prefix with a non-empty name', function() {
+      p = Tree.getPrefixWithType('abc', 0x02);
+      should.strictEqual(p.toString('hex'), new Buffer([3,97,98,99,0,2]).toString('hex'));
+    });
+  });
+
   describe('parseKey', function() {
     it('should require key to be a buffer', function() {
       (function() { Tree.parseKey({}); }).should.throw('key must be a buffer');
