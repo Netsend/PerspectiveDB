@@ -41,14 +41,19 @@ program
   .parse(process.argv);
 
 var pe = program.args[0];
+var dbroot = program.args[1] || '/var/pdb';
 
 if (!pe) {
   program.help();
 }
+if (!dbroot) {
+  program.help();
+}
+console.log('removing %s from %s', pe, dbroot);
 
 function run(db) {
   var mt = new MergeTree(db, { perspectives: [pe] });
-  mt.rmTree(pe, function(err) {
+  mt.rmRemote(pe, function(err) {
     db.close();
     if (err) {
       console.error(err);
@@ -57,4 +62,4 @@ function run(db) {
   });
 }
 
-run(openDb({ dbroot: dbroot });
+run(openDb.byPath(dbroot));
