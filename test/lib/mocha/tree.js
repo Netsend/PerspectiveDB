@@ -274,26 +274,14 @@ describe('Tree', function() {
       (function() { p = Tree.getPrefix(name); }).should.throw('name must not exceed 254 bytes');
     });
 
-    it('should require type to be a numner', function() {
-      (function() { p = Tree.getPrefix(''); }).should.throw('type must be a number');
-    });
-
-    it('should require type to be >= 0x01', function() {
-      (function() { p = Tree.getPrefix('', 0x00); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
-    });
-
-    it('should require type to be <= 0x05', function() {
-      (function() { p = Tree.getPrefix('', 0x06); }).should.throw('type must be in the subkey range of 0x01 to 0x05');
-    });
-
     it('should return the right prefix with an empty name', function() {
-      p = Tree.getPrefix('', 0x04);
-      should.strictEqual(p.toString('hex'), new Buffer([0,0,4]).toString('hex'));
+      p = Tree.getPrefix('');
+      should.strictEqual(p.toString('hex'), new Buffer([0,0]).toString('hex'));
     });
 
     it('should return the right prefix with a non-empty name', function() {
-      p = Tree.getPrefix('abc', 0x02);
-      should.strictEqual(p.toString('hex'), new Buffer([3,97,98,99,0,2]).toString('hex'));
+      p = Tree.getPrefix('abc');
+      should.strictEqual(p.toString('hex'), new Buffer([3,97,98,99,0]).toString('hex'));
     });
   });
 
