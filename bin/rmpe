@@ -21,45 +21,51 @@
 'use strict';
 
 var fs = require('fs');
-var stream = require('stream');
 
-var async = require('async');
+var hjson = require('hjson');
 var program = require('commander');
 
 var MergeTree = require('../lib/merge_tree');
 var noop = require('../lib/noop');
 
-var openDb = require('./_open_db');
-
-var Writable = stream.Writable;
+var openDbs = require('./_open_dbs');
 
 program
   .version('0.0.1')
-  .usage('perspective <dbpath>')
+  .usage('<config> db perspective')
   .description('remove perspective: remove all documents in dbpath of a perspective')
-  .option('dbpath defaults to /var/pdb/')
+  .option('config        defaults to ../config/local/pdb.hjson')
+  .option('db            name of the database in <config>')
+  .option('perspective   name of the persspective in the database')
   .parse(process.argv);
 
-var pe = program.args[0];
-var dbroot = program.args[1] || '/var/pdb';
+var configFile = program.args[0] || __dirname + '/../config/local/pdb.hjson';
+var config = hjson.parse(fs.readFileSync(configFile, 'utf8'));
+
+var dbname = program.args[1];
+var pe = program.args[2];
 
 if (!pe) {
   program.help();
 }
-if (!dbroot) {
-  program.help();
-}
-console.log('removing %s from %s', pe, dbroot);
 
-function run(db) {
-  var mt = new MergeTree(db, { perspectives: [pe] });
+function run(db, cfg, cb) {
+  cfg = cfg || {};
+  cfg.log = {
+    err: noop,
+    notice: noop,
+    info: noop,
+    debug: noop,
+    debug2: noop
+  };
+  if (cfg.name !== dbname) { cb(); return; }
+  var mt = new MergeTree(db, cfg);
   mt.rmRemote(pe, function(err) {
     db.close();
-    if (err) {
-      console.error(err);
-      process.exit(1);
-    }
+    cb(err);
   });
 }
 
-run(openDb.byPath(dbroot));
+openDbs(config, run, function(err) {
+  if (err) { console.error(err); process.exit(2); }
+});
