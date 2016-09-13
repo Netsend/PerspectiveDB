@@ -177,12 +177,15 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
   ot.startStream();
 
   // save an object in the conflict collection
-  function handleConflict(origErr, obj, cb) {
+  function handleConflict(origErr, obj, collItem, cb) {
     // remove from expected
     findAndDelete(expected, item => { item === obj; });
     obj.err = origErr.message;
     if (~['delete failed', 'insert failed', 'update failed'].indexOf(obj.err)) {
       obj.errCode = 'adapterQueryFailed';
+    }
+    if (collItem) {
+      obj.collItem = collItem;
     }
     conflictCollection.insert(obj, function(err, r) {
       if (err || !r.insertedCount) {
@@ -200,7 +203,7 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
     objectMode: true,
     write: function(obj, enc, cb) {
       if (obj.c) {
-        handleConflict(new Error('upstream merge conflict'), obj, cb);
+        handleConflict(new Error('upstream merge conflict'), obj, null, cb);
         return;
       }
 
@@ -220,7 +223,7 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
       var collName = getMongoColl(obj.n.h);
       if (!collName) {
         log.notice('collection could not be determined');
-        handleConflict(new Error('could not determine collection'), obj, cb);
+        handleConflict(new Error('could not determine collection'), obj, null, cb);
         return;
       }
       var coll = collectionMap[collName];
@@ -232,76 +235,75 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
           ot.addCollection(coll);
         } else {
           log.debug('item belongs to unspecified collection: %s', collName);
-          handleConflict(new Error('unspecified collection'), obj, cb);
+          handleConflict(new Error('unspecified collection'), obj, null, cb);
           return;
         }
       }
 
       var mongoId = getMongoId(obj);
-      coll.find({ _id: mongoId }).limit(1).next(function(err, doc) {
-        if (err) { handleConflict(err, obj, cb); return; }
-        var collItem = doc;
+      coll.find({ _id: mongoId }).limit(1).next(function(err, collItem) {
+        if (err) { handleConflict(err, obj, collItem, cb); return; }
         var lhead;
 
         if (obj.n.h.d === true) { // delete
-          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, cb); return; }
+          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, collItem, cb); return; }
           if (!collItem) {
             log.debug('nothing in collection by %s', mongoId);
-            handleConflict(new Error('item in collection expected'), obj, cb);
+            handleConflict(new Error('item in collection expected'), obj, collItem, cb);
             return;
           }
 
           // ensure a current version with id based on the given local head
           lhead = xtend(obj.l.b, { _id: mongoId });
-          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, cb); return; }
+          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, collItem, cb); return; }
 
           coll.findOneAndDelete(lhead, function(err, r) {
             if (err || !r.ok) {
               log.notice('NO delete %j, err: %s', obj.n.h, err);
-              handleConflict(err || new Error('delete failed'), obj, cb);
+              handleConflict(err || new Error('delete failed'), obj, collItem, cb);
               return;
             }
             if (!isEqual(r.value, lhead)) {
               obj.expected = collItem;
               obj.replaced = r.value;
-              handleConflict(new Error('race condition on delete'), obj, cb);
+              handleConflict(new Error('race condition on delete'), obj, collItem, cb);
               return;
             }
             log.debug('delete %j', obj.n.h);
             cb();
           });
         } else if (obj.l == null || obj.l.b == null) { // insert
-          if (obj.n == null) { handleConflict(new Error('new object expected'), obj, cb); return; }
-          if (collItem) { handleConflict(new Error('no item in collection expected'), obj, cb); return; }
+          if (obj.n == null) { handleConflict(new Error('new object expected'), obj, collItem, cb); return; }
+          if (collItem) { handleConflict(new Error('no item in collection expected'), obj, collItem, cb); return; }
 
           // put mongo id on the document
           coll.insertOne(xtend(obj.n.b, { _id: mongoId }), function(err, r) {
             if (err || !r.insertedCount) {
               log.notice('NO insert %j', obj.n.h);
-              handleConflict(err || new Error('insert failed'), obj, cb);
+              handleConflict(err || new Error('insert failed'), obj, collItem, cb);
               return;
             }
             log.debug('insert %j', obj.n.h);
             cb();
           });
         } else { // update
-          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, cb); return; }
-          if (!collItem) { handleConflict(new Error('item in collection expected'), obj, cb); return; }
+          if (obj.l == null) { handleConflict(new Error('local head expected'), obj, collItem, cb); return; }
+          if (!collItem) { handleConflict(new Error('item in collection expected'), obj, collItem, cb); return; }
 
           // put mongo id back on the document
           lhead = xtend(obj.l.b, { _id: mongoId });
-          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, cb); return; }
+          if (!isEqual(collItem, lhead)) { handleConflict(new Error('collection and local head are not equal'), obj, collItem, cb); return; }
 
           coll.findOneAndReplace(lhead, xtend(obj.n.b, { _id: mongoId }), function(err, r) {
             if (err || !r.ok) {
               log.notice('NO update %j', obj.n.h);
-              handleConflict(err || new Error('update failed'), obj, cb);
+              handleConflict(err || new Error('update failed'), obj, collItem, cb);
               return;
             }
             if (!isEqual(r.value, lhead)) {
               obj.expected = collItem;
               obj.replaced = r.value;
-              handleConflict(new Error('race condition on update'), obj, cb);
+              handleConflict(new Error('race condition on update'), obj, collItem, cb);
               return;
             }
             log.debug('update %j', obj.n.h);
