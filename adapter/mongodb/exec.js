@@ -187,6 +187,7 @@ function start(oplogDb, oplogCollName, dbName, collections, dataChannel, version
     if (collItem) {
       obj.collItem = collItem;
     }
+    obj.d = new Date();
     conflictCollection.insert(obj, function(err, r) {
       if (err || !r.insertedCount) {
         log.err('could not save conflicting object %s %j, original error %s', err, obj.n.h, origErr);
