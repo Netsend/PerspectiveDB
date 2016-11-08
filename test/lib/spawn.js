@@ -40,7 +40,7 @@ function spawn(args, options, spawnOpts) {
     exitSignal: null,                                         // test if exit signal is empty
     testStdout: null,
     testStderr: function(s) {                                 // test if stderr is empty
-      if (s.length) { throw new Error(s); }
+      if (s.length) { throw new Error('errors'); }
     }
   }, options);
 
