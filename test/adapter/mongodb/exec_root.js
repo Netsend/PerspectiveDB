@@ -350,6 +350,7 @@ tasks.push(function(done) {
 
                     assert.strictEqual(items.length, 1);
                     delete items[0]._id; // delete object id
+                    delete items[0].d; // delete date
                     assert.deepEqual(items, [{
                       n: {
                         h: { id: collectionName2 + '\x01qux', v: 'Aaaa', pe: pe, pa: [], d: true },
