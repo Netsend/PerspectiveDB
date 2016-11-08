@@ -764,16 +764,21 @@ OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateM
 
   var that = this;
 
+  // ask for last version of this id
+  var upstreamId = this._createUpstreamId(oplogItem.ns, oplogItem.o2._id);
+
   // listen for response, expect it to be the last stored version
   this._controlRead.once('readable', function() {
     var head = that._controlRead.read();
-    if (!head || !head.h) return void cb(new Error('previous version of doc not found'));
+    if (!head || !head.h) {
+      that._log.info('ot _applyOplogUpdateModifier previous version of doc not found', JSON.stringify(oplogItem), upstreamId);
+      cb(new Error('previous version of doc not found'));
+      return;
+    }
 
     that._createNewVersionByUpdateDoc(head, oplogItem, cb);
   });
 
-  // ask for last version of this id
-  var upstreamId = this._createUpstreamId(oplogItem.ns, oplogItem.o2._id);
   this._controlWrite.write(JSON.stringify({ id: upstreamId }) + '\n');
 };
 
