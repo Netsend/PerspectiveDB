@@ -191,7 +191,9 @@ OplogTransform.prototype.startStream = function startStream() {
     that._or.pipe(that, { end: false });
   }
 
+  this._booting = true;
   this._boot(function(err, offset) {
+    that._booting = false;
     if (err) {
       that.emit('error', err);
       return;
@@ -216,6 +218,12 @@ OplogTransform.prototype.startStream = function startStream() {
  */
 OplogTransform.prototype.close = function close(cb) {
   this._stop = true;
+
+  if (this._booting) {
+    this._log.info('ot close still booting, wait a second and retry');
+    setTimeout(() => this.close(cb), 1000);
+    return;
+  }
 
   var that = this;
 
