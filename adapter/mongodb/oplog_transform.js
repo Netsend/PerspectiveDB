@@ -471,7 +471,6 @@ OplogTransform.prototype._zipUp = function _zipUp(offsetCollections, cb) {
  *
  * opts:
  *   filter {Object}  extra filter to apply apart from namespace
- *   bson {Boolean, default false}  whether to return raw bson or parsed objects
  *   includeOffset {Boolean, default false}  whether to include or exclude offset
  */
 OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
@@ -480,8 +479,9 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
   if (opts == null) opts = {};
   if (typeof opts !== 'object') { throw new TypeError('opts must be an object'); }
   if (opts.filter != null && typeof opts.filter !== 'object') { throw new TypeError('opts.filter must be an object'); }
-  if (opts.bson != null && typeof opts.bson !== 'boolean') { throw new TypeError('opts.bson must be a boolean'); }
   if (opts.includeOffset != null && typeof opts.includeOffset !== 'boolean') { throw new TypeError('opts.includeOffset must be a boolean'); }
+
+  if (opts.bson != null) { throw new TypeError('opts.bson is no longer supported'); }
 
   // setup CursorStream
   var selector = {};
@@ -498,7 +498,6 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
     sort: { '$natural': 1 },
     comment: 'oplog_reader'
   }, opts);
-  if (typeof opts.bson === 'boolean') { mongoOpts.raw = opts.bson; }
 
   this._log.debug2('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
 

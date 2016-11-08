@@ -159,13 +159,6 @@ describe('OplogTransform', function() {
       (function() { ot._oplogReader(offset, { filter: '' }); }).should.throw('opts.filter must be an object');
     });
 
-    it('should require opts.bson to be a boolean', function() {
-      var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
-      var ot = new OplogTransform(oplogDb, oplogCollName, 'foo', [''], controlWrite, controlRead, [], { log: silence });
-      (function() { ot._oplogReader(offset, { bson: '' }); }).should.throw('opts.bson must be a boolean');
-    });
-
     it('should require opts.includeOffset to be a boolean', function() {
       var controlWrite = through2(function(chunk, enc, cb) { cb(null, chunk); });
       var controlRead = through2(function(chunk, enc, cb) { cb(null, chunk); });
