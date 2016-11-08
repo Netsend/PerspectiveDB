@@ -374,14 +374,9 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
   var that = this;
 
   // use current last offset and send every object in the collections upstream
-  this._oplogColl.find({}).sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
+  this._oplogColl.find().sort({ '$natural': -1 }).limit(1).project({ ts: 1 }).next(function(err, oplogItem) {
     if (err) { cb(err); return; }
     if (!oplogItem) { cb(new Error('no oplog item found')); return; }
-
-    var s = coll.find({}, {
-      comment: 'bootstrap_oplog_reader',
-      sort: { _id: true }
-    });
 
     var collName = coll.collectionName;
 
@@ -407,7 +402,10 @@ OplogTransform.prototype._bootstrapColl = function _bootstrapColl(coll, cb) {
       cb(null, oplogItem.ts);
     });
 
-    s.pipe(transformer).pipe(that, { end: false });
+    var c = coll.find();
+    c.comment('bootstrap_oplog_reader');
+    c.sort('_id');
+    c.pipe(transformer).pipe(that, { end: false });
   });
 };
 
@@ -504,7 +502,14 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
 
   this._log.debug2('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
 
-  return this._oplogColl.find(selector, mongoOpts);
+  var c = this._oplogColl.find(selector);
+
+  if (mongoOpts.sort)
+    c.sort(mongoOpts.sort);
+  if (mongoOpts.comment)
+    c.comment(mongoOpts.comment);
+
+  return c;
 };
 
 /**
@@ -640,7 +645,7 @@ OplogTransform.prototype._createNewVersionByUpdateDoc = function _createNewVersi
   that._tmpStorage.replaceOne(selector, dagItem.b, { w: 1, upsert: true, comment: '_createNewVersionByUpdateDoc' }, function(err, result) {
     if (err) { cb(err); return; }
 
-    if (result.modifiedCount !== 1) {
+    if (!result.result.ok) {
       error = new Error('new version not inserted in tmp collection');
       that._log.err('ot _createNewVersionByUpdateDoc %s %j %j', error, dagItem, result);
       cb(error);
