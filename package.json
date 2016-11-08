@@ -21,7 +21,6 @@
     "bson-stream": "^0.0.8",
     "commander": "^2.3.0",
     "crc-32": "^0.2.2",
-    "daemon": "^1.1.0",
     "hjson": "^1.7.4",
     "idb-readable-stream": "0.0.4",
     "ld-jsonstream": "^0.0.6",
