@@ -132,7 +132,8 @@ function start() {
     // load password hashes from config or password files for each perspective
     var files = {};
     config.dbs.forEach(function(dbCfg) {
-      if (!dbCfg.perspectives || !dbCfg.perspectives.length) { return; }
+      // ensure dbCfg.perspectives in the rest of the code
+      if (!dbCfg.perspectives || !dbCfg.perspectives.length) { dbCfg.perspectives = []; return; }
       dbCfg.perspectives.forEach(function(pdbCfg) {
         var username = pdbCfg.username || pdbCfg.name;
         var file = pdbCfg.passdb;
