@@ -876,7 +876,7 @@ describe('OplogTransform', function() {
         controlRead.write(BSON.serialize({}));
       });
 
-      var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence });
+      var ot = new OplogTransform(oplogDb, oplogCollName, databaseName, [coll], controlWrite, controlRead, [], { log: silence, updateRetry: 100 });
       ot._applyOplogUpdateModifier(oplogItem, function(err, newVersion) {
         should.equal(err.message, 'previous version of doc not found');
         should.strictEqual(versionRequested, true);

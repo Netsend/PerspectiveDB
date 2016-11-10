@@ -56,6 +56,8 @@ var Writable = stream.Writable;
  * @param {Object} [opts]  object containing configurable parameters
  *
  * Options:
+ *   updateRetry {Number, defaults to 5000}  retry once more if previous head
+ *     not found
  *   conflicts {mongodb.Collection, defaults to conflicts}  collection to monitor
  *     for conflicts
  *   blacklist {String[]}  collections to not track, takes precedence over
@@ -101,6 +103,7 @@ function OplogTransform(oplogDb, oplogCollName, dbName, collections, controlWrit
 
   this._conflicts = opts.conflicts || this._db.collection('conflicts');
   this._tmpStorage = opts.tmpStorage || this._db.collection('_pdbtmp');
+  this._updateRetry = opts.updateRetry || 5000;
 
   // blacklist mongo system collections
   this._blacklist = opts.blacklist || ['system.users', 'system.profile', 'system.indexes', this._tmpStorage.collectionName, this._conflicts.collectionName];
@@ -753,6 +756,8 @@ OplogTransform.prototype._applyOplogFullDoc = function _applyOplogFullDoc(oplogI
  * Every mongodb update modifier is supported since the update operation is executed
  * by the database engine.
  *
+ * If a version is not found, it will be retried once more after a five second delay.
+ *
  * @param {Object} oplogItem  the update item from the oplog.
  * @param {Function} cb  On error the first parameter will be the Error object and
  *                       the second parameter will be undefined. On success the
@@ -770,13 +775,30 @@ OplogTransform.prototype._applyOplogUpdateModifier = function _applyOplogUpdateM
   // listen for response, expect it to be the last stored version
   this._controlRead.once('readable', function() {
     var head = that._controlRead.read();
-    if (!head || !head.h) {
-      that._log.info('ot _applyOplogUpdateModifier previous version of doc not found', JSON.stringify(oplogItem), upstreamId);
-      cb(new Error('previous version of doc not found'));
+
+    if (head && head.h) {
+      that._createNewVersionByUpdateDoc(head, oplogItem, cb);
       return;
     }
 
-    that._createNewVersionByUpdateDoc(head, oplogItem, cb);
+		/* give it a bit more time and try again */
+    that._log.warning('ot _applyOplogUpdateModifier previous version of doc not found (first try)', JSON.stringify(oplogItem), upstreamId);
+    setTimeout(function() {
+      that._controlRead.once('readable', function() {
+        head = that._controlRead.read();
+
+        if (head && head.h) {
+          that._createNewVersionByUpdateDoc(head, oplogItem, cb);
+          return;
+        }
+
+        that._log.err('ot _applyOplogUpdateModifier previous version of doc not found (second and last try)', JSON.stringify(oplogItem), upstreamId);
+        cb(new Error('previous version of doc not found'));
+        return;
+      });
+
+      that._controlWrite.write(JSON.stringify({ id: upstreamId }) + '\n');
+    }, that._updateRetry);
   });
 
   this._controlWrite.write(JSON.stringify({ id: upstreamId }) + '\n');
