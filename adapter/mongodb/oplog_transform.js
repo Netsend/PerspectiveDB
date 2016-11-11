@@ -499,7 +499,7 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
 
   var mongoOpts = xtend({
     sort: { '$natural': 1 },
-    comment: 'oplog_reader'
+    comment: 'oplog_reader2'
   }, opts);
 
   this._log.debug2('ot oplogReader selector: %j, opts: %j', selector, mongoOpts);
@@ -510,6 +510,10 @@ OplogTransform.prototype._oplogReader = function _oplogReader(offset, opts) {
     c.sort(mongoOpts.sort);
   if (mongoOpts.comment)
     c.comment(mongoOpts.comment);
+  if (mongoOpts.tailable)
+    c.addCursorFlag('tailable', true)
+  if (mongoOpts.awaitData)
+    c.addCursorFlag('awaitData', true)
 
   return c;
 };
