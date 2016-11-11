@@ -485,12 +485,12 @@ describe('Tree', function() {
 
       it('should err if i is smaller than specified length (1)', function() {
         var b = new Buffer('00000201', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       it('should err if i is smaller than specified length (2)', function() {
         var b = new Buffer('0000020200', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       describe('i 1,', function() {
@@ -551,12 +551,12 @@ describe('Tree', function() {
 
       it('should err if v is smaller than specified length (1)', function() {
         var b = new Buffer('0000030001', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       it('should err if v is smaller than specified length (2)', function() {
         var b = new Buffer('000003000200', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       describe('v 1,', function() {
@@ -665,12 +665,12 @@ describe('Tree', function() {
 
       it('should err if v is smaller than specified length (1)', function() {
         var b = new Buffer('00000401', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       it('should err if v is smaller than specified length (2)', function() {
         var b = new Buffer('0000040200', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       describe('v 1,', function() {
@@ -731,12 +731,12 @@ describe('Tree', function() {
 
       it('should err if i is smaller than specified length (1)', function() {
         var b = new Buffer('00000501000001', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       it('should err if i is smaller than specified length (2)', function() {
         var b = new Buffer('0000050100000200', 'hex');
-        (function() { Tree.parseKey(b); }).should.throw('index out of range');
+        (function() { Tree.parseKey(b); }).should.throw('Index out of range');
       });
 
       describe('i 1,', function() {
@@ -854,7 +854,7 @@ describe('Tree', function() {
 
     it('should err if i is smaller than specified length', function() {
       var b = new Buffer('000200', 'hex');
-      (function() { Tree.parseHeadVal(b); }).should.throw('index out of range');
+      (function() { Tree.parseHeadVal(b); }).should.throw('Index out of range');
     });
 
     describe('i 1,', function() {
