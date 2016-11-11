@@ -320,19 +320,12 @@ describe('MergeTree', function() {
           }
           if (i === 2) {
             should.deepEqual(obj, {
-              n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'], i: 3 }, b: { more3: 'body' } },
-              l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 }, b: { more1: 'body' } },
+              n: { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'] }, b: { more2: 'body', more3: 'body' } },
+              l: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } },
               lcas: ['Aaaa'],
               pe: '_createMergeStreamOneTwoHeads_foo',
               c: null
             });
-            /* TODO: subsequent merges should be based on all non-conflicting heads in the stage
-            // this iteration should start after _mergeStageWithLocal is invoked again
-            // should merge and use a content based version number (parents must be sorted)
-            should.deepEqual(merge, { h: { id: 'XI', v: 'xeaV', pa: ['Bbbb', 'Cccc'], i: 4 }, b: { more2: 'body', more3: 'body' } });
-            should.deepEqual(lhead, { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'], i: 2 }, b: { more2: 'body' } });
-            next();
-            */
           }
         });
 
