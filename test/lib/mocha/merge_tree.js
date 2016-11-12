@@ -1323,7 +1323,7 @@ describe('MergeTree', function() {
       mt._pe[pe].write([oitem1, oitem2, oitem3, oitem4], done);
     });
 
-    it('write oitem2, fast-forward from other perspective', function(done) {
+    xit('write oitem2, fast-forward from other perspective', function(done) {
       var mt = new MergeTree(db, { perspectives: [pe], vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       var i2 = xtend(oitem2); // set perspective on the item
@@ -1382,7 +1382,7 @@ describe('MergeTree', function() {
       });
     });
 
-    it('should not accept item if given local head does not match the current local head', function(done) {
+    xit('should not accept item if given local head does not match the current local head', function(done) {
       var mt = new MergeTree(db, { perspectives: [pe], vSize: 3, log: silence });
       var lws = mt.createLocalWriteStream();
       var i3 = xtend(oitem3); // set perspective on the item
@@ -1417,7 +1417,7 @@ describe('MergeTree', function() {
         });
       });
 
-      it('should accept a merge between a remote and local', function(done) {
+      xit('should accept a merge between a remote and local', function(done) {
         var mt = new MergeTree(db, { perspectives: [pe], vSize: 3, log: silence });
         var lws = mt.createLocalWriteStream();
         lws.end({ n: aitem5, l: aitem3, lcas: ['Llll'], pe: pe }, function() {
