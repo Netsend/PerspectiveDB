@@ -798,8 +798,8 @@ describe('MergeTree', function() {
         if (i > 1) {
           should.deepEqual(obj, {
             n: item2,
-            l: null,
-            lcas: [],
+            l: item1,
+            lcas: ['Aaaa'],
             c: null,
             pe: sname
           });
@@ -833,9 +833,9 @@ describe('MergeTree', function() {
         if (i > 1) {
           should.deepEqual(obj, {
             n: item2,
-            l: null,
+            l: item1,
             c: null,
-            lcas: [],
+            lcas: ['Aaaa'],
             pe: sname
           });
         }
@@ -877,8 +877,8 @@ describe('MergeTree', function() {
         }
         if (i > 1) {
           should.deepEqual(obj, {
-            n: { h: { id: 'XI', v: 'Cccc', pe: sname, pa: ['Aaaa'] }, b: { more2: 'body' } },
-            l: { h: { id: 'XI', v: 'Aaaa', pa: [], i: 1 },            b: { some: 'body' } },
+            n: { h: { id: 'XI', v: 'QBPL', pa: ['Bbbb', 'Cccc'] }, b: { more: 'body', more2: 'body' } }, // h.i is from stage
+            l: { h: { id: 'XI', v: 'Bbbb', pe: sname, pa: ['Aaaa'] }, b: { more: 'body' } },
             c: null,
             lcas: ['Aaaa'],
             pe: sname
